@@ -1,0 +1,21 @@
+Package: growthcleanr
+Type: Package
+Title: Growth Measurements Cleaner
+Version: 0.1.0
+Authors@R: c(
+    person("Daymont","Carrie",,"carriedaymont@gmail.com",c("aut","cre")),
+    person("Grundmeier","Robert",,"grundmeier@email.chop.edu","aut"),
+    person("Miller","Jeffrey",,"millerjm1@email.chop.edu","aut"),
+    person("Campos","Diego",,"camposd@email.chop.edu","aut")
+  )
+Maintainer: Robert Grundmeier <grundmeier@email.chop.edu>
+Description: Cleans growth data that may contain implausible data based on unit or data range
+Depends: data.table, plyr
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 6.0.1
+Roxygen: list(markdown = TRUE)
+Suggests: knitr,
+    rmarkdown
+VignetteBuilder: knitr
