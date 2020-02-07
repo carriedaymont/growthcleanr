@@ -4,11 +4,30 @@
 \alias{cleangrowth}
 \title{Clean growth measurements}
 \usage{
-cleangrowth(subjid, param, agedays, sex, measurement, recover.unit.error = F,
-  sd.extreme = 25, z.extreme = 25, height.tolerance.cm = 2.5,
-  too.many.errors = 3, sd.recenter = NA, include.carryforward = F,
-  ewma.exp = -1.5, ref.data.path = "", log.path = NA, parallel = F,
-  num.batches = NA, quietly = T)
+cleangrowth(
+  subjid,
+  param,
+  agedays,
+  sex,
+  measurement,
+  recover.unit.error = F,
+  sd.extreme = 25,
+  z.extreme = 25,
+  lt3.exclude.mode = "default",
+  height.tolerance.cm = 2.5,
+  error.load.mincount = 2,
+  error.load.threshold = 0.5,
+  sd.recenter = NA,
+  sdmedian.filename = "",
+  sdrecentered.filename = "",
+  include.carryforward = F,
+  ewma.exp = -1.5,
+  ref.data.path = "",
+  log.path = NA,
+  parallel = F,
+  num.batches = NA,
+  quietly = T
+)
 }
 \arguments{
 \item{subjid}{Vector of unique identifiers for each subject in the database.}
@@ -36,7 +55,30 @@ the mean (either above or below) will be flagged as invalid. Defaults to 25.}
 \item{z.extreme}{Measurements with an absolute z-score greater than
 z.extreme will be flagged as invalid. Defaults to 25.}
 
-\item{include.carryforward}{Determines whether Carry-Forward values are kept in the output.  Defaults to False.}
+\item{lt3.exclude.mode}{Determines type of exclusion procedure to use for 1 or 2 measurements of one type without
+matching same ageday measurements for the other parameter. Options include "default" (standard growthcleanr approach),
+and "flag.both" (in case of two measurements of one type without matching values for the other parameter, flag both
+for exclusion if beyond threshold)}
+
+\item{error.load.mincount}{minimum count of exclusions on parameter before
+considering excluding all measurements. Defaults to 2.}
+
+\item{error.load.threshold}{threshold of percentage of excluded measurement count to included measurement
+count that must be exceeded before excluding all measurements of either parameter. Defaults to 0.5.}
+
+\item{sd.recenter}{Data frame or table with median SD-scores per day of life
+by gender and parameter. Columns in the table must include param, sex,
+agedays, and sd.median.  If not supplied, the median values will be
+calculated using the growth data that is being cleaned. Defaults to NA.}
+
+\item{sdmedian.filename}{Name of file to save sd.median data calculated on the input dataset to as CSV.
+Defaults to "", for which this data will not be saved. Use for extracting medians for parallel processing
+scenarios other than the built-in parallel option.}
+
+\item{sdrecentered.filename}{Name of file to save re-centered data to as CSV. Defaults to "", for which this
+data will not be saved. Useful for post-processing and debugging.}
+
+\item{include.carryforward}{Determines whether Carry-Forward values are kept in the output. Defaults to False.}
 
 \item{ewma.exp}{Exponent to use for weighting measurements in the
 exponentially weighted moving average calculations. Defaults to -1.5.
@@ -59,11 +101,6 @@ returned by the getDoParWorkers function in the foreach package.}
 
 \item{quietly}{Determines if function messages are to be displayed and if log files (parallel only) are to be generated.
 Defaults to TRUE}
-
-\item{sd.receiver}{Data frame or table with median SD-scores per day of life
-by gender and parameter. Columns in the table must include param, sex,
-agedays, and sd.median.  If not supplied, the median values will be
-calculated using the growth data that is being cleaned. Defaults to NA.}
 }
 \value{
 Vector of exclusion codes for each of the input measurements.
@@ -72,9 +109,11 @@ Possible values for each code are:
 \itemize{
 \item 'Include', 'Unit-Error-High', 'Unit-Error-Low', 'Swapped-Measurements', 'Missing',
 \item 'Exclude-Carried-Forward', 'Exclude-SD-Cutoff', 'Exclude-EWMA-Extreme', 'Exclude-EWMA-Extreme-Pair',
-\item 'Exclude-Duplicate', 'Exclude-EWMA-8', 'Exclude-EWMA-9', 'Exclude-EWMA-10', 'Exclude-EWMA-11', 'Exclude-EWMA-12', 'Exclude-EWMA-13', 'Exclude-EWMA-14',
+\item 'Exclude-Duplicate',
+\item 'Exclude-EWMA-8', 'Exclude-EWMA-9', 'Exclude-EWMA-10', 'Exclude-EWMA-11', 'Exclude-EWMA-12', 'Exclude-EWMA-13', 'Exclude-EWMA-14',
 \item 'Exclude-Min-Height-Change', 'Exclude-Max-Height-Change',
-\item 'Exclude-Pair-Delta-17', 'Exclude-Pair-Delta-18', 'Exclude-Single-Outlier', 'Exclude-Too-Many-Errors', 'Exclude-Too-Many-Errors-Other-Parameter'
+\item 'Exclude-Pair-Delta-17', 'Exclude-Pair-Delta-18', 'Exclude-Pair-Delta-19',
+\item 'Exclude-Single-Outlier', 'Exclude-Too-Many-Errors', 'Exclude-Too-Many-Errors-Other-Parameter'
 }
 }
 \description{
@@ -89,7 +128,7 @@ clean_stats<-cleangrowth(data_stats$id, data_stats$measure, data_stats$agedays, 
 data_stats<-data_stats[,clean_result:=clean_stats]
 clean_data_stats<-data_stats[clean_result="Include"] # only include data marked as "Include"
 
-# Parallel Processing (currently only supported on Unix/Linux)
+# Parallel Processing
 # Run using 6 cores and batches
 clean_stats<-cleangrowth(data_stats$id, data_stats$measure, data_stats$agedays, data_stats$sex, data_stats$value, parallel = TRUE, num.batches = 6)
 

@@ -37,3 +37,5 @@ rsconnect/
 *.DS_Store
 
 inst/doc
+packrat/lib*/
+packrat/src/

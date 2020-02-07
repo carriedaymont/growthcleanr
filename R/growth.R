@@ -17,11 +17,24 @@
 #' the mean (either above or below) will be flagged as invalid. Defaults to 25.
 #' @param z.extreme Measurements with an absolute z-score greater than
 #' z.extreme will be flagged as invalid. Defaults to 25.
-#' @param sd.receiver Data frame or table with median SD-scores per day of life
+#' @param lt3.exclude.mode Determines type of exclusion procedure to use for 1 or 2 measurements of one type without
+#' matching same ageday measurements for the other parameter. Options include "default" (standard growthcleanr approach),
+#' and "flag.both" (in case of two measurements of one type without matching values for the other parameter, flag both
+#' for exclusion if beyond threshold)
+#' @param error.load.mincount minimum count of exclusions on parameter before
+#' considering excluding all measurements. Defaults to 2.
+#' @param error.load.threshold threshold of percentage of excluded measurement count to included measurement
+#' count that must be exceeded before excluding all measurements of either parameter. Defaults to 0.5.
+#' @param sd.recenter Data frame or table with median SD-scores per day of life
 #' by gender and parameter. Columns in the table must include param, sex,
 #' agedays, and sd.median.  If not supplied, the median values will be
 #' calculated using the growth data that is being cleaned. Defaults to NA.
-#' @param include.carryforward Determines whether Carry-Forward values are kept in the output.  Defaults to False.
+#' @param sdmedian.filename Name of file to save sd.median data calculated on the input dataset to as CSV.
+#' Defaults to "", for which this data will not be saved. Use for extracting medians for parallel processing
+#' scenarios other than the built-in parallel option.
+#' @param sdrecentered.filename Name of file to save re-centered data to as CSV. Defaults to "", for which this
+#' data will not be saved. Useful for post-processing and debugging.
+#' @param include.carryforward Determines whether Carry-Forward values are kept in the output. Defaults to False.
 #' @param ewma.exp Exponent to use for weighting measurements in the
 #' exponentially weighted moving average calculations. Defaults to -1.5.
 #' This exponent should be negative in order to weight growth measurements
@@ -45,9 +58,11 @@
 #'
 #' * 'Include', 'Unit-Error-High', 'Unit-Error-Low', 'Swapped-Measurements', 'Missing',
 #' *  'Exclude-Carried-Forward', 'Exclude-SD-Cutoff', 'Exclude-EWMA-Extreme', 'Exclude-EWMA-Extreme-Pair',
-#' *  'Exclude-Duplicate', 'Exclude-EWMA-8', 'Exclude-EWMA-9', 'Exclude-EWMA-10', 'Exclude-EWMA-11', 'Exclude-EWMA-12', 'Exclude-EWMA-13', 'Exclude-EWMA-14',
+#' *  'Exclude-Duplicate',
+#' *  'Exclude-EWMA-8', 'Exclude-EWMA-9', 'Exclude-EWMA-10', 'Exclude-EWMA-11', 'Exclude-EWMA-12', 'Exclude-EWMA-13', 'Exclude-EWMA-14',
 #' *  'Exclude-Min-Height-Change', 'Exclude-Max-Height-Change',
-#' *  'Exclude-Pair-Delta-17', 'Exclude-Pair-Delta-18', 'Exclude-Single-Outlier', 'Exclude-Too-Many-Errors', 'Exclude-Too-Many-Errors-Other-Parameter'
+#' *  'Exclude-Pair-Delta-17', 'Exclude-Pair-Delta-18', 'Exclude-Pair-Delta-19',
+#' *  'Exclude-Single-Outlier', 'Exclude-Too-Many-Errors', 'Exclude-Too-Many-Errors-Other-Parameter'
 #' @md
 #'
 #' @export
@@ -61,11 +76,32 @@
 #' data_stats<-data_stats[,clean_result:=clean_stats]
 #' clean_data_stats<-data_stats[clean_result="Include"] # only include data marked as "Include"
 #'
-#' # Parallel Processing (currently only supported on Unix/Linux)
+#' # Parallel Processing
 #' # Run using 6 cores and batches
 #' clean_stats<-cleangrowth(data_stats$id, data_stats$measure, data_stats$agedays, data_stats$sex, data_stats$value, parallel = TRUE, num.batches = 6)
 #'
-cleangrowth = function(subjid, param, agedays, sex, measurement, recover.unit.error=F, sd.extreme = 25, z.extreme = 25, height.tolerance.cm = 2.5, too.many.errors = 3, sd.recenter=NA, include.carryforward=F, ewma.exp=-1.5, ref.data.path="", log.path=NA, parallel=F, num.batches=NA, quietly=T) {
+cleangrowth = function(subjid,
+                       param,
+                       agedays,
+                       sex,
+                       measurement,
+                       recover.unit.error=F,
+                       sd.extreme = 25,
+                       z.extreme = 25,
+                       lt3.exclude.mode="default",
+                       height.tolerance.cm = 2.5,
+                       error.load.mincount = 2,
+                       error.load.threshold = 0.5,
+                       sd.recenter=NA,
+                       sdmedian.filename = "",
+                       sdrecentered.filename = "",
+                       include.carryforward=F,
+                       ewma.exp=-1.5,
+                       ref.data.path="",
+                       log.path=NA,
+                       parallel=F,
+                       num.batches=NA,
+                       quietly=T) {
   library("plyr",quietly=T)
   library("data.table",quietly=T)
 
@@ -111,10 +147,12 @@ cleangrowth = function(subjid, param, agedays, sex, measurement, recover.unit.er
   who_ht_vel_3sd_path<-ifelse(ref.data.path=="",
                               system.file("extdata/who_ht_vel_3sd.csv",package = "growthcleanr"),
                               paste(ref.data.path, "who_ht_vel_3sd.csv", sep=""))
+  who.max.ht.vel = fread(who_max_ht_vel_path)
+  who.ht.vel = fread(who_ht_vel_3sd_path)
+  setkey(who.max.ht.vel, sex, whoagegrp_ht)
+  setkey(who.ht.vel, sex, whoagegrp_ht)
+  who.ht.vel = as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel, by=c('sex','whoagegrp_ht')))
 
-  who.max.ht.vel = read.csv(who_max_ht_vel_path)
-  who.ht.vel = read.csv(who_ht_vel_3sd_path)
-  who.ht.vel = as.data.table(merge(who.ht.vel, who.max.ht.vel, by=c('sex','whoagegrp_ht'), all=T))
   setnames(who.ht.vel,colnames(who.ht.vel),gsub('_','.',colnames(who.ht.vel)))
   setkey(who.ht.vel, sex, whoagegrp.ht)
   # keep track of column names in the who growth velocity data
@@ -182,7 +220,8 @@ cleangrowth = function(subjid, param, agedays, sex, measurement, recover.unit.er
                      'Exclude-Temporary-Duplicate', 'Exclude-Carried-Forward', 'Exclude-SD-Cutoff', 'Exclude-EWMA-Extreme', 'Exclude-EWMA-Extreme-Pair',
                      'Exclude-Duplicate', 'Exclude-EWMA-8', 'Exclude-EWMA-9', 'Exclude-EWMA-10', 'Exclude-EWMA-11', 'Exclude-EWMA-12', 'Exclude-EWMA-13', 'Exclude-EWMA-14',
                      'Exclude-Min-Height-Change', 'Exclude-Max-Height-Change',
-                     'Exclude-Pair-Delta-17', 'Exclude-Pair-Delta-18', 'Exclude-Single-Outlier', 'Exclude-Too-Many-Errors', 'Exclude-Too-Many-Errors-Other-Parameter')
+                     'Exclude-Pair-Delta-17', 'Exclude-Pair-Delta-18', 'Exclude-Pair-Delta-19',
+                     'Exclude-Single-Outlier', 'Exclude-Too-Many-Errors', 'Exclude-Too-Many-Errors-Other-Parameter')
 
   # Mark missing values for exclusion
   data.all[, exclude := factor(with(data.all, ifelse(is.na(v) | agedays < 0, 'Missing', 'Include')), levels=exclude.levels, ordered=T)]
@@ -212,12 +251,24 @@ cleangrowth = function(subjid, param, agedays, sex, measurement, recover.unit.er
   # returns a data table indexed by param, sex, agedays
   if(!is.data.table(sd.recenter)) {
     sd.recenter = data.all[exclude < 'Exclude', sd.median(param, sex, agedays, sd.orig)]
+    if(sdmedian.filename != "") {
+      write.csv(sd.recenter, sdmedian.filename, row.names=F)
+      if(!quietly) cat(sprintf("[%s] Wrote re-centering medians to %s...\n", Sys.time(), sdmedian.filename))
+    }
+  } else {
+    # ensure passed-in medians are sorted correctly
+    setkey(sd.recenter, param, sex, agedays)
   }
   # add sd.recenter to data, and recenter
   setkey(data.all, param, sex, agedays)
   data.all = sd.recenter[data.all]
   setkey(data.all, subjid, param, agedays)
   data.all[, tbc.sd := sd.orig - sd.median]
+
+  if(sdrecentered.filename != "") {
+    write.csv(data.all, sdrecentered.filename, row.names=F)
+    if(!quietly) cat(sprintf("[%s] Wrote re-centered data to %s...\n", Sys.time(), sdrecentered.filename))
+  }
 
   # safety check: treat observations where tbc.sd cannot be calculated as missing
   data.all[is.na(tbc.sd), exclude := 'Missing']
@@ -740,12 +791,12 @@ cleangrowth = function(subjid, param, agedays, sex, measurement, recover.unit.er
         subj.df[, exclude := (function(df) {
           # 14g.  Calculate median_tbcOsd which is the median_tbc*sd for the OTHER parameter for the same subject with exc_*==0 (this may be missing)
           # also assign param variable for use in subsequent steps
-          median.tbc.other.sd=df[j=median(tbc.other.sd, na.rm=T)]
-          num.valid=df[j=sum(valid(exclude))]
+          median.tbc.other.sd=median(df$tbc.other.sd, na.rm=T)
+          num.valid=sum(valid(df$exclude))
 
           # 14h.	Identify values for possible exclusion if they meet one of the following sets of criteria. Generate a temporary exclusion variable temp_exc_* equal
           #     to the number indicated to keep track of which set of criteria were met
-          df[, temp.exclude := factor(NA, levels=exclude.levels, ordered=T)]
+          df$temp.exclude <- factor(NA, levels=exclude.levels, ordered=T)
 
           # 14h.i.	Replace temp_exc_*=8 if the value is one of 3 or more measurements for a subject/parameter AND the value is neither the first nor the last measurement
           #       AND one of the following sets of criteria are met
@@ -765,7 +816,8 @@ cleangrowth = function(subjid, param, agedays, sex, measurement, recover.unit.er
           #     2.	dewma_*<-2 & dewma_*_aft<-1 & d_nextsd_*<-1 & d_nextsd_plus_*<-1 & d_nextsd_minus_*<-1
 
           # take advantage of other variables we have calculated to infer that a row is the first of three or more valid measurements for a paramete
-          df[, `:=`(first.of.three.or.more=F, last.of.three.or.more=F)]
+          df$first.of.three.or.more <- F
+          df$last.of.three.or.more <- F
           df[is.na(delta.agedays.prev) & num.valid >= 3, first.of.three.or.more := T]
           df[is.na(delta.agedays.next) & num.valid >= 3, last.of.three.or.more := T]
 
@@ -898,14 +950,14 @@ cleangrowth = function(subjid, param, agedays, sex, measurement, recover.unit.er
           # for efficiency, bring get.next inline here (working on valid rows within a single parameter for a single subject)
           # structure c(field.name[-1], NA) == get.next
           df[, `:=`(agedays.next=c(agedays[-1],NA), v.next=c(v[-1],NA), dewma.before.next=c(dewma.before[-1],NA), abs.tbc.sd.next=c(abs.tbc.sd[-1],NA))]
-          df[, delta.agedays.next := agedays.next - agedays]
+          df$delta.agedays.next <- with(df, agedays.next - agedays)
 
           # 15c.	For each height, calculate mid_agedays=0.5*(agedays of next value + agedays of current value)
-          df[, mid.agedays := 0.5*(agedays.next + agedays)]
+          df$mid.agedays <- 0.5*(df$agedays.next + df$agedays)
 
           # 15d.	Generate variable tanner_months= 6+12*(round(mid_agedays/365.25))
           # only calculate for rows that relate to height (may speed up subsequent processing)
-          df[, tanner.months := 6 + 12*(round(mid.agedays/365.25))]
+          df$tanner.months <- with(df, 6 + 12*(round(mid.agedays/365.25)))
 
           # 15e.	Merge with dataset tanner_ht_vel using sex and tanner_months – this will give you min_ht_vel and max_ht_vel
           setkey(df, sex, tanner.months)
@@ -1029,7 +1081,7 @@ cleangrowth = function(subjid, param, agedays, sex, measurement, recover.unit.er
           #   i.	d_prev_ht<mindiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
           #     a.  (temp_diff=|dewma_ht_bef|)
           df[, temp.diff := as.double(NaN)]
-          df[, temp.exclude := factor(NA, levels=exclude.levels, ordered=T)]
+          df$temp.exclude <- factor(NA, levels=exclude.levels, ordered=T)
           df[delta.prev.ht < mindiff.prev.ht & bef.g.aftm1,
              `:=`(temp.diff=abs(dewma.before), temp.exclude = 'Exclude-Min-Height-Change')]
 
@@ -1120,11 +1172,35 @@ cleangrowth = function(subjid, param, agedays, sex, measurement, recover.unit.er
         # b.	For subjects/parameters with 2 values with exc_*==0, replace exc_*=17 if one of the following sets of criteria are met:
         #   1.	If |d_agedays_other|>365.25 and |d_tbc*sd_other|>3; replace exc_*=17 for the value of the pair that has the largest abs_d_*_O. If abs_d_*O is missing, replace exc_*=17 for the value of the pair with the higher |tbc*sd|
         #   2.	If |d_agedays_other|<365.25 and |d_tbc*sd_other|>2; replace exc_*=18 for the value of the pair that has the largest abs_d_*_O. If abs_d_*O is missing, replace exc_*=18 for the value of the pair with the higher |tbc*sd|
-        worst.row = order(valid(df), abs(df$tbc.sd), abs(abs.delta.other), decreasing=T)[1]
-        if(na.as.false(delta.agedays.other >= 365.25 & delta.tbc.sd.other > 3)) {
-          df$exclude[worst.row] = 'Exclude-Pair-Delta-17'
-        } else if(na.as.false(delta.agedays.other < 365.25 & delta.tbc.sd.other > 2)) {
-          df$exclude[worst.row] = 'Exclude-Pair-Delta-18'
+        #
+        # MODE default
+        #   1.  uses current behavior outlined in b, in else statement
+        #
+        # MODE flag.both
+        #   1.  similar to b, except in cases where only HTs values exist or only WTs values exist, both are dropped instead of only 1 (first if)
+        #
+        #
+        # check whether each value in double has other parameters (make sure they don't first)
+        if (lt3.exclude.mode == "flag.both" &&
+            (is.na(df$tbc.other.sd[valid.rows[1]])) &&
+            (is.na(df$tbc.other.sd[valid.rows[2]])) &&
+            is.na(abs.delta.other)) {# if they don't then do test
+            # check default thresholds, if they fail then exclude both regardless of tbc.sd
+            if(na.as.false(delta.agedays.other >= 365.25 & delta.tbc.sd.other > 3)) {
+              df$exclude[valid.rows[1]] = 'Exclude-Pair-Delta-19'
+              df$exclude[valid.rows[2]] = 'Exclude-Pair-Delta-19'
+            } else if(na.as.false(delta.agedays.other < 365.25 & delta.tbc.sd.other > 2)) {
+              df$exclude[valid.rows[1]] = 'Exclude-Pair-Delta-19'
+              df$exclude[valid.rows[2]] = 'Exclude-Pair-Delta-19'
+            }
+
+        } else { # default method if other mode is not used or if other parameters exist
+          worst.row = order(valid(df), abs(df$tbc.sd), abs(abs.delta.other), decreasing=T)[1]
+          if(na.as.false(delta.agedays.other >= 365.25 & delta.tbc.sd.other > 3)) {
+            df$exclude[worst.row] = 'Exclude-Pair-Delta-17'
+          } else if(na.as.false(delta.agedays.other < 365.25 & delta.tbc.sd.other > 2)) {
+            df$exclude[worst.row] = 'Exclude-Pair-Delta-18'
+          }
         }
       }
       # c.	Identify subjects/parameters with exactly 1 value for which exc_*=0. This will include subjects/parameters for which a value was excluded in step 16b.
@@ -1136,14 +1212,16 @@ cleangrowth = function(subjid, param, agedays, sex, measurement, recover.unit.er
       valid.rows = valid(df)
       # NOTE: valid.rows is now a boolean.  was a row number in code above
       if(sum(valid.rows) == 1) {
+        #cat("param = ", df[valid.rows, param])
         df[valid.rows & (abs(tbc.sd) > 3 & abs(tbc.sd - ifelse(!is.na(tbc.other.sd), tbc.other.sd, median.tbc.other.sd)) > 5 |
-                           abs(tbc.sd) > 5 & is.na(tbc.other.sd) & is.na(median.tbc.other.sd)),
+                             abs(tbc.sd) > 5 & is.na(tbc.other.sd) & is.na(median.tbc.other.sd)),
            exclude := 'Exclude-Single-Outlier']
       }
 
       # ensure factor levels didn't accidentally get mangled
       return(factor(df$exclude, levels=exclude.levels, ordered=T))
-    })(copy(.SD)),by=.(subjid, param), .SDcols=c('agedays', 'tbc.sd', 'tbc.other.sd', 'exclude')]
+
+    })(copy(.SD)),by=.(subjid, param), .SDcols=c('agedays', 'tbc.sd', 'tbc.other.sd', 'exclude', 'param')] #added param here for debugging, i think it's dropped otherwise
 
     # 17.  Exclude measurements based on error load for the subject
     # a.	For each subject/parameter determine the following:
@@ -1166,9 +1244,9 @@ cleangrowth = function(subjid, param, agedays, sex, measurement, recover.unit.er
       for(p in unique(subj.df$param)) {
         exclude.count.this.parameter = inc.exc[param==p,exclude.count]
         exclude.count.other.parameter = sum(inc.exc[param!=p,exclude.count])
-        if(exclude.count.this.parameter > 0.5 * inc.exc[param==p,include.count] & exclude.count.this.parameter >= 2) {
+        if(exclude.count.this.parameter > error.load.threshold * inc.exc[param==p,include.count] & exclude.count.this.parameter >= error.load.mincount) {
           subj.df[param==p & valid(exclude), exclude := 'Exclude-Too-Many-Errors']
-        } else if (exclude.count.other.parameter > sum(inc.exc[param!=p,include.count]) & exclude.count.other.parameter >= 2) {
+        } else if (exclude.count.other.parameter > sum(inc.exc[param!=p,include.count]) & exclude.count.other.parameter >= error.load.mincount) {
           subj.df[param==p & valid(exclude), exclude := 'Exclude-Too-Many-Errors-Other-Parameter']
         }
       }
@@ -1178,7 +1256,7 @@ cleangrowth = function(subjid, param, agedays, sex, measurement, recover.unit.er
 
     if(!quietly) cat(sprintf("[%s] Completed Batch #%s...\n", Sys.time(), data.df$batch[1]))
     if(!quietly & parallel) sink()
-    return(data.df[j=.(line, exclude)])
+    return(data.df[j=.(line, exclude, tbc.sd, tbc.other.sd, param)]) #debugging
   }
 
   # optionally process batches in parallel
@@ -1192,6 +1270,7 @@ cleangrowth = function(subjid, param, agedays, sex, measurement, recover.unit.er
   if(!quietly) cat(sprintf("[%s] Done!\n", Sys.time()))
 
   return(ret.df$exclude[order(ret.df$line)])
+
 }
 
 #' Read anthro
@@ -1216,14 +1295,21 @@ read.anthro = function(path="", cdc.only=F) {
                               system.file("extdata/growthfile_cdc_ext.csv",package = "growthcleanr"),
                               paste(path,"growthfile_cdc_ext.csv",sep=""))
 
-  anthro = as.data.table(rbind(
+
+  growth_cdc_ext <-read.csv(growth_cdc_ext_path)
+
+  l <- list(
     with(read.table(weianthro_path, header=T), data.frame(src='WHO', param='WEIGHTKG', sex=sex-1, age, l, m, s, csdpos=as.double(NA), csdneg=as.double(NA))),
     with(read.table(lenanthro_path, header=T), data.frame(src='WHO', param='HEIGHTCM', sex=sex-1, age, l, m, s, csdpos=as.double(NA), csdneg=as.double(NA))),
     with(read.table(bmianthro_path, header=T), data.frame(src='WHO', param='BMI',      sex=sex-1, age, l, m, s, csdpos=as.double(NA), csdneg=as.double(NA))),
-    with(read.csv(growth_cdc_ext_path),    data.frame(src='CDC', param='WEIGHTKG', sex, age=agedays, l=cdc_wt_l,  m=cdc_wt_m,  s=cdc_wt_s,  csdpos=cdc_wt_csd_pos, csdneg=cdc_wt_csd_neg)),
-    with(read.csv(growth_cdc_ext_path),    data.frame(src='CDC', param='HEIGHTCM', sex, age=agedays, l=cdc_ht_l,  m=cdc_ht_m,  s=cdc_ht_s,  csdpos=cdc_ht_csd_pos, csdneg=cdc_ht_csd_neg)),
-    with(read.csv(growth_cdc_ext_path),    data.frame(src='CDC', param='BMI',      sex, age=agedays, l=cdc_bmi_l, m=cdc_bmi_m, s=cdc_bmi_s, csdpos=cdc_bmi_csd_pos, csdneg=cdc_bmi_csd_neg))
-  ))
+    with(growth_cdc_ext,    data.frame(src='CDC', param='WEIGHTKG', sex, age=agedays, l=cdc_wt_l,  m=cdc_wt_m,  s=cdc_wt_s,  csdpos=cdc_wt_csd_pos, csdneg=cdc_wt_csd_neg)),
+    with(growth_cdc_ext,    data.frame(src='CDC', param='HEIGHTCM', sex, age=agedays, l=cdc_ht_l,  m=cdc_ht_m,  s=cdc_ht_s,  csdpos=cdc_ht_csd_pos, csdneg=cdc_ht_csd_neg)),
+    with(growth_cdc_ext,    data.frame(src='CDC', param='BMI',      sex, age=agedays, l=cdc_bmi_l, m=cdc_bmi_m, s=cdc_bmi_s, csdpos=cdc_bmi_csd_pos, csdneg=cdc_bmi_csd_neg))
+  )
+
+  anthro <- rbindlist(l)
+
+
   setkey(anthro,src,param,sex,age)
 
   return(function(param, agedays, sex, measurement, csd=F) {
@@ -1247,7 +1333,6 @@ read.anthro = function(path="", cdc.only=F) {
     return(dt$ret)
   })
 }
-
 #' Exponentially Weighted Moving Average (EWMA)
 #'
 #' \code{ewma} calculates the exponentially weighted moving average (EWMA) for a set of numeric observations over time.
@@ -1298,24 +1383,25 @@ ewma = function(agedays, z, ewma.exp, ewma.adjacent=T) {
   if(n>0) {
     # organize into data frame and sort into order of increasing age,
     # but retain original sort order information in index
+    if (!all(agedays == cummax(agedays))) warning("EWMA ordering is not sorted; double check") #add in a check to make sure the inputs are already sorted (they should be)
     index = order(agedays)
-    data = data.table(agedays, z, key='agedays')
+
 
     # calculate matrix of differences in age, and add 5 to each delta per Daymont algorithm
-    delta = as.matrix.delta(data$agedays)
+    delta = as.matrix.delta(agedays)
     delta = ifelse(delta == 0, 0, (delta + 5)^ewma.exp)
 
     # calculate EWMAs, and return in order of original data
-    ewma.all[index] = delta %*% data$z / apply(delta,1,sum)
+    ewma.all[index] = delta %*% z / apply(delta,1,sum)
 
     if(ewma.adjacent) {
       if (n>2) {
         delta2 = delta
         delta2[col(delta2)==row(delta2)-1]=0
-        ewma.before[index] = delta2 %*% data$z / apply(delta2,1,sum)
+        ewma.before[index] = delta2 %*% z / apply(delta2,1,sum)
         delta3 = delta
         delta3[col(delta3)==row(delta3)+1]=0
-        ewma.after[index] = delta3 %*% data$z / apply(delta3,1,sum)
+        ewma.after[index] = delta3 %*% z / apply(delta3,1,sum)
       } else {
         ewma.before = ewma.after = ewma.all
       }
@@ -1328,10 +1414,8 @@ ewma = function(agedays, z, ewma.exp, ewma.adjacent=T) {
 
 as.matrix.delta = function(agedays) {
   n = length(agedays)
-  delta = matrix(0,n,n)
-  for(i in 1:n) {
-    delta[i,] = abs(agedays - agedays[i])
-  }
+  delta = abs( matrix(rep(agedays, n), n, byrow=T) - agedays)
+
   return(delta)
 }
 
@@ -1371,3 +1455,56 @@ sd.median = function(param, sex, agedays, sd.orig) {
   setkey(dt.median, param, sex, agedays)
   return(dt.median)
 }
+
+
+#' splitinput
+#'
+#' \code{splitinput} Splits input based on keepcol specified, yielding csv files each with at least the mininum
+#' number of rows that are written and saved separately (except for the last split file written, which may be
+#' smaller). Allows splitting input data while ensuring all records for each individual subject will stay together
+#' in one file. Pads split filenames with zeros out to five digits for consistency, assuming < 100,000 file count
+#' result.
+#'
+#' @param df data frame to split
+#' @param fname new name for each of the split files to start with
+#' @param min_row minimum number of rows for each split file (default 10000)
+#' @param keepcol the column name (default "subjid") to use to keep records with the same values together in the same single split file
+#'
+#' @return the count number refering to the last split file written
+#'
+#' @export
+splitinput <- function(df, fname = deparse(substitute(df)), min_nrow = 10000, keepcol = 'subjid') {
+
+  fname_counter <- 0
+  row_count <- 0
+  split_df <- data.frame()
+
+  # split the data frame by the grouping that user specifies
+  split_sample <- split(df, df[[keepcol]])
+
+  # grab the individual grouping names
+  split_sample_names <- names(split_sample)
+
+  for(name in split_sample_names) {
+    # append the rows from name, store new total row_count for current split file
+    split_df <- rbind(split_df, split_sample[[name]])
+    current_nrow <- nrow(split_df)
+
+    # check if updated row count will exceed min row count,
+    # if min nrow is exceeded, then write.csv the current split file and clear the split dataframe starter (start from 0)
+    if (current_nrow > min_nrow) {
+
+      fname_counter_str <- sprintf("%05d", fname_counter) #pad 0s
+      write.csv(split_df, file = paste(fname, fname_counter_str, "csv", sep = "."), row.names=FALSE)
+
+      split_df <- data.frame() #reset split_df
+      fname_counter <- fname_counter + 1
+    } else if (name == tail(split_sample_names, 1)) { #for last part, just write
+      fname_counter_str <- sprintf("%05d", fname_counter) #pad 0s
+      write.csv(split_df, file = paste(fname, fname_counter_str, "csv", sep = "."), row.names=FALSE)
+    }
+  }
+
+  return(fname_counter)
+}
+
