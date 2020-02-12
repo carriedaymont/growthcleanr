@@ -71,7 +71,9 @@ details and notes can be found under [Installation](#installation) below.
 Once the `growthcleanr` package and its dependencies are installed, the minimal
 data vectors needed are:
 
-1. `subjid` - a unique identifier for each subject
+1. `subjid` - a unique identifier for each subject; if you have long (64-bit)
+   integer `subjid` values, add the `bit64` R package to your install list to
+   ensure R will process these correctly
 2. `param` - a string designating the measurement being '`HEIGHTCM`',
    '`LENGTHCM`', or '`WEIGHTKG`'
 3. `agedays` - a numeric value for age in days at time of measurement; will be
@@ -174,7 +176,11 @@ are some additional [platform-specific notes](#platform) you may wish to review.
 In an up-to-date R environment such as RStudio, first install the dependencies:
 
 ```R
+# Required packages for growthcleanr operation
 install.packages(c("devtools", "dplyr", "data.table", "foreach", "doParallel", "Hmisc"))
+# Optional additional packages referenced in this document
+install.packages("argparse")
+install.packages("bit64")
 ```
 
 Note that this might take some time.
@@ -617,7 +623,7 @@ args <- parser$parse_args()
 logfile <- sprintf('log-%s.txt', args$infile)
 
 if (args$sdrecenter != '' ) {
-  sdrecenter <- data.table(read.csv(args$sdrecenter))
+  sdrecenter <- fread(args$sdrecenter)
 } else {
   sdrecenter <- ''
 }
