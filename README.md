@@ -372,7 +372,7 @@ experiment with these options to determine the best settings for your needs.
 Note that there are additional notes on
 [working with large datasets](#largedata) below.
 
-The default values of `log.path` is `"."`, the current working directory.
+The default value of `log.path` is `"."`, the current working directory.
 `growthcleanr` will write batch-specific log files to the `log.path` directory,
 and will create the directory if necessary.
 
