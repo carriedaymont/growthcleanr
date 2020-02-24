@@ -44,7 +44,8 @@
 #' using the default exponent.
 #' @param ref.data.path Path to reference data. If not supplied, the year 2000
 #' Centers for Disease Control (CDC) reference data will be used.
-#' @param log.path Path to log file output when running in parallel (non-quiet mode).
+#' @param log.path Path to log file output when running in parallel (non-quiet mode). Default is ".". A new
+#' directory will be created if necessary.
 #' @param parallel Determines if function runs in parallel.  Defaults to FALSE.
 #' @param num.batches Specify the number of batches to run in parallel. Only
 #' applies if parallel is set to TRUE. Defaults to the number of workers
@@ -98,7 +99,7 @@ cleangrowth = function(subjid,
                        include.carryforward=F,
                        ewma.exp=-1.5,
                        ref.data.path="",
-                       log.path=NA,
+                       log.path=".",
                        parallel=F,
                        num.batches=NA,
                        quietly=T) {
@@ -282,12 +283,12 @@ cleangrowth = function(subjid,
 
   # NOTE: to use mutliple processes in R we will process patients in batches using the plyr ddply function
   # set up function to process one patient.  Function to parallelize batches is below.
-  cleanbatch = function(data.df) {
+  cleanbatch = function(data.df, log.path) {
     data.df = data.table(data.df, key=c('subjid','param','agedays','index'))
 
     if(!quietly & parallel) {
       # use local directory as default for logs
-      if(!is.na(log.path)) {
+      if(is.na(log.path)) {
         log.path = "."
       }
       sink(sprintf("%s/cleangrowth-%s-batch-%s.log", log.path, Sys.Date(), data.df$batch[1]))
@@ -1262,9 +1263,14 @@ cleangrowth = function(subjid,
   # optionally process batches in parallel
   if(!quietly) cat(sprintf("[%s] Cleaning growth data in %d batch(es)...\n", Sys.time(), num.batches))
   if(num.batches == 1) {
-    ret.df = cleanbatch(data.all)
+    ret.df = cleanbatch(data.all, log.path=log.path)
   } else {
-    ret.df = ddply(data.all, .(batch), cleanbatch, .parallel=parallel,.paropts = list(.packages = "data.table"))
+    # create log directory if necessary
+    if(!quietly) cat(sprintf("[%s] Writing batch logs to '%s'...\n", Sys.time(), log.path))
+    ifelse(!dir.exists(log.path), dir.create(log.path), FALSE)
+
+    ret.df = ddply(data.all, .(batch), cleanbatch, .parallel=parallel,.paropts = list(.packages = "data.table"),
+                   log.path=log.path)
     stopImplicitCluster()
   }
   if(!quietly) cat(sprintf("[%s] Done!\n", Sys.time()))

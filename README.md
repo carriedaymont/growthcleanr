@@ -359,7 +359,8 @@ speed the process while working with large data sets:
 cleaned_data <- data[, clean_value_both:=
                        cleangrowth(subjid, param, agedays, sex, measurement,
                                    parallel=T,
-                                   num.batches=4
+                                   num.batches=4,
+                                   log.path="logs"
                                    )]
 ```
 
@@ -370,6 +371,22 @@ system hardware. If you are working with large datasets, you may need to
 experiment with these options to determine the best settings for your needs.
 Note that there are additional notes on
 [working with large datasets](#largedata) below.
+
+The default values of `log.path` is `"."`, the current working directory.
+`growthcleanr` will write batch-specific log files to the `log.path` directory,
+and will create the directory if necessary.
+
+Note that if you run `growthcleanr` in parallel with multiple batches and see
+warning errors such as the following, they can be ignored.
+
+```R
+Warning messages:
+1: <anonymous>: ... may be used in an incorrect context: ‘.fun(piece, ...)’
+2: <anonymous>: ... may be used in an incorrect context: ‘.fun(piece, ...)’
+```
+
+This set of warnings is coming from one of `growthcleanr`'s dependencies, and
+does not indicate either failure or improper execution.
 
 ## <a name="configuration"></a>Configuration options
 
@@ -417,7 +434,10 @@ techniques.
   measurement being evaluated compared to using the default exponent.
 
 * `ref.data.path` - defaults to using CDC reference data from year 2000; supply
-  a file path to use alternate reference data.
+  a file path to use alternate reference data. Note that when running from an
+  installed `growthcleanr` package (e.g. having called `library(growthcleanr)`),
+  this path does not need to be specified. Developers testing the source code
+  directly from the source directory will need to specify this as well.
 
 * `error.load.mincount` - default `2`; minimum count of exclusions on parameter
   for one subject before considering excluding all measurements.
@@ -468,8 +488,8 @@ effect on the algorithm itself.
 * `quietly` - default `TRUE`; when `TRUE`, displays function messages and will
   output log files when `parallel` is `TRUE`.
 
-* `log.path` - set path for log file output (e.g. `log/`). **Will not produce
-  log files if omitted.**
+* `log.path` - default `"."`; sets directory for batch log file output when
+  processing with `parallel = TRUE`. A new directory will be created if necessary.
 
 ## <a name="output"></a>Understanding output
 
@@ -620,8 +640,6 @@ parser$add_argument('--quietly', default=F, action='store_true',
                     help='Disable verbose output')
 args <- parser$parse_args()
 
-logfile <- sprintf('log-%s.txt', args$infile)
-
 if (args$sdrecenter != '' ) {
   sdrecenter <- fread(args$sdrecenter)
 } else {
@@ -632,7 +650,6 @@ df_in <- fread(args$infile)
 df_out <- df_in[, clean_value:=
                 cleangrowth(subjid, param, agedays, sex, measurement,
                             sd.recenter=sdrecenter,
-                            log.path=logfile,
                             quietly=args$quietly)
            ]
 write.csv(df_out, args$outfile, row.names=FALSE)
