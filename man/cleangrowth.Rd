@@ -23,7 +23,7 @@ cleangrowth(
   include.carryforward = F,
   ewma.exp = -1.5,
   ref.data.path = "",
-  log.path = NA,
+  log.path = ".",
   parallel = F,
   num.batches = NA,
   quietly = T
@@ -91,7 +91,8 @@ using the default exponent.}
 \item{ref.data.path}{Path to reference data. If not supplied, the year 2000
 Centers for Disease Control (CDC) reference data will be used.}
 
-\item{log.path}{Path to log file output when running in parallel (non-quiet mode).}
+\item{log.path}{Path to log file output when running in parallel (non-quiet mode). Default is ".". A new
+directory will be created if necessary.}
 
 \item{parallel}{Determines if function runs in parallel.  Defaults to FALSE.}
 
