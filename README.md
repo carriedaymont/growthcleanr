@@ -254,6 +254,40 @@ RGui or from the command line using `Rscript`. An example standalone script that
 may be used for this purpose is documented below under [Working with large data
 sets](#largedata).
 
+#### Docker
+
+This package includes a `Dockerfile` that enables easy installation of R and
+`growthcleanr` on a machine with [Docker](https://www.docker.com/) installed. It
+requires an up-to-date Docker install, and a few command-line steps, but can save time
+over installing R and `growthcleanr`'s dependencies manually.
+
+To install and run `growthcleanr` using Docker:
+
+```bash
+% docker run -it mitre/growthcleanr:latest R
+```
+
+The first time this command is run, it might take a few minutes to download several
+necessary components, but this should be fully automated. If successful, you should see
+an R prompt, from which you can use `growthcleanr` as described below.
+
+This R environment is virtualized inside Docker, however, and isolated from your local
+machine. Because of this, you will need to map a local folder on your computer into the
+Docker environment to work with your own data. For example, if your data is in
+`/Users/exampleuser/analysis`, specify a folder mapping using the added `-v` step below:
+
+```bash
+% docker run -it -v /Users/exampleusers/analysis:/usr/src/app mitre/growthcleanr:latest R
+```
+
+Inside the Docker environment's R prompt, if you issue a command like `list.files()`,
+you should see a list of the same files from that folder. You can now open and read data
+files, run `cleangrowth()` and other analyses, and write result files to that same
+directory.
+
+Exit the Docker R environment with `quit()` as you normally would. Any new files you
+saved will appear in the folder you mapped.
+
 ## <a name="usage"></a>Usage
 
 With the `growthcleanr` package installed [as described above](#installation),
