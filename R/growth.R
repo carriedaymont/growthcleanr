@@ -1,7 +1,7 @@
 #' Clean growth measurements
 #'
 #' @param subjid Vector of unique identifiers for each subject in the database.
-#' @param param Vector identifying each measurement, may be 'WEIGHTKG', 'HEIGHTCM', or 'LENGTHCM'
+#' @param param Vector identifying each measurement, may be 'WEIGHTKG', 'HEIGHTCM', 'LENGTHCM', or 'HEADCM'
 #'   'HEIGHTCM' vs. 'LENGTHCM' only affects z-score calculations between ages 24 to 35 months (730 to 1095 days).
 #'   All linear measurements below 731 days of life (age 0-23 months) are interpreted as supine length, and
 #'   all linear measurements above 1095 days of life (age 36+ months) are interpreted as standing height.
