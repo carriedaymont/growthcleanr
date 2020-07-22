@@ -4,6 +4,9 @@ MAINTAINER dlchudnov@mitre.org
 
 WORKDIR /usr/src/app
 
+COPY LICENSE /LICENSE
+COPY README.md /README.md
+
 RUN R -e "install.packages(c( \
     'argparse', \
     'bit64', \
