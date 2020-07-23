@@ -261,32 +261,51 @@ This package includes a `Dockerfile` that enables easy installation of R and
 requires an up-to-date Docker install, and a few command-line steps, but can save time
 over installing R and `growthcleanr`'s dependencies manually.
 
-To install and run `growthcleanr` using Docker:
+To install and run `growthcleanr` using Docker, open the PowerShell on Windows, or open
+the Terminal on macOS, and enter this `docker` command:
 
 ```bash
 % docker run -it mitre/growthcleanr:latest R
 ```
 
-The first time this command is run, it might take a few minutes to download several
-necessary components, but this should be fully automated. If successful, you should see
-an R prompt, from which you can use `growthcleanr` as described below.
+The first time this command is run, it might take a few minutes to download and extract
+several necessary components, but this should be fully automated. If successful, you
+should see an R prompt, from which you can use `growthcleanr` as described below.
 
 This R environment is virtualized inside Docker, however, and isolated from your local
 machine. Because of this, you will need to map a local folder on your computer into the
-Docker environment to work with your own data. For example, if your data is in
-`/Users/exampleuser/analysis`, specify a folder mapping using the added `-v` step below:
+Docker environment to work with your own data. For example, if you are on Windows, and
+your data is in `C:\Users\exampleuser\analysis`, specify a mapping using the added `-v`
+step below:
+
+```bash
+> docker run -it -v C:\Users\exampleusers\analysis:/usr/src/app mitre/growthcleanr:latest R
+```
+
+Note that the slashes in file paths reverse direction from the reference to the folder
+location on your Windows machine (before the colon) to the folder location on the Docker
+container (after the colon); this is intentional, and accounts for how the two different
+environments reference disk locations.
+
+Note also that when mapping a folder on Windows, you may be prompted to confirm that you
+indeed want to "Share" the folder. This is a standard Windows security practice, and it
+is okay to confirm and proceed.
+
+If you are on macOS, and your data is in `/Users/exampleuser/analysis`, specify a folder
+mapping like this:
 
 ```bash
 % docker run -it -v /Users/exampleusers/analysis:/usr/src/app mitre/growthcleanr:latest R
 ```
 
-Inside the Docker environment's R prompt, if you issue a command like `list.files()`,
-you should see a list of the same files from that folder. You can now open and read data
+If you mapped a folder, then inside the Docker environment's R prompt, when you then
+issue a command like `list.files()`, you should see a list of the same files in the R
+session that you see in that folder on your desktop. You can now open and read your data
 files, run `cleangrowth()` and other analyses, and write result files to that same
 directory.
 
 Exit the Docker R environment with `quit()` as you normally would. Any new files you
-saved will appear in the folder you mapped.
+saved will appear in the desktop folder you mapped.
 
 ## <a name="usage"></a>Usage
 
