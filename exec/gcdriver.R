@@ -5,7 +5,8 @@ library(data.table)
 
 library(growthcleanr)
 
-parser <- ArgumentParser(description = 'CLI driver for growthcleanr')
+parser <-
+  ArgumentParser(description = 'CLI driver for growthcleanr')
 parser$add_argument(
   'infile',
   metavar = 'INFILE',
@@ -36,7 +37,7 @@ args <- parser$parse_args()
 logfile <- sprintf('output/log/log-%s.txt', args$infile)
 
 if (args$sdrecenter != '') {
-  sdrecenter <- data.table(read.csv(args$sdrecenter))
+  sdrecenter <- fread(args$sdrecenter)
 } else {
   sdrecenter <- ''
 }
@@ -53,4 +54,4 @@ df_out <- df_in[, exclude :=
                     log.path = logfile,
                     quietly = args$quietly
                   )]
-write.csv(df_out, args$outfile, row.names = FALSE)
+fwrite(df_out, args$outfile, row.names = FALSE)
