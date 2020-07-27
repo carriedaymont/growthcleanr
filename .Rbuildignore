@@ -3,3 +3,6 @@
 ^packrat/
 ^\.Rprofile$
 ^data-raw$
+^output$
+.dockerignore
+Dockerfile

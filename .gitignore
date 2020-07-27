@@ -41,3 +41,4 @@ packrat/lib*/
 packrat/src/
 
 *.swp
+output
