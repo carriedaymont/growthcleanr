@@ -3,7 +3,6 @@
 library(plyr, quietly = T)
 library(dplyr, quietly = T)
 library(data.table, quietly = T)
-library(jsonlite, quietly = T)
 
 
 ### Define the helper function and the carryforward adjustment function ###

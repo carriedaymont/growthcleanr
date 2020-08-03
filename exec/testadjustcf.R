@@ -49,7 +49,6 @@ library(plyr, quietly = T)
 library(dplyr, quietly = T)
 
 library(data.table, quietly = T)
-library(jsonlite, quietly = T)
 
 library(growthcleanr)
 
