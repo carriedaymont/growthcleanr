@@ -39,3 +39,6 @@ rsconnect/
 inst/doc
 packrat/lib*/
 packrat/src/
+
+*.swp
+output
