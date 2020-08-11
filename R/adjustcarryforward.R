@@ -246,8 +246,15 @@ adjustcarryforward <- function(subjid,
   # see function definition below for explanation of the re-centering process
   # returns a data table indexed by param, sex, agedays
   if (!is.data.table(sd.recenter)) {
-    # ADJUSTCF EDIT - exclude is now a factor, so re-characterize here
-    sd.recenter = data.all[as.character(orig.exclude) < 'Exclude', sd.median(param, sex, agedays, sd.orig)]
+    # ADJUSTCF EDIT - be explicit about levels to keep
+    keep.levels <- c(
+      "Include",
+      "Unit-Error-High",
+      "Unit-Error-Low",
+      "Unit-Error-Possible",
+      "Swapped-Measurements"
+    )
+    sd.recenter = data.all[orig.exclude %in% keep.levels, sd.median(param, sex, agedays, sd.orig)]
     # END EDIT
   }
   # add sd.recenter to data, and recenter
