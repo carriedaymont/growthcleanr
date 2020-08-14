@@ -1,5 +1,16 @@
 # growthcleanr
 
+## [1.2.1] - 2020-08-14
+
+### Added
+
+- New tests in `tests/testthat/test-utils.R` and `tests/testthat/test-cdc.R`
+  to support newly added functions
+
+### Changed
+
+- Improved error handling in `longwide()`; fixed missing import in DESCRIPTION
+
 ## [1.2] - 2020-07-24
 
 ### Added
