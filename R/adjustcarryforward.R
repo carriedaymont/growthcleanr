@@ -12,7 +12,7 @@ library(data.table, quietly = T)
 
 # helper function to treat NA values as FALSE
 na.as.false = function(v) {
-  v[is.na(v)] = F
+  v[is.na(v)] <- F
   v
 }
 
@@ -60,7 +60,7 @@ adjustcarryforward <- function(subjid,
                                max_ht.exp_under = 0.33,
                                max_ht.exp_over = 1.5) {
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
-  data.all = data.table(
+  data.all <- data.table(
     line = seq_along(measurement),
     subjid = as.factor(subjid),
     param,
@@ -73,14 +73,14 @@ adjustcarryforward <- function(subjid,
   )
 
   ### ADJUSTCF EDIT
-  data.all = data.all[, n := 1:.N]
+  data.all <- data.all[, n := 1:.N]
   ### ENDEDIT
 
-  data.orig = data.all
+  data.orig <- data.all
 
   setkey(data.all, subjid)
 
-  subjid.unique = unique(data.all$subjid)
+  subjid.unique <- unique(data.all$subjid)
 
   #### ADJUSTCF EDIT ####
   # for this purpose, want to subset dataset down to just "Exclude-Carried-Forward" and "Include" - assume all other measurements are invalid
@@ -110,15 +110,15 @@ adjustcarryforward <- function(subjid,
             "")
   )
 
-  tanner.ht.vel = fread(tanner_ht_vel_path)
+  tanner.ht.vel <- fread(tanner_ht_vel_path)
 
   setnames(tanner.ht.vel,
            colnames(tanner.ht.vel),
            gsub('_', '.', colnames(tanner.ht.vel)))
   setkey(tanner.ht.vel, sex, tanner.months)
   # keep track of column names in the tanner data
-  tanner.fields = colnames(tanner.ht.vel)
-  tanner.fields = tanner.fields[!tanner.fields %in% c('sex', 'tanner.months')]
+  tanner.fields <- colnames(tanner.ht.vel)
+  tanner.fields <- tanner.fields[!tanner.fields %in% c('sex', 'tanner.months')]
 
   who_max_ht_vel_path <- ifelse(
     ref.data.path == "",
@@ -133,18 +133,18 @@ adjustcarryforward <- function(subjid,
     paste(ref.data.path, "who_ht_vel_3sd.csv", sep =
             "")
   )
-  who.max.ht.vel = fread(who_max_ht_vel_path)
-  who.ht.vel = fread(who_ht_vel_3sd_path)
+  who.max.ht.vel <- fread(who_max_ht_vel_path)
+  who.ht.vel <- fread(who_ht_vel_3sd_path)
   setkey(who.max.ht.vel, sex, whoagegrp_ht)
   setkey(who.ht.vel, sex, whoagegrp_ht)
-  who.ht.vel = as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel, by =
+  who.ht.vel <- as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel, by =
                                                 c('sex', 'whoagegrp_ht')))
 
   setnames(who.ht.vel, colnames(who.ht.vel), gsub('_', '.', colnames(who.ht.vel)))
   setkey(who.ht.vel, sex, whoagegrp.ht)
   # keep track of column names in the who growth velocity data
-  who.fields = colnames(who.ht.vel)
-  who.fields = who.fields[!who.fields %in% c('sex', 'whoagegrp.ht')]
+  who.fields <- colnames(who.ht.vel)
+  who.fields <- who.fields[!who.fields %in% c('sex', 'whoagegrp.ht')]
 
   # 1.  General principles
   # a.	All steps are done separately for each parameter unless otherwise noted
@@ -190,7 +190,7 @@ adjustcarryforward <- function(subjid,
   # calculate z scores
   if (!quietly)
     cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
-  measurement.to.z = read.anthro(ref.data.path, cdc.only = T)
+  measurement.to.z <- read.anthro(ref.data.path, cdc.only = T)
   data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
 
   # calculate "standard deviation" scores
@@ -205,7 +205,7 @@ adjustcarryforward <- function(subjid,
   data.all[, index := 1:.N]
 
   # enumerate the different exclusion levels
-  exclude.levels = c(
+  exclude.levels <- c(
     'Missing',
     'No Change',
     'Include',
@@ -225,7 +225,7 @@ adjustcarryforward <- function(subjid,
   data.all[param == 'LENGTHCM', param := 'HEIGHTCM']
 
   # define field names needed by helper functions
-  ewma.fields = c('ewma.all', 'ewma.before', 'ewma.after')
+  ewma.fields <- c('ewma.all', 'ewma.before', 'ewma.after')
 
   # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time, we need to account for the fact that
   #     the mean SD-score for the population changes with age.
@@ -254,12 +254,12 @@ adjustcarryforward <- function(subjid,
       "Unit-Error-Possible",
       "Swapped-Measurements"
     )
-    sd.recenter = data.all[orig.exclude %in% keep.levels, sd.median(param, sex, agedays, sd.orig)]
+    sd.recenter <- data.all[orig.exclude %in% keep.levels, sd.median(param, sex, agedays, sd.orig)]
     # END EDIT
   }
   # add sd.recenter to data, and recenter
   setkey(data.all, param, sex, agedays)
-  data.all = sd.recenter[data.all]
+  data.all <- sd.recenter[data.all]
   setkey(data.all, subjid, param, agedays)
   data.all[, tbc.sd := sd.orig - sd.median]
 
@@ -288,7 +288,7 @@ adjustcarryforward <- function(subjid,
     #subj.df[, `:=`(subjid = subjid, param='HEIGHTCM',index=1:.N)]
     subj.df[, index := 1:.N]
 
-    num.height.excluded = 0
+    num.height.excluded <- 0
     while (T) {
       # use a closure to discard all the extra fields added to df with each iteration
       subj.df[, exclude := (function (df) {
@@ -345,7 +345,7 @@ adjustcarryforward <- function(subjid,
 
         # 15e.	Merge with dataset tanner_ht_vel using sex and tanner_months – this will give you min_ht_vel and max_ht_vel
         setkey(df, sex, tanner.months)
-        df = tanner.ht.vel[df]
+        df <- tanner.ht.vel[df]
 
         # 15f.	Calculate the following:
         #   i.	mindiff_ht=0.5*min_ht_vel*(d_agedays/365.25)^2-3 if d_agedays<365.25
@@ -400,7 +400,7 @@ adjustcarryforward <- function(subjid,
         # i.	Merge using sex and whoagegrp_ht using who_ht_vel_3sd and who_ht_maxvel_3sd; this will give you varaibles whoinc_i_ht and maxwhoinc_i_ht
         #     for various intervals where i is 1,2, 3,4, 6 and corresponds to whoinc_age_ht.
         setkey(df, sex, whoagegrp.ht)
-        df = who.ht.vel[df]
+        df <- who.ht.vel[df]
 
         # restore original sort order (ensures valid.rows variable applies to correct rows)
         setkey(df, index)
@@ -533,7 +533,7 @@ adjustcarryforward <- function(subjid,
 
         # 15p.v.  Determine the total number of ht values for each subject (tot_ht)
         # NOTE: all rows are valid due to constraint in subj.df[...] statement
-        num.valid = .N
+        num.valid <- .N
 
         # 15q.	Identify a value for possible exclusion if one of the following sets of criteria are met. For values identified by each set of criteria determine
         #       the value of temp_diff using the formula given
@@ -604,8 +604,8 @@ adjustcarryforward <- function(subjid,
         })
         ##### END EDIT #####
 
-        rep = df$temp.exclude == "Include"
-        num.exclude = sum(rep)
+        rep <- df$temp.exclude == "Include"
+        num.exclude <- sum(rep)
         if (num.exclude == 1)
           df[rep, exclude := temp.exclude]
 
@@ -614,7 +614,7 @@ adjustcarryforward <- function(subjid,
 
         if (num.exclude > 1) {
           # first order by decreasing temp.diff (where rep=T)
-          worst.row = order(rep, df$temp.diff, decreasing = T)[1]
+          worst.row <- order(rep, df$temp.diff, decreasing = T)[1]
           df[worst.row, exclude := temp.exclude]
         }
 
