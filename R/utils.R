@@ -126,108 +126,98 @@ longwide <-
            clean_value = "clean_value",
            include_all = FALSE,
            inclusion_types = c("Include")) {
-    library(tidyr, quietly = T)
-    library(dplyr, quietly = T)
+  library(tidyr, quietly = T)
+  library(dplyr, quietly = T)
 
-    found_error <- FALSE
+  # selects each column with specified / default variable name
+  long_df %>%
+    select(id, subjid, sex, agedays,
+           param, measurement, clean_value) -> obs_df
 
-    # selects each column with specified / default variable name
-    long_df %>%
-      select(id, subjid, sex, agedays,
-             param, measurement, clean_value) -> obs_df
-
-    # if all columns could be found,
-    # 7 columns will be present in the correct order. Thus, rename
-    if (ncol(obs_df) == 7) {
-      names(obs_df) <- c("id",
-                         "subjid",
-                         "sex",
-                         "agedays",
-                         "param",
-                         "measurement",
-                         "clean_value")
-    } else{
-      # catch error if any variables were not found
-      found_error = TRUE
-      err_msg <- "Not all needed columns were present."
-    }
-
-    # extract values flagged with indicated inclusion types:
-    if (include_all == TRUE) {
-      obs_df <- obs_df
-    } else if (include_all == FALSE) {
-      obs_df <- obs_df[obs_df$clean_value %in% inclusion_types,]
-    } else{
-      found_error = TRUE
-      err_msg <- "An error occured with inclusion types."
-    }
-
-
-    # only include observations at least 24 months old
-    obs_df <- obs_df[obs_df$agedays >= 730, ]
-
-    # calculate age in years
-    obs_df$agey <- round(obs_df$agedays / 365.25, 4)
-
-    # calculate age in months
-    obs_df$agem = round((obs_df$agey * 12), 4)
-
-    # recode sex to expected ext_bmiz() format
-    obs_df <- recode_sex(
-      input_data = obs_df,
-      sourcecol = "sex",
-      sourcem = "0",
-      sourcef = "1",
-      targetcol = "sex_recoded",
-      targetm = 1L,
-      targetf = 2L
-    )
-
-    obs_df %>%
-      mutate(sex = sex_recoded) %>%
-      mutate(param = as.character(param)) %>%
-      select(subjid, id, agey, agem, agedays, sex, param, measurement) -> clean_df
-
-
-    # check for unique weight and height ids
-    if (any(duplicated(clean_df$id))) {
-      found_error <- TRUE
-      err_msg <- "An error occured due to duplicate IDs"
-    }
-
-    # separate heights and weights using unique ids
-    clean_df %>%
-      pivot_wider(names_from = param, values_from = measurement) -> param_separated
-
-    # extract heights and weights attached to ids
-    param_separated %>%
-      filter(!is.na(HEIGHTCM)) %>%
-      filter(is.na(WEIGHTKG)) %>%
-      mutate(ht_id = id) %>%
-      select(-id) %>%
-      select(-WEIGHTKG) -> height
-
-    param_separated %>%
-      filter(is.na(HEIGHTCM)) %>%
-      filter(!is.na(WEIGHTKG)) %>%
-      mutate(wt_id = id) %>%
-      select(-id) %>%
-      select(-HEIGHTCM) -> weight
-
-
-    # join based on subjid, age, and sex
-    wide_df <- merge(height,
-                     weight,
-                     by = c("subjid", "agey", "agem", "agedays", "sex")) %>%
-      mutate(bmi = WEIGHTKG / ((HEIGHTCM * .01) ^ 2)) %>% # calculate bmi
-      mutate(wt = WEIGHTKG, ht = HEIGHTCM) %>% # rename height and weight
-      select(subjid, agey, agem, bmi, sex, wt, wt_id, ht, ht_id, agedays)
-
-    if (found_error == FALSE) {
-      return(wide_df)
-    } else{
-      print(err_msg)
-      return(NULL)
-    }
-
+  # if all columns could be found,
+  # 7 columns will be present in the correct order. Thus, rename
+  if (ncol(obs_df) == 7) {
+    names(obs_df) <- c("id",
+                       "subjid",
+                       "sex",
+                       "agedays",
+                       "param",
+                       "measurement",
+                       "clean_value")
+  } else{
+    # catch error if any variables were not found
+    stop("not all needed columns were present")
   }
+
+  # extract values flagged with indicated inclusion types:
+  if (include_all == TRUE) {
+    obs_df <- obs_df
+  } else if (include_all == FALSE) {
+    obs_df <- obs_df[obs_df$clean_value %in% inclusion_types,]
+  } else{
+    stop(paste0("include_all is not a logical of length 1. It is a ",
+                typeof(include_all), " of length ", length(include_all)))
+  }
+
+
+  # only include observations at least 24 months old
+  obs_df <- obs_df[obs_df$agedays >= 730, ]
+
+  # calculate age in years
+  obs_df$agey <- round(obs_df$agedays / 365.25, 4)
+
+  # calculate age in months
+  obs_df$agem = round((obs_df$agey * 12), 4)
+
+  # recode sex to expected ext_bmiz() format
+  obs_df <- recode_sex(
+    input_data = obs_df,
+    sourcecol = "sex",
+    sourcem = "0",
+    sourcef = "1",
+    targetcol = "sex_recoded",
+    targetm = 1L,
+    targetf = 2L
+  )
+
+  obs_df %>%
+    mutate(sex = sex_recoded) %>%
+    mutate(param = as.character(param)) %>%
+    select(subjid, id, agey, agem, agedays, sex, param, measurement) -> clean_df
+
+
+  # check for unique weight and height ids
+  if (any(duplicated(clean_df$id))) {
+    stop("duplicate IDs in long_df")
+  }
+
+  # separate heights and weights using unique ids
+  clean_df %>%
+    pivot_wider(names_from = param, values_from = measurement) -> param_separated
+
+  # extract heights and weights attached to ids
+  param_separated %>%
+    filter(!is.na(HEIGHTCM)) %>%
+    filter(is.na(WEIGHTKG)) %>%
+    mutate(ht_id = id) %>%
+    select(-id) %>%
+    select(-WEIGHTKG) -> height
+
+  param_separated %>%
+    filter(is.na(HEIGHTCM)) %>%
+    filter(!is.na(WEIGHTKG)) %>%
+    mutate(wt_id = id) %>%
+    select(-id) %>%
+    select(-HEIGHTCM) -> weight
+
+
+  # join based on subjid, age, and sex
+  wide_df <- merge(height,
+                   weight,
+                   by = c("subjid", "agey", "agem", "agedays", "sex")) %>%
+    mutate(bmi = WEIGHTKG / ((HEIGHTCM * .01) ^ 2)) %>% # calculate bmi
+    mutate(wt = WEIGHTKG, ht = HEIGHTCM) %>% # rename height and weight
+    select(subjid, agey, agem, bmi, sex, wt, wt_id, ht, ht_id, agedays)
+
+  return(wide_df)
+}

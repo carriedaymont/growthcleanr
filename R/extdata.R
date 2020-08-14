@@ -104,3 +104,29 @@ NULL
 #'
 #'
 NULL
+
+#' CDC SAS BMI Input
+#'
+#' Contains input data for CDC SAS macro for calculating BMI values.
+#'
+#' @name test_syngrowth_wide
+#'
+#' @section test_syngrowth_wide.csv:
+#'
+#' Used to test function `ext_bmiz()`
+#'
+#'
+NULL
+
+#' CDC SAS BMI Output
+#'
+#' Contains results of CDC SAS macro for calculating BMI values.
+#'
+#' @name test_syngrowth_sas_output_compare
+#'
+#' @section test_syngrowth_sas_output_compare.csv:
+#'
+#' Used to test function `ext_bmiz()`
+#'
+#'
+NULL
