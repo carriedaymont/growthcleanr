@@ -64,11 +64,13 @@ An R environment with the following packages installed is required to run
 growthcleanr:
 
 * `devtools`
-* `dplyr`
 * `data.table`
-* `foreach`
 * `doParallel`
+* `dplyr`
+* `foreach`
 * `Hmisc`
+* `labelled`
+* `plyr`
 
 The `growthcleanr` package itself must also be installed. Further installation
 details and notes can be found under [Installation](#installation) below.
@@ -201,7 +203,8 @@ In an up-to-date R environment such as RStudio, first install the dependencies:
 
 ```R
 # Required packages for growthcleanr operation
-install.packages(c("devtools", "dplyr", "data.table", "foreach", "doParallel", "Hmisc"))
+install.packages(c("data.table", "devtools", "doParallel", "dplyr", "foreach",
+    "Hmisc", "labelled", "plyr"))
 # Optional additional packages referenced in this document
 install.packages("argparse")
 install.packages("bit64")
