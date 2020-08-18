@@ -167,7 +167,7 @@ longwide <-
   obs_df$agey <- round(obs_df$agedays / 365.25, 4)
 
   # calculate age in months
-  obs_df$agem = round((obs_df$agey * 12), 4)
+  obs_df$agem <- round((obs_df$agey * 12), 4)
 
   # recode sex to expected ext_bmiz() format
   obs_df <- recode_sex(
