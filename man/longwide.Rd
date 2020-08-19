@@ -37,7 +37,7 @@ longwide(
 \item{inclusion_types}{Vector indicating which exclusion codes from the cleaning algorithm should be included in the data, given that include_all is FALSE. For all options, see growthcleanr::cleangrowth(). Defaults to c("Include").}
 }
 \value{
-Returns a data frame transformed from long to wide. Includes only values flagged with indicated inclusion types.
+Returns a data frame transformed from long to wide. Includes only values flagged with indicated inclusion types. Note that, for each subject, heights without corresponding weights for a given age (and vice versa) will be dropped.
 }
 \description{
 \code{longwide} transforms data from long to wide format. Ideal for transforming output from growthcleanr::cleangrowth() into a format suitable for growthcleanr::ext_bmiz().
