@@ -1,0 +1,25 @@
+citHeader("To cite growthcleanr in publications use:")
+
+citEntry(entry = "Article",
+  title        = "Automated identification of implausible values in growth data from pediatric electronic health records",
+  author       = personList(
+                  as.person("Carrie Daymont"),
+                  as.person("Michelle E Ross"),
+                  person(given="A", family = "Russell Localio"),
+                  as.person("Alexander G Fiks"),
+                  as.person("Richard C Wasserman"),
+                  as.person("Robert W Grundmeier")),
+  journal      = "Journal of the American Medical Informatics Association",
+  year         = "2017",
+  doi = "10.1093/jamia/ocx037",
+  volume = "24",
+  number = "6",
+  pages = "1080-1087",
+  year = "2017",
+  month = "04",
+  url = "https://doi.org/10.1093/bioinformatics/btz617",
+  issn = "1067-5027",
+
+  textVersion  =
+  paste("Carrie Daymont, Michelle E Ross, A Russell Localio, Alexander G Fiks, Richard C Wasserman, Robert W Grundmeier, Automated identification of implausible values in growth data from pediatric electronic health records, Journal of the American Medical Informatics Association, Volume 24, Issue 6, November 2017, Pages 1080–1087, https://doi.org/10.1093/jamia/ocx037")
+)
