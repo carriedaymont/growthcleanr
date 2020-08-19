@@ -149,7 +149,7 @@ setkey(data, subjid, param, agedays)
 cleaned_data <- data[, clean_value:=cleangrowth(subjid, param, agedays, sex, measurement)]
 
 # extract data limited only to values flagged for inclusion:
-only_included_data <- cleaned_data[clean_vaue=='Include']
+only_included_data <- cleaned_data[clean_value=='Include']
 ```
 
 If our Example dataset above were named `source_data`, examining `cleaned_data`
