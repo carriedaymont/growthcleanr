@@ -1,3 +1,18 @@
+#' Function for LMS formula with modified (m) z-scores
+#'
+#' @keywords internal
+#' @noRd
+z_score <- function(var, l, m, s) {
+  ls <- l * s
+  invl <- 1 / l
+  z <- (((var / m) ^ l) - 1) / (ls) # z-score formula
+  sdp2 <- (m * (1 + 2 * ls) ^ (invl)) - m
+  # modified z-score (+2)
+  sdm2 <- m - (m * (1 - 2 * ls) ^ (invl))
+  mz <- fifelse(var < m, (var - m) / (0.5 * sdm2), (var - m) / (sdp2 * 0.5))
+  return(list(z, mz))
+}
+
 #' ext_bmiz
 #'
 #' \code{ext_bmiz} Calculates the sigma (scale parameter for the half-normal
@@ -98,18 +113,6 @@ ext_bmiz <- function(data,
         names(DT), cols
       ))))
     }
-  }
-
-  z_score <- function(var, l, m, s) {
-    # LMS formula with modified (m) z-scores
-    ls <- l * s
-    invl <- 1 / l
-    z <- (((var / m) ^ l) - 1) / (ls) # z-score formula
-    sdp2 <- (m * (1 + 2 * ls) ^ (invl)) - m
-    # modified z-score (+2)
-    sdm2 <- m - (m * (1 - 2 * ls) ^ (invl))
-    mz <- fifelse(var < m, (var - m) / (0.5 * sdm2), (var - m) / (sdp2 * 0.5))
-    return(list(z, mz))
   }
 
   setDT(data)
