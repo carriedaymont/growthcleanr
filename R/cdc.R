@@ -62,6 +62,17 @@
 #'
 #' @export
 #' @examples
+#' # Run on a small subset of given data
+#' df <- as.data.frame(syngrowth)
+#' df <- df[df$subjid %in% unique(df[, "subjid"])[1:5], ]
+#' df <- cbind(df,
+#'             "clean_value" = cleangrowth(df$subjid,
+#'                                         df$param,
+#'                                         df$agedays,
+#'                                         df$sex,
+#'                                         df$measurement))
+#' df <- longwide(df) # convert to wide format for ext_bmiz
+#'
 #' # Calling the function with default column names
 #' d_bmi <- ext_bmiz(inputdata)
 #'
