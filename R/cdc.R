@@ -62,7 +62,6 @@
 #'
 #' @export
 #' @examples
-#' # Run on a small subset of given data
 #' df <- as.data.frame(syngrowth)
 #' df <- df[df$subjid %in% unique(df[, "subjid"])[1:5], ]
 #' df <- cbind(df,
@@ -74,14 +73,16 @@
 #' df <- longwide(df) # convert to wide format for ext_bmiz
 #'
 #' # Calling the function with default column names
-#' d_bmi <- ext_bmiz(inputdata)
+#' d_bmi <- ext_bmiz(df)
 #'
 #' # Specifying different column names; note that quotes are used
-#' d_bmi <- ext_bmiz(inputdata, age="agemos", wt="weightkg", ht="heightcm")
+#' dfc <- df
+#' colnames(dfc)[colnames(dfc) %in% c("agem", "wt", "ht")] <-
+#'   c("agemos", "weightkg", "heightcm")
+#' d_bmi <- ext_bmiz(dfc, age="agemos", wt="weightkg", ht="heightcm")
 #'
 #' # Disabling conversion of all-integer age in months to (age + 0.5)
-#' d_bmi <- ext_bmiz(inputdata, adjust.integer.age=F)
-#'
+#' d_bmi <- ext_bmiz(df, adjust.integer.age=F)
 ext_bmiz <- function(data,
                      age = "agem",
                      wt = "wt",
