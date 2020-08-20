@@ -62,6 +62,7 @@
 #'
 #' @export
 #' @examples
+#' # Run on a small subset of given data
 #' df <- as.data.frame(syngrowth)
 #' df <- df[df$subjid %in% unique(df[, "subjid"])[1:5], ]
 #' df <- cbind(df,
