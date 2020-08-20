@@ -494,7 +494,7 @@ adjustcarryforward <- function(subjid,
 
         # 15p.  Perform a EWMA calculation with the following modifications:
         #  i.	  Generate a variable pair=1 if (d_prev_ht<mindiff_prev_ht OR d_ht<mindiff_ht OR d_prev_ht>maxdiff_prev_ht  OR d_ht>maxdiff_ht) AND exc_ht==0
-        df[, pair := na.as.false(
+        df[, pair := na_as_false(
           delta.prev.ht < mindiff.prev.ht |
             delta.next.ht < mindiff.next.ht |
             delta.prev.ht > maxdiff.prev.ht |
@@ -514,10 +514,10 @@ adjustcarryforward <- function(subjid,
         #       AND the value of interest is not the last height value for that subject AND pair==1 AND pair for the next value==1
         # NOTE: pair.next will be NA last height, which will result in a FALSE value below
         df[, `:=`(
-          bef.g.aftm1 = na.as.false(
+          bef.g.aftm1 = na_as_false(
             abs(dewma.before) > abs(dewma.after.prev)  & pair & pair.prev
           ),
-          aft.g.befp1 = na.as.false(
+          aft.g.befp1 = na_as_false(
             abs(dewma.after)  > abs(dewma.before.next) & pair & pair.next
           )
         )]
