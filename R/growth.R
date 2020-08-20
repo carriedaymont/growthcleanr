@@ -1,5 +1,7 @@
 
-# helper function for cleanbatch to identify subset of observations that are either "included" or a "temporary duplicate"
+#' helper function for cleanbatch to identify subset of observations that are either "included" or a "temporary duplicate"
+#' @keywords internal
+#' @noRd
 valid <- function(df,
                   include.temporary.duplicates = F,
                   include.duplicates = F,
@@ -18,6 +20,12 @@ valid <- function(df,
       include.carryforward &
       exclude == 'Exclude-Carried-Forward'
   )
+}
+
+# helper function to treat NA values as FALSE
+na.as.false <- function(v) {
+  v[is.na(v)] = F
+  v
 }
 
 #' @keywords internal
@@ -65,12 +73,6 @@ cleanbatch <- function(data.df,
 
   # save a copy of all original measurement values before any transformation
   data.df[, v.orig := v]
-
-  # helper function to treat NA values as FALSE
-  na.as.false <- function(v) {
-    v[is.na(v)] = F
-    v
-  }
 
   # 5.  Temporary duplicates: I use duplicates to refer to more than more than one recorded value for a parameter on the same day,
   #     and we need to select which one to include in our analysis. The overall strategy will be to select a measurement using a simple
