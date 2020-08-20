@@ -23,9 +23,84 @@ valid <- function(df,
 }
 
 # helper function to treat NA values as FALSE
+#' @keywords internal
+#' @noRd
 na.as.false <- function(v) {
   v[is.na(v)] = F
   v
+}
+
+# 5.  Temporary duplicates: I use duplicates to refer to more than more than one recorded value for a parameter on the same day,
+#     and we need to select which one to include in our analysis. The overall strategy will be to select a measurement using a simple
+#     strategy that will be used temporarily, and select permanently in a later step after we have a somewhat cleaner dataset that
+#     can help us identify the best duplicate.
+# a.  For subjects/parameters with duplicates: Determine median_tbc*sd for both parameters: the median tbc*sd for each subject
+#     and parameter including only non-duplicate values with exc_*==0. The median of the same parameter as the duplicate will
+#     be referred to as median_tbc*sd, the median of the other parameter will be referred to as median_tbcOsd.
+# b.	For each subject/parameter with duplicates and at least one value for the subject/parameter on a day with no duplicates,
+#     select the value closest to the median_tbc*sd for temporary inclusion, and assign all other duplicates exc_*=2.
+#  i.	For each subject/parameter with duplicates and no values for the subject/parameter on a day with no duplicates, select the
+#     value closest to the median_tbcOsd for temporary inclusion, and assign all other duplicates exc_*=2.
+#     If median_tbcOsd is missing because there are no values for the other parameter, randomly choose one duplicate value for
+#     each subject/parameter/age to keep as exc_*=0 and replace exc_*=2 for all other duplicates for that subject/parameter/age.
+#' @keywords internal
+#' @noRd
+temporary.duplicates <- function(df) {
+  # add subjid and param if needed (may be missing depending on where this is called from)
+  if (is.null(df$subjid))
+    df[, subjid := NA]
+  if (is.null(df$param))
+    df[, param := NA]
+  # only operate on valid rows (but include rows that may have previously been flagged as a "temporary duplicate")
+  valid.rows <- valid(df, include.temporary.duplicates = T)
+  # make a small copy of df with only the fields we need for efficiency
+  df <- df[j = .(tbc.sd), keyby = .(subjid, param, agedays, index)]
+  # initialize some useful fields
+  df[, `:=`(
+    median.sd = as.double(NA),
+    delta.median.sd = as.double(NA),
+    duplicates.this.day = F,
+    duplicate = F
+  )]
+  # determine on which days there are duplicate measurements (more than 1 valid measurement on that age day)
+  df[valid.rows, duplicates.this.day := (.N > 1), by = .(subjid, param, agedays)]
+  # calculate median of measurements on days where there is no duplicate
+  df[valid.rows &
+       !duplicates.this.day, median.sd := median(tbc.sd), by = .(subjid, param)]
+  # distribute median to other valid or potential duplicate rows for same parameter for that subject
+  df[valid.rows, median.sd := sort(median.sd)[1], by = .(subjid, param)]
+  # take care of subject/parameters with more than one day with a valid observation
+  # determine the absolute difference between the measurements sd score and the median for that parameter for each child
+  df[valid.rows &
+       duplicates.this.day, delta.median.sd := abs(tbc.sd - median.sd), by = .(subjid, param)]
+  # identify subjects that have duplicates on all days of observation for that parameter (i.e. delta.median.sd undefined)
+  subj.all.dups <- df[valid.rows &
+                        duplicates.this.day &
+                        is.na(delta.median.sd), unique(subjid)]
+  df[valid.rows &
+       subjid %in% subj.all.dups, delta.median.sd := (function(subj.df) {
+         # iterate over parameters where delta.median.sd is not yet defined
+         # pass 1: take median from other parameter(s)
+         for (p in subj.df[is.na(delta.median.sd) &
+                           duplicates.this.day, unique(param)]) {
+           median.other.sd <- subj.df[param != p &
+                                        !duplicates.this.day, median(tbc.sd)]
+           subj.df[param == p, delta.median.sd := abs(tbc.sd - median.other.sd)]
+         }
+         return(subj.df$delta.median.sd)
+       })(copy(.SD)), by = .(subjid)]
+  # Final pass: take median as zero (i.e. if no measurements from a different parameter)
+  # NOTE -- this is not exactly the same as taking a random parameter
+  df[valid.rows &
+       duplicates.this.day &
+       is.na(delta.median.sd), delta.median.sd := abs(tbc.sd)]
+  # flag any duplicate value on the same day that is not the minimum distance from the median sd score
+  # NOTE: in the case of exact ducplicates, "which.min" will pick the first
+  df[valid.rows &
+       duplicates.this.day, duplicate := seq_along(delta.median.sd) != which.min(delta.median.sd), by =
+       .(subjid, param, agedays)]
+  # return the duplicated valid rows (i.e. the ones that should be temporarily excluded)
+  return(df$duplicate & valid.rows)
 }
 
 #' @keywords internal
@@ -74,82 +149,12 @@ cleanbatch <- function(data.df,
   # save a copy of all original measurement values before any transformation
   data.df[, v.orig := v]
 
-  # 5.  Temporary duplicates: I use duplicates to refer to more than more than one recorded value for a parameter on the same day,
-  #     and we need to select which one to include in our analysis. The overall strategy will be to select a measurement using a simple
-  #     strategy that will be used temporarily, and select permanently in a later step after we have a somewhat cleaner dataset that
-  #     can help us identify the best duplicate.
-  # a.  For subjects/parameters with duplicates: Determine median_tbc*sd for both parameters: the median tbc*sd for each subject
-  #     and parameter including only non-duplicate values with exc_*==0. The median of the same parameter as the duplicate will
-  #     be referred to as median_tbc*sd, the median of the other parameter will be referred to as median_tbcOsd.
-  # b.	For each subject/parameter with duplicates and at least one value for the subject/parameter on a day with no duplicates,
-  #     select the value closest to the median_tbc*sd for temporary inclusion, and assign all other duplicates exc_*=2.
-  #  i.	For each subject/parameter with duplicates and no values for the subject/parameter on a day with no duplicates, select the
-  #     value closest to the median_tbcOsd for temporary inclusion, and assign all other duplicates exc_*=2.
-  #     If median_tbcOsd is missing because there are no values for the other parameter, randomly choose one duplicate value for
-  #     each subject/parameter/age to keep as exc_*=0 and replace exc_*=2 for all other duplicates for that subject/parameter/age.
-  temporary.duplicates <- function(df = data.df) {
-    # add subjid and param if needed (may be missing depending on where this is called from)
-    if (is.null(df$subjid))
-      df[, subjid := NA]
-    if (is.null(df$param))
-      df[, param := NA]
-    # only operate on valid rows (but include rows that may have previously been flagged as a "temporary duplicate")
-    valid.rows <- valid(df, include.temporary.duplicates = T)
-    # make a small copy of df with only the fields we need for efficiency
-    df <- df[j = .(tbc.sd), keyby = .(subjid, param, agedays, index)]
-    # initialize some useful fields
-    df[, `:=`(
-      median.sd = as.double(NA),
-      delta.median.sd = as.double(NA),
-      duplicates.this.day = F,
-      duplicate = F
-    )]
-    # determine on which days there are duplicate measurements (more than 1 valid measurement on that age day)
-    df[valid.rows, duplicates.this.day := (.N > 1), by = .(subjid, param, agedays)]
-    # calculate median of measurements on days where there is no duplicate
-    df[valid.rows &
-         !duplicates.this.day, median.sd := median(tbc.sd), by = .(subjid, param)]
-    # distribute median to other valid or potential duplicate rows for same parameter for that subject
-    df[valid.rows, median.sd := sort(median.sd)[1], by = .(subjid, param)]
-    # take care of subject/parameters with more than one day with a valid observation
-    # determine the absolute difference between the measurements sd score and the median for that parameter for each child
-    df[valid.rows &
-         duplicates.this.day, delta.median.sd := abs(tbc.sd - median.sd), by = .(subjid, param)]
-    # identify subjects that have duplicates on all days of observation for that parameter (i.e. delta.median.sd undefined)
-    subj.all.dups <- df[valid.rows &
-                          duplicates.this.day &
-                          is.na(delta.median.sd), unique(subjid)]
-    df[valid.rows &
-         subjid %in% subj.all.dups, delta.median.sd := (function(subj.df) {
-           # iterate over parameters where delta.median.sd is not yet defined
-           # pass 1: take median from other parameter(s)
-           for (p in subj.df[is.na(delta.median.sd) &
-                             duplicates.this.day, unique(param)]) {
-             median.other.sd <- subj.df[param != p &
-                                          !duplicates.this.day, median(tbc.sd)]
-             subj.df[param == p, delta.median.sd := abs(tbc.sd - median.other.sd)]
-           }
-           return(subj.df$delta.median.sd)
-         })(copy(.SD)), by = .(subjid)]
-    # Final pass: take median as zero (i.e. if no measurements from a different parameter)
-    # NOTE -- this is not exactly the same as taking a random parameter
-    df[valid.rows &
-         duplicates.this.day &
-         is.na(delta.median.sd), delta.median.sd := abs(tbc.sd)]
-    # flag any duplicate value on the same day that is not the minimum distance from the median sd score
-    # NOTE: in the case of exact ducplicates, "which.min" will pick the first
-    df[valid.rows &
-         duplicates.this.day, duplicate := seq_along(delta.median.sd) != which.min(delta.median.sd), by =
-         .(subjid, param, agedays)]
-    # return the duplicated valid rows (i.e. the ones that should be temporarily excluded)
-    return(df$duplicate & valid.rows)
-  }
   if (!quietly)
     cat(sprintf(
       "[%s] Preliminarily identify potential duplicates...\n",
       Sys.time()
     ))
-  data.df$exclude[temporary.duplicates()] <- 'Exclude-Temporary-Duplicate'
+  data.df$exclude[temporary.duplicates(data.df)] <- 'Exclude-Temporary-Duplicate'
 
   # capture a list of subjects with possible duplicates for efficiency later
   subj.dup <- data.df[exclude == 'Exclude-Temporary-Duplicate', unique(subjid)]
@@ -415,7 +420,7 @@ cleanbatch <- function(data.df,
 
   # 9d.  Replace exc_*=0 if exc_*==2 & redo step 5 (temporary duplicates)
   data.df[exclude == 'Exclude-Temporary-Duplicate', exclude := 'Include']
-  data.df[temporary.duplicates(), exclude := 'Exclude-Temporary-Duplicate']
+  data.df[temporary.duplicates(data.df), exclude := 'Exclude-Temporary-Duplicate']
 
   # 10.  Exclude extreme errors with SD cutoffs. For this, a cutoff of |SD|>25 is used. Because of differences in SD and z score, there are some very extreme values
   #      with a |z|>25 that are implausible with an |SD|<25, so both are used to exclude extreme errors. This works better than using a lower value for the limit
@@ -438,7 +443,7 @@ cleanbatch <- function(data.df,
 
   # 10d. Redo temporary duplicates as in step 5.
   data.df[exclude == 'Exclude-Temporary-Duplicate', exclude := 'Include']
-  data.df[temporary.duplicates(), exclude := 'Exclude-Temporary-Duplicate']
+  data.df[temporary.duplicates(data.df), exclude := 'Exclude-Temporary-Duplicate']
 
   # 11.  Exclude extreme errors with EWMA
   # a.	Erroneous measurements can distort the EWMA for measurements around them. Therefore, if the EWMA method identifies more than one value for a subject and
@@ -565,7 +570,7 @@ cleanbatch <- function(data.df,
   #      median_tbc*sd for inclusion in EWMA calculations.
 
   # This is functionally the same as re-doing the "temporary duplicate" step before doing the EWMA
-  temp.dups <- temporary.duplicates()
+  temp.dups <- temporary.duplicates(data.df)
   data.df[temp.dups, exclude := 'Exclude-Temporary-Duplicate']
 
   # prepare a list of valid rows and initialize variables for convenience
