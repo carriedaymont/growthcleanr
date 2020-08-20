@@ -1,5 +1,5 @@
-
-#' helper function for cleanbatch to identify subset of observations that are either "included" or a "temporary duplicate"
+#' Helper function for cleanbatch to identify subset of observations that are either "included" or a "temporary duplicate"
+#'
 #' @keywords internal
 #' @noRd
 valid <- function(df,
@@ -22,27 +22,30 @@ valid <- function(df,
   )
 }
 
-# helper function to treat NA values as FALSE
+#' Helper function to treat NA values as FALSE
+#'
 #' @keywords internal
 #' @noRd
 na.as.false <- function(v) {
-  v[is.na(v)] = F
+  v[is.na(v)] <- F
   v
 }
 
-# 5.  Temporary duplicates: I use duplicates to refer to more than more than one recorded value for a parameter on the same day,
-#     and we need to select which one to include in our analysis. The overall strategy will be to select a measurement using a simple
-#     strategy that will be used temporarily, and select permanently in a later step after we have a somewhat cleaner dataset that
-#     can help us identify the best duplicate.
-# a.  For subjects/parameters with duplicates: Determine median_tbc*sd for both parameters: the median tbc*sd for each subject
-#     and parameter including only non-duplicate values with exc_*==0. The median of the same parameter as the duplicate will
-#     be referred to as median_tbc*sd, the median of the other parameter will be referred to as median_tbcOsd.
-# b.	For each subject/parameter with duplicates and at least one value for the subject/parameter on a day with no duplicates,
-#     select the value closest to the median_tbc*sd for temporary inclusion, and assign all other duplicates exc_*=2.
-#  i.	For each subject/parameter with duplicates and no values for the subject/parameter on a day with no duplicates, select the
-#     value closest to the median_tbcOsd for temporary inclusion, and assign all other duplicates exc_*=2.
-#     If median_tbcOsd is missing because there are no values for the other parameter, randomly choose one duplicate value for
-#     each subject/parameter/age to keep as exc_*=0 and replace exc_*=2 for all other duplicates for that subject/parameter/age.
+#' Function for temporary duplicates (step 5):
+#' 5.  Temporary duplicates: I use duplicates to refer to more than more than one recorded value for a parameter on the same day,
+#'     and we need to select which one to include in our analysis. The overall strategy will be to select a measurement using a simple
+#'     strategy that will be used temporarily, and select permanently in a later step after we have a somewhat cleaner dataset that
+#'     can help us identify the best duplicate.
+#' a.  For subjects/parameters with duplicates: Determine median_tbc*sd for both parameters: the median tbc*sd for each subject
+#'     and parameter including only non-duplicate values with exc_*==0. The median of the same parameter as the duplicate will
+#'     be referred to as median_tbc*sd, the median of the other parameter will be referred to as median_tbcOsd.
+#' b.	For each subject/parameter with duplicates and at least one value for the subject/parameter on a day with no duplicates,
+#'     select the value closest to the median_tbc*sd for temporary inclusion, and assign all other duplicates exc_*=2.
+#'  i.	For each subject/parameter with duplicates and no values for the subject/parameter on a day with no duplicates, select the
+#'     value closest to the median_tbcOsd for temporary inclusion, and assign all other duplicates exc_*=2.
+#'     If median_tbcOsd is missing because there are no values for the other parameter, randomly choose one duplicate value for
+#'     each subject/parameter/age to keep as exc_*=0 and replace exc_*=2 for all other duplicates for that subject/parameter/age.
+#'
 #' @keywords internal
 #' @noRd
 temporary.duplicates <- function(df) {
@@ -103,9 +106,11 @@ temporary.duplicates <- function(df) {
   return(df$duplicate & valid.rows)
 }
 
-# 7.  Identify switches (weight and height each recorded as the other parameter)
-# Utility function to find the value associated with the opposite parameter
-# For example, if param.1='WEIGHTKG' and param.2='HEIGHTCM', then a vector of height values observed on the same day as the weight values is returned and vice versa.
+#' Function to identify switches (step 6):
+#'  7.  Identify switches (weight and height each recorded as the other parameter)
+#' Utility function to find the value associated with the opposite parameter
+#' For example, if param.1='WEIGHTKG' and param.2='HEIGHTCM', then a vector of height values observed on the same day as the weight values is returned and vice versa.
+#'
 #' @keywords internal
 #' @noRd
 swap.parameters <- function(param.1 = 'WEIGHTKG',
@@ -134,6 +139,17 @@ swap.parameters <- function(param.1 = 'WEIGHTKG',
   return(df$swap)
 }
 
+#' Function to clean data (optionally in batches):
+#' 4.  Dataset split (optional)
+#' a.	In Stata, many of the rest of the steps require you to repeat steps as many times as there are observations for the subject with the highest number of
+#'     observations. Therefore, in order to speed things up I separated the dataset at this point into three groups: short (subjects with <=10 total
+#'     observations), medium (subjects with >10 and <=30 observations) and long (subjects with >30 observations). I performed all the rest of the steps
+#'     separately for each of the 3 datasets and then re-combined them at the end. Note that all observations for a subject stay together. This step is
+#'     definitely not necessary if it will not speed things up in whatever software program you're using.
+#'
+#' NOTE: to use mutliple processes in R we will process patients in batches using the plyr ddply function
+#' set up function to process one patient.  Function to parallelize batches is below.
+#'
 #' @keywords internal
 #' @noRd
 cleanbatch <- function(data.df,
@@ -1907,16 +1923,7 @@ cleangrowth <- function(subjid,
   # safety check: treat observations where tbc.sd cannot be calculated as missing
   data.all[is.na(tbc.sd), exclude := 'Missing']
 
-  # 4.  Dataset split (optional)
-  # a.	In Stata, many of the rest of the steps require you to repeat steps as many times as there are observations for the subject with the highest number of
-  #     observations. Therefore, in order to speed things up I separated the dataset at this point into three groups: short (subjects with <=10 total
-  #     observations), medium (subjects with >10 and <=30 observations) and long (subjects with >30 observations). I performed all the rest of the steps
-  #     separately for each of the 3 datasets and then re-combined them at the end. Note that all observations for a subject stay together. This step is
-  #     definitely not necessary if it will not speed things up in whatever software program you're using.
-
-  # NOTE: to use mutliple processes in R we will process patients in batches using the plyr ddply function
-  # set up function to process one patient.  Function to parallelize batches is below.
-  # CLEANBATCH WAS HERE
+  # NOTE: the rest of cleangrowth's steps are done through cleanbatch().
 
   # optionally process batches in parallel
   if (!quietly)
@@ -1981,8 +1988,10 @@ cleangrowth <- function(subjid,
 
 }
 
-#' Read anthro
+#' Function to calculate z-scores and csd-scores based on anthro tables.
 #'
+#' @param path Path to supplied reference anthro data. Defaults to package anthro tables.
+#' @param cdc.only Whether or not only CDC data should be used. Defaults to false.
 #'
 #' @return Function for calculating BMI based on measurement, age in days, sex, and measurement value.
 #' @export
@@ -2128,6 +2137,7 @@ read.anthro <- function(path = "", cdc.only = F) {
     return(dt$ret)
   })
 }
+
 #' Exponentially Weighted Moving Average (EWMA)
 #'
 #' \code{ewma} calculates the exponentially weighted moving average (EWMA) for a set of numeric observations over time.
@@ -2148,7 +2158,7 @@ read.anthro <- function(path = "", cdc.only = F) {
 #' * The third variable (ewma.after) contains the EWMA for each observation excluding both the actual observation
 #'   and the subsequent observation.
 #'@md
-
+#'
 #' @export
 ewma <- function(agedays, z, ewma.exp, ewma.adjacent = T) {
   # 6.  EWMA calculation description: Most of the next steps will involve calculating the exponentially weighted moving average for each subject and parameter. I will
@@ -2210,7 +2220,10 @@ ewma <- function(agedays, z, ewma.exp, ewma.adjacent = T) {
       data.frame(ewma.all))
 }
 
-
+#' Function to convert vector of ages, in days, into matrix
+#'
+#' @keywords internal
+#' @noRd
 as.matrix.delta <- function(agedays) {
   n <- length(agedays)
   delta <- abs(matrix(rep(agedays, n), n, byrow = T) - agedays)
