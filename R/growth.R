@@ -103,6 +103,37 @@ temporary.duplicates <- function(df) {
   return(df$duplicate & valid.rows)
 }
 
+# 7.  Identify switches (weight and height each recorded as the other parameter)
+# Utility function to find the value associated with the opposite parameter
+# For example, if param.1='WEIGHTKG' and param.2='HEIGHTCM', then a vector of height values observed on the same day as the weight values is returned and vice versa.
+#' @keywords internal
+#' @noRd
+swap.parameters <- function(param.1 = 'WEIGHTKG',
+                            param.2 = 'HEIGHTCM',
+                            field.name = 'tbc.sd',
+                            df) {
+  valid.rows <- valid(df)
+  # copy swap field to a new value for convenience in the code below
+  df$swap <- df[, field.name, with = F]
+  # construct an indexed table with valid parameters for speed in swapping
+  valid.other <- df[valid.rows, list(
+    subjid.other = subjid,
+    param.other = ifelse(
+      param == param.1,
+      param.2,
+      ifelse(param == param.2, param.1, NA)
+    ),
+    agedays.other = agedays,
+    swap
+  )]
+  setkey(valid.other, subjid.other, param.other, agedays.other)
+  # clear swap field (should retain original type)
+  df[, swap := NA]
+  # use indexed table for speed -- assign all values in one statement
+  df[valid.rows, swap := valid.other[list(subjid, param, agedays), swap]]
+  return(df$swap)
+}
+
 #' @keywords internal
 #' @noRd
 cleanbatch <- function(data.df,
@@ -159,35 +190,6 @@ cleanbatch <- function(data.df,
   # capture a list of subjects with possible duplicates for efficiency later
   subj.dup <- data.df[exclude == 'Exclude-Temporary-Duplicate', unique(subjid)]
 
-  # 7.  Identify switches (weight and height each recorded as the other parameter)
-  # Utility function to find the value associated with the opposite parameter
-  # For example, if param.1='WEIGHTKG' and param.2='HEIGHTCM', then a vector of height values observed on the same day as the weight values is returned and vice versa.
-  swap.parameters <- function(param.1 = 'WEIGHTKG',
-                              param.2 = 'HEIGHTCM',
-                              field.name = 'tbc.sd',
-                              df = data.df) {
-    valid.rows <- valid(df)
-    # copy swap field to a new value for convenience in the code below
-    df$swap <- df[, field.name, with = F]
-    # construct an indexed table with valid parameters for speed in swapping
-    valid.other <- df[valid.rows, list(
-      subjid.other = subjid,
-      param.other = ifelse(
-        param == param.1,
-        param.2,
-        ifelse(param == param.2, param.1, NA)
-      ),
-      agedays.other = agedays,
-      swap
-    )]
-    setkey(valid.other, subjid.other, param.other, agedays.other)
-    # clear swap field (should retain original type)
-    df[, swap := NA]
-    # use indexed table for speed -- assign all values in one statement
-    df[valid.rows, swap := valid.other[list(subjid, param, agedays), swap]]
-    return(df$swap)
-  }
-
   # 7a.  For each day on which a subject had both a weight and a height recorded, calculate tbc*sd_sw: SD scores as if the weight had been recorded as the height
   #      and the height had been recorded as the weight, recentered using rcsd_*.  I intentionally did not allow values that were the first or last for a subject/parameter to be replaced as a switch.
   # NOTE: this additional constraint related to first and last values is implemented below via the code
@@ -199,7 +201,7 @@ cleanbatch <- function(data.df,
       Sys.time()
     ))
 
-  data.df[, v.sw := swap.parameters(field.name = 'v')]
+  data.df[, v.sw := swap.parameters(field.name = 'v', df = data.df)]
   # calculate "standard deviation" score for the "swapped" parameter and recenter
   data.df[, tbc.sd.sw := measurement.to.z(param, agedays, sex, v.sw, T) - sd.median]
 
@@ -256,7 +258,7 @@ cleanbatch <- function(data.df,
   # 7d.  For pairs of measurements that meet criteria for a switch, do the following:
   #   i.	Replace wt with the value that was originally recorded as the ht, and replace ht with the value that was originally recorded as the wt
   #   ii.	Replace tbc*sd with the values for tbc*sd_sw
-  data.df$swap.flag.2 <- swap.parameters(field.name = 'swap.flag.1')
+  data.df$swap.flag.2 <- swap.parameters(field.name = 'swap.flag.1', df = data.df)
   data.df[swap.flag.1 &
             swap.flag.2, `:=`(v = v.sw,
                               tbc.sd = tbc.sd.sw,
@@ -1399,7 +1401,7 @@ cleanbatch <- function(data.df,
       "[%s] Exclude single measurements and pairs...\n",
       Sys.time()
     ))
-  data.df$tbc.other.sd <- swap.parameters()
+  data.df$tbc.other.sd <- swap.parameters(df = data.df)
   data.df[, exclude := (function(df) {
     valid.rows <- which(valid(df))
     # calculate median SD for other parameter (used in steps below)
