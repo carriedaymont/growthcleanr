@@ -13,6 +13,26 @@ z_score <- function(var, l, m, s) {
   return(list(z, mz))
 }
 
+#' Function to reorder columns of data table
+#'
+#' @keywords internal
+#' @noRd
+set_cols_first <- function(DT, cols, intersection = TRUE)
+{
+  # thanks to hutils
+  if (intersection) {
+    return(setcolorder(DT, c(
+      intersect(cols, names(DT)),
+      setdiff(names(DT), cols)
+    )))
+  }
+  else {
+    return(setcolorder(DT, c(cols, setdiff(
+      names(DT), cols
+    ))))
+  }
+}
+
 #' ext_bmiz
 #'
 #' \code{ext_bmiz} Calculates the sigma (scale parameter for the half-normal
@@ -98,22 +118,6 @@ ext_bmiz <- function(data,
   library(Hmisc, quietly = T)
   library(magrittr, quietly = T)
   library(labelled, quietly = T)
-
-  set_cols_first <- function (DT, cols, intersection = TRUE)
-  {
-    # thanks to hutils
-    if (intersection) {
-      return(setcolorder(DT, c(
-        intersect(cols, names(DT)),
-        setdiff(names(DT), cols)
-      )))
-    }
-    else {
-      return(setcolorder(DT, c(cols, setdiff(
-        names(DT), cols
-      ))))
-    }
-  }
 
   setDT(data)
 
