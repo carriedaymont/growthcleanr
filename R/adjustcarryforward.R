@@ -10,12 +10,6 @@ library(data.table, quietly = T)
 # changes were made to the original cleangrowth logic. There are other changes
 # as well that are not specifically called out.
 
-# helper function to treat NA values as FALSE
-na.as.false = function(v) {
-  v[is.na(v)] <- F
-  v
-}
-
 #' adjustcarryforward
 #' \code{adjustcarryforward} Uses absolute height velocity to identify values
 #' excluded as carried forward values for reinclusion.
