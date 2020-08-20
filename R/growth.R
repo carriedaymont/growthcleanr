@@ -1,5 +1,26 @@
 
-#' @internal
+# helper function for cleanbatch to identify subset of observations that are either "included" or a "temporary duplicate"
+valid <- function(df,
+                  include.temporary.duplicates = F,
+                  include.duplicates = F,
+                  include.carryforward = F) {
+  exclude <- if (is.data.frame(df))
+    df$exclude
+  else
+    df
+  return(
+    exclude < 'Exclude'
+    |
+      include.temporary.duplicates &
+      exclude == 'Exclude-Temporary-Duplicate'
+    | include.duplicates & exclude == 'Exclude-Duplicate'
+    |
+      include.carryforward &
+      exclude == 'Exclude-Carried-Forward'
+  )
+}
+
+#' @keywords internal
 #' @noRd
 cleanbatch <- function(data.df,
                        log.path,
@@ -44,27 +65,6 @@ cleanbatch <- function(data.df,
 
   # save a copy of all original measurement values before any transformation
   data.df[, v.orig := v]
-
-  # helper function to identify subset of observations that are either "included" or a "temporary duplicate"
-  valid <- function(df = data.df,
-                    include.temporary.duplicates = F,
-                    include.duplicates = F,
-                    include.carryforward = F) {
-    exclude <- if (is.data.frame(df))
-      df$exclude
-    else
-      df
-    return(
-      exclude < 'Exclude'
-      |
-        include.temporary.duplicates &
-        exclude == 'Exclude-Temporary-Duplicate'
-      | include.duplicates & exclude == 'Exclude-Duplicate'
-      |
-        include.carryforward &
-        exclude == 'Exclude-Carried-Forward'
-    )
-  }
 
   # helper function to treat NA values as FALSE
   na.as.false <- function(v) {
@@ -216,7 +216,7 @@ cleanbatch <- function(data.df,
                  swap.flag.1 = F)]
 
   # flag interior measurements
-  data.df[valid(), valid.interior.measurement := if (.N > 2)
+  data.df[valid(data.df), valid.interior.measurement := if (.N > 2)
     c(F, rep(T, .N - 2), F)
     else
       F, by = .(subjid, param)]
@@ -266,7 +266,7 @@ cleanbatch <- function(data.df,
     #    iv.	ht_t_2=ht*2.54
     if (!quietly)
       cat(sprintf("[%s] Identify and recover unit errors...\n", Sys.time()))
-    valid.rows <- valid()
+    valid.rows <- valid(data.df)
     data.df[, `:=`(
       v.d = v / ifelse(param == 'WEIGHTKG', 2.204622, 2.54),
       v.t = v * ifelse(param == 'WEIGHTKG', 2.204622, 2.54)
@@ -310,7 +310,7 @@ cleanbatch <- function(data.df,
     #     replace tbc*sd with the recentered sd-score for the transformed value
 
     # process unit error low first (8.e.i and iii from above), re-factor slightly for efficiency
-    data.df[valid() &
+    data.df[valid(data.df) &
               abs(tbc.sd.d - ewma.all) < 0.3 &
               abs(tbc.sd.d - ewma.before) < 0.5 &
               abs(tbc.sd.d - ewma.after) < 0.5 & abs(tbc.sd.d) < 3
@@ -339,7 +339,7 @@ cleanbatch <- function(data.df,
                  exclude = 'Unit-Error-High')]
 
     # process unit error high second (8.e.ii and iv from above), re-factor slightly for efficiency
-    data.df[valid() &
+    data.df[valid(data.df) &
               abs(tbc.sd.t - ewma.all) < 0.3 &
               abs(tbc.sd.t - ewma.before) < 0.5 &
               abs(tbc.sd.t - ewma.after) < 0.5 & abs(tbc.sd.t) < 3
@@ -385,7 +385,7 @@ cleanbatch <- function(data.df,
     # for efficiency, bring get.prev and get.next inline here (working on valid rows within a single parameter for a single subject)
     # structure c(NA, field.name[-.N]) == get.prev
     data.df[, prev.v := as.double(NaN)]
-    data.df[valid(), prev.v := c(NA, v.orig[-.N]), by = .(subjid, param)]
+    data.df[valid(data.df), prev.v := c(NA, v.orig[-.N]), by = .(subjid, param)]
 
     # optimize "carry forward" for children without duplicates.
     data.df[!(subjid %in% subj.dup) &
@@ -393,7 +393,7 @@ cleanbatch <- function(data.df,
 
     # need to handle children with duplicate measurements on same day separately
     data.df[subjid %in% subj.dup &
-              valid(include.temporary.duplicates = T), exclude := (function(df) {
+              valid(data.df, include.temporary.duplicates = T), exclude := (function(df) {
                 setkey(df, agedays)
                 ages = unique(agedays)
                 # no point in looking for measurements carried forward if all measurements are from a single day of life
@@ -427,7 +427,7 @@ cleanbatch <- function(data.df,
       Sys.time()
     ))
   data.df[na.as.false(
-    valid(include.temporary.duplicates = T) & abs(tbc.sd) > sd.extreme
+    valid(data.df, include.temporary.duplicates = T) & abs(tbc.sd) > sd.extreme
     |
       exclude %in% c('Include', 'Exclude-Temporary-Duplicate') &
       abs(z.orig) > z.extreme
@@ -567,7 +567,7 @@ cleanbatch <- function(data.df,
   data.df[temp.dups, exclude := 'Exclude-Temporary-Duplicate']
 
   # prepare a list of valid rows and initialize variables for convenience
-  valid.rows <- valid()
+  valid.rows <- valid(data.df)
   data.df[, `:=`(
     ewma.all = as.double(NaN),
     abssum2 = as.double(NaN),
