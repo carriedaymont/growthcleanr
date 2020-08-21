@@ -42,3 +42,22 @@ Returns a data frame transformed from long to wide. Includes only values flagged
 \description{
 \code{longwide} transforms data from long to wide format. Ideal for transforming output from growthcleanr::cleangrowth() into a format suitable for growthcleanr::ext_bmiz().
 }
+\examples{
+# Run on a small subset of given data
+df <- as.data.frame(syngrowth)
+df <- df[df$subjid \%in\% unique(df[, "subjid"])[1:5], ]
+df <- cbind(df,
+            "clean_value" = cleangrowth(df$subjid,
+                                        df$param,
+                                        df$agedays,
+                                        df$sex,
+                                        df$measurement))
+# Convert to wide format
+long_df <- longwide(df)
+
+# Include all inclusion types
+long_df <- longwide(df, include_all = T)
+
+# Specify all inclusion codes
+long_df <- longwide(df, inclusion_types = c("Include", "Exclude-Carried-Forward"))
+}
