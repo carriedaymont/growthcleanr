@@ -2108,6 +2108,22 @@ read.anthro = function(path = "", cdc.only = F) {
 #'@md
 
 #' @export
+#' @examples
+#' # Run on 1 subject, 1 type of parameter
+#' df_stats <- as.data.frame(syngrowth)
+#' df_stats <- df_stats[df_stats$subjid == df_stats$subjid[1] &
+#'                        df_stats$param == "HEIGHTCM", ]
+#'
+#' # Get the z-scores
+#' measurement_to_z <- read.anthro(cdc.only = T)
+#' sd <- measurement_to_z(df_stats$param,
+#'                        df_stats$agedays,
+#'                        df_stats$sex,
+#'                        df_stats$measurement,
+#'                        T)
+#'
+#' # Calculate exponentially weighted moving average
+#' e_df <- ewma(df_stats$agedays, sd, ewma.exp = -1.5)
 ewma = function(agedays, z, ewma.exp, ewma.adjacent = T) {
   # 6.  EWMA calculation description: Most of the next steps will involve calculating the exponentially weighted moving average for each subject and parameter. I will
   #     describe how to calculate EWMASDs, and will describe how it needs to be varied in subsequent steps.
