@@ -35,7 +35,7 @@ df_stats <- as.data.frame(syngrowth)
 df_stats <- df_stats[df_stats$subjid == df_stats$subjid[1] &
                        df_stats$param == "HEIGHTCM", ]
 
-# Get the z-scores
+# Get the uncentered z-scores
 measurement_to_z <- read.anthro(cdc.only = T)
 sd <- measurement_to_z(df_stats$param,
                        df_stats$agedays,

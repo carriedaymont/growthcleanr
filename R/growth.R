@@ -2114,7 +2114,7 @@ read.anthro = function(path = "", cdc.only = F) {
 #' df_stats <- df_stats[df_stats$subjid == df_stats$subjid[1] &
 #'                        df_stats$param == "HEIGHTCM", ]
 #'
-#' # Get the z-scores
+#' # Get the uncentered z-scores
 #' measurement_to_z <- read.anthro(cdc.only = T)
 #' sd <- measurement_to_z(df_stats$param,
 #'                        df_stats$agedays,
@@ -2202,6 +2202,24 @@ as.matrix.delta = function(agedays) {
 #' @return Table of data with median SD-scores per day of life by gender and parameter.
 #'
 #' @export
+#' @examples
+#' #' # Run on 1 subject
+#' df_stats <- as.data.frame(syngrowth)
+#' df_stats <- df_stats[df_stats$subjid == df_stats$subjid[1], ]
+#'
+#' # Get the original standard deviations
+#' measurement_to_z <- read.anthro(cdc.only = T)
+#' sd.orig <- measurement_to_z(df_stats$param,
+#'                        df_stats$agedays,
+#'                        df_stats$sex,
+#'                        df_stats$measurement,
+#'                        T)
+#'
+#' # Calculate median standard deviations
+#' sd.m <- sd.median(df_stats$param,
+#'                   df_stats$sex,
+#'                   df_stats$agedays,
+#'                   sd.orig)
 sd.median = function(param, sex, agedays, sd.orig) {
   library("data.table", quietly = T)
 
