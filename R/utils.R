@@ -12,9 +12,23 @@
 #' @param min_row minimum number of rows for each split file (default 10000)
 #' @param keepcol the column name (default "subjid") to use to keep records with the same values together in the same single split file
 #'
-#' @return the count number refering to the last split file written
+#' @return the count number referring to the last split file written
 #'
 #' @export
+#' @examples
+#' \donttest{
+#' df <- as.data.frame(syngrowth)
+#'
+#' # Run with all defaults
+#' splitinput(df)
+#'
+#' # Specifying the name, directory and minimum row size
+#' splitinput(df, fname = "syngrowth", fdir = tempdir(), min_nrow = 5000)
+#'
+#' # Specifying a different subject ID column
+#' colnames(df)[colnames(df) == "subjid"] <- "sub_id"
+#' splitinput(df, keepcol = "sub_id")
+#' }
 splitinput <-
   function(df,
            fname = deparse(substitute(df)),
