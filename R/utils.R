@@ -99,6 +99,17 @@ splitinput <-
 #' @return Returns a data table with recoded sex variables.
 #'
 #' @export
+#' @examples
+#' df <- as.data.frame(syngrowth)
+#'
+#' # Run with all defaults
+#' df_r <- recode_sex(df)
+#'
+#' # Specify different targets
+#' df_rt <- recode_sex(df, targetcol = "sexr", targetm = "Male", targetf = "Female")
+#'
+#' # Specify different inputs
+#' df_ri <- recode_sex(df_rt, sourcecol = "sexr", sourcem = "Male", sourcef = "Female")
 recode_sex <- function(input_data,
                        sourcecol = "sex",
                        sourcem = "0",
