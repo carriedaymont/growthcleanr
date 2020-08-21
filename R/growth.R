@@ -2001,24 +2001,23 @@ read_anthro <- function(path = "", cdc.only = F) {
   # set correct path based on input reference table path (if any)
   weianthro_path <- ifelse(
     path == "",
-    system.file("extdata/weianthro.txt", package = "growthcleanr"),
-    paste(path, "weianthro.txt", sep = "")
+    system.file(file.path("extdata","weianthro.txt"), package = "growthcleanr"),
+    file.path(path, "weianthro.txt")
   )
   lenanthro_path <- ifelse(
     path == "",
-    system.file("extdata/lenanthro.txt", package = "growthcleanr"),
-    paste(path, "lenanthro.txt", sep = "")
+    system.file(file.path("extdata","lenanthro.txt"), package = "growthcleanr"),
+    file.path(path, "lenanthro.txt")
   )
   bmianthro_path <- ifelse(
     path == "",
-    system.file("extdata/bmianthro.txt", package = "growthcleanr"),
-    paste(path, "bmianthro.txt", sep = "")
+    system.file(file.path("extdata","bmianthro.txt"), package = "growthcleanr"),
+    file.path(path, "bmianthro.txt")
   )
   growth_cdc_ext_path <- ifelse(
     path == "",
-    system.file("extdata/growthfile_cdc_ext.csv", package = "growthcleanr"),
-    paste(path, "growthfile_cdc_ext.csv", sep =
-            "")
+    system.file(file.path("extdata","growthfile_cdc_ext.csv"), package = "growthcleanr"),
+    file.path(path, "growthfile_cdc_ext.csv")
   )
 
 
