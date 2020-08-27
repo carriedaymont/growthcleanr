@@ -105,6 +105,10 @@ parser$add_argument('--gridlength',
                     default = 9,
                     type = "integer",
                     help = "Number of steps in grid to search")
+parser$add_argument('--seed',
+                    default = 7,
+                    type = "integer",
+                    help = "Random seed, used only when performing random search")
 parser$add_argument('--quietly',
                     default = FALSE,
                     action = 'store_true',
@@ -126,6 +130,7 @@ parser$add_argument("--outdir",
 
 args <- parser$parse_args()
 
+seed <- args$seed
 searchtype <- args$searchtype
 grid.length <- args$gridlength
 outdir <- args$outdir
@@ -179,6 +184,11 @@ v_min_ht.exp_under <- make_grid_vect(0, 4, grid.length)
 v_min_ht.exp_over <- make_grid_vect(-1, 1, grid.length)
 v_max_ht.exp_under <- make_grid_vect(0, 0.66, grid.length)
 v_max_ht.exp_over <- make_grid_vect(0, 3, grid.length)
+
+# Specify seed, if using random
+if (searchtype == "random"){
+  set.seed(seed)
+}
 
 # Execute
 combo <- exec_sweep(v_minfactor,
