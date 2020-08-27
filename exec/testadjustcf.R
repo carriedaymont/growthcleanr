@@ -6,7 +6,87 @@
 # absolute height velocity check based on step 15 of the Daymont et al.
 # algorithm.
 
+# Specify libraries ----
+
 library(argparse, quietly = T)
+# Load plyr before dplyr intentionally
+library(plyr, quietly = T)
+library(dplyr, quietly = T)
+
+library(data.table, quietly = T)
+
+library(growthcleanr)
+
+# Specify functions ----
+
+# Function to make a grid vector for future sweep
+# inputs:
+# - low: number to start vector
+# - high: number to end vector
+# - grid.length: length of vector
+# outputs
+# - numeric vector with specified qualities
+make_grid_vect <- function(low, high, grid.length){
+  return(seq(low, high, length = grid.length))
+}
+
+# Function to execute sweep of parameter values for adjustcarryforward
+# inputs:
+# - vectors of parameters to sweep
+# outputs:
+# - combined input file and result of each run
+exec_sweep <- function(v_minfactor,
+                       v_maxfactor,
+                       v_banddiff,
+                       v_banddiff_plus,
+                       v_min_ht.exp_under,
+                       v_min_ht.exp_over,
+                       v_max_ht.exp_under,
+                       v_max_ht.exp_over){
+
+  for (index in 1:length(v_minfactor)) {
+    if (!quietly)
+      cat(sprintf(
+        "[%s] Calling adjustcarryforward(), run %s\n",
+        Sys.time(),
+        index
+      ))
+    out <-
+      adjustcarryforward(
+        subjid,
+        param,
+        agedays,
+        sex,
+        measurement,
+        orig.exclude,
+        n,
+        quietly = quietly,
+        minfactor = v_minfactor[index],
+        maxfactor = v_maxfactor[index],
+        banddiff = v_banddiff[index],
+        banddiff_plus = v_banddiff_plus[index],
+        min_ht.exp_under = v_min_ht.exp_under[index],
+        v_min_ht.exp_over[index],
+        max_ht.exp_under = v_max_ht.exp_under[index],
+        max_ht.exp_over = v_max_ht.exp_over[index]
+      )
+
+    setnames(out, "adjustcarryforward", sprintf("run-%s", index))
+    export <-
+      merge(as.data.frame(dm_filt), out, by = "n", all = T)
+
+    # Combine into one wide set for simplicity
+    if (index == 1) {
+      combo <- export
+    } else {
+      combo <- merge(combo, out, by = "n", all = T) # %>% select(-n)
+    }
+  }
+
+  return(combo)
+}
+
+# Specify parser ----
 
 parser <-
   ArgumentParser(description = 'CLI driver for carry forward adjustments')
@@ -17,6 +97,10 @@ parser$add_argument(
   nargs = 1,
   help = 'Input file, cleaned by cleangrowth()'
 )
+parser$add_argument('--searchtype',
+                    default = 'random',
+                    type = "character",
+                    help = "Type of search to perform: random (default), line-grid, full-grid")
 parser$add_argument('--gridlength',
                     default = 9,
                     type = "integer",
@@ -38,22 +122,17 @@ parser$add_argument("--outdir",
                     type = "character",
                     help = "Directory for output files, default 'output' (no trailing slash)")
 
+# Parse arguments for ease ----
+
 args <- parser$parse_args()
 
+searchtype <- args$searchtype
 grid.length <- args$gridlength
 outdir <- args$outdir
 quietly <- args$quietly
 
-# Load plyr before dplyr intentionally
-library(plyr, quietly = T)
-library(dplyr, quietly = T)
+# Prepare the data ----
 
-library(data.table, quietly = T)
-
-library(growthcleanr)
-
-
-######################## Prepare the data #############
 # Read in data
 dm <- fread(args$infile)
 setkey(dm, subjid, param, agedays)
@@ -81,9 +160,10 @@ param <- with(dm_filt, param)
 sex <- with(dm_filt, sex)
 agedays <- with(dm_filt, agedays)
 measurement <- with(dm_filt, measurement)
-orig.exclude <- with(dm_filt, exclude)
+orig.exclude <- with(dm_filt, clean_value)
 
-### Execute a sweep of parameters ###
+# Execute parameter sweep ----
+
 if (!quietly)
   cat(sprintf(
     "[%s] Running parameter sweep of adjustcarryforward on cleaned dataset\n",
@@ -91,54 +171,26 @@ if (!quietly)
   ))
 
 # Define the params to test
-v_minfactor <- seq(0, 1, length = grid.length)
-v_maxfactor <- seq(0, 4, length = grid.length)
-v_banddiff <-  seq(0, 6, length = grid.length)
-v_banddiff_plus <- seq(0, 11, length = grid.length)
-v_min_ht.exp_under <- seq(0, 4, length = grid.length)
-v_min_ht.exp_over <- seq(-1, 1, length = grid.length)
-v_max_ht.exp_under <- seq(0, 0.66, length = grid.length)
-v_max_ht.exp_over <- seq(0, 3, length = grid.length)
+v_minfactor <- make_grid_vect(0, 1, grid.length)
+v_maxfactor <- make_grid_vect(0, 4, grid.length)
+v_banddiff <-  make_grid_vect(0, 6, grid.length)
+v_banddiff_plus <- make_grid_vect(0, 11, grid.length)
+v_min_ht.exp_under <- make_grid_vect(0, 4, grid.length)
+v_min_ht.exp_over <- make_grid_vect(-1, 1, grid.length)
+v_max_ht.exp_under <- make_grid_vect(0, 0.66, grid.length)
+v_max_ht.exp_over <- make_grid_vect(0, 3, grid.length)
 
 # Execute
-for (index in 1:length(v_minfactor)) {
-  if (!quietly)
-    cat(sprintf(
-      "[%s] Calling adjustcarryforward(), run %s\n",
-      Sys.time(),
-      index
-    ))
-  out <-
-    adjustcarryforward(
-      subjid,
-      param,
-      agedays,
-      sex,
-      measurement,
-      orig.exclude,
-      n,
-      quietly = quietly,
-      minfactor = v_minfactor[index],
-      maxfactor = v_maxfactor[index],
-      banddiff = v_banddiff[index],
-      banddiff_plus = v_banddiff_plus[index],
-      min_ht.exp_under = v_min_ht.exp_under[index],
-      v_min_ht.exp_over[index],
-      max_ht.exp_under = v_max_ht.exp_under[index],
-      max_ht.exp_over = v_max_ht.exp_over[index]
-    )
+combo <- exec_sweep(v_minfactor,
+                    v_maxfactor,
+                    v_banddiff,
+                    v_banddiff_plus,
+                    v_min_ht.exp_under,
+                    v_min_ht.exp_over,
+                    v_max_ht.exp_under,
+                    v_max_ht.exp_over)
 
-  setnames(out, "adjustcarryforward", sprintf("run-%s", index))
-  export <-
-    merge(as.data.frame(dm_filt), out, by = "n", all = T)
-
-  # Combine into one wide set for simplicity
-  if (index == 1) {
-    combo <- export
-  } else {
-    combo <- merge(combo, out, by = "n", all = T) # %>% select(-n)
-  }
-}
+# Write out results ----
 
 # Combined adjusted set
 fwrite(combo %>% select(-n), file.path(outdir, "all-adjusted.csv"), row.names = F)

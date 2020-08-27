@@ -28,6 +28,8 @@ file:
 ```R
 > fwrite(cleaned_data, "cleaned.csv", row.names = F)
 ```
+Note that the column names should be as described for `cleaned_data` the Example 
+under Quickstart.
 
 The sweep script is executed from the command line on the cleaned data file:
 
@@ -93,7 +95,7 @@ sweep (hence the examples w/5 and 9 step sweeps).
 And the first few result rows in `output/all-adjusted.csv` would be:
 
 ```R
-id     subjid    sex  agedays  param     measurement  exclude                    run-1      run-2      run-3      run-4      run-5
+id     subjid    sex  agedays  param     measurement  clean_value                   run-1      run-2      run-3      run-4      run-5
 1510   775155    0    889      HEIGHTCM  84.9         Exclude-Duplicate          Missing    Missing    Missing    Missing    Missing
 1511   775155    0    889      HEIGHTCM  89.06        Include                    No Change  No Change  No Change  No Change  No Change
 1512   775155    0    1071     HEIGHTCM  92.5         Include                    No Change  No Change  No Change  No Change  No Change
@@ -111,7 +113,7 @@ adjusted for reinclusion. To demonstrate the range, the following is an extract 
 measurements only marked as carried forward exclusions by `cleangrowth()`:
 
 ```R
-id     subjid     sex  agedays  param     measurement  exclude                  run-1      run-2      run-3      run-4      run-5
+id     subjid     sex  agedays  param     measurement  clean_value                  run-1      run-2      run-3      run-4      run-5
 1514   775155     0    1435     HEIGHTCM  96.2         Exclude-Carried-Forward  No Change  No Change  Include    Include    Include
 1521   775155     0    1435     WEIGHTKG  15.3         Exclude-Carried-Forward  No Change  No Change  No Change  No Change  No Change
 7952   1340377    1    1806     HEIGHTCM  107.1        Exclude-Carried-Forward  No Change  Include    Include    Include    Include
