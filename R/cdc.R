@@ -61,6 +61,11 @@
 #' @return Expanded data frame containing computed BMI values
 #'
 #' @export
+#' @import data.table
+#' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
+#' @import Hmisc
+#' @import magrittr
+#' @import labelled
 #' @examples
 #' # Calling the function with default column names
 #' d_bmi <- ext_bmiz(inputdata)
@@ -78,12 +83,6 @@ ext_bmiz <- function(data,
                      bmi = "bmi",
                      adjust.integer.age = T,
                      ref.data.path = "") {
-  library(data.table, quietly = T)
-  library(dplyr, quietly = T)
-  library(Hmisc, quietly = T)
-  library(magrittr, quietly = T)
-  library(labelled, quietly = T)
-
   set_cols_first <- function (DT, cols, intersection = TRUE)
   {
     # thanks to hutils

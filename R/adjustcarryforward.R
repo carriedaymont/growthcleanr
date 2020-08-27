@@ -1,10 +1,3 @@
-
-# Load plyr before dplyr intentionally
-library(plyr, quietly = T)
-library(dplyr, quietly = T)
-library(data.table, quietly = T)
-
-
 ### Define the helper function and the carryforward adjustment function ###
 # Segments labeled with ADJUSTCF EDIT in comments are areas where substantive
 # changes were made to the original cleangrowth logic. There are other changes
@@ -52,6 +45,9 @@ na.as.false = function(v) {
 #' @return Re-evaluated exclusion assessments based on height velocity.
 #'
 #' @export
+#' @rawNamespace import(plyr, except = c(failwith, id, summarize, count, desc, mutate, arrange, rename, is.discrete, summarise, summarize))
+#' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
+#' @import data.table
 adjustcarryforward <- function(subjid,
                                param,
                                agedays,

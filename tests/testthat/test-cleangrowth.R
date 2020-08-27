@@ -1,5 +1,3 @@
-library(dplyr)
-
 test_that("growthcleanr works as expected on synthetic data", {
 
   # Run cleangrowth() on syngrowth data
