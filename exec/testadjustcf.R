@@ -46,7 +46,16 @@ make_grid_vect <- function(low,
   } else if (searchtype == "line-grid") { # line-grid parameter sweep
     return(seq(low, high, length = grid.length))
   } else if (searchtype == "full-grid"){
-
+    if (is_included){
+      # full grid vectors are put together outside the list
+      return(seq(low, high, length = grid.length))
+    } else {
+      if (is.na(fg_val)){
+        return(c((low + high)/2))
+      } else {
+        return(c(fg_val))
+      }
+    }
   } else {
     stop("Invalid search type")
   }
@@ -212,42 +221,62 @@ if (searchtype == "random"){
   set.seed(seed)
 }
 
+# Have a data frame of ranges
+param_n <- c("minfactor",
+             "maxfactor",
+             "banddiff",
+             "banddiff_plus",
+             "min_ht.exp_under",
+             "min_ht.exp_over",
+             "max_ht.exp_under",
+             "max_ht.exp_over")
+
+p_range <- data.frame(
+  "param" = param_n,
+  low = c(0,0,0,0,0,-1,0,0),
+  high = c(1,4,6,11,4,1,0.66,3)
+)
+rownames(p_range) <- p_range$param
+
 # Define the params to test
 if (searchtype == "full-grid"){
   # specify parameter choices -- default to choosing all
   if (param_choice != "none"){
     param_df <- read.csv(param_choice)
-    colnames(param_df) <- c("Param", "Include", "Value")
+    colnames(param_df) <- c("param", "include", "value")
   } else {
     param_df <- data.frame(
-      "Param" = c("minfactor",
-                  "maxfactor",
-                  "banddiff",
-                  "banddiff_plus",
-                  "min_ht.exp_under",
-                  "min_ht.exp_over",
-                  "max_ht.exp_under",
-                  "max_ht.exp_over"),
-      "Include" = T,
-      "Value" = NA
+      "param" = param_n,
+      "include" = T,
+      "value" = NA
     )
   }
   # now pass them in one by one
   grid_list <- list()
   for (i in 1:nrow(param_df)){
-
+    grid_list[[param_df$param[i]]] <-
+      make_grid_vect(p_range[param_df$param[i], "low"],
+                     p_range[param_df$param[i], "high"],
+                     grid.length,
+                     searchtype,
+                     as.logical(param_df$include[i]),
+                     as.numeric(param_df$value[i]))
   }
 
+  # make the full grid based on the list
+  grid_df <- expand.grid(grid_list)
+} else {
+  grid_df <- as.data.frame(matrix(NA, nrow = grid.length, ncol = nrow(p_range)))
+  colnames(grid_df) <- p_range$param
+  for (i in 1:nrow(param_df)){
+    grid_df[,param_df$param[i]] <-
+      make_grid_vect(p_range[param_df$param[i], "low"],
+                     p_range[param_df$param[i], "high"],
+                     grid.length,
+                     searchtype)
+  }
 }
 
-v_minfactor <- make_grid_vect(0, 1, grid.length, searchtype)
-v_maxfactor <- make_grid_vect(0, 4, grid.length, searchtype)
-v_banddiff <-  make_grid_vect(0, 6, grid.length, searchtype)
-v_banddiff_plus <- make_grid_vect(0, 11, grid.length, searchtype)
-v_min_ht.exp_under <- make_grid_vect(0, 4, grid.length, searchtype)
-v_min_ht.exp_over <- make_grid_vect(-1, 1, grid.length, searchtype)
-v_max_ht.exp_under <- make_grid_vect(0, 0.66, grid.length, searchtype)
-v_max_ht.exp_over <- make_grid_vect(0, 3, grid.length, searchtype)
 
 # Execute
 combo <- exec_sweep(v_minfactor,
