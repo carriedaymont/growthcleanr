@@ -25,9 +25,16 @@ library(growthcleanr)
 # - high: number to end vector
 # - grid.length: length of vector
 # - searchtype: type of vector to make ("random","line-grid","full-grid")
+# - is_included:
+# - fg_val: value to use for non-used param in full-grid search
 # outputs
 # - numeric vector with specified qualities
-make_grid_vect <- function(low, high, grid.length, searchtype){
+make_grid_vect <- function(low,
+                           high,
+                           grid.length,
+                           searchtype,
+                           is_included = T,
+                           fg_val = (low + high)/2){
   if (searchtype == "random"){ # random parameter sweep
     mid <- (low + high)/2
     # return half random below, midpoint, half random above
@@ -38,6 +45,8 @@ make_grid_vect <- function(low, high, grid.length, searchtype){
     return(gv)
   } else if (searchtype == "line-grid") { # line-grid parameter sweep
     return(seq(low, high, length = grid.length))
+  } else if (searchtype == "full-grid"){
+
   } else {
     stop("Invalid search type")
   }
@@ -122,6 +131,10 @@ parser$add_argument('--seed',
                     default = 7,
                     type = "integer",
                     help = "Random seed, used only when performing random search")
+parser$add_argument("--param",
+                    default = "none",
+                    type = "character",
+                    help = "CSV to specify which parameters to run full search on, and values to use if not, used only when performing full-grid search")
 parser$add_argument('--quietly',
                     default = FALSE,
                     action = 'store_true',
@@ -148,6 +161,7 @@ searchtype <- args$searchtype
 grid.length <- args$gridlength
 outdir <- args$outdir
 quietly <- args$quietly
+param_choice <- args$param
 
 if (searchtype == "random"){
   # if the line search isn't odd, add one so that it includes the midpoint
@@ -199,6 +213,33 @@ if (searchtype == "random"){
 }
 
 # Define the params to test
+if (searchtype == "full-grid"){
+  # specify parameter choices -- default to choosing all
+  if (param_choice != "none"){
+    param_df <- read.csv(param_choice)
+    colnames(param_df) <- c("Param", "Include", "Value")
+  } else {
+    param_df <- data.frame(
+      "Param" = c("minfactor",
+                  "maxfactor",
+                  "banddiff",
+                  "banddiff_plus",
+                  "min_ht.exp_under",
+                  "min_ht.exp_over",
+                  "max_ht.exp_under",
+                  "max_ht.exp_over"),
+      "Include" = T,
+      "Value" = NA
+    )
+  }
+  # now pass them in one by one
+  grid_list <- list()
+  for (i in 1:nrow(param_df)){
+
+  }
+
+}
+
 v_minfactor <- make_grid_vect(0, 1, grid.length, searchtype)
 v_maxfactor <- make_grid_vect(0, 4, grid.length, searchtype)
 v_banddiff <-  make_grid_vect(0, 6, grid.length, searchtype)
