@@ -202,11 +202,12 @@ orig.exclude <- with(dm_filt, clean_value)
 
 # Execute parameter sweep ----
 
-if (!quietly)
+if (!quietly){
   cat(sprintf(
     "[%s] Running parameter sweep of adjustcarryforward on cleaned dataset\n",
     Sys.time()
   ))
+}
 
 # Specify seed, if using random
 if (searchtype == "random"){
@@ -243,6 +244,15 @@ if (searchtype == "full-grid"){
       "value" = NA
     )
   }
+
+  if (searchtype == "full-grid"){
+    cat(paste0(
+      "[",Sys.time(),
+      "] Note: due to the search type specified (full-grid), there will be ",
+      grid.length^sum(param_df$include)," runs\n"
+    ))
+  }
+
   # now pass them in one by one
   grid_list <- list()
   for (i in 1:nrow(param_df)){
@@ -257,10 +267,10 @@ if (searchtype == "full-grid"){
 
   # make the full grid based on the list
   grid_df <- expand.grid(grid_list)
-} else {
+} else { # for random and line-grid options
   grid_df <- as.data.frame(matrix(NA, nrow = grid.length, ncol = nrow(p_range)))
   colnames(grid_df) <- p_range$param
-  for (i in 1:nrow(grid_df)){
+  for (i in 1:ncol(grid_df)){
     grid_df[,p_range$param[i]] <-
       make_grid_vect(p_range[p_range$param[i], "low"],
                      p_range[p_range$param[i], "high"],
@@ -279,7 +289,7 @@ combo <- exec_sweep(grid_df)
 fwrite(combo %>% select(-n), file.path(outdir, "all-adjusted.csv"), row.names = F)
 
 # Record the sweep parameters for review
-grid <- cbind("run" = 1:grid.length, grid_df)
+grid <- cbind("run" = 1:nrow(grid_df), grid_df)
 fwrite(grid, file.path(outdir, "params.csv"), row.names = F)
 
 # Any additional debugging output
