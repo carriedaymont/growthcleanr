@@ -279,18 +279,7 @@ combo <- exec_sweep(grid_df)
 fwrite(combo %>% select(-n), file.path(outdir, "all-adjusted.csv"), row.names = F)
 
 # Record the sweep parameters for review
-grid <-
-  data.frame(
-    run = 1:grid.length,
-    minfactor = v_minfactor,
-    maxfactor = v_maxfactor,
-    banddiff = v_banddiff,
-    banddiff_plus = v_banddiff_plus,
-    min_ht.exp_under = v_min_ht.exp_under,
-    min_ht.exp_over = v_min_ht.exp_over,
-    max_ht.exp_under = v_max_ht.exp_under,
-    max_ht.exp_over = v_max_ht.exp_over
-  )
+grid <- cbind("run" = 1:grid.length, grid_df)
 fwrite(grid, file.path(outdir, "params.csv"), row.names = F)
 
 # Any additional debugging output
