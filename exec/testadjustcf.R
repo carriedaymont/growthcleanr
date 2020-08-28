@@ -63,19 +63,11 @@ make_grid_vect <- function(low,
 
 # Function to execute sweep of parameter values for adjustcarryforward
 # inputs:
-# - vectors of parameters to sweep
+# - grid_df: data frame of parameters to sweep
 # outputs:
 # - combined input file and result of each run
-exec_sweep <- function(v_minfactor,
-                       v_maxfactor,
-                       v_banddiff,
-                       v_banddiff_plus,
-                       v_min_ht.exp_under,
-                       v_min_ht.exp_over,
-                       v_max_ht.exp_under,
-                       v_max_ht.exp_over){
-
-  for (index in 1:length(v_minfactor)) {
+exec_sweep <- function(grid_df){
+  for (index in 1:nrow(grid_df)) {
     if (!quietly)
       cat(sprintf(
         "[%s] Calling adjustcarryforward(), run %s\n",
@@ -92,14 +84,14 @@ exec_sweep <- function(v_minfactor,
         orig.exclude,
         n,
         quietly = quietly,
-        minfactor = v_minfactor[index],
-        maxfactor = v_maxfactor[index],
-        banddiff = v_banddiff[index],
-        banddiff_plus = v_banddiff_plus[index],
-        min_ht.exp_under = v_min_ht.exp_under[index],
-        v_min_ht.exp_over[index],
-        max_ht.exp_under = v_max_ht.exp_under[index],
-        max_ht.exp_over = v_max_ht.exp_over[index]
+        minfactor = grid_df$minfactor[index],
+        maxfactor = grid_df$maxfactor[index],
+        banddiff = grid_df$banddiff[index],
+        banddiff_plus = grid_df$banddiff_plus[index],
+        min_ht.exp_under = grid_df$min_ht.exp_under[index],
+        min_ht.exp_over = grid_df$min_ht.exp_over[index],
+        max_ht.exp_under = grid_df$max_ht.exp_under[index],
+        max_ht.exp_over = grid_df$max_ht.exp_over[index]
       )
 
     setnames(out, "adjustcarryforward", sprintf("run-%s", index))
@@ -268,10 +260,10 @@ if (searchtype == "full-grid"){
 } else {
   grid_df <- as.data.frame(matrix(NA, nrow = grid.length, ncol = nrow(p_range)))
   colnames(grid_df) <- p_range$param
-  for (i in 1:nrow(param_df)){
-    grid_df[,param_df$param[i]] <-
-      make_grid_vect(p_range[param_df$param[i], "low"],
-                     p_range[param_df$param[i], "high"],
+  for (i in 1:nrow(grid_df)){
+    grid_df[,p_range$param[i]] <-
+      make_grid_vect(p_range[p_range$param[i], "low"],
+                     p_range[p_range$param[i], "high"],
                      grid.length,
                      searchtype)
   }
@@ -279,14 +271,7 @@ if (searchtype == "full-grid"){
 
 
 # Execute
-combo <- exec_sweep(v_minfactor,
-                    v_maxfactor,
-                    v_banddiff,
-                    v_banddiff_plus,
-                    v_min_ht.exp_under,
-                    v_min_ht.exp_over,
-                    v_max_ht.exp_under,
-                    v_max_ht.exp_over)
+combo <- exec_sweep(grid_df)
 
 # Write out results ----
 
