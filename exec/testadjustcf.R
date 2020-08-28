@@ -24,10 +24,23 @@ library(growthcleanr)
 # - low: number to start vector
 # - high: number to end vector
 # - grid.length: length of vector
+# - searchtype: type of vector to make ("random","line-grid","full-grid")
 # outputs
 # - numeric vector with specified qualities
-make_grid_vect <- function(low, high, grid.length){
-  return(seq(low, high, length = grid.length))
+make_grid_vect <- function(low, high, grid.length, searchtype){
+  if (searchtype == "random"){ # random parameter sweep
+    mid <- (low + high)/2
+    # return half random below, midpoint, half random above
+    gv <- c(runif(floor(grid.length/2), low, mid),
+            mid,
+            runif(floor(grid.length/2), mid, high))
+
+    return(gv)
+  } else if (searchtype == "line-grid") { # line-grid parameter sweep
+    return(seq(low, high, length = grid.length))
+  } else {
+    stop("Invalid search type")
+  }
 }
 
 # Function to execute sweep of parameter values for adjustcarryforward
@@ -136,6 +149,11 @@ grid.length <- args$gridlength
 outdir <- args$outdir
 quietly <- args$quietly
 
+if (searchtype == "random"){
+  # if the line search isn't odd, add one so that it includes the midpoint
+  grid.length <- if (grid.length %% 2 == 0){ grid.length + 1 } else { grid.length }
+}
+
 # Prepare the data ----
 
 # Read in data
@@ -175,20 +193,20 @@ if (!quietly)
     Sys.time()
   ))
 
-# Define the params to test
-v_minfactor <- make_grid_vect(0, 1, grid.length)
-v_maxfactor <- make_grid_vect(0, 4, grid.length)
-v_banddiff <-  make_grid_vect(0, 6, grid.length)
-v_banddiff_plus <- make_grid_vect(0, 11, grid.length)
-v_min_ht.exp_under <- make_grid_vect(0, 4, grid.length)
-v_min_ht.exp_over <- make_grid_vect(-1, 1, grid.length)
-v_max_ht.exp_under <- make_grid_vect(0, 0.66, grid.length)
-v_max_ht.exp_over <- make_grid_vect(0, 3, grid.length)
-
 # Specify seed, if using random
 if (searchtype == "random"){
   set.seed(seed)
 }
+
+# Define the params to test
+v_minfactor <- make_grid_vect(0, 1, grid.length, searchtype)
+v_maxfactor <- make_grid_vect(0, 4, grid.length, searchtype)
+v_banddiff <-  make_grid_vect(0, 6, grid.length, searchtype)
+v_banddiff_plus <- make_grid_vect(0, 11, grid.length, searchtype)
+v_min_ht.exp_under <- make_grid_vect(0, 4, grid.length, searchtype)
+v_min_ht.exp_over <- make_grid_vect(-1, 1, grid.length, searchtype)
+v_max_ht.exp_under <- make_grid_vect(0, 0.66, grid.length, searchtype)
+v_max_ht.exp_over <- make_grid_vect(0, 3, grid.length, searchtype)
 
 # Execute
 combo <- exec_sweep(v_minfactor,
