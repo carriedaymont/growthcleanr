@@ -58,8 +58,31 @@ on either side of the midpoint. The midpoint is always included.
   * Note that if an even number is specified for `--gridlength`, one will be added to 
   include the midpoint in the run.
   * A random seed can be specified with `--seed` (default 7).
-* `line-grid`: Values will be evenly distributed along the range for each parameter. 
+* `line-grid`: Values will be evenly distributed along the range for each parameter.
 If the `--gridlength` specified is odd, this will include the midpoint.
+* `full-grid`: Values for each included parameter will evenly distributed along the
+range for each parameter and in a full combination between all parameters.
+  * Thus, the amount of runs done will be the `--gridlength`^(number of included 
+parameters).
+  * Default includes a full grid search among all parameters. To specify use of only specific parameters, use the `--param` option, which specifies a CSV of the following format:
+  | parameter | include | value |
+  | - | - | - |
+  `minfactor` | T |  |
+  `maxfactor` | F | 3 |
+  `banddiff` | F |  |
+  `banddiff_plus` | F |  |
+  `min_ht.exp_under` | T |  |
+  `min_ht.exp_over` | F |  |
+  `max_ht_exp_under` | F | .5 |
+  `max_ht.exp_over` | F |  |
+    * The first column specifies all the parameter names; the second specifies a
+    true or false value for whether or not the parameter should be included; the
+    third specifies a constant value to be used for not included parameters, left
+    empty if the value should be the default.
+    * In the above example, `minfactor` and `min_ht.exp_under` will be included, and
+    `maxfactor` and `max_ht_exp_under` will not be included, but will use 3 and .5
+    as their values.
+  * Warning: this will take much longer!
 
 The default number of sweep steps is 9; this can be changed with the option
 `--gridlength`. 
@@ -94,6 +117,21 @@ run  minfactor  maxfactor  banddiff  banddiff_plus  min_ht.exp_under  min_ht.exp
 7    0.75       3          4.5       8.25           3                 0.5              0.495             2.25
 8    0.875      3.5        5.25      9.625          3.5               0.75             0.5775            2.625
 9    1          4          6         11             4                 1                0.66              3
+```
+
+In a 3-step sweep with a `full-grid` search type, with the `--param` CSV specified as in the above example, the parameters passed to the function in each pass will be:
+
+```R
+run minfactor maxfactor banddiff banddiff_plus min_ht.exp_under min_ht.exp_over max_ht.exp_under max_ht.exp_over
+1       0.0         3        3           5.5                0               0              0.5             1.5
+2       0.5         3        3           5.5                0               0              0.5             1.5
+3       1.0         3        3           5.5                0               0              0.5             1.5
+4       0.0         3        3           5.5                2               0              0.5             1.5
+5       0.5         3        3           5.5                2               0              0.5             1.5
+6       1.0         3        3           5.5                2               0              0.5             1.5
+7       0.0         3        3           5.5                4               0              0.5             1.5
+8       0.5         3        3           5.5                4               0              0.5             1.5
+9       1.0         3        3           5.5                4               0              0.5             1.5
 ```
 
 The output, in the `output/` directory will contain the sweep parameters, like
