@@ -51,8 +51,36 @@ following parameters, where the min and max surround the default value:
 `max_ht_exp_under` | 0.33 | 0 | 0.66
 `max_ht.exp_over` | 1.5 | 0 | 3
 
+The determination of these values depends on the search type (specified with the 
+option `--searchtype`:
+* `random` (default): Values will be generated randomly, with equal amounts of values 
+on either side of the midpoint. The midpoint is always included.
+  * Note that if an even number is specified for `--gridlength`, one will be added to 
+  include the midpoint in the run.
+  * A random seed can be specified with `--seed` (default 7).
+* `line-grid`: Values will be evenly distributed along the range for each parameter. 
+If the `--gridlength` specified is odd, this will include the midpoint.
+
 The default number of sweep steps is 9; this can be changed with the option
-`--gridlength`. For example, for a 9-step sweep, the parameters passed to the
+`--gridlength`. 
+
+For example, for a 9-step sweep with the default search type, `random`, the parameters 
+passed to the function in each pass will be:
+
+```R
+run	minfactor	maxfactor	banddiff	banddiff_plus	min_ht.exp_under	min_ht.exp_over	max_ht.exp_under	max_ht.exp_over
+1	0.494454649	0.331710969	1.681997601	5.438065292	0.371428523	-0.200524185	0.296497153	0.244186167
+2	0.198872727	0.918207332	0.0261138	0.361051567	0.370286443	-0.618056939	0.318943811	0.280842425
+3	0.057848889	0.343496154	2.957211272	3.448713172	0.758593493	-0.240298769	0.189112731	0.586874211
+4	0.034874339	0.462954204	0.949754412	2.697612725	1.694048784	-0.563224398	0.237626234	0.410851815
+5	0.5	2	3	5.5	2	0	0.33	1.5
+6	0.621874695	3.545623892	4.918346826	10.84063427	2.996152267	0.904217721	0.585439346	1.787876622
+7	0.896005213	2.192603083	3.885669706	7.492214661	3.581171147	0.319534914	0.537161064	2.25658771
+8	0.670031176	2.90689554	5.990111082	9.239964036	3.676927744	0.082569093	0.568586483	2.645760535
+9	0.98603125	2.169401426	5.718063961	6.950459617	2.91380773	0.816289079	0.457654322	2.540503306
+```
+
+In a 9-step sweep with a `line-grid` search type, the parameters passed to the
 function in each pass will be:
 
 ```R
@@ -72,10 +100,10 @@ The output, in the `output/` directory will contain the sweep parameters, like
 the above, in a file called `params.csv`, and the output with adjustment results
 in a file called `all-adjusted.csv`.
 
-For example, a 5-step sweep would be run with this command:
+For example, a 5-step sweep with the `line-grid` search would be run with this command:
 
 ```bash
-% Rscript exec/textadjustcf.R --gridlength 5 cleaned.csv
+% Rscript exec/textadjustcf.R --gridlength 5 --searchtype line-grid cleaned.csv
 ```
 
 The parameter set for the sweep in file `output/params.csv` would be:
