@@ -70,9 +70,10 @@ exec_sweep <- function(grid_df){
   for (index in 1:nrow(grid_df)) {
     if (!quietly)
       cat(sprintf(
-        "[%s] Calling adjustcarryforward(), run %s\n",
+        "[%s] Calling adjustcarryforward(), run %s of %s\n",
         Sys.time(),
-        index
+        index,
+        nrow(grid_df)
       ))
     out <-
       adjustcarryforward(
