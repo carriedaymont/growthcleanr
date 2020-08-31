@@ -48,7 +48,7 @@ following parameters, where the min and max surround the default value:
 `banddiff_plus` | 5.5 | 0 | 11
 `min_ht.exp_under` | 2 | 0 | 4
 `min_ht.exp_over` | 0 | -1 | 1
-`max_ht_exp_under` | 0.33 | 0 | 0.66
+`max_ht.exp_under` | 0.33 | 0 | 0.66
 `max_ht.exp_over` | 1.5 | 0 | 3
 
 The determination of these values depends on the search type (specified with the 
@@ -73,7 +73,7 @@ parameters).
   `banddiff_plus` | F |  |
   `min_ht.exp_under` | T |  |
   `min_ht.exp_over` | F |  |
-  `max_ht_exp_under` | F | .5 |
+  `max_ht.exp_under` | F | .5 |
   `max_ht.exp_over` | F |  |
     * The first column specifies all the parameter names; the second specifies a
     true or false value for whether or not the parameter should be included; the
