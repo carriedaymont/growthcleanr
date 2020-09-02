@@ -7,6 +7,7 @@
 splitinput(
   df,
   fname = deparse(substitute(df)),
+  fdir = "",
   min_nrow = 10000,
   keepcol = "subjid"
 )
@@ -15,6 +16,8 @@ splitinput(
 \item{df}{data frame to split}
 
 \item{fname}{new name for each of the split files to start with}
+
+\item{fdir}{directory to put each of the split files (default working directory)}
 
 \item{keepcol}{the column name (default "subjid") to use to keep records with the same values together in the same single split file}
 
