@@ -13,7 +13,8 @@ test_that("splitinput splits files correctly with default values", {
   df <- create_df(num_ids, num_obs)
   # where to put output
   fcount <- splitinput(df,
-                       fname = paste0(tempdir(), "/df"))
+                       fname = "df",
+                       fdir = tempdir())
 
   # check that it yielded the correct number of files, with the correct name
   f_log <- grepl("df.*.csv", list.files(tempdir()))
@@ -62,7 +63,8 @@ test_that("splitinput splits files correctly with custom values", {
   df <- create_df(num_ids, num_obs)
   # run splitinput with new name, less than the default observations
   fcount <- splitinput(df,
-                       fname = paste0(tempdir(), "/onesub"))
+                       fname = "onesub",
+                       fdir = tempdir())
 
   # check that it yielded the correct number of files, with the correct name
   f_log <- grepl("onesub.*.csv", list.files(tempdir()))
@@ -85,7 +87,8 @@ test_that("splitinput splits files correctly with custom values", {
   # try reducing the amount of minimum rows
   fcount <- splitinput(df,
                        min_nrow = 2,
-                       fname = paste0(tempdir(), "/lessrows"))
+                       fname = "lessrows",
+                       fdir = tempdir())
 
   # check that it did not split the file
   f_log <- grepl("lessrows.*.csv", list.files(tempdir()))
@@ -96,10 +99,11 @@ test_that("splitinput splits files correctly with custom values", {
   # check that it splits correctly for a given minimum amount of rows
   df <- create_df(2, 10)
   df$X2 <- c(1:(2 * 10)) # creating fake observations
-  df <- df[sample(1:nrow(df), nrow(df)),] # reorder
+  df <- df[sample(1:nrow(df), nrow(df)), ] # reorder
   fcount <- splitinput(df,
                        min_nrow = 5,
-                       fname = paste0(tempdir(), "/multless"))
+                       fname = "multless",
+                       fdir = tempdir())
 
   # check that it yielded the correct number of files, with the correct name
   f_log <- grepl("multless.*.csv", list.files(tempdir()))
@@ -126,6 +130,13 @@ test_that("splitinput splits files correctly with custom values", {
 
   # remove created csvs
   remove_files(f_log)
+})
+
+test_that("splitinput throws errors when expected", {
+  # run splitinput with several wrong directory names
+  expect_error(splitinput(data.frame(), fdir = "hello"))
+  expect_error(splitinput(data.frame(), fdir = T))
+  expect_error(splitinput(data.frame(), fdir = data.frame()))
 })
 
 test_that("recode_sex works as expected with defaults", {

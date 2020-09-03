@@ -36,7 +36,7 @@ set_cols_first <- function(DT, cols, intersection = TRUE)
 #' ext_bmiz
 #'
 #' \code{ext_bmiz} Calculates the sigma (scale parameter for the half-normal
-#' distribution, extended BMI percentile, extended BMIz, and the CDC LMS
+#' distribution), extended BMI percentile, extended BMIz, and the CDC LMS
 #' Z-scores for weight, height, and BMI for children between 2 and 19.9 years
 #' of age. Note that for BMIs <= 95th percentile of the CDC growth charts, the
 #' extended values for BMI are equal to the LMS values. The extended values
@@ -96,12 +96,17 @@ set_cols_first <- function(DT, cols, intersection = TRUE)
 #' @return Expanded data frame containing computed BMI values
 #'
 #' @export
+#' @import data.table
+#' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
+#' @import Hmisc
+#' @import magrittr
+#' @import labelled
 #' @examples
 #' # Calling the function with default column names
 #' d_bmi <- ext_bmiz(inputdata)
 #'
 #' # Specifying different column names; note that quotes are used
-#' d_bmi <- ext_bmiz(inputdata, age=agemos, wt=weightkg, ht=heightcm)
+#' d_bmi <- ext_bmiz(inputdata, age="agemos", wt="weightkg", ht="heightcm")
 #'
 #' # Disabling conversion of all-integer age in months to (age + 0.5)
 #' d_bmi <- ext_bmiz(inputdata, adjust.integer.age=F)

@@ -1,10 +1,3 @@
-
-# Load plyr before dplyr intentionally
-library(plyr, quietly = T)
-library(dplyr, quietly = T)
-library(data.table, quietly = T)
-
-
 ### Define the helper function and the carryforward adjustment function ###
 # Segments labeled with ADJUSTCF EDIT in comments are areas where substantive
 # changes were made to the original cleangrowth logic. There are other changes
@@ -13,28 +6,42 @@ library(data.table, quietly = T)
 #' adjustcarryforward
 #' \code{adjustcarryforward} Uses absolute height velocity to identify values
 #' excluded as carried forward values for reinclusion.
-#' @param subjid
-#' @param param
-#' @param agedays
-#' @param sex
-#' @param measurement
-#' @param orig.exclude
-#' @param sd.recenter
-#' @param ewma.exp
-#' @param ref.data.path
-#' @param quietly
-#' @param minfactor
-#' @param maxfactor
-#' @param banddiff
-#' @param banddiff_plus
-#' @param min_ht.exp_under
-#' @param min_ht.exp_over
-#' @param max_ht.exp_under
-#' @param max_ht.exp_over
+#' @param subjid Vector of unique identifiers for each subject in the database.
+#' @param param Vector identifying each measurement, may be 'WEIGHTKG', 'HEIGHTCM', or 'LENGTHCM'
+#'   'HEIGHTCM' vs. 'LENGTHCM' only affects z-score calculations between ages 24 to 35 months (730 to 1095 days).
+#'   All linear measurements below 731 days of life (age 0-23 months) are interpreted as supine length, and
+#'   all linear measurements above 1095 days of life (age 36+ months) are interpreted as standing height.
+#' @param agedays Numeric vector containing the age in days at each measurement.
+#' @param sex Vector identifying the gender of the subject, may be 'M', 'm', or 0 for males, vs. 'F',
+#'  'f' or 1 for females.
+#' @param measurement Numeric vector containing the actual measurement data.  Weight must be in
+#'   kilograms (kg), and linear measurements (height vs. length) in centimeters (cm).
+#' @param orig.exclude Vector of exclusion assessment results from cleangrowth()
+#' @param sd.recenter Data frame or table with median SD-scores per day of life
+#' @param ewma.exp Exponent to use for weighting measurements in the exponentially weighted moving
+#'  average calculations. Defaults to -1.5. This exponent should be negative in order to weight growth
+#'  measurements closer to the measurement being evaluated more strongly. Exponents that are further from
+#'  zero (e.g. -3) will increase the relative influence of measurements close in time to the measurement
+#'  being evaluated compared to using the default exponent.
+#' @param ref.data.path Path to reference data. If not supplied, the year 2000
+#' Centers for Disease Control (CDC) reference data will be used.
+#' @param quietly Determines if function messages are to be displayed and if log files (parallel only)
+#' are to be generated. Defaults to TRUE.
+#' @param minfactor Sweep variable for computing mindiff.next.ht in 15f, default 0.5
+#' @param maxfactor Sweep variable for computing maxdiff.next.ht in 15f, default 2
+#' @param banddiff Sweep variable for computing mindiff.next.ht in 15f, default 3
+#' @param banddiff_plus Sweep variable for computing maxdiff.next.ht in 15, default 5.5
+#' @param min_ht.exp_under Sweep variable for computing ht.exp in 15f, default 2
+#' @param min_ht.exp_over Sweep variable for computing ht.exp in 15f, default 0
+#' @param max_ht.exp_under Sweep variable for computing ht.exp in 15f, default 0.33
+#' @param max_ht.exp_over Sweep variable for computing ht.exp in 15f, default 1.5
 #'
-#' @return
+#' @return Re-evaluated exclusion assessments based on height velocity.
 #'
 #' @export
+#' @rawNamespace import(plyr, except = c(failwith, id, summarize, count, desc, mutate, arrange, rename, is.discrete, summarise, summarize))
+#' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
+#' @import data.table
 adjustcarryforward <- function(subjid,
                                param,
                                agedays,

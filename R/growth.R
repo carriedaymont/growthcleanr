@@ -1645,6 +1645,9 @@ cleanbatch <- function(data.df,
 #'
 #' @export
 #' @import data.table
+#' @rawNamespace import(plyr, except = c(failwith, id, summarize, count, desc, mutate, arrange, rename, is.discrete, summarise, summarize))
+#' @import foreach
+#' @import doParallel
 #' @examples
 #' # Standard calculation Using Provided Age/Weight Data
 #' colnames(data_stats)<-c("id", "measure", "agedays", "sex", "value")
@@ -1680,9 +1683,6 @@ cleangrowth <- function(subjid,
                        parallel = F,
                        num.batches = NA,
                        quietly = T) {
-  library("plyr", quietly = T)
-  library("data.table", quietly = T)
-
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
   data.all <- data.table(
     line = seq_along(measurement),
@@ -1697,9 +1697,6 @@ cleangrowth <- function(subjid,
 
   # if parallel processing is desired, load additional modules
   if (parallel) {
-    library("foreach", quietly = quietly)
-    library("doParallel", quietly = quietly)
-    library("data.table", quietly = quietly)
     registerDoParallel(cores = num.batches)
     if (is.na(num.batches)) {
       num.batches <- getDoParWorkers()

@@ -8,6 +8,7 @@
 #'
 #' @param df data frame to split
 #' @param fname new name for each of the split files to start with
+#' @param fdir directory to put each of the split files (default working directory)
 #' @param min_row minimum number of rows for each split file (default 10000)
 #' @param keepcol the column name (default "subjid") to use to keep records with the same values together in the same single split file
 #'
@@ -17,8 +18,14 @@
 splitinput <-
   function(df,
            fname = deparse(substitute(df)),
+           fdir = "",
            min_nrow = 10000,
            keepcol = 'subjid') {
+    # first, check if the given directory exists
+    if (fdir != "" & is.character(fdir) & !dir.exists(fdir)){
+      stop("invalid directory")
+    }
+
     fname_counter <- 0
     row_count <- 0
     split_df <- data.frame()
@@ -40,7 +47,7 @@ splitinput <-
         fname_counter_str <- sprintf("%05d", fname_counter) #pad 0s
         write.csv(
           split_df,
-          file = paste(fname, fname_counter_str, "csv", sep = "."),
+          file = file.path(fdir, paste(fname, fname_counter_str, "csv", sep = ".")),
           row.names = FALSE
         )
 
@@ -51,8 +58,9 @@ splitinput <-
         fname_counter_str <- sprintf("%05d", fname_counter) #pad 0s
         write.csv(
           split_df,
-          file = paste(fname, fname_counter_str, "csv", sep = "."),
-          row.names = FALSE
+          file = file.path(fdir, paste(fname, fname_counter_str, "csv", sep = ".")),
+          row.names = FALSE,
+          na = ""
         )
       }
     }
@@ -112,9 +120,11 @@ recode_sex <- function(input_data,
 #' @param include_all Determines whether the function keeps all exclusion codes. If TRUE, all exclusion types are kept and the inclusion_types argument is ignored. Defaults to FALSE.
 #' @param inclusion_types Vector indicating which exclusion codes from the cleaning algorithm should be included in the data, given that include_all is FALSE. For all options, see growthcleanr::cleangrowth(). Defaults to c("Include").
 #'
-#' @return Returns a data frame transformed from long to wide. Includes only values flagged with indicated inclusion types.
+#' @return Returns a data frame transformed from long to wide. Includes only values flagged with indicated inclusion types. Note that, for each subject, heights without corresponding weights for a given age (and vice versa) will be dropped.
 #'
 #' @export
+#' @rawNamespace import(tidyr, except = extract)
+#' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
 longwide <-
   function(long_df,
            id = "id",
@@ -126,9 +136,6 @@ longwide <-
            clean_value = "clean_value",
            include_all = FALSE,
            inclusion_types = c("Include")) {
-  library(tidyr, quietly = T)
-  library(dplyr, quietly = T)
-
   # selects each column with specified / default variable name
   long_df %>%
     select(id, subjid, sex, agedays,

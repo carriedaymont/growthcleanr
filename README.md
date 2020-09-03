@@ -60,20 +60,22 @@ The rest of this documentation includes:
 
 ### <a name="setup"></a>R setup
 
-An R environment with the following packages installed is required to run
-growthcleanr:
+The `growthcleanr` package must be installed, which will in turn install the
+following packages:
 
-* `devtools`
 * `data.table`
+* `foreach`
 * `doParallel`
 * `dplyr`
-* `foreach`
 * `Hmisc`
 * `labelled`
 * `plyr`
+* `tidyr`
+* `magrittr`
 
-The `growthcleanr` package itself must also be installed. Further installation
-details and notes can be found under [Installation](#installation) below.
+In addition, an R environment with `devtools` installed is also required. 
+Further installation details and notes can be found under
+[Installation](#installation) below.
 
 ### Data preparation
 
@@ -149,7 +151,7 @@ setkey(data, subjid, param, agedays)
 cleaned_data <- data[, clean_value:=cleangrowth(subjid, param, agedays, sex, measurement)]
 
 # extract data limited only to values flagged for inclusion:
-only_included_data <- cleaned_data[clean_vaue=='Include']
+only_included_data <- cleaned_data[clean_value=='Include']
 ```
 
 If our Example dataset above were named `source_data`, examining `cleaned_data`
@@ -203,8 +205,7 @@ In an up-to-date R environment such as RStudio, first install the dependencies:
 
 ```R
 # Required packages for growthcleanr operation
-install.packages(c("data.table", "devtools", "doParallel", "dplyr", "foreach",
-    "Hmisc", "labelled", "plyr"))
+install.packages("devtools")
 # Optional additional packages referenced in this document
 install.packages("argparse")
 install.packages("bit64")
