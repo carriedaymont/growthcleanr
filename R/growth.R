@@ -68,6 +68,9 @@
 #'
 #' @export
 #' @import data.table
+#' @rawNamespace import(plyr, except = c(failwith, id, summarize, count, desc, mutate, arrange, rename, is.discrete, summarise, summarize))
+#' @import foreach
+#' @import doParallel
 #' @examples
 #' # Run calculation using a small subset of given data
 #' df_stats <- as.data.frame(syngrowth)
@@ -113,9 +116,6 @@ cleangrowth = function(subjid,
                        parallel = F,
                        num.batches = NA,
                        quietly = T) {
-  library("plyr", quietly = T)
-  library("data.table", quietly = T)
-
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
   data.all = data.table(
     line = seq_along(measurement),
@@ -130,9 +130,6 @@ cleangrowth = function(subjid,
 
   # if parallel processing is desired, load additional modules
   if (parallel) {
-    library("foreach", quietly = quietly)
-    library("doParallel", quietly = quietly)
-    library("data.table", quietly = quietly)
     registerDoParallel(cores = num.batches)
     if (is.na(num.batches)) {
       num.batches = getDoParWorkers()
@@ -1935,6 +1932,7 @@ cleangrowth = function(subjid,
 #'
 #' @return Function for calculating BMI based on measurement, age in days, sex, and measurement value.
 #' @export
+#' @import data.table
 #' @examples
 #' # Return calculating function with all defaults
 #' afunc <- read.anthro()
@@ -1943,8 +1941,6 @@ cleangrowth = function(subjid,
 #' afunc <- read.anthro(path = system.file("extdata", package = "growthcleanr"),
 #'                      cdc.only = T)
 read.anthro = function(path = "", cdc.only = F) {
-  library("data.table", quietly = T)
-
   # set correct path based on input reference table path (if any)
   weianthro_path <- ifelse(
     path == "",
@@ -2199,6 +2195,7 @@ as.matrix.delta = function(agedays) {
 #' @return Table of data with median SD-scores per day of life by gender and parameter.
 #'
 #' @export
+#' @import data.table
 #' @examples
 #' # Run on 1 subject
 #' df_stats <- as.data.frame(syngrowth)
@@ -2218,8 +2215,6 @@ as.matrix.delta = function(agedays) {
 #'                   df_stats$agedays,
 #'                   sd.orig)
 sd.median = function(param, sex, agedays, sd.orig) {
-  library("data.table", quietly = T)
-
   # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time, we need to account for the fact that
   #     the mean SD-score for the population changes with age.
   # a.  Determine the median cdc*sd for each parameter by year of age (with sexes combined): median*sd.

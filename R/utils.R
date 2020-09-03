@@ -150,6 +150,8 @@ recode_sex <- function(input_data,
 #' @return Returns a data frame transformed from long to wide. Includes only values flagged with indicated inclusion types. Note that, for each subject, heights without corresponding weights for a given age (and vice versa) will be dropped.
 #'
 #' @export
+#' @rawNamespace import(tidyr, except = extract)
+#' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
 #' @examples
 #' # Run on a small subset of given data
 #' df <- as.data.frame(syngrowth)
@@ -179,9 +181,6 @@ longwide <-
            clean_value = "clean_value",
            include_all = FALSE,
            inclusion_types = c("Include")) {
-  library(tidyr, quietly = T)
-  library(dplyr, quietly = T)
-
   # selects each column with specified / default variable name
   long_df %>%
     select(id, subjid, sex, agedays,
