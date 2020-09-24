@@ -22,7 +22,7 @@ Table of data with median SD-scores per day of life by gender and parameter.
 Calculate median SD score by age for each parameter.
 }
 \examples{
-#' # Run on 1 subject
+# Run on 1 subject
 df_stats <- as.data.frame(syngrowth)
 df_stats <- df_stats[df_stats$subjid == df_stats$subjid[1], ]
 

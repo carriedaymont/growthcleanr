@@ -37,6 +37,7 @@ Returns a data table with recoded sex variables.
 Useful in transforming output from growthcleanr::cleangrowth() into a format suitable for growthcleanr::ext_bmiz().
 }
 \examples{
+# Run on given data
 df <- as.data.frame(syngrowth)
 
 # Run with all defaults

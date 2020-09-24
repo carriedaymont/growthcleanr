@@ -13,12 +13,10 @@ Function for calculating BMI based on measurement, age in days, sex, and measure
 Read anthro
 }
 \examples{
-\donttest{
 # Return calculating function with all defaults
 afunc <- read.anthro()
 
 # Return calculating function while specifying a path and using only CDC data
 afunc <- read.anthro(path = system.file("extdata", package = "growthcleanr"),
                      cdc.only = T)
-}
 }

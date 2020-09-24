@@ -17,7 +17,7 @@
 #' @export
 #' @examples
 #' \donttest{
-#' Run on given data
+#' # Run on given data
 #' df <- as.data.frame(syngrowth)
 #'
 #' # Run with all defaults
@@ -101,7 +101,7 @@ splitinput <-
 #'
 #' @export
 #' @examples
-#' Run on given data
+#' # Run on given data
 #' df <- as.data.frame(syngrowth)
 #'
 #' # Run with all defaults
