@@ -72,7 +72,6 @@
 #' @import foreach
 #' @import doParallel
 #' @examples
-#' \donttest{
 #' # Run calculation using a small subset of given data
 #' df_stats <- as.data.frame(syngrowth)
 #' df_stats <- df_stats[df_stats$subjid %in% unique(df_stats[, "subjid"])[1:5], ]
@@ -94,8 +93,7 @@
 #'                       sex = df_stats$sex,
 #'                       measurement = df_stats$measurement,
 #'                       parallel = TRUE,
-#'                       num.batches = 3)
-#' }
+#'                       num.batches = 2)
 cleangrowth = function(subjid,
                        param,
                        agedays,
