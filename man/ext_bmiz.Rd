@@ -105,5 +105,5 @@ colnames(dfc)[colnames(dfc) \%in\% c("agem", "wt", "ht")] <-
 d_bmi <- ext_bmiz(dfc, age="agemos", wt="weightkg", ht="heightcm")
 
 # Disabling conversion of all-integer age in months to (age + 0.5)
-d_bmi <- ext_bmiz(df, adjust.integer.age=F)
+d_bmi <- ext_bmiz(df, adjust.integer.age=FALSE)
 }

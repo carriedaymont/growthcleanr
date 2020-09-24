@@ -56,7 +56,7 @@ df <- cbind(df,
 long_df <- longwide(df)
 
 # Include all inclusion types
-long_df <- longwide(df, include_all = T)
+long_df <- longwide(df, include_all = TRUE)
 
 # Specify all inclusion codes
 long_df <- longwide(df, inclusion_types = c("Include", "Exclude-Carried-Forward"))

@@ -18,5 +18,5 @@ afunc <- read.anthro()
 
 # Return calculating function while specifying a path and using only CDC data
 afunc <- read.anthro(path = system.file("extdata", package = "growthcleanr"),
-                     cdc.only = T)
+                     cdc.only = TRUE)
 }

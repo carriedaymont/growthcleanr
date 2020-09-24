@@ -27,12 +27,12 @@ df_stats <- as.data.frame(syngrowth)
 df_stats <- df_stats[df_stats$subjid == df_stats$subjid[1], ]
 
 # Get the original standard deviations
-measurement_to_z <- read.anthro(cdc.only = T)
+measurement_to_z <- read.anthro(cdc.only = TRUE)
 sd.orig <- measurement_to_z(df_stats$param,
                        df_stats$agedays,
                        df_stats$sex,
                        df_stats$measurement,
-                       T)
+                       TRUE)
 
 # Calculate median standard deviations
 sd.m <- sd.median(df_stats$param,

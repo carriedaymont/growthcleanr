@@ -1941,7 +1941,7 @@ cleangrowth = function(subjid,
 #'
 #' # Return calculating function while specifying a path and using only CDC data
 #' afunc <- read.anthro(path = system.file("extdata", package = "growthcleanr"),
-#'                      cdc.only = T)
+#'                      cdc.only = TRUE)
 read.anthro = function(path = "", cdc.only = F) {
   # set correct path based on input reference table path (if any)
   weianthro_path <- ifelse(
@@ -2110,12 +2110,12 @@ read.anthro = function(path = "", cdc.only = F) {
 #'                        df_stats$param == "HEIGHTCM", ]
 #'
 #' # Get the uncentered z-scores
-#' measurement_to_z <- read.anthro(cdc.only = T)
+#' measurement_to_z <- read.anthro(cdc.only = TRUE)
 #' sd <- measurement_to_z(df_stats$param,
 #'                        df_stats$agedays,
 #'                        df_stats$sex,
 #'                        df_stats$measurement,
-#'                        T)
+#'                        TRUE)
 #'
 #' # Calculate exponentially weighted moving average
 #' e_df <- ewma(df_stats$agedays, sd, ewma.exp = -1.5)
@@ -2204,12 +2204,12 @@ as.matrix.delta = function(agedays) {
 #' df_stats <- df_stats[df_stats$subjid == df_stats$subjid[1], ]
 #'
 #' # Get the original standard deviations
-#' measurement_to_z <- read.anthro(cdc.only = T)
+#' measurement_to_z <- read.anthro(cdc.only = TRUE)
 #' sd.orig <- measurement_to_z(df_stats$param,
 #'                        df_stats$agedays,
 #'                        df_stats$sex,
 #'                        df_stats$measurement,
-#'                        T)
+#'                        TRUE)
 #'
 #' # Calculate median standard deviations
 #' sd.m <- sd.median(df_stats$param,

@@ -36,12 +36,12 @@ df_stats <- df_stats[df_stats$subjid == df_stats$subjid[1] &
                        df_stats$param == "HEIGHTCM", ]
 
 # Get the uncentered z-scores
-measurement_to_z <- read.anthro(cdc.only = T)
+measurement_to_z <- read.anthro(cdc.only = TRUE)
 sd <- measurement_to_z(df_stats$param,
                        df_stats$agedays,
                        df_stats$sex,
                        df_stats$measurement,
-                       T)
+                       TRUE)
 
 # Calculate exponentially weighted moving average
 e_df <- ewma(df_stats$agedays, sd, ewma.exp = -1.5)
