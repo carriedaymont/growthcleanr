@@ -2,4 +2,4 @@
 
 syngrowth <- read.csv('data-raw/syngrowth.csv')
 
-usethis::use_data(syngrowth, compress="gzip", overwrite=T)
+usethis::use_data(syngrowth, compress="xz", overwrite=T)
