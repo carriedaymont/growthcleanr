@@ -1,0 +1,31 @@
+language: r
+cache: packages
+warnings_are_errors: false
+
+r:
+  - oldrel
+  - release
+  - devel
+
+r_packages:
+  - argparse
+  - bit64
+  - covr  # for codecov
+  - data.table
+  - doParallel
+  - dplyr
+  - foreach
+  - Hmisc
+  - labelled
+  - plyr
+
+r_check_args: --no-build-vignettes --no-manual --no-codoc --no-examples
+
+after_success:
+  - test $TRAVIS_R_VERSION_STRING = 'release' && Rscript -e 'covr::codecov()'
+
+notifications:
+  email:
+    on_success: change
+    on_failure: change
+
