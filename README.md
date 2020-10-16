@@ -1,5 +1,7 @@
 # growthcleanr
 
+[![Build Status](https://travis-ci.com/mitre/growthcleanr.svg?branch=main)](https://travis-ci.com/mitre/growthcleanr)
+
 R package for cleaning data from Electronic Health Record systems, focused on
 cleaning height and weight measurements.
 
