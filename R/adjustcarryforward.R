@@ -92,16 +92,23 @@ adjustcarryforward <- function(subjid,
   #### ADJUSTCF EDIT ####
   # for this purpose, want to subset dataset down to just "Exclude-Carried-Forward" and "Include" - assume all other measurements are invalid
   # want to remove any carried forward values whose non-carried forward is also excluded
-  data.all <- data.all %>%
-    mutate(orig.exclude.lag = lag(orig.exclude, n = 1)) %>%
-    filter(!(
-      orig.exclude == "Exclude-Carried-Forward" &
-        grepl("exclude", orig.exclude.lag, ignore.case = T)
-    )) %>%
-    filter(orig.exclude %in% c("Exclude-Carried-Forward", "Include")) %>%
-    select(-orig.exclude.lag)
+  # data.all <- data.all %>%
+  #   mutate(orig.exclude.lag = lag(orig.exclude, n = 1)) %>%
+  #   filter(!(
+  #     orig.exclude == "Exclude-Carried-Forward" &
+  #       grepl("exclude", orig.exclude.lag, ignore.case = T)
+  #   )) %>%
+  #   filter(orig.exclude %in% c("Exclude-Carried-Forward", "Include")) %>%
+  #   select(-orig.exclude.lag)
 
-  # filter to only subjects with valid carried forwards - n is here to merge back
+  # NEW EDIT --
+  # here's what we want to filer out -- anything that's not carried forward/include
+  # we're also going to include strings of carried forward
+  data.all <- data.all %>%
+    filter(orig.exclude %in% c("Exclude-Carried-Forward", "Include"))
+
+  # filter to only subjects with possible carried forwards - n is here to merge back
+  # if they have all includes, filter them out
   data.all <- data.all %>%
     filter(subjid %in% data.all$subjid[data.all$orig.exclude == "Exclude-Carried-Forward"]) %>%
     as.data.table()
@@ -226,7 +233,7 @@ adjustcarryforward <- function(subjid,
       agedays < 0, 'Missing', 'No Change'
   )),
   levels = exclude.levels,
-  ordered = T)]
+  ordered = T)] # why is this ordered??
 
   # after calculating z scores, for convenience, recategorize linear parameters as 'HEIGHTCM'
   data.all[param == 'LENGTHCM', param := 'HEIGHTCM']
@@ -384,25 +391,26 @@ adjustcarryforward <- function(subjid,
         #   107-152	      4
         #   153-198	      6
         #   All others	  missing
-        df[, whoinc.age.ht := ifelse(delta.agedays.next < 20 ,
-                                     NA,
-                                     ifelse(
-                                       delta.agedays.next <= 45,
-                                       1,
-                                       ifelse(
-                                         delta.agedays.next <= 75,
-                                         2,
-                                         ifelse(
-                                           delta.agedays.next <= 106,
-                                           3,
-                                           ifelse(
-                                             delta.agedays.next <= 152,
-                                             4,
-                                             ifelse(delta.agedays.next <= 198, 6, NA)
-                                           )
-                                         )
-                                       )
-                                     ))]
+        df[, whoinc.age.ht :=
+             ifelse(delta.agedays.next < 20 ,
+                    NA,
+                    ifelse(
+                      delta.agedays.next <= 45,
+                      1,
+                      ifelse(
+                        delta.agedays.next <= 75,
+                        2,
+                        ifelse(
+                          delta.agedays.next <= 106,
+                          3,
+                          ifelse(
+                            delta.agedays.next <= 152,
+                            4,
+                            ifelse(delta.agedays.next <= 198, 6, NA)
+                          )
+                        )
+                      )
+                    ))]
 
         # i.	Merge using sex and whoagegrp_ht using who_ht_vel_3sd and who_ht_maxvel_3sd; this will give you varaibles whoinc_i_ht and maxwhoinc_i_ht
         #     for various intervals where i is 1,2, 3,4, 6 and corresponds to whoinc_age_ht.
