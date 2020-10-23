@@ -143,9 +143,8 @@ run minfactor maxfactor banddiff banddiff_plus min_ht.exp_under min_ht.exp_over 
 9       1.0         3        3           5.5                4               0              0.5             1.5
 ```
 
-The output, in the `output/` directory will contain the sweep parameters, like
-the above, in a file called `params.csv`, and the output with adjustment results
-in a file called `all-adjusted.csv`.
+The output in the working directory will contain the sweep parameters, like
+the above, in a file called `test_adjustcarrforward_DATE_TIME_parameters.csv`, and the output with adjustment results in a file called `test_adjustcarrforward_DATE_TIME.csv`, where DATE and TIME are the system date and time.
 
 For example, a 5-step sweep with the `line-grid` search would be run with this command:
 
@@ -153,7 +152,7 @@ For example, a 5-step sweep with the `line-grid` search would be run with this c
 % Rscript exec/textadjustcf.R --gridlength 5 --searchtype line-grid cleaned.csv
 ```
 
-The parameter set for the sweep in file `output/params.csv` would be:
+The parameter set for the sweep in file `test_adjustcarrforward_DATE_TIME_parameters.csv` would be:
 
 ```R
 run  minfactor  maxfactor  banddiff  banddiff_plus  min_ht.exp_under  min_ht.exp_over  max_ht.exp_under  max_ht.exp_over
@@ -167,7 +166,7 @@ run  minfactor  maxfactor  banddiff  banddiff_plus  min_ht.exp_under  min_ht.exp
 Note that an odd-numbered length will include the default values in the middle run of the
 sweep (hence the examples w/5 and 9 step sweeps).
 
-And the first few result rows in `output/all-adjusted.csv` would be:
+And the first few result rows in `test_adjustcarrforward_DATE_TIME.csv` would be:
 
 ```R
 id     subjid    sex  agedays  param     measurement  clean_value                   run-1      run-2      run-3      run-4      run-5
