@@ -31,10 +31,17 @@ file:
 Note that the column names should be as described for `cleaned_data` the Example 
 under Quickstart.
 
-The sweep script is executed from the command line on the cleaned data file:
+The sweep script is executed from the command line on the cleaned data file for 
+Windows as follows:
 
 ```bash
 % Rscript exec/testadjustcf.R cleaned.csv
+```
+
+For Macs/Linux, the script is executed with the following command:
+
+```bash
+% Rscript testadjustcf.R cleaned.csv
 ```
 
 By default, the script will generate a range of values with nine steps for the
@@ -42,14 +49,14 @@ following parameters, where the min and max surround the default value:
 
 | parameter | default | min | max |
 | - | - | - | - |
-`minfactor` | 0.5 | 0 | 1
-`maxfactor` | 2 | 0 | 4
-`banddiff` | 3 | 0 | 6
-`banddiff_plus` | 5.5 | 0 | 11
-`min_ht.exp_under` | 2 | 0 | 4
-`min_ht.exp_over` | 0 | -1 | 1
-`max_ht.exp_under` | 0.33 | 0 | 0.66
-`max_ht.exp_over` | 1.5 | 0 | 3
+`minfactor` | 0.5 | 0 | 1 |
+`maxfactor` | 2 | 0 | 4 |
+`banddiff` | 3 | 0 | 6 |
+`banddiff_plus` | 5.5 | 0 | 11 |
+`min_ht.exp_under` | 2 | 0 | 4 |
+`min_ht.exp_over` | 0 | -1 | 1 |
+`max_ht.exp_under` | 0.33 | 0 | 0.66 |
+`max_ht.exp_over` | 1.5 | 0 | 3 |
 
 The determination of these values depends on the search type (specified with the 
 option `--searchtype`:
@@ -65,6 +72,7 @@ range for each parameter and in a full combination between all parameters.
   * Thus, the amount of runs done will be the `--gridlength`^(number of included 
 parameters).
   * Default includes a full grid search among all parameters. To specify use of only specific parameters, use the `--param` option, which specifies a CSV of the following format:
+  
   | parameter | include | value |
   | - | - | - |
   `minfactor` | T |  |
@@ -75,13 +83,14 @@ parameters).
   `min_ht.exp_over` | F |  |
   `max_ht.exp_under` | F | .5 |
   `max_ht.exp_over` | F |  |
-    * The first column specifies all the parameter names; the second specifies a
-    true or false value for whether or not the parameter should be included; the
-    third specifies a constant value to be used for not included parameters, left
-    empty if the value should be the default.
-    * In the above example, `minfactor` and `min_ht.exp_under` will be included, and
-    `maxfactor` and `max_ht_exp_under` will not be included, but will use 3 and .5
-    as their values.
+  
+  * The first column specifies all the parameter names; the second specifies a
+  true or false value for whether or not the parameter should be included; the
+  third specifies a constant value to be used for not included parameters, left
+  empty if the value should be the default.
+  * In the above example, `minfactor` and `min_ht.exp_under` will be included, and
+  `maxfactor` and `max_ht_exp_under` will not be included, but will use 3 and .5
+  as their values.
   * Warning: this will take much longer!
 
 The default number of sweep steps is 9; this can be changed with the option
