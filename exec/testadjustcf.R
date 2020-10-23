@@ -149,10 +149,11 @@ parser$add_argument("--maxrecs",
                     default = 0,
                     type = "integer",
                     help = "Limit to specified # recs, default 0 (no limit)")
-parser$add_argument("--outdir",
-                    default = "output",
+parser$add_argument("--outfile",
+                    default = paste0("test_adjustcarryforward_",
+                                     format(Sys.time(), "%m-%d-%Y_%H-%M-%S")),
                     type = "character",
-                    help = "Directory for output files, default 'output' (no trailing slash)")
+                    help = "Output file name, default 'test_adjustcarrforward_DATE_TIME', where DATE is the current system date and time")
 
 # Parse arguments for ease ----
 
@@ -161,7 +162,7 @@ args <- parser$parse_args()
 seed <- args$seed
 searchtype <- args$searchtype
 grid.length <- args$gridlength
-outdir <- args$outdir
+outfile <- args$outfile
 quietly <- args$quietly
 param_choice <- args$param
 
@@ -189,8 +190,8 @@ if (args$maxrecs > 0) {
   dm_filt <- dm
 }
 
-# Create outdir if necessary; ignore warnings if it already exists
-dir.create(file.path(outdir), showWarnings = FALSE)
+# # Create outdir if necessary; ignore warnings if it already exists
+# dir.create(file.path(outdir), showWarnings = FALSE)
 
 dm_filt$n <- as.numeric(rownames(dm_filt))
 
@@ -287,11 +288,11 @@ combo <- exec_sweep(grid_df)
 # Write out results ----
 
 # Combined adjusted set
-fwrite(combo %>% select(-n), file.path(outdir, "all-adjusted.csv"), row.names = F)
+fwrite(combo %>% select(-n), paste0(outfile, ".csv"), row.names = F)
 
 # Record the sweep parameters for review
 grid <- cbind("run" = 1:nrow(grid_df), grid_df)
-fwrite(grid, file.path(outdir, "params.csv"), row.names = F)
+fwrite(grid, paste0(outfile, "_parameters.csv"), row.names = F)
 
 # Any additional debugging output
 if (args$debug) {
@@ -299,5 +300,5 @@ if (args$debug) {
     cat(sprintf("[%s] Writing debugging output files\n", Sys.time()))
   }
   # Filtered data
-  fwrite(dm_filt, file.path(outdir, "dm_filt.csv"), row.names = F)
+  fwrite(dm_filt, paste0(outfile, "_debug_filtered_data.csv"), row.names = F)
 }
