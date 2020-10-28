@@ -102,13 +102,45 @@ adjustcarryforward <- function(subjid,
   #   select(-orig.exclude.lag)
 
   # NEW EDIT --
-  # here's what we want to filer out -- anything that's not carried forward/include
-  # we're also going to include strings of carried forward
+  # remove all the weight measurements
   data.all <- data.all %>%
-    filter(orig.exclude %in% c("Exclude-Carried-Forward", "Include"))
+    filter(param %in% c("HEIGHTCM", "LENGTHCM"))
 
   # filter to only subjects with possible carried forwards - n is here to merge back
   # if they have all includes, filter them out
+  data.all <- data.all %>%
+    filter(subjid %in% data.all$subjid[data.all$orig.exclude == "Exclude-Carried-Forward"]) %>%
+    as.data.table()
+
+  # here's what we want to filter out -- anything that's not carried forward/include
+  # we're also going to include strings of carried forward
+  # but we also need to make sure they're not coming from an excluded value
+
+  # start of string to remove: everything that isn't include/excl-cf
+  st <- which(!data.all$orig.exclude %in% c("Exclude-Carried-Forward", "Include"))
+  # end of string: include or the end of a subject
+  subj_end <- length(data.all$subjid)-match(unique(data.all$subjid),rev(data.all$subjid))+1
+  end <- c(which(data.all$orig.exclude == "Include"),subj_end)
+  end <- unique(sort(end))
+
+  # remove anything between start and ends (including start, not including end)
+  to_rem <- unlist(
+    lapply(st, function(x){
+      to_rem <- c(x:(end[end > x][1]))
+      if (to_rem[length(to_rem)] %in% subj_end){
+        # if it's the last value, we want to get rid of that end
+        return(to_rem)
+      } else {
+        # if it's an include, we want to keep it (don't remove)
+        return(to_rem[-length(to_rem)])
+      }
+    })
+  )
+  to_rem <- unique(to_rem)
+
+  data.all <- data.all[-to_rem,]
+
+  # filter to only subjects with possible carried forwards again
   data.all <- data.all %>%
     filter(subjid %in% data.all$subjid[data.all$orig.exclude == "Exclude-Carried-Forward"]) %>%
     as.data.table()
