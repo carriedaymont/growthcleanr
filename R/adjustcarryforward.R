@@ -126,7 +126,7 @@ adjustcarryforward <- function(subjid,
   # remove anything between start and ends (including start, not including end)
   to_rem <- unlist(
     lapply(st, function(x){
-      to_rem <- c(x:(end[end > x][1]))
+      to_rem <- c(x:(end[end >= x][1]))
       if (to_rem[length(to_rem)] %in% subj_end){
         # if it's the last value, we want to get rid of that end
         return(to_rem)
@@ -138,7 +138,9 @@ adjustcarryforward <- function(subjid,
   )
   to_rem <- unique(to_rem)
 
-  data.all <- data.all[-to_rem,]
+  if (length(to_rem) > 0){
+    data.all <- data.all[-to_rem,]
+  }
 
   # filter to only subjects with possible carried forwards again
   data.all <- data.all %>%
