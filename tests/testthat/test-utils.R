@@ -397,3 +397,4 @@ test_that("longwide throws errors correctly", {
   sub_syn$id <- 1
   expect_error(longwide(sub_syn))
 })
+
