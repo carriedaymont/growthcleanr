@@ -3,9 +3,9 @@
 #' @keywords internal
 #' @noRd
 valid <- function(df,
-                  include.temporary.duplicates = F,
-                  include.duplicates = F,
-                  include.carryforward = F) {
+                  include.temporary.duplicates = FALSE,
+                  include.duplicates = FALSE,
+                  include.carryforward = FALSE) {
   exclude <- if (is.data.frame(df)) df$exclude else df
   return(
     exclude < "Exclude" |
@@ -20,7 +20,7 @@ valid <- function(df,
 #' @keywords internal
 #' @noRd
 na_as_false <- function(v) {
-  v[is.na(v)] <- F
+  v[is.na(v)] <- FALSE
   v
 }
 
@@ -50,15 +50,15 @@ temporary_duplicates <- function(df) {
     df[, param := NA]
   }
   # only operate on valid rows (but include rows that may have previously been flagged as a "temporary duplicate")
-  valid.rows <- valid(df, include.temporary.duplicates = T)
+  valid.rows <- valid(df, include.temporary.duplicates = TRUE)
   # make a small copy of df with only the fields we need for efficiency
   df <- df[j = .(tbc.sd), keyby = .(subjid, param, agedays, index)]
   # initialize some useful fields
   df[, `:=`(
     median.sd = as.double(NA),
     delta.median.sd = as.double(NA),
-    duplicates.this.day = F,
-    duplicate = F
+    duplicates.this.day = FALSE,
+    duplicate = FALSE
   )]
   # determine on which days there are duplicate measurements (more than 1 valid measurement on that age day)
   df[valid.rows, duplicates.this.day := (.N > 1), by = .(subjid, param, agedays)]
@@ -111,7 +111,7 @@ swap_parameters <- function(param.1 = "WEIGHTKG",
                             df) {
   valid.rows <- valid(df)
   # copy swap field to a new value for convenience in the code below
-  df$swap <- df[, field.name, with = F]
+  df$swap <- df[, field.name, with = FALSE]
   # construct an indexed table with valid parameters for speed in swapping
   valid.other <- df[valid.rows, list(
     subjid.other = subjid,
@@ -201,7 +201,7 @@ cleanbatch <- function(data.df,
   # 7a.  For each day on which a subject had both a weight and a height recorded, calculate tbc*sd_sw: SD scores as if the weight had been recorded as the height
   #      and the height had been recorded as the weight, recentered using rcsd_*.  I intentionally did not allow values that were the first or last for a subject/parameter to be replaced as a switch.
   # NOTE: this additional constraint related to first and last values is implemented below via the code
-  # swap.flag.1 := if(.N>2) c(F, rep(T, .N-2), F) else F, by=.(subjid,param)
+  # swap.flag.1 := if(.N>2) c(FALSE, rep(TRUE, .N-2), FALSE) else FALSE, by=.(subjid,param)
 
   if (!quietly) {
     cat(sprintf(
@@ -212,12 +212,12 @@ cleanbatch <- function(data.df,
 
   data.df[, v.sw := swap_parameters(field.name = "v", df = data.df)]
   # calculate "standard deviation" score for the "swapped" parameter and recenter
-  data.df[, tbc.sd.sw := measurement.to.z(param, agedays, sex, v.sw, T) - sd.median]
+  data.df[, tbc.sd.sw := measurement.to.z(param, agedays, sex, v.sw, TRUE) - sd.median]
 
   # 7b.  Perform a EWMA calculation.
   #   i.	In addition to the standard all/bef/aft dewma_* variables calculate all/bef/aft dewma_*_sw variables by subtracting EWMASD from tbc*sd_sw
   data.df[, (ewma.fields) := as.double(NaN)]
-  data.df[valid(exclude), (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, T), by = .(subjid, param)]
+  data.df[valid(exclude), (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE), by = .(subjid, param)]
 
 
   # 7c.  Label pairs of height/weight measurements recorded on the same day as a switch if ALL of the following criteria are met for BOTH parameters:
@@ -229,15 +229,15 @@ cleanbatch <- function(data.df,
   #
 
   # initialize swap.flag.1
-  data.df[, `:=`(valid.interior.measurement = F, swap.flag.1 = F)]
+  data.df[, `:=`(valid.interior.measurement = FALSE, swap.flag.1 = FALSE)]
 
   # flag interior measurements
   data.df[
     valid(data.df),
     valid.interior.measurement := if (.N > 2) {
-      c(F, rep(T, .N - 2), F)
+      c(FALSE, rep(TRUE, .N - 2), FALSE)
     } else {
-      F
+      FALSE
     },
     by = .(subjid, param)
   ]
@@ -266,7 +266,7 @@ cleanbatch <- function(data.df,
             abs(tbc.sd.sw - ewma.before) < 0.5 &
             abs(tbc.sd.sw - ewma.after) < 0.5
       ),
-    swap.flag.1 := T
+    swap.flag.1 := TRUE
   ]
 
 
@@ -300,11 +300,11 @@ cleanbatch <- function(data.df,
     # 8b.  Calculate SD scores for each transformed variable and recenter these (tbc*sd_d_2 and tbc_*sd_t_2)
     data.df$tbc.sd.d <- with(
       data.df,
-      measurement.to.z(param, agedays, sex, v.d, T) - sd.median
+      measurement.to.z(param, agedays, sex, v.d, TRUE) - sd.median
     )
     data.df$tbc.sd.t <- with(
       data.df,
-      measurement.to.z(param, agedays, sex, v.t, T) - sd.median
+      measurement.to.z(param, agedays, sex, v.t, TRUE) - sd.median
     )
 
     # 8c.  Perform a EWMA calculation
@@ -312,7 +312,7 @@ cleanbatch <- function(data.df,
     #         tbc*sd_d_2 and tbc_*_sd_t_2
     # NOTE: the additional dewma fields are calculated in the tests below
     data.df[, (ewma.fields) := as.double(NaN)]
-    data.df[valid(exclude), (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, T), by = .(subjid, param)]
+    data.df[valid(exclude), (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE), by = .(subjid, param)]
 
     # 8d.  Also calculate d_prevsd_*=tbc*sd-tbc*sdprev and d_nextsd_*=tbc*sdi-tbc*sdnext. d_prevsd_* will be missing for the first value and d_nextsd_* should be
     #     missing for the last value. I intentionally did not allow values that were the first or last for a subject/parameter to be replaced as unit errors.
@@ -433,7 +433,7 @@ cleanbatch <- function(data.df,
 
     # need to handle children with duplicate measurements on same day separately
     data.df[
-      subjid %in% subj.dup & valid(data.df, include.temporary.duplicates = T),
+      subjid %in% subj.dup & valid(data.df, include.temporary.duplicates = TRUE),
       exclude := (function(df) {
         setkey(df, agedays)
         ages <- unique(agedays)
@@ -473,7 +473,7 @@ cleanbatch <- function(data.df,
   }
   data.df[
     na_as_false(
-      valid(data.df, include.temporary.duplicates = T) & abs(tbc.sd) > sd.extreme |
+      valid(data.df, include.temporary.duplicates = TRUE) & abs(tbc.sd) > sd.extreme |
         exclude %in% c("Include", "Exclude-Temporary-Duplicate") & abs(z.orig) > z.extreme
     ),
     exclude := "Exclude-SD-Cutoff"
@@ -500,9 +500,9 @@ cleanbatch <- function(data.df,
       num.ewma.excluded <- 0
       # optimization: determine whether this subject has any duplicates
       has.duplicates <- subjid %in% subj.dup
-      while (T) {
+      while (TRUE) {
         df[, (ewma.fields) := as.double(NaN)]
-        df[valid(exclude), (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, T)]
+        df[valid(exclude), (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE)]
 
         # note: at this point, only one ewma exists per param on a given day for a subject, so sort(ewma.all)[1] will returns the non-missing ewma.all
         # restrict to children with possible duplicates for efficiency
@@ -542,7 +542,7 @@ cleanbatch <- function(data.df,
         #     replace exc_*=5 for the value with the highest abssum_*
         if (num.exclude > 1) {
           # first order by decreasing abssum
-          worst.row <- with(df, order(rep, abs(tbc.sd + (tbc.sd - ewma.all)), decreasing = T))[1]
+          worst.row <- with(df, order(rep, abs(tbc.sd + (tbc.sd - ewma.all)), decreasing = TRUE))[1]
           df[worst.row, exclude := "Exclude-EWMA-Extreme"]
         }
 
@@ -565,7 +565,7 @@ cleanbatch <- function(data.df,
         }
         if (num.exclude > 1) {
           # first order by decreasing abssum
-          worst.row <- with(df, order(rep, abs(tbc.sd), decreasing = T))[1]
+          worst.row <- with(df, order(rep, abs(tbc.sd), decreasing = TRUE))[1]
           df[worst.row, exclude := "Exclude-EWMA-Extreme-Pair"]
         }
 
@@ -619,7 +619,7 @@ cleanbatch <- function(data.df,
     ewma.all = as.double(NaN),
     abssum2 = as.double(NaN),
     median.other.sd = as.double(NaN),
-    duplicate = F
+    duplicate = FALSE
   )]
 
   # 12c.	Calculate a EWMA step for all subjects/parameters with duplicates and at least one non-duplicate value with the
@@ -645,7 +645,7 @@ cleanbatch <- function(data.df,
   # perform ewma for subjects with duplicates
   data.df[
     subjid %in% subj.dup & valid.rows,
-    ewma.all := ewma(agedays, tbc.sd, ewma.exp, ewma.adjacent = F),
+    ewma.all := ewma(agedays, tbc.sd, ewma.exp, ewma.adjacent = FALSE),
     by = .(subjid, param)
   ]
   # note: at this point, only one ewma.all exists per param on a given day for a subject, so sort(ewma.all)[1] will returns the non-missing ewma.all
@@ -677,8 +677,8 @@ cleanbatch <- function(data.df,
       df[
         valid(
           exclude,
-          include.duplicates = T,
-          include.temporary.duplicates = T
+          include.duplicates = TRUE,
+          include.temporary.duplicates = TRUE
         ),
         `:=`(
           tbc.sd.min = min(tbc.sd),
@@ -716,15 +716,15 @@ cleanbatch <- function(data.df,
     exclude := (function(subj.df) {
       # flag days that have duplicates / potentially valid parameters
       subj.df[, `:=`(
-        duplicates.this.day = F,
-        duplicate = F,
+        duplicates.this.day = FALSE,
+        duplicate = FALSE,
         tbc.sd.min = as.double(NaN),
         tbc.sd.max = as.double(NaN)
       )]
       valid.rows <- valid(
         subj.df,
-        include.duplicates = T,
-        include.temporary.duplicates = T
+        include.duplicates = TRUE,
+        include.temporary.duplicates = TRUE
       )
       subj.df[valid.rows, duplicates.this.day := (.N > 1), by = .(param, agedays)]
       for (p in subj.df[j = unique(param)]) {
@@ -735,14 +735,14 @@ cleanbatch <- function(data.df,
       subj.df[is.na(median.other.sd), median.other.sd := 0]
       # identify rows as duplicate where |tbc*sd-median_tbcOsd| is not at the minimum value
       subj.df[
-        duplicates.this.day == T,
+        duplicates.this.day == TRUE,
         duplicate := seq_along(median.other.sd) != which.min(abs(tbc.sd - median.other.sd)),
         by = .(param, agedays)
       ]
       subj.df[duplicates.this.day & !duplicate, exclude := "Include"]
       subj.df[duplicates.this.day & duplicate, exclude := "Exclude-Duplicate"]
       subj.df[
-        duplicates.this.day == T,
+        duplicates.this.day == TRUE,
         `:=`(
           tbc.sd.min = min(tbc.sd),
           tbc.sd.max = max(tbc.sd)
@@ -762,7 +762,7 @@ cleanbatch <- function(data.df,
       ]
 
       # identify kids who had an SD or EWMA extreme excluded that was a duplicate and re-label as "Exclude-Duplicate"
-      subj.df[, duplicates.this.day := F]
+      subj.df[, duplicates.this.day := FALSE]
       # consider any non-missing measurement when determining presence of duplicates
       subj.df[
         exclude != "Missing",
@@ -812,8 +812,8 @@ cleanbatch <- function(data.df,
   data.df[, delta := ifelse(param == "WEIGHTKG", .05 * v, 1)]
   data.df[, `:=`(v.minus = v - delta, v.plus = v + delta)]
   data.df[, `:=`(
-    tbc.sd.minus = measurement.to.z(param, agedays, sex, v.minus, T),
-    tbc.sd.plus = measurement.to.z(param, agedays, sex, v.plus, T)
+    tbc.sd.minus = measurement.to.z(param, agedays, sex, v.minus, TRUE),
+    tbc.sd.plus = measurement.to.z(param, agedays, sex, v.plus, TRUE)
   )]
 
   # 14.  Exclude moderate errors based on EWMA
@@ -827,7 +827,7 @@ cleanbatch <- function(data.df,
   data.df[,
     exclude := (function(subj.df) {
       num.ewma.excluded <- 0
-      while (T) {
+      while (TRUE) {
         valid.rows <- valid(subj.df)
         # initialize fields
         subj.df[, `:=`(
@@ -843,7 +843,7 @@ cleanbatch <- function(data.df,
         )]
         subj.df[
           valid.rows,
-          (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, T),
+          (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE),
           by =param
         ]
         subj.df[, `:=`(
@@ -899,12 +899,12 @@ cleanbatch <- function(data.df,
           exclude := (function(df) {
             # 14g.  Calculate median_tbcOsd which is the median_tbc*sd for the OTHER parameter for the same subject with exc_*==0 (this may be missing)
             # also assign param variable for use in subsequent steps
-            median.tbc.other.sd <- median(df$tbc.other.sd, na.rm = T)
+            median.tbc.other.sd <- median(df$tbc.other.sd, na.rm = TRUE)
             num.valid <- sum(valid(df$exclude))
 
             # 14h.	Identify values for possible exclusion if they meet one of the following sets of criteria. Generate a temporary exclusion variable temp_exc_* equal
             #     to the number indicated to keep track of which set of criteria were met
-            df$temp.exclude <- factor(NA, levels = exclude.levels, ordered = T)
+            df$temp.exclude <- factor(NA, levels = exclude.levels, ordered = TRUE)
 
             # 14h.i.	Replace temp_exc_*=8 if the value is one of 3 or more measurements for a subject/parameter AND the value is neither the first nor the last measurement
             #       AND one of the following sets of criteria are met
@@ -946,10 +946,10 @@ cleanbatch <- function(data.df,
             #     2.	dewma_*<-2 & dewma_*_aft<-1 & d_nextsd_*<-1 & d_nextsd_plus_*<-1 & d_nextsd_minus_*<-1
 
             # take advantage of other variables we have calculated to infer that a row is the first of three or more valid measurements for a paramete
-            df$first.of.three.or.more <- F
-            df$last.of.three.or.more <- F
-            df[is.na(delta.agedays.prev) & num.valid >= 3, first.of.three.or.more := T]
-            df[is.na(delta.agedays.next) & num.valid >= 3, last.of.three.or.more := T]
+            df$first.of.three.or.more <- FALSE
+            df$last.of.three.or.more <- FALSE
+            df[is.na(delta.agedays.prev) & num.valid >= 3, first.of.three.or.more := TRUE]
+            df[is.na(delta.agedays.next) & num.valid >= 3, last.of.three.or.more := TRUE]
 
             df[
               first.of.three.or.more & delta.agedays.next < 365.25 &
@@ -1129,8 +1129,8 @@ cleanbatch <- function(data.df,
             # 14j.	If there is more than one potential exclusion identified in step 14h for a subject and parameter, calculate abssum_*=|tbc*sd+dewma_*| for each exclusion
             #     and replace exc_*=temp_exc_* for the value with the highest abssum_*
             if (num.exclude > 1) {
-              # first order by decreasing abssum  (where rep=T)
-              worst.row <- with(df, order(rep, abs(tbc.sd + dewma.all), decreasing = T))[1]
+              # first order by decreasing abssum  (where rep=TRUE)
+              worst.row <- with(df, order(rep, abs(tbc.sd + dewma.all), decreasing = TRUE))[1]
               df[worst.row, exclude := temp.exclude]
             }
 
@@ -1185,7 +1185,7 @@ cleanbatch <- function(data.df,
     subj.df[, index := 1:.N]
 
     num.height.excluded <- 0
-    while (T) {
+    while (TRUE) {
       # use a closure to discard all the extra fields added to df with each iteration
       subj.df[valid(exclude), exclude := (function(df) {
         # with each iteration we are operating only on valid rows to allow simplification of code below
@@ -1205,12 +1205,12 @@ cleanbatch <- function(data.df,
           mindiff.next.ht = as.double(NaN),
           maxdiff.prev.ht = as.double(NaN),
           maxdiff.next.ht = as.double(NaN),
-          pair.prev = F,
-          pair.next = F
+          pair.prev = FALSE,
+          pair.next = FALSE
         )]
 
         # ewma fields are needed later -- calculate now for efficiency
-        df[, (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, T)]
+        df[, (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE)]
 
         # calculate some usefule values (e.g. dewma values and tbc.sd) for use in later steps
         df[, `:=`(
@@ -1411,8 +1411,8 @@ cleanbatch <- function(data.df,
         # structure c(NA, field.name[-.N]) == get.prev
         # structure c(field.name[-1], NA) == get.next
         df[, `:=`(
-          pair.prev = c(F, pair[-.N]),
-          pair.next = c(pair[-1], F)
+          pair.prev = c(FALSE, pair[-.N]),
+          pair.next = c(pair[-1], FALSE)
         )]
 
         #  ii.	Generate bef_g_aftm1=1 if |Δewma_htbef| for the value of interest is greater than |Δewma_htaft| for the previous value
@@ -1438,7 +1438,7 @@ cleanbatch <- function(data.df,
         #   i.	d_prev_ht<mindiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
         #     a.  (temp_diff=|dewma_ht_bef|)
         df[, temp.diff := as.double(NaN)]
-        df$temp.exclude <- factor(NA, levels = exclude.levels, ordered = T)
+        df$temp.exclude <- factor(NA, levels = exclude.levels, ordered = TRUE)
         df[
           delta.prev.ht < mindiff.prev.ht & bef.g.aftm1,
           `:=`(
@@ -1507,8 +1507,8 @@ cleanbatch <- function(data.df,
         #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi and exc_ht=16 for that value if it met criteria iii,  iv, vii, or viii.
 
         if (num.exclude > 1) {
-          # first order by decreasing temp.diff (where rep=T)
-          worst.row <- order(rep, df$temp.diff, decreasing = T)[1]
+          # first order by decreasing temp.diff (where rep=TRUE)
+          worst.row <- order(rep, df$temp.diff, decreasing = TRUE)[1]
           df[worst.row, exclude := temp.exclude]
         }
 
@@ -1602,7 +1602,7 @@ cleanbatch <- function(data.df,
           worst.row <- order(valid(df),
             abs(df$tbc.sd),
             abs(abs.delta.other),
-            decreasing = T
+            decreasing = TRUE
           )[1]
           if (na_as_false(delta.agedays.other >= 365.25 & delta.tbc.sd.other > 3)) {
             df$exclude[worst.row] <- "Exclude-Pair-Delta-17"
@@ -1639,7 +1639,7 @@ cleanbatch <- function(data.df,
       }
 
       # ensure factor levels didn't accidentally get mangled
-      return(factor(df$exclude, levels = exclude.levels, ordered = T))
+      return(factor(df$exclude, levels = exclude.levels, ordered = TRUE))
     })(copy(.SD)),
     by = .(subjid, param),
     .SDcols = c("agedays", "tbc.sd", "tbc.other.sd", "exclude", "param")
@@ -1656,7 +1656,7 @@ cleanbatch <- function(data.df,
   # important part of the rule in the English - tot_exc_* has to be >=2. I'm forwarding an updated English version.
   # Also, because your exclusions are handled a little differently I wanted to specify that unit errors and swaps are not included
   # in tot_exc_* and are included in tot_inc_*, whereas carried forwards and duplicates are not included in either count.
-  # NOTE: updated to include optional argument "include.carryforward=T" in the valid() function, and added the
+  # NOTE: updated to include optional argument "include.carryforward=TRUE" in the valid() function, and added the
   # constraints "exclude.count.this.parameter >= 2" and "exclude.count.other.parameter >= 2" in the code below
 
   if (!quietly) {
@@ -1676,8 +1676,8 @@ cleanbatch <- function(data.df,
           exclude.count = sum(
             !valid(
               exclude,
-              include.duplicates = T,
-              include.carryforward = T
+              include.duplicates = TRUE,
+              include.carryforward = TRUE
             )
           ),
           include.count = sum(valid(exclude))
@@ -1700,7 +1700,7 @@ cleanbatch <- function(data.df,
         }
       }
       # ensure factor levels didn't accidentally get mangled
-      return(factor(subj.df$exclude, levels = exclude.levels, ordered = T))
+      return(factor(subj.df$exclude, levels = exclude.levels, ordered = TRUE))
     })(copy(.SD)),
     by = subjid,
     .SDcols = c("param", "exclude")
@@ -1820,7 +1820,7 @@ cleangrowth <- function(subjid,
                         agedays,
                         sex,
                         measurement,
-                        recover.unit.error = F,
+                        recover.unit.error = FALSE,
                         sd.extreme = 25,
                         z.extreme = 25,
                         lt3.exclude.mode = "default",
@@ -1830,13 +1830,13 @@ cleangrowth <- function(subjid,
                         sd.recenter = NA,
                         sdmedian.filename = "",
                         sdrecentered.filename = "",
-                        include.carryforward = F,
+                        include.carryforward = FALSE,
                         ewma.exp = -1.5,
                         ref.data.path = "",
                         log.path = ".",
-                        parallel = F,
+                        parallel = FALSE,
                         num.batches = NA,
-                        quietly = T) {
+                        quietly = TRUE) {
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
   data.all <- data.table(
     line = seq_along(measurement),
@@ -1865,7 +1865,7 @@ cleangrowth <- function(subjid,
   subjid.unique <- data.all[j = unique(subjid)]
   batches.all <- data.table(
     subjid = subjid.unique,
-    batch = sample(num.batches, length(subjid.unique), replace = T),
+    batch = sample(num.batches, length(subjid.unique), replace = TRUE),
     key = "subjid"
   )
   data.all <- batches.all[data.all]
@@ -1958,14 +1958,14 @@ cleangrowth <- function(subjid,
   if (!quietly) {
     cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
   }
-  measurement.to.z <- read.anthro(ref.data.path, cdc.only = T)
+  measurement.to.z <- read.anthro(ref.data.path, cdc.only = TRUE)
   data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
 
   # calculate "standard deviation" scores
   if (!quietly) {
     cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
   }
-  data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, T)]
+  data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, TRUE)]
 
   # sort by subjid, param, agedays
   setkey(data.all, subjid, param, agedays)
@@ -2012,7 +2012,7 @@ cleangrowth <- function(subjid,
           agedays < 0, "Missing", "Include"
       )),
       levels = exclude.levels,
-      ordered = T
+      ordered = TRUE
     )
   ]
 
@@ -2044,7 +2044,7 @@ cleangrowth <- function(subjid,
   if (!is.data.table(sd.recenter)) {
     sd.recenter <- data.all[exclude < "Exclude", sd.median(param, sex, agedays, sd.orig)]
     if (sdmedian.filename != "") {
-      write.csv(sd.recenter, sdmedian.filename, row.names = F)
+      write.csv(sd.recenter, sdmedian.filename, row.names = FALSE)
       if (!quietly) {
         cat(
           sprintf(
@@ -2066,7 +2066,7 @@ cleangrowth <- function(subjid,
   data.all[, tbc.sd := sd.orig - sd.median]
 
   if (sdrecentered.filename != "") {
-    write.csv(data.all, sdrecentered.filename, row.names = F)
+    write.csv(data.all, sdrecentered.filename, row.names = FALSE)
     if (!quietly) {
       cat(
         sprintf(
@@ -2166,7 +2166,7 @@ cleangrowth <- function(subjid,
 #'   path = system.file("extdata", package = "growthcleanr"),
 #'   cdc.only = TRUE
 #' )
-read.anthro <- function(path = "", cdc.only = F) {
+read.anthro <- function(path = "", cdc.only = FALSE) {
   # set correct path based on input reference table path (if any)
   weianthro_path <- ifelse(
     path == "",
@@ -2194,7 +2194,7 @@ read.anthro <- function(path = "", cdc.only = F) {
 
   l <- list(
     with(
-      read.table(weianthro_path, header = T),
+      read.table(weianthro_path, header = TRUE),
       data.frame(
         src = "WHO",
         param = "WEIGHTKG",
@@ -2208,7 +2208,7 @@ read.anthro <- function(path = "", cdc.only = F) {
       )
     ),
     with(
-      read.table(lenanthro_path, header = T),
+      read.table(lenanthro_path, header = TRUE),
       data.frame(
         src = "WHO",
         param = "HEIGHTCM",
@@ -2222,7 +2222,7 @@ read.anthro <- function(path = "", cdc.only = F) {
       )
     ),
     with(
-      read.table(bmianthro_path, header = T),
+      read.table(bmianthro_path, header = TRUE),
       data.frame(
         src = "WHO",
         param = "BMI",
@@ -2284,7 +2284,7 @@ read.anthro <- function(path = "", cdc.only = F) {
 
   setkey(anthro, src, param, sex, age)
 
-  return(function(param, agedays, sex, measurement, csd = F) {
+  return(function(param, agedays, sex, measurement, csd = FALSE) {
     # For now, we will only use CDC growth reference data, note that the cubically interpolated file
     # we are using has linear measurments derived from length data for children < 731 days, and height thereafter
     src <- ifelse(agedays < 731 & !cdc.only, "WHO", "CDC")
@@ -2346,7 +2346,7 @@ read.anthro <- function(path = "", cdc.only = F) {
 #'
 #' # Calculate exponentially weighted moving average
 #' e_df <- ewma(df_stats$agedays, sd, ewma.exp = -1.5)
-ewma <- function(agedays, z, ewma.exp, ewma.adjacent = T) {
+ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE) {
   # 6.  EWMA calculation description: Most of the next steps will involve calculating the exponentially weighted moving average for each subject and parameter. I will
   #     describe how to calculate EWMASDs, and will describe how it needs to be varied in subsequent steps.
   # a.	The overall goal of the EWMASD calculation is to identify the difference between the SD-score and what we might predict that DS-score should be, in order to
@@ -2414,7 +2414,7 @@ ewma <- function(agedays, z, ewma.exp, ewma.adjacent = T) {
 #' @noRd
 as_matrix_delta <- function(agedays) {
   n <- length(agedays)
-  abs(matrix(rep(agedays, n), n, byrow = T) - agedays)
+  abs(matrix(rep(agedays, n), n, byrow = TRUE) - agedays)
 }
 
 #' Calculate median SD score by age for each parameter.
