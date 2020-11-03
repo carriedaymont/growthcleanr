@@ -10,7 +10,7 @@ ext_bmiz(
   wt = "wt",
   ht = "ht",
   bmi = "bmi",
-  adjust.integer.age = T,
+  adjust.integer.age = TRUE,
   ref.data.path = ""
 )
 }
