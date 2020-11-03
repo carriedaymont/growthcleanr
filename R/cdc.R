@@ -5,10 +5,10 @@
 z_score <- function(var, l, m, s) {
   ls <- l * s
   invl <- 1 / l
-  z <- (((var / m) ^ l) - 1) / (ls) # z-score formula
-  sdp2 <- (m * (1 + 2 * ls) ^ (invl)) - m
+  z <- (((var / m)^l) - 1) / (ls) # z-score formula
+  sdp2 <- (m * (1 + 2 * ls)^(invl)) - m
   # modified z-score (+2)
-  sdm2 <- m - (m * (1 - 2 * ls) ^ (invl))
+  sdm2 <- m - (m * (1 - 2 * ls)^(invl))
   mz <- fifelse(var < m, (var - m) / (0.5 * sdm2), (var - m) / (sdp2 * 0.5))
   return(list(z, mz))
 }
@@ -17,19 +17,12 @@ z_score <- function(var, l, m, s) {
 #'
 #' @keywords internal
 #' @noRd
-set_cols_first <- function(DT, cols, intersection = TRUE)
-{
+set_cols_first <- function(DT, cols, intersection = TRUE) {
   # thanks to hutils
   if (intersection) {
-    return(setcolorder(DT, c(
-      intersect(cols, names(DT)),
-      setdiff(names(DT), cols)
-    )))
-  }
-  else {
-    return(setcolorder(DT, c(cols, setdiff(
-      names(DT), cols
-    ))))
+    setcolorder(DT, c(intersect(cols, names(DT)), setdiff(names(DT), cols)))
+  } else {
+    setcolorder(DT, c(cols, setdiff(names(DT), cols)))
   }
 }
 
@@ -106,11 +99,14 @@ set_cols_first <- function(DT, cols, intersection = TRUE)
 #' df <- as.data.frame(syngrowth)
 #' df <- df[df$subjid %in% unique(df[, "subjid"])[1:5], ]
 #' df <- cbind(df,
-#'             "clean_value" = cleangrowth(df$subjid,
-#'                                         df$param,
-#'                                         df$agedays,
-#'                                         df$sex,
-#'                                         df$measurement))
+#'   "clean_value" = cleangrowth(
+#'     df$subjid,
+#'     df$param,
+#'     df$agedays,
+#'     df$sex,
+#'     df$measurement
+#'   )
+#' )
 #' df <- longwide(df) # convert to wide format for ext_bmiz
 #'
 #' # Calling the function with default column names
@@ -120,10 +116,10 @@ set_cols_first <- function(DT, cols, intersection = TRUE)
 #' dfc <- df
 #' colnames(dfc)[colnames(dfc) %in% c("agem", "wt", "ht")] <-
 #'   c("agemos", "weightkg", "heightcm")
-#' d_bmi <- ext_bmiz(dfc, age="agemos", wt="weightkg", ht="heightcm")
+#' d_bmi <- ext_bmiz(dfc, age = "agemos", wt = "weightkg", ht = "heightcm")
 #'
 #' # Disabling conversion of all-integer age in months to (age + 0.5)
-#' d_bmi <- ext_bmiz(df, adjust.integer.age=FALSE)
+#' d_bmi <- ext_bmiz(df, adjust.integer.age = FALSE)
 ext_bmiz <- function(data,
                      age = "agem",
                      wt = "wt",
@@ -140,8 +136,9 @@ ext_bmiz <- function(data,
   setDT(data)
 
   setnames(data,
-           old = c(age, wt, ht, bmi),
-           new = c('age', 'wt', 'ht', 'bmi'))
+    old = c(age, wt, ht, bmi),
+    new = c("age", "wt", "ht", "bmi")
+  )
 
   # needed for merging back with original data
   data$seq_ <- 1L:nrow(data)
@@ -154,54 +151,62 @@ ext_bmiz <- function(data,
     }
   }
 
-  data <- data[between(age, 24, 240) & !(is.na(wt) & is.na(ht)),
-               .(seq_, sex, age, wt, ht, bmi)]
+  data <- data[
+    between(age, 24, 240) & !(is.na(wt) & is.na(ht)),
+    .(seq_, sex, age, wt, ht, bmi)
+  ]
 
   v1 <- Cs(seq_, id, sex, age, wt, ht, bmi)
 
   dref_path <- ifelse(
     ref.data.path == "",
     system.file("extdata/CDCref_d.csv", package = "growthcleanr"),
-    paste(ref.data.path, "CDCref_d.csv", sep = "")
+    paste0(ref.data.path, "CDCref_d.csv")
   )
   dref <-
-    fread(dref_path)[`_AGEMOS1` > 23 & denom == 'age']
+    fread(dref_path)[`_AGEMOS1` > 23 & denom == "age"]
   names(dref) <- tolower(names(dref))
-  names(dref) <- gsub('^_', '', names(dref))
+  names(dref) <- gsub("^_", "", names(dref))
 
-  d20 <- dref[agemos2 == 240,
-              .(sex,
-                agemos2,
-                lwt2,
-                mwt2,
-                swt2,
-                lbmi2,
-                mbmi2,
-                sbmi2,
-                lht2,
-                mht2,
-                sht2)]
-  names(d20) <- gsub('2', '', names(d20))
+  d20 <- dref[
+    agemos2 == 240,
+    .(
+      sex,
+      agemos2,
+      lwt2,
+      mwt2,
+      swt2,
+      lbmi2,
+      mbmi2,
+      sbmi2,
+      lht2,
+      mht2,
+      sht2
+    )
+  ]
+  names(d20) <- gsub("2", "", names(d20))
 
   dref <-
-    dref[, .(sex,
-             agemos1,
-             lwt1,
-             mwt1,
-             swt1,
-             lbmi1,
-             mbmi1,
-             sbmi1,
-             lht1,
-             mht1,
-             sht1)]
-  names(dref) <- gsub('1', '', names(dref))
+    dref[, .(
+      sex,
+      agemos1,
+      lwt1,
+      mwt1,
+      swt1,
+      lbmi1,
+      mbmi1,
+      sbmi1,
+      lht1,
+      mht1,
+      sht1
+    )]
+  names(dref) <- gsub("1", "", names(dref))
 
   dref <- rbindlist(list(dref, d20))
   adj_bmi_met <-
     dref[agemos == 240, .(sex, mbmi, sbmi)] %>% setnames(., Cs(sex, mref, sref))
 
-  dref <- dref[adj_bmi_met, on = 'sex']
+  dref <- dref[adj_bmi_met, on = "sex"]
   v <- Cs(sex, age, wl, wm, ws, bl, bm, bs, hl, hm, hs, mref, sref)
   setnames(dref, v)
 
@@ -210,8 +215,9 @@ ext_bmiz <- function(data,
     uages <- unique(data$age)
     fapprox <- function(i) {
       .d <- dref[sex == i]
-      fapp <- function(vars, ...)
+      fapp <- function(vars, ...) {
         approx(.d$age, vars, xout = uages)$y
+      }
       data.frame(sapply(.d[, ..v], fapp))
     }
     dref <- rbindlist(lapply(1:2, fapprox))
@@ -232,8 +238,8 @@ ext_bmiz <- function(data,
   dt <- mutate(
     dt,
     bp = 100 * pnorm(bz),
-    p95 = m * (1 + l * s * qnorm(0.95)) ^ (1 / l),
-    p97 = m * (1 + l * s * qnorm(0.97)) ^ (1 / l),
+    p95 = m * (1 + l * s * qnorm(0.95))^(1 / l),
+    p97 = m * (1 + l * s * qnorm(0.97))^(1 / l),
     bmip95 = 100 * (bmi / p95),
     wp = 100 * pnorm(waz),
     hp = 100 * pnorm(haz),
@@ -255,16 +261,18 @@ ext_bmiz <- function(data,
   ) %>% setDT()
 
   ## now create Extended z-score for BMI >=95th P
-  dt[, ':=' (ebz = bz,
-             ebp = bp,
-             agey = age / 12)]
-  dt[, sigma := fifelse(sex == 1,
-                        0.3728 + 0.5196 * agey - 0.0091 * agey ^ 2,
-                        0.8334 + 0.3712 * agey - 0.0011 * agey ^ 2)]
+  dt[, ":="(ebz = bz,
+    ebp = bp,
+    agey = age / 12)]
+  dt[, sigma := fifelse(
+    sex == 1,
+    0.3728 + 0.5196 * agey - 0.0091 * agey^2,
+    0.8334 + 0.3712 * agey - 0.0011 * agey^2
+  )]
   dt[bp >= 95, ebp := 90 + 10 * pnorm((bmi - p95) / sigma)]
   dt[bp >= 95, ebz := qnorm(ebp / 100)]
   dt[bp > 99 &
-       is.infinite(ebz), ebz := 8.21] # highest poss value is 8.20945
+    is.infinite(ebz), ebz := 8.21] # highest poss value is 8.20945
 
   x <- Cs(agey, mref, sref, sex, wt, ht, bmi)
   dt[, (x) := NULL]
@@ -319,27 +327,27 @@ ext_bmiz <- function(data,
 
   # Add labels for convenience
   dtot <- dtot %>% labelled::set_variable_labels(
-    age = 'Age (months)',
-    ht = 'Height (cm)',
-    wt = 'Weight (kg)',
-    bmi = 'BMI',
-    bmiz = 'LMS BMI-for-sex/age z-score',
-    bmip = 'LMS BMI-for-sex/age percentile',
-    waz =  'LMS Weight-for-sex/age z-score',
-    wp =  'LMS Weight-for-sex/age percentile',
-    haz =  'LMS Height-for-sex/age z-score',
-    hp =  'LMS Height-for-sex/age percentile',
-    p95 = '95th percentile of BMI in growth charts',
-    p97 = '97th percentile of BMI in growth charts',
-    bmip95 = 'BMI as a percentage of the 95th percentile',
-    mod_bmiz = 'Modified BMI-for-age z-score',
-    mod_waz = 'Modified Weight-for-age z-score',
-    mod_haz = 'Modified Height-for-age z-score',
-    sigma = 'Scale parameter for half-normal distribution',
-    ext_bmip = 'Extended BMI percentile',
-    ext_bmiz = 'Extended BMI z-score',
-    sev_obese = 'BMI >= 120% of 95th percentile (0/1)',
-    obese = 'BMI >= 95th percentile (0/1)'
+    age = "Age (months)",
+    ht = "Height (cm)",
+    wt = "Weight (kg)",
+    bmi = "BMI",
+    bmiz = "LMS BMI-for-sex/age z-score",
+    bmip = "LMS BMI-for-sex/age percentile",
+    waz = "LMS Weight-for-sex/age z-score",
+    wp = "LMS Weight-for-sex/age percentile",
+    haz = "LMS Height-for-sex/age z-score",
+    hp = "LMS Height-for-sex/age percentile",
+    p95 = "95th percentile of BMI in growth charts",
+    p97 = "97th percentile of BMI in growth charts",
+    bmip95 = "BMI as a percentage of the 95th percentile",
+    mod_bmiz = "Modified BMI-for-age z-score",
+    mod_waz = "Modified Weight-for-age z-score",
+    mod_haz = "Modified Height-for-age z-score",
+    sigma = "Scale parameter for half-normal distribution",
+    ext_bmip = "Extended BMI percentile",
+    ext_bmiz = "Extended BMI z-score",
+    sev_obese = "BMI >= 120% of 95th percentile (0/1)",
+    obese = "BMI >= 95th percentile (0/1)"
   )
 
   return(dtot[])

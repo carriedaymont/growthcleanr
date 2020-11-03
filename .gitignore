@@ -42,3 +42,5 @@ packrat/src/
 
 *.swp
 output
+
+.lintr

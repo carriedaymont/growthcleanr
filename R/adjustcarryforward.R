@@ -47,19 +47,24 @@
 #' df <- as.data.frame(syngrowth)
 #' df <- df[df$subjid %in% unique(df[, "subjid"])[1:5], ]
 #' clean_df <- cbind(df,
-#'                   "clean_value" = cleangrowth(df$subjid,
-#'                                               df$param,
-#'                                               df$agedays,
-#'                                               df$sex,
-#'                                               df$measurement))
+#'   "clean_value" = cleangrowth(
+#'     df$subjid,
+#'     df$param,
+#'     df$agedays,
+#'     df$sex,
+#'     df$measurement
+#'   )
+#' )
 #'
 #' # Adjust carry forward values in cleaned data
-#' adj_clean <- adjustcarryforward(subjid = clean_df$subjid,
-#'                                 param = clean_df$param,
-#'                                 agedays = clean_df$agedays,
-#'                                 sex = clean_df$sex,
-#'                                 measurement = clean_df$measurement,
-#'                                 orig.exclude = clean_df$clean_value)
+#' adj_clean <- adjustcarryforward(
+#'   subjid = clean_df$subjid,
+#'   param = clean_df$param,
+#'   agedays = clean_df$agedays,
+#'   sex = clean_df$sex,
+#'   measurement = clean_df$measurement,
+#'   orig.exclude = clean_df$clean_value
+#' )
 adjustcarryforward <- function(subjid,
                                param,
                                agedays,
@@ -86,7 +91,7 @@ adjustcarryforward <- function(subjid,
     agedays = as.integer(agedays),
     v = ifelse(measurement == 0, NaN, measurement),
     sex = as.integer(ifelse(
-      sex %in% c(0, 'm', 'M'), 0, ifelse(sex %in% c(1, 'f', 'F'), 1, NA)
+      sex %in% c(0, "m", "M"), 0, ifelse(sex %in% c(1, "f", "F"), 1, NA)
     )),
     orig.exclude = as.factor(orig.exclude)
   )
@@ -125,45 +130,45 @@ adjustcarryforward <- function(subjid,
   tanner_ht_vel_path <- ifelse(
     ref.data.path == "",
     system.file("extdata/tanner_ht_vel.csv", package = "growthcleanr"),
-    paste(ref.data.path, "tanner_ht_vel.csv", sep =
-            "")
+    paste0(ref.data.path, "tanner_ht_vel.csv")
   )
 
   tanner.ht.vel <- fread(tanner_ht_vel_path)
 
-  setnames(tanner.ht.vel,
-           colnames(tanner.ht.vel),
-           gsub('_', '.', colnames(tanner.ht.vel)))
+  setnames(
+    tanner.ht.vel,
+    colnames(tanner.ht.vel),
+    gsub("_", ".", colnames(tanner.ht.vel))
+  )
   setkey(tanner.ht.vel, sex, tanner.months)
   # keep track of column names in the tanner data
   tanner.fields <- colnames(tanner.ht.vel)
-  tanner.fields <- tanner.fields[!tanner.fields %in% c('sex', 'tanner.months')]
+  tanner.fields <- tanner.fields[!tanner.fields %in% c("sex", "tanner.months")]
 
   who_max_ht_vel_path <- ifelse(
     ref.data.path == "",
     system.file("extdata/who_ht_maxvel_3sd.csv", package = "growthcleanr"),
-    paste(ref.data.path, "who_ht_maxvel_3sd.csv", sep =
-            "")
+    paste0(ref.data.path, "who_ht_maxvel_3sd.csv")
   )
 
   who_ht_vel_3sd_path <- ifelse(
     ref.data.path == "",
     system.file("extdata/who_ht_vel_3sd.csv", package = "growthcleanr"),
-    paste(ref.data.path, "who_ht_vel_3sd.csv", sep =
-            "")
+    paste0(ref.data.path, "who_ht_vel_3sd.csv")
   )
   who.max.ht.vel <- fread(who_max_ht_vel_path)
   who.ht.vel <- fread(who_ht_vel_3sd_path)
   setkey(who.max.ht.vel, sex, whoagegrp_ht)
   setkey(who.ht.vel, sex, whoagegrp_ht)
-  who.ht.vel <- as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel, by =
-                                                c('sex', 'whoagegrp_ht')))
+  who.ht.vel <- as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel,
+    by = c("sex", "whoagegrp_ht")
+  ))
 
-  setnames(who.ht.vel, colnames(who.ht.vel), gsub('_', '.', colnames(who.ht.vel)))
+  setnames(who.ht.vel, colnames(who.ht.vel), gsub("_", ".", colnames(who.ht.vel)))
   setkey(who.ht.vel, sex, whoagegrp.ht)
   # keep track of column names in the who growth velocity data
   who.fields <- colnames(who.ht.vel)
-  who.fields <- who.fields[!who.fields %in% c('sex', 'whoagegrp.ht')]
+  who.fields <- who.fields[!who.fields %in% c("sex", "whoagegrp.ht")]
 
   # 1.  General principles
   # a.	All steps are done separately for each parameter unless otherwise noted
@@ -184,7 +189,7 @@ adjustcarryforward <- function(subjid,
   # g.  exc_* should only be replaced with a  higher value if exc_*==0 at the time of replacement, unless otherwise specified.
 
 
-  # NOTE: in the R code below exclusion is documented as a series of factor levels, where all levels occuring before 'Exclude' in the sequence are considered
+  # NOTE: in the R code below exclusion is documented as a series of factor levels, where all levels occuring before "Exclude" in the sequence are considered
   # to be valid measurements.  We use the built in sorting of the data.table object and subsets rather than re-sorting at each step
   # to ensure that only valid measurements are used at the beginning of each step.
   # Also, unlike the Stata code, the measurement parameter (weight vs. height) is recorded as a factor in the data frame, rather than as a variable name
@@ -207,14 +212,16 @@ adjustcarryforward <- function(subjid,
   #     median). These SD-scores, rather than z-scores, now form the basis for the algorithm.
 
   # calculate z scores
-  if (!quietly)
+  if (!quietly) {
     cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
+  }
   measurement.to.z <- read.anthro(ref.data.path, cdc.only = T)
   data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
 
   # calculate "standard deviation" scores
-  if (!quietly)
+  if (!quietly) {
     cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
+  }
   data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, T)]
 
   # sort by subjid, param, agedays
@@ -225,26 +232,27 @@ adjustcarryforward <- function(subjid,
 
   # enumerate the different exclusion levels
   exclude.levels <- c(
-    'Missing',
-    'No Change',
-    'Include',
-    'Exclude-Min-Height-Change',
-    'Exclude-Max-Height-Change'
+    "Missing",
+    "No Change",
+    "Include",
+    "Exclude-Min-Height-Change",
+    "Exclude-Max-Height-Change"
   )
 
   # Mark missing values for exclusion
   data.all[, exclude := factor(with(data.all, ifelse(
     is.na(v) |
-      agedays < 0, 'Missing', 'No Change'
+      agedays < 0, "Missing", "No Change"
   )),
   levels = exclude.levels,
-  ordered = T)]
+  ordered = T
+  )]
 
   # after calculating z scores, for convenience, recategorize linear parameters as 'HEIGHTCM'
-  data.all[param == 'LENGTHCM', param := 'HEIGHTCM']
+  data.all[param == "LENGTHCM", param := "HEIGHTCM"]
 
   # define field names needed by helper functions
-  ewma.fields <- c('ewma.all', 'ewma.before', 'ewma.after')
+  ewma.fields <- c("ewma.all", "ewma.before", "ewma.after")
 
   # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time, we need to account for the fact that
   #     the mean SD-score for the population changes with age.
@@ -259,8 +267,9 @@ adjustcarryforward <- function(subjid,
   # f.	In future steps I will sometimes refer to measprev and measnext which refer to the previous or next wt or ht measurement
   #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject, parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
 
-  if (!quietly)
+  if (!quietly) {
     cat(sprintf("[%s] Re-centering data...\n", Sys.time()))
+  }
 
   # see function definition below for explanation of the re-centering process
   # returns a data table indexed by param, sex, agedays
@@ -283,7 +292,7 @@ adjustcarryforward <- function(subjid,
   data.all[, tbc.sd := sd.orig - sd.median]
 
   # safety check: treat observations where tbc.sd cannot be calculated as missing
-  data.all[is.na(tbc.sd), exclude := 'Missing']
+  data.all[is.na(tbc.sd), exclude := "Missing"]
 
 
 
@@ -297,20 +306,21 @@ adjustcarryforward <- function(subjid,
   #      excludes the other value in the pair. For subjects/parameters with 2 or more measurements, this is done by looking at the absolute value of the tbc*sd.
   #      The Tanner height velocity reference is used for measurements taken at >2yo, WHO will be used for <2yo. For a few pairs of measurements either could be used;
   #      WHO will be used if difference between ages is < 9 months.
-  if (!quietly)
+  if (!quietly) {
     cat(sprintf(
       "[%s] Exclude heights based on growth velocity...\n",
       Sys.time()
     ))
-  data.all[param == 'HEIGHTCM', exclude := (function(subj.df) {
+  }
+  data.all[param == "HEIGHTCM", exclude := (function(subj.df) {
     # assign some book keeping variables
-    #subj.df[, `:=`(subjid = subjid, param='HEIGHTCM',index=1:.N)]
+    # subj.df[, `:=`(subjid = subjid, param='HEIGHTCM',index=1:.N)]
     subj.df[, index := 1:.N]
 
     num.height.excluded <- 0
     while (T) {
       # use a closure to discard all the extra fields added to df with each iteration
-      subj.df[, exclude := (function (df) {
+      subj.df[, exclude := (function(df) {
         # initialize fields
         df[, (ewma.fields) := as.double(NaN)]
         df[, `:=`(
@@ -370,20 +380,24 @@ adjustcarryforward <- function(subjid,
         #   i.	mindiff_ht=0.5*min_ht_vel*(d_agedays/365.25)^2-3 if d_agedays<365.25
         #   ii.	replace mindiff_ht=0.5*min_ht_vel-3 if d_agedays>365.25
         df[, ht.exp := ifelse(delta.agedays.next < 365.25,
-                              min_ht.exp_under,
-                              min_ht.exp_over)]
-        df[, `:=`(maxdiff.next.ht = as.double(NA),
-                  mindiff.next.ht = as.double(NaN))]
+          min_ht.exp_under,
+          min_ht.exp_over
+        )]
+        df[, `:=`(
+          maxdiff.next.ht = as.double(NA),
+          mindiff.next.ht = as.double(NaN)
+        )]
         df[, mindiff.next.ht := minfactor * min.ht.vel * (delta.agedays.next /
-                                                            365.25) ^ ht.exp - banddiff]
+          365.25)^ht.exp - banddiff]
 
         # 15f.iii.	maxdiff_ht=2*max_ht_vel*(d_agedays/365.25)^1.5+5.5 if d_agedays>365.25
         #   iv.	replace maxdiff_ht=2*max_ht_vel*(d_agedays/365.25)^0.33+5.5 if d_agedays<365.25
         df[, ht.exp := ifelse(delta.agedays.next < 365.25,
-                              max_ht.exp_under,
-                              max_ht.exp_over)]
+          max_ht.exp_under,
+          max_ht.exp_over
+        )]
         df[, maxdiff.next.ht := maxfactor * max.ht.vel * (delta.agedays.next /
-                                                            365.25) ^ ht.exp + banddiff_plus]
+          365.25)^ht.exp + banddiff_plus]
 
         # 15g.	Generate variable whoagegrp_ht=agedays/30.4375 rounded to the nearest integer
         df[, whoagegrp.ht := round(agedays / 30.4375)]
@@ -396,25 +410,26 @@ adjustcarryforward <- function(subjid,
         #   107-152	      4
         #   153-198	      6
         #   All others	  missing
-        df[, whoinc.age.ht := ifelse(delta.agedays.next < 20 ,
-                                     NA,
-                                     ifelse(
-                                       delta.agedays.next <= 45,
-                                       1,
-                                       ifelse(
-                                         delta.agedays.next <= 75,
-                                         2,
-                                         ifelse(
-                                           delta.agedays.next <= 106,
-                                           3,
-                                           ifelse(
-                                             delta.agedays.next <= 152,
-                                             4,
-                                             ifelse(delta.agedays.next <= 198, 6, NA)
-                                           )
-                                         )
-                                       )
-                                     ))]
+        df[, whoinc.age.ht := ifelse(delta.agedays.next < 20,
+          NA,
+          ifelse(
+            delta.agedays.next <= 45,
+            1,
+            ifelse(
+              delta.agedays.next <= 75,
+              2,
+              ifelse(
+                delta.agedays.next <= 106,
+                3,
+                ifelse(
+                  delta.agedays.next <= 152,
+                  4,
+                  ifelse(delta.agedays.next <= 198, 6, NA)
+                )
+              )
+            )
+          )
+        )]
 
         # i.	Merge using sex and whoagegrp_ht using who_ht_vel_3sd and who_ht_maxvel_3sd; this will give you varaibles whoinc_i_ht and maxwhoinc_i_ht
         #     for various intervals where i is 1,2, 3,4, 6 and corresponds to whoinc_age_ht.
@@ -426,7 +441,7 @@ adjustcarryforward <- function(subjid,
 
         # 15j.	Generate variable who_mindiff_ht=whoinc_i_ht according to the value if whoinc_age_ht; make who_mindiff_ht missing if whoinc_i_ht or whoinc_age_ht is missing.
         df[, who.mindiff.next.ht := ifelse(
-          delta.agedays.next < 20 ,
+          delta.agedays.next < 20,
           NA,
           ifelse(
             delta.agedays.next <= 45,
@@ -450,7 +465,7 @@ adjustcarryforward <- function(subjid,
         # 15k.	Generate variable who_maxdiff_ht=max_whoinc_i_ht according to the value if whoinc_age_ht; make who_maxdiff_ht missing if max_whoinc_i_ht or
         #     whoinc_age_ht is missing.
         df[, who.maxdiff.next.ht := ifelse(
-          delta.agedays.next < 20 ,
+          delta.agedays.next < 20,
           NA,
           ifelse(
             delta.agedays.next <= 45,
@@ -474,13 +489,15 @@ adjustcarryforward <- function(subjid,
         # 15l.	Scale allowed value based on d_agedays_ht:
         #   1.	replace who_mindiff_`p'=who_mindiff_`p'*d_agedays_`p'/(whoinc_age_`p'*30.4375) if d_agedays_`p'<(whoinc_age_`p'*30.4375)
         #   2.	replace who_maxdiff_`p'=who_maxdiff_`p'*d_agedays_`p'/(whoinc_age_`p'*30.4375) if d_agedays_`p'>(whoinc_age_`p'*30.4375)
-        df[delta.agedays.next < whoinc.age.ht * 30.4375,
-           `:=`(
-             who.mindiff.next.ht = who.mindiff.next.ht * delta.agedays.next / (whoinc.age.ht *
-                                                                                 30.4375),
-             who.maxdiff.next.ht = who.maxdiff.next.ht * delta.agedays.next /
-               (whoinc.age.ht * 30.4375)
-           )]
+        df[
+          delta.agedays.next < whoinc.age.ht * 30.4375,
+          `:=`(
+            who.mindiff.next.ht = who.mindiff.next.ht * delta.agedays.next / (whoinc.age.ht *
+              30.4375),
+            who.maxdiff.next.ht = who.maxdiff.next.ht * delta.agedays.next /
+              (whoinc.age.ht * 30.4375)
+          )
+        ]
 
         # 15m.	Replace mindiff_ht/maxdiff_ht with adjusted WHO value if Tanner value is missing or if both are present and age difference is < 9 months:
         #   1.	replace mindiff_`p'=0.5*who_mindiff_`p'-3 if who_mindiff_`p' is not missing & d_agedays_`p'<(9*30.4375)
@@ -489,13 +506,15 @@ adjustcarryforward <- function(subjid,
         #   4.	replace maxdiff_`p'=2*who_maxdiff_`p'+3 if maxdiff_`p is missing & who_maxdiff_`p' is not missing
 
         # refactored logic slightly for efficiency
-        df[!is.na(who.mindiff.next.ht) &
-             (delta.agedays.next < 9 * 30.4375 |
-                is.na(mindiff.next.ht)),
-           `:=`(
-             mindiff.next.ht = minfactor * who.mindiff.next.ht - banddiff,
-             maxdiff.next.ht = maxfactor * who.maxdiff.next.ht + banddiff
-           )]
+        df[
+          !is.na(who.mindiff.next.ht) &
+            (delta.agedays.next < 9 * 30.4375 |
+              is.na(mindiff.next.ht)),
+          `:=`(
+            mindiff.next.ht = minfactor * who.mindiff.next.ht - banddiff,
+            maxdiff.next.ht = maxfactor * who.maxdiff.next.ht + banddiff
+          )
+        ]
 
         # 15m.5.  replace mindiff_`p'=-3 if mindiff_`p' is missing
         df[is.na(mindiff.next.ht), mindiff.next.ht := -3]
@@ -514,8 +533,10 @@ adjustcarryforward <- function(subjid,
         )]
 
         # 15o.	Determine d_prev_ht=ht-htprev (set to missing for the first value for a subject) and d_next_ht=htnext-ht (set to missing for the last value for a subject)
-        df[, `:=`(delta.prev.ht = v - v.prev,
-                  delta.next.ht = v.next - v)]
+        df[, `:=`(
+          delta.prev.ht = v - v.prev,
+          delta.next.ht = v.next - v
+        )]
 
         # 15p.  Perform a EWMA calculation with the following modifications:
         #  i.	  Generate a variable pair=1 if (d_prev_ht<mindiff_prev_ht OR d_ht<mindiff_ht OR d_prev_ht>maxdiff_prev_ht  OR d_ht>maxdiff_ht) AND exc_ht==0
@@ -529,8 +550,10 @@ adjustcarryforward <- function(subjid,
         # for efficiency, bring get.prev and get.next inline here (working on valid rows within a single parameter for a single subject)
         # structure c(NA, field.name[-.N]) == get.prev
         # structure c(field.name[-1], NA) == get.next
-        df[, `:=`(pair.prev = c(F, pair[-.N]),
-                  pair.next = c(pair[-1], F))]
+        df[, `:=`(
+          pair.prev = c(F, pair[-.N]),
+          pair.next = c(pair[-1], F)
+        )]
 
         #  ii.	Generate bef_g_aftm1=1 if |Δewma_htbef| for the value of interest is greater than |Δewma_htaft| for the previous value
         #       AND the value of interest is not the first height value for that subject AND pair==1 AND pair for the previous value==1
@@ -540,10 +563,10 @@ adjustcarryforward <- function(subjid,
         # NOTE: pair.next will be NA last height, which will result in a FALSE value below
         df[, `:=`(
           bef.g.aftm1 = na_as_false(
-            abs(dewma.before) > abs(dewma.after.prev)  & pair & pair.prev
+            abs(dewma.before) > abs(dewma.after.prev) & pair & pair.prev
           ),
           aft.g.befp1 = na_as_false(
-            abs(dewma.after)  > abs(dewma.before.next) & pair & pair.next
+            abs(dewma.after) > abs(dewma.before.next) & pair & pair.next
           )
         )]
 
@@ -559,48 +582,70 @@ adjustcarryforward <- function(subjid,
         #   i.	d_prev_ht<mindiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
         #     a.  (temp_diff=|dewma_ht_bef|)
         df[, temp.diff := as.double(NaN)]
-        df[, temp.exclude := factor(NA, levels = exclude.levels, ordered =
-                                      T)]
-        df[delta.prev.ht < mindiff.prev.ht & bef.g.aftm1,
-           `:=`(temp.diff = abs(dewma.before),
-                temp.exclude = 'Exclude-Min-Height-Change')]
+        df[, temp.exclude := factor(NA,
+          levels = exclude.levels, ordered =
+            T
+        )]
+        df[
+          delta.prev.ht < mindiff.prev.ht & bef.g.aftm1,
+          `:=`(
+            temp.diff = abs(dewma.before),
+            temp.exclude = "Exclude-Min-Height-Change"
+          )
+        ]
 
         #   ii.	d_ht<mindiff_ht & aft_g_befp1_ht==1 & exc_ht==0 & mindiff_ht is not missing
         #     a.	(temp_diff=|dewma_ht_aft|)
-        df[delta.next.ht < mindiff.next.ht & aft.g.befp1,
-           `:=`(temp.diff = abs(dewma.after),
-                temp.exclude = 'Exclude-Min-Height-Change')]
+        df[
+          delta.next.ht < mindiff.next.ht & aft.g.befp1,
+          `:=`(
+            temp.diff = abs(dewma.after),
+            temp.exclude = "Exclude-Min-Height-Change"
+          )
+        ]
 
         #   iii.	d_prev_ht>maxdiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
         #     a.  (temp_diff=|dewma_ht_bef|)
-        df[delta.prev.ht > maxdiff.prev.ht & bef.g.aftm1,
-           `:=`(temp.diff = abs(dewma.before),
-                temp.exclude = 'Exclude-Max-Height-Change')]
+        df[
+          delta.prev.ht > maxdiff.prev.ht & bef.g.aftm1,
+          `:=`(
+            temp.diff = abs(dewma.before),
+            temp.exclude = "Exclude-Max-Height-Change"
+          )
+        ]
 
         #   iv.	d_ht>maxdiff_ht & aft_g_befp1_ht==1 & exc_ht==0 & mindiff_ht is not missing
         #     a.  (temp_diff=|dewma_ht_aft|)
-        df[delta.next.ht > maxdiff.next.ht & aft.g.befp1,
-           `:=`(temp.diff = abs(dewma.after),
-                temp.exclude = 'Exclude-Max-Height-Change')]
+        df[
+          delta.next.ht > maxdiff.next.ht & aft.g.befp1,
+          `:=`(
+            temp.diff = abs(dewma.after),
+            temp.exclude = "Exclude-Max-Height-Change"
+          )
+        ]
 
         #   v.	d_prev_ht<mindiff_prev_ht & tot_ht==2 & |tbchtsd|>|prev_tbchtsd|
         #     a. for v-viii temp_diff is kept as missing
         #   vi. d_ht<mindiff_ht & tot_ht==2 & |tbchtsd|>|next_tbchtsd|
-        df[delta.prev.ht < mindiff.prev.ht &
-             num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev
-           |
-             delta.next.ht < mindiff.next.ht &
-             num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
-           temp.exclude := 'Exclude-Min-Height-Change']
+        df[
+          delta.prev.ht < mindiff.prev.ht &
+            num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev
+          |
+            delta.next.ht < mindiff.next.ht &
+              num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
+          temp.exclude := "Exclude-Min-Height-Change"
+        ]
 
         #   vii.	d_prev_ht>maxdiff_prev_ht & tot_ht==2 & |tbchtsd|>|prev_tbchtsd|
         #   viii. d_ht>maxdiff_ht & tot_ht==2 & |tbchtsd|>|next_tbchtsd|
-        df[delta.prev.ht > maxdiff.prev.ht &
-             num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev
-           |
-             delta.next.ht > maxdiff.next.ht &
-             num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
-           temp.exclude := 'Exclude-Max-Height-Change']
+        df[
+          delta.prev.ht > maxdiff.prev.ht &
+            num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev
+          |
+            delta.next.ht > maxdiff.next.ht &
+              num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
+          temp.exclude := "Exclude-Max-Height-Change"
+        ]
 
         # r.  If there is only one potential exclusion identified in step 15j for a subject and parameter,
         #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi  and exc_ht=16 if it met criteria iii, iv, vii, or viii
@@ -612,21 +657,22 @@ adjustcarryforward <- function(subjid,
           ifelse(
             (
               df$temp.exclude[x] %in% c(
-                'Exclude-Min-Height-Change',
-                'Exclude-Max-Height-Change'
+                "Exclude-Min-Height-Change",
+                "Exclude-Max-Height-Change"
               )
             ) |
               (df$orig.exclude[x] != "Exclude-Carried-Forward"),
-            'No Change',
-            'Include'
+            "No Change",
+            "Include"
           )
         })
         ##### END EDIT #####
 
         rep <- df$temp.exclude == "Include"
         num.exclude <- sum(rep)
-        if (num.exclude == 1)
+        if (num.exclude == 1) {
           df[rep, exclude := temp.exclude]
+        }
 
         # s.  If there is more than one potential exclusion identified in step 14h for a subject and parameter, determine which value has the largest temp_diff and
         #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi and exc_ht=16 for that value if it met criteria iii,  iv, vii, or viii.
@@ -638,17 +684,15 @@ adjustcarryforward <- function(subjid,
         }
 
         return(df$exclude)
-
-
       })(copy(.SD))]
 
 
 
       # t.  If there was at least one subject who had a potential exclusion identified in step 15q, repeat steps 15b-15q. If there were no subjects with potential
       #     exclusions identified in step 15q, move on to step 16.
-      newly.excluded = sum(subj.df$exclude %in% c('Include'))
+      newly.excluded <- sum(subj.df$exclude %in% c("Include"))
       if (newly.excluded > num.height.excluded) {
-        num.height.excluded = newly.excluded
+        num.height.excluded <- newly.excluded
       } else {
         break
       }
@@ -656,12 +700,12 @@ adjustcarryforward <- function(subjid,
 
     setkey(subj.df, index)
     return(subj.df$exclude)
-  })(copy(.SD)), by = .(subjid), .SDcols = c('sex', 'agedays', 'v', 'tbc.sd', 'exclude', 'orig.exclude')]
+  })(copy(.SD)), by = .(subjid), .SDcols = c("sex", "agedays", "v", "tbc.sd", "exclude", "orig.exclude")]
 
   return(rbind(
     data.frame(adjustcarryforward = data.all$exclude, n = data.all$n),
     data.frame(
-      filter(data.orig,!n %in% data.all$n) %>% mutate(adjustcarryforward = "Missing")  %>% select(adjustcarryforward, n)
+      filter(data.orig, !n %in% data.all$n) %>% mutate(adjustcarryforward = "Missing") %>% select(adjustcarryforward, n)
     )
   ))
 }

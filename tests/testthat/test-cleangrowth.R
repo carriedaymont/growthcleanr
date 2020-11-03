@@ -18,7 +18,7 @@ test_that("growthcleanr works as expected on synthetic data", {
     )]
 
   # Spot check individual results
-  clean_value <- function (df, rowid) {
+  clean_value <- function(df, rowid) {
     return(as.character(df[id == rowid]$clean_value))
   }
   expect_equal("Exclude-EWMA-8", clean_value(data_sample, 9652))
@@ -26,13 +26,14 @@ test_that("growthcleanr works as expected on synthetic data", {
   expect_equal("Include", clean_value(data_sample, 15102))
 
   # Check counts of exclusions by category
-  catcount <- function (df, category) {
+  catcount <- function(df, category) {
     return(as.numeric(df %>% filter(clean_value == category) %>% select(n)))
   }
   exclusions <-
-    cleaned_data %>% group_by(clean_value) %>% tally(sort = TRUE)
+    cleaned_data %>%
+    group_by(clean_value) %>%
+    tally(sort = TRUE)
   expect_equal(1505, catcount(exclusions, "Include"))
   expect_equal(275, catcount(exclusions, "Exclude-Carried-Forward"))
   expect_equal(1, catcount(exclusions, "Exclude-EWMA-11"))
-
 })

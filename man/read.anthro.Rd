@@ -22,6 +22,8 @@ Function to calculate z-scores and csd-scores based on anthro tables.
 afunc <- read.anthro()
 
 # Return calculating function while specifying a path and using only CDC data
-afunc <- read.anthro(path = system.file("extdata", package = "growthcleanr"),
-                     cdc.only = TRUE)
+afunc <- read.anthro(
+  path = system.file("extdata", package = "growthcleanr"),
+  cdc.only = TRUE
+)
 }

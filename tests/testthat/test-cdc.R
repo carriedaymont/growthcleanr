@@ -21,7 +21,8 @@ test_that("ext_bmiz produces comparable output to CDC SAS implementation", {
   # load the SAS output
   cdcdatapath <-
     system.file(file.path("extdata", "test_syngrowth_sas_output_compare.csv"),
-                package = "growthcleanr")
+      package = "growthcleanr"
+    )
   cdcdata <- read.csv(cdcdatapath)
 
   # compare dimensions to the output of ext_bmiz
@@ -51,10 +52,11 @@ test_that("ext_bmiz produces comparable output to CDC SAS implementation", {
 
   # check all values within a tolerance of 1e-4
   err_df <- abs(as.data.frame(myd_bmi)[, names(map_to_cdc)] -
-                  cdcdata[, map_to_cdc])
+    cdcdata[, map_to_cdc])
   # 99.99% of values should be within tolerance of 1e-4
-  expect_gte(sum(err_df <= 1e-4) / nrow(cdcdata) / length(map_to_cdc) *
-               100,
-             99.99)
-
+  expect_gte(
+    sum(err_df <= 1e-4) / nrow(cdcdata) / length(map_to_cdc) *
+      100,
+    99.99
+  )
 })

@@ -88,11 +88,14 @@ directory if necessary.
 df <- as.data.frame(syngrowth)
 df <- df[df$subjid \%in\% unique(df[, "subjid"])[1:5], ]
 df <- cbind(df,
-            "clean_value" = cleangrowth(df$subjid,
-                                        df$param,
-                                        df$agedays,
-                                        df$sex,
-                                        df$measurement))
+  "clean_value" = cleangrowth(
+    df$subjid,
+    df$param,
+    df$agedays,
+    df$sex,
+    df$measurement
+  )
+)
 df <- longwide(df) # convert to wide format for ext_bmiz
 
 # Calling the function with default column names
@@ -102,8 +105,8 @@ d_bmi <- ext_bmiz(df)
 dfc <- df
 colnames(dfc)[colnames(dfc) \%in\% c("agem", "wt", "ht")] <-
   c("agemos", "weightkg", "heightcm")
-d_bmi <- ext_bmiz(dfc, age="agemos", wt="weightkg", ht="heightcm")
+d_bmi <- ext_bmiz(dfc, age = "agemos", wt = "weightkg", ht = "heightcm")
 
 # Disabling conversion of all-integer age in months to (age + 0.5)
-d_bmi <- ext_bmiz(df, adjust.integer.age=FALSE)
+d_bmi <- ext_bmiz(df, adjust.integer.age = FALSE)
 }

@@ -28,15 +28,19 @@ df_stats <- df_stats[df_stats$subjid == df_stats$subjid[1], ]
 
 # Get the original standard deviations
 measurement_to_z <- read.anthro(cdc.only = TRUE)
-sd.orig <- measurement_to_z(df_stats$param,
-                       df_stats$agedays,
-                       df_stats$sex,
-                       df_stats$measurement,
-                       TRUE)
+sd.orig <- measurement_to_z(
+  df_stats$param,
+  df_stats$agedays,
+  df_stats$sex,
+  df_stats$measurement,
+  TRUE
+)
 
 # Calculate median standard deviations
-sd.m <- sd.median(df_stats$param,
-                  df_stats$sex,
-                  df_stats$agedays,
-                  sd.orig)
+sd.m <- sd.median(
+  df_stats$param,
+  df_stats$sex,
+  df_stats$agedays,
+  sd.orig
+)
 }

@@ -125,22 +125,26 @@ Clean growth measurements
 df_stats <- as.data.frame(syngrowth)
 df_stats <- df_stats[df_stats$subjid \%in\% unique(df_stats[, "subjid"])[1:5], ]
 
-clean_stats <-cleangrowth(subjid = df_stats$subjid,
-                         param = df_stats$param,
-                         agedays = df_stats$agedays,
-                         sex = df_stats$sex,
-                         measurement = df_stats$measurement)
+clean_stats <- cleangrowth(
+  subjid = df_stats$subjid,
+  param = df_stats$param,
+  agedays = df_stats$agedays,
+  sex = df_stats$sex,
+  measurement = df_stats$measurement
+)
 
 # Once processed you can filter data based on result value
 df_stats <- cbind(df_stats, "clean_result" == clean_stats)
 clean_df_stats <- df_stats[, df_stats$clean_result == "Include"]
 
 # Parallel processing: run using 3 cores and batches
-df_stats<-cleangrowth(subjid = df_stats$subjid,
-                      param = df_stats$param,
-                      agedays = df_stats$agedays,
-                      sex = df_stats$sex,
-                      measurement = df_stats$measurement,
-                      parallel = TRUE,
-                      num.batches = 2)
+df_stats <- cleangrowth(
+  subjid = df_stats$subjid,
+  param = df_stats$param,
+  agedays = df_stats$agedays,
+  sex = df_stats$sex,
+  measurement = df_stats$measurement,
+  parallel = TRUE,
+  num.batches = 2
+)
 }
