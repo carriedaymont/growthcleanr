@@ -9,7 +9,7 @@ z_score <- function(var, l, m, s) {
   sdp2 <- (m * (1 + 2 * ls)^invl) - m
   # modified z-score (+2)
   sdm2 <- m - (m * (1 - 2 * ls)^invl)
-  mz <- data.table::fifelse(var < m, (var - m) / (0.5 * sdm2), (var - m) / (sdp2 * 0.5))
+  mz <- fifelse(var < m, (var - m) / (0.5 * sdm2), (var - m) / (sdp2 * 0.5))
   return(list(z, mz))
 }
 
@@ -20,9 +20,9 @@ z_score <- function(var, l, m, s) {
 set_cols_first <- function(DT, cols, intersection = TRUE) {
   # thanks to hutils
   if (intersection) {
-    data.table::setcolorder(DT, c(intersect(cols, names(DT)), setdiff(names(DT), cols)))
+    setcolorder(DT, c(intersect(cols, names(DT)), setdiff(names(DT), cols)))
   } else {
-    data.table::setcolorder(DT, c(cols, setdiff(names(DT), cols)))
+    setcolorder(DT, c(cols, setdiff(names(DT), cols)))
   }
 }
 
@@ -125,16 +125,16 @@ ext_bmiz <- function(data,
                      adjust.integer.age = TRUE,
                      ref.data.path = "") {
 
-  data.table::setDT(data)
+  setDT(data)
 
-  data.table::setnames(data,
+  setnames(data,
     old = c(age, wt, ht, bmi),
     new = c("age", "wt", "ht", "bmi")
   )
 
   # needed for merging back with original data
   data[, seq_ := 1L:nrow(data)]
-  dorig <- data.table::copy(data)
+  dorig <- copy(data)
 
   # Adjust integer values only if specified (default) and all values are integer
   if (adjust.integer.age) {
@@ -144,7 +144,7 @@ ext_bmiz <- function(data,
   }
 
   data <- data[
-    data.table::between(age, 24, 240) & !(is.na(wt) & is.na(ht)),
+    between(age, 24, 240) & !(is.na(wt) & is.na(ht)),
     .(seq_, sex, age, wt, ht, bmi)
   ]
 
@@ -155,7 +155,7 @@ ext_bmiz <- function(data,
     system.file("extdata/CDCref_d.csv", package = "growthcleanr"),
     paste0(ref.data.path, "CDCref_d.csv")
   )
-  dref <- data.table::fread(dref_path)[`_AGEMOS1` > 23 & denom == "age"]
+  dref <- fread(dref_path)[`_AGEMOS1` > 23 & denom == "age"]
   names(dref) <- tolower(names(dref))
   names(dref) <- gsub("^_", "", names(dref))
 
@@ -192,13 +192,13 @@ ext_bmiz <- function(data,
   )]
   names(dref) <- gsub("1", "", names(dref))
 
-  dref <- data.table::rbindlist(list(dref, d20))
+  dref <- rbindlist(list(dref, d20))
   adj_bmi_met <- dref[agemos == 240, .(sex, mbmi, sbmi)]
-  data.table::setnames(adj_bmi_met, Cs(sex, mref, sref))
+  setnames(adj_bmi_met, Cs(sex, mref, sref))
 
   dref <- dref[adj_bmi_met, on = "sex"]
   v <- Cs(sex, age, wl, wm, ws, bl, bm, bs, hl, hm, hs, mref, sref)
-  data.table::setnames(dref, v)
+  setnames(dref, v)
 
   # interpolate reference data to match each agemos in input data
   if (length(setdiff(data$age, dref$age)) > 0) {
@@ -210,19 +210,19 @@ ext_bmiz <- function(data,
       }
       data.frame(sapply(.d[, ..v], fapp))
     }
-    dref <- data.table::rbindlist(lapply(1:2, fapprox))
+    dref <- rbindlist(lapply(1:2, fapprox))
   }
 
-  data.table::setkeyv(data, c("sex", "age"))
-  data.table::setkeyv(dref, c("sex", "age"))
+  setkeyv(data, c("sex", "age"))
+  setkeyv(dref, c("sex", "age"))
   dt <- dref[data]
 
   dt[, Cs(waz, mwaz) := z_score(wt, wl, wm, ws)]
   dt[, Cs(haz, mhaz) := z_score(ht, hl, hm, hs)]
   dt[, Cs(bz, mbz) := z_score(bmi, bl, bm, bs)]
 
-  data.table::setDT(dt)
-  data.table::setnames(dt, Cs(bl, bm, bs), Cs(l, m, s))
+  setDT(dt)
+  setnames(dt, Cs(bl, bm, bs), Cs(l, m, s))
   dt[, Cs(wl, wm, ws, hl, hm, hs) := NULL]
 
   dt[,
@@ -275,7 +275,7 @@ ext_bmiz <- function(data,
 
   ## now create Extended z-score for BMI >=95th P
   dt[, `:=`(ebz = bz, ebp = bp, agey = age / 12)]
-  dt[, sigma := data.table::fifelse(
+  dt[, sigma := fifelse(
     sex == 1,
     0.3728 + 0.5196 * agey - 0.0091 * agey^2,
     0.8334 + 0.3712 * agey - 0.0011 * agey^2
@@ -287,7 +287,7 @@ ext_bmiz <- function(data,
 
   x <- Cs(agey, mref, sref, sex, wt, ht, bmi)
   dt[, (x) := NULL]
-  data.table::setnames(
+  setnames(
     dt,
     Cs(adist1, aperc1, bp, bz, mbz, mwaz, mhaz, ebp, ebz, l, m, s),
     Cs(
@@ -330,8 +330,8 @@ ext_bmiz <- function(data,
   )
   dt <- dt[, ..v]
 
-  data.table::setkeyv(dt, "seq_")
-  data.table::setkeyv(dorig, "seq_")
+  setkeyv(dt, "seq_")
+  setkeyv(dorig, "seq_")
   dtot <- dt[dorig]
   set_cols_first(dtot, names(dorig))
   dtot[, Cs(seq_) := NULL]

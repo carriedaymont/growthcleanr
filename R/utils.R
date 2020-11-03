@@ -285,4 +285,5 @@ longwide <- function(long_df,
 #' @return character string vector
 #'
 #' @keywords internal
+#' @noRd
 Cs <- function(...) as.character(sys.call())[-1]
