@@ -63,7 +63,7 @@ temporary_duplicates <- function(df) {
   # determine on which days there are duplicate measurements (more than 1 valid measurement on that age day)
   df[valid.rows, duplicates.this.day := (.N > 1), by = .(subjid, param, agedays)]
   # calculate median of measurements on days where there is no duplicate
-  df[valid.rows & !duplicates.this.day, median.sd := median(tbc.sd), by = .(subjid, param)]
+  df[valid.rows & !duplicates.this.day, median.sd := stats::median(tbc.sd), by = .(subjid, param)]
   # distribute median to other valid or potential duplicate rows for same parameter for that subject
   df[valid.rows, median.sd := sort(median.sd)[1], by = .(subjid, param)]
   # take care of subject/parameters with more than one day with a valid observation
@@ -77,11 +77,11 @@ temporary_duplicates <- function(df) {
       # iterate over parameters where delta.median.sd is not yet defined
       # pass 1: take median from other parameter(s)
       for (p in subj.df[is.na(delta.median.sd) & duplicates.this.day, unique(param)]) {
-        median.other.sd <- subj.df[param != p & !duplicates.this.day, median(tbc.sd)]
+        median.other.sd <- subj.df[param != p & !duplicates.this.day, stats::median(tbc.sd)]
         subj.df[param == p, delta.median.sd := abs(tbc.sd - median.other.sd)]
       }
       return(subj.df$delta.median.sd)
-    })(copy(.SD)),
+    })(data.table::copy(.SD)),
     by = .(subjid)
   ]
   # Final pass: take median as zero (i.e. if no measurements from a different parameter)
@@ -123,7 +123,7 @@ swap_parameters <- function(param.1 = "WEIGHTKG",
     agedays.other = agedays,
     swap
   )]
-  setkeyv(valid.other, c("subjid.other", "param.other", "agedays.other"))
+  data.table::setkeyv(valid.other, c("subjid.other", "param.other", "agedays.other"))
   # clear swap field (should retain original type)
   df[, swap := NA]
   # use indexed table for speed -- assign all values in one statement
@@ -161,7 +161,7 @@ cleanbatch <- function(data.df,
                        lt3.exclude.mode,
                        error.load.threshold,
                        error.load.mincount) {
-  data.df <- data.table(data.df, key = c("subjid", "param", "agedays", "index"))
+  data.df <- data.table::data.table(data.df, key = c("subjid", "param", "agedays", "index"))
 
   if (!quietly & parallel) {
     # use local directory as default for logs
@@ -275,7 +275,7 @@ cleanbatch <- function(data.df,
   #   ii.	Replace tbc*sd with the values for tbc*sd_sw
   data.df$swap.flag.2 <- swap_parameters(field.name = "swap.flag.1", df = data.df)
   data.df[
-    swap.flag.1 &s wap.flag.2,
+    swap.flag.1 & swap.flag.2,
     `:=`(v = v.sw, tbc.sd = tbc.sd.sw, exclude = "Swapped-Measurements")
   ]
 
@@ -435,7 +435,7 @@ cleanbatch <- function(data.df,
     data.df[
       subjid %in% subj.dup & valid(data.df, include.temporary.duplicates = TRUE),
       exclude := (function(df) {
-        setkeyv(df, "agedays")
+        data.table::setkeyv(df, "agedays")
         ages <- unique(agedays)
         # no point in looking for measurements carried forward if all measurements are from a single day of life
         if (length(ages) > 1) {
@@ -449,7 +449,7 @@ cleanbatch <- function(data.df,
           }
         }
         return(df$exclude)
-      })(copy(.SD)),
+      })(data.table::copy(.SD)),
       .SDcols = c("agedays", "exclude", "v.orig"),
       by = .(subjid, param)
     ]
@@ -586,7 +586,7 @@ cleanbatch <- function(data.df,
         }
       }
       return(df$exclude)
-    })(copy(.SD)),
+    })(data.table::copy(.SD)),
     by = .(subjid, param),
     .SDcols = c("index", "sex", "agedays", "tbc.sd", "exclude")
   ]
@@ -697,7 +697,7 @@ cleanbatch <- function(data.df,
         exclude := "Exclude-Duplicate"
       ]
       return(df$exclude)
-    })(copy(.SD)),
+    })(data.table::copy(.SD)),
     .SDcols = c("exclude", "tbc.sd"),
     by = .(subjid, param, agedays)
   ]
@@ -728,7 +728,7 @@ cleanbatch <- function(data.df,
       )
       subj.df[valid.rows, duplicates.this.day := (.N > 1), by = .(param, agedays)]
       for (p in subj.df[j = unique(param)]) {
-        median.sd <- subj.df[param != p & !duplicates.this.day, median(tbc.sd)]
+        median.sd <- subj.df[param != p & !duplicates.this.day, stats::median(tbc.sd)]
         subj.df[param == p, median.other.sd := median.sd]
       }
       # safety check -- assign median.other.sd==0 to ensure "which.min" functions correctly below
@@ -780,7 +780,7 @@ cleanbatch <- function(data.df,
       ]
 
       return(subj.df$exclude)
-    })(copy(.SD)),
+    })(data.table::copy(.SD)),
     .SDcols = c("param", "agedays", "exclude", "tbc.sd"),
     by = .(subjid)
   ]
@@ -797,7 +797,7 @@ cleanbatch <- function(data.df,
         ), exclude := "Exclude-Duplicate"]
       }
       return(subj.df$exclude)
-    })(copy(.SD)),
+    })(data.table::copy(.SD)),
     .SDcols = c("exclude"),
     by = .(subjid, param, agedays)
   ]
@@ -892,14 +892,14 @@ cleanbatch <- function(data.df,
           agedays.other = agedays,
           tbc.sd
         )]
-        setkeyv(valid.other, c("param.other", "agedays.other"))
+        data.table::setkeyv(valid.other, c("param.other", "agedays.other"))
         subj.df[valid.rows, tbc.other.sd := valid.other[list(param, agedays), tbc.sd]]
 
         subj.df[,
           exclude := (function(df) {
             # 14g.  Calculate median_tbcOsd which is the median_tbc*sd for the OTHER parameter for the same subject with exc_*==0 (this may be missing)
             # also assign param variable for use in subsequent steps
-            median.tbc.other.sd <- median(df$tbc.other.sd, na.rm = TRUE)
+            median.tbc.other.sd <- stats::median(df$tbc.other.sd, na.rm = TRUE)
             num.valid <- sum(valid(df$exclude))
 
             # 14h.	Identify values for possible exclusion if they meet one of the following sets of criteria. Generate a temporary exclusion variable temp_exc_* equal
@@ -1135,7 +1135,7 @@ cleanbatch <- function(data.df,
             }
 
             return(df$exclude)
-          })(copy(.SD)),
+          })(data.table::copy(.SD)),
           by = param
         ]
 
@@ -1150,7 +1150,7 @@ cleanbatch <- function(data.df,
       }
 
       return(subj.df$exclude)
-    })(copy(.SD)),
+    })(data.table::copy(.SD)),
     by = subjid,
     .SDcols = c(
       "index",
@@ -1242,7 +1242,7 @@ cleanbatch <- function(data.df,
         df$tanner.months <- with(df, 6 + 12 * (round(mid.agedays / 365.25)))
 
         # 15e.	Merge with dataset tanner_ht_vel using sex and tanner_months – this will give you min_ht_vel and max_ht_vel
-        setkeyv(df, c("sex", "tanner.months"))
+        data.table::setkeyv(df, c("sex", "tanner.months"))
         df <- tanner.ht.vel[df]
 
         # 15f.	Calculate the following:
@@ -1296,11 +1296,11 @@ cleanbatch <- function(data.df,
 
         # i.	Merge using sex and whoagegrp_ht using who_ht_vel_3sd and who_ht_maxvel_3sd; this will give you varaibles whoinc_i_ht and maxwhoinc_i_ht
         #     for various intervals where i is 1,2, 3,4, 6 and corresponds to whoinc_age_ht.
-        setkeyv(df, c("sex", "whoagegrp.ht"))
+        data.table::setkeyv(df, c("sex", "whoagegrp.ht"))
         df <- who.ht.vel[df]
 
         # restore original sort order (ensures valid.rows variable applies to correct rows)
-        setkeyv(df, "index")
+        data.table::setkeyv(df, "index")
 
         # 15j.	Generate variable who_mindiff_ht=whoinc_i_ht according to the value if whoinc_age_ht; make who_mindiff_ht missing if whoinc_i_ht or whoinc_age_ht is missing.
         df[, who.mindiff.next.ht := ifelse(
@@ -1513,7 +1513,7 @@ cleanbatch <- function(data.df,
         }
 
         return(df$exclude)
-      })(copy(.SD))]
+      })(data.table::copy(.SD))]
 
       # t.  If there was at least one subject who had a potential exclusion identified in step 15q, repeat steps 15b-15q. If there were no subjects with potential
       #     exclusions identified in step 15q, move on to step 16.
@@ -1530,9 +1530,9 @@ cleanbatch <- function(data.df,
       }
     }
 
-    setkeyv(subj.df, "index")
+    data.table::setkeyv(subj.df, "index")
     return(subj.df$exclude)
-  })(copy(.SD)), by = .(subjid), .SDcols = c("sex", "agedays", "v", "tbc.sd", "exclude")]
+  })(data.table::copy(.SD)), by = .(subjid), .SDcols = c("sex", "agedays", "v", "tbc.sd", "exclude")]
 
   # 16.  Exclude measurements for subjects/parameters with only 1 or 2 measurements with exc_*=0. This step uses a variety of criteria,
   #      including the tbc*sd of the other parameter.
@@ -1547,7 +1547,7 @@ cleanbatch <- function(data.df,
     exclude := (function(df) {
       valid.rows <- which(valid(df))
       # calculate median SD for other parameter (used in steps below)
-      median.tbc.other.sd <- median(df$tbc.other.sd)
+      median.tbc.other.sd <- stats::median(df$tbc.other.sd)
       # a.  Identify subjects/parameters with only 2 values with exc_*==0, and determine the following:
       #   1.  d_tbc*sd_other=the absolute value difference in tbc*sd
       #   2.	d_agedays_other=the difference in agedays between the 2 values
@@ -1640,7 +1640,7 @@ cleanbatch <- function(data.df,
 
       # ensure factor levels didn't accidentally get mangled
       return(factor(df$exclude, levels = exclude.levels, ordered = TRUE))
-    })(copy(.SD)),
+    })(data.table::copy(.SD)),
     by = .(subjid, param),
     .SDcols = c("agedays", "tbc.sd", "tbc.other.sd", "exclude", "param")
   ] # added param here for debugging, i think it's dropped otherwise
@@ -1701,7 +1701,7 @@ cleanbatch <- function(data.df,
       }
       # ensure factor levels didn't accidentally get mangled
       return(factor(subj.df$exclude, levels = exclude.levels, ordered = TRUE))
-    })(copy(.SD)),
+    })(data.table::copy(.SD)),
     by = subjid,
     .SDcols = c("param", "exclude")
   ]
@@ -1838,7 +1838,7 @@ cleangrowth <- function(subjid,
                         num.batches = NA,
                         quietly = TRUE) {
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
-  data.all <- data.table(
+  data.all <- data.table::data.table(
     line = seq_along(measurement),
     subjid = as.factor(subjid),
     param,
@@ -1861,9 +1861,9 @@ cleangrowth <- function(subjid,
     }
   }
 
-  setkeyv(data.all, "subjid")
+  data.table::setkeyv(data.all, "subjid")
   subjid.unique <- data.all[j = unique(subjid)]
-  batches.all <- data.table(
+  batches.all <- data.table::data.table(
     subjid = subjid.unique,
     batch = sample(num.batches, length(subjid.unique), replace = TRUE),
     key = "subjid"
@@ -1878,14 +1878,14 @@ cleangrowth <- function(subjid,
     paste0(ref.data.path, "tanner_ht_vel.csv")
   )
 
-  tanner.ht.vel <- fread(tanner_ht_vel_path)
+  tanner.ht.vel <- data.table::fread(tanner_ht_vel_path)
 
-  setnames(
+  data.table::setnames(
     tanner.ht.vel,
     colnames(tanner.ht.vel),
     gsub("_", ".", colnames(tanner.ht.vel))
   )
-  setkeyv(tanner.ht.vel, c("sex", "tanner.months"))
+  data.table::setkeyv(tanner.ht.vel, c("sex", "tanner.months"))
   # keep track of column names in the tanner data
   tanner.fields <- colnames(tanner.ht.vel)
   tanner.fields <- tanner.fields[!tanner.fields %in% c("sex", "tanner.months")]
@@ -1901,14 +1901,14 @@ cleangrowth <- function(subjid,
     system.file("extdata/who_ht_vel_3sd.csv", package = "growthcleanr"),
     paste0(ref.data.path, "who_ht_vel_3sd.csv")
   )
-  who.max.ht.vel <- fread(who_max_ht_vel_path)
-  who.ht.vel <- fread(who_ht_vel_3sd_path)
-  setkeyv(who.max.ht.vel, c("sex", "whoagegrp_ht"))
-  setkeyv(who.ht.vel, c("sex", "whoagegrp_ht"))
-  who.ht.vel <- as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel, by = c("sex", "whoagegrp_ht")))
+  who.max.ht.vel <- data.table::fread(who_max_ht_vel_path)
+  who.ht.vel <- data.table::fread(who_ht_vel_3sd_path)
+  data.table::setkeyv(who.max.ht.vel, c("sex", "whoagegrp_ht"))
+  data.table::setkeyv(who.ht.vel, c("sex", "whoagegrp_ht"))
+  who.ht.vel <- data.table::as.data.table(merge(who.ht.vel, who.max.ht.vel, by = c("sex", "whoagegrp_ht")))
 
-  setnames(who.ht.vel, colnames(who.ht.vel), gsub("_", ".", colnames(who.ht.vel)))
-  setkeyv(who.ht.vel, c("sex", "whoagegrp.ht"))
+  data.table::setnames(who.ht.vel, colnames(who.ht.vel), gsub("_", ".", colnames(who.ht.vel)))
+  data.table::setkeyv(who.ht.vel, c("sex", "whoagegrp.ht"))
   # keep track of column names in the who growth velocity data
   who.fields <- colnames(who.ht.vel)
   who.fields <- who.fields[!who.fields %in% c("sex", "whoagegrp.ht")]
@@ -1968,7 +1968,7 @@ cleangrowth <- function(subjid,
   data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, TRUE)]
 
   # sort by subjid, param, agedays
-  setkeyv(data.all, c("subjid", "param", "agedays"))
+  data.table::setkeyv(data.all, c("subjid", "param", "agedays"))
 
   # add a new convenience index for bookkeeping
   data.all[, index := 1:.N]
@@ -2041,10 +2041,10 @@ cleangrowth <- function(subjid,
 
   # see function definition below for explanation of the re-centering process
   # returns a data table indexed by param, sex, agedays
-  if (!is.data.table(sd.recenter)) {
+  if (!data.table::is.data.table(sd.recenter)) {
     sd.recenter <- data.all[exclude < "Exclude", sd.median(param, sex, agedays, sd.orig)]
     if (sdmedian.filename != "") {
-      write.csv(sd.recenter, sdmedian.filename, row.names = FALSE)
+      utils::write.csv(sd.recenter, sdmedian.filename, row.names = FALSE)
       if (!quietly) {
         cat(
           sprintf(
@@ -2057,16 +2057,16 @@ cleangrowth <- function(subjid,
     }
   } else {
     # ensure passed-in medians are sorted correctly
-    setkeyv(sd.recenter, c("param", "sex", "agedays"))
+    data.table::setkeyv(sd.recenter, c("param", "sex", "agedays"))
   }
   # add sd.recenter to data, and recenter
-  setkeyv(data.all, c("param", "sex", "agedays"))
+  data.table::setkeyv(data.all, c("param", "sex", "agedays"))
   data.all <- sd.recenter[data.all]
-  setkeyv(data.all, c("subjid", "param", "agedays"))
+  data.table::setkeyv(data.all, c("subjid", "param", "agedays"))
   data.all[, tbc.sd := sd.orig - sd.median]
 
   if (sdrecentered.filename != "") {
-    write.csv(data.all, sdrecentered.filename, row.names = FALSE)
+    utils::write.csv(data.all, sdrecentered.filename, row.names = FALSE)
     if (!quietly) {
       cat(
         sprintf(
@@ -2190,11 +2190,11 @@ read.anthro <- function(path = "", cdc.only = FALSE) {
   )
 
 
-  growth_cdc_ext <- read.csv(growth_cdc_ext_path)
+  growth_cdc_ext <- utils::read.csv(growth_cdc_ext_path)
 
   l <- list(
     with(
-      read.table(weianthro_path, header = TRUE),
+      utils::read.table(weianthro_path, header = TRUE),
       data.frame(
         src = "WHO",
         param = "WEIGHTKG",
@@ -2208,7 +2208,7 @@ read.anthro <- function(path = "", cdc.only = FALSE) {
       )
     ),
     with(
-      read.table(lenanthro_path, header = TRUE),
+      utils::read.table(lenanthro_path, header = TRUE),
       data.frame(
         src = "WHO",
         param = "HEIGHTCM",
@@ -2222,7 +2222,7 @@ read.anthro <- function(path = "", cdc.only = FALSE) {
       )
     ),
     with(
-      read.table(bmianthro_path, header = TRUE),
+      utils::read.table(bmianthro_path, header = TRUE),
       data.frame(
         src = "WHO",
         param = "BMI",
@@ -2279,10 +2279,10 @@ read.anthro <- function(path = "", cdc.only = FALSE) {
     )
   )
 
-  anthro <- rbindlist(l)
+  anthro <- data.table::rbindlist(l)
 
 
-  setkeyv(anthro, c("src", "param", "sex", "age"))
+  data.table::setkeyv(anthro, c("src", "param", "sex", "age"))
 
   return(function(param, agedays, sex, measurement, csd = FALSE) {
     # For now, we will only use CDC growth reference data, note that the cubically interpolated file
@@ -2290,7 +2290,7 @@ read.anthro <- function(path = "", cdc.only = FALSE) {
     src <- ifelse(agedays < 731 & !cdc.only, "WHO", "CDC")
 
     # keep column sequence the same fo efficient join
-    dt <- data.table(src, param, sex, agedays, measurement)
+    dt <- data.table::data.table(src, param, sex, agedays, measurement)
     dt <- anthro[dt]
 
     dt[, ret := as.double(NA)]
@@ -2463,21 +2463,21 @@ sd.median <- function(param, sex, agedays, sd.orig) {
   #     (stands for "to be cleaned") will be used for most of the rest of the analyses.
   # f.	In future steps I will sometimes refer to measprev and measnext which refer to the previous or next wt or ht measurement
   #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject, parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
-  dt <- data.table(param, sex, agedays, ageyears = floor(agedays / 365.25), sd.orig)
-  setkeyv(dt, c("param", "sex", "agedays"))
+  dt <- data.table::data.table(param, sex, agedays, ageyears = floor(agedays / 365.25), sd.orig)
+  data.table::setkeyv(dt, c("param", "sex", "agedays"))
   # determine ages (in days) we need to cover from min to max age in years
   agedays.to.cover <- dt[, (floor(min(ageyears) * 365.25):floor(max(ageyears + 1) * 365.25))]
   # group all measurements above age 19 together (copied from CD stata code e-mailed 4/3/15)
   dt[ageyears > 19, ageyears := 19]
   dt.median <- dt[
     !is.na(sd.orig),
-    list(sex = c(0, 1), sd.median = rep(median(sd.orig), 2)),
+    list(sex = c(0, 1), sd.median = rep(stats::median(sd.orig), 2)),
     by = .(param, ageyears)
   ]
   dt.median <- dt.median[,
     list(
       agedays = agedays.to.cover,
-      sd.median = approx(
+      sd.median = stats::approx(
         floor((ageyears + 0.5) * 365.25),
         sd.median,
         xout = agedays.to.cover,
@@ -2486,6 +2486,6 @@ sd.median <- function(param, sex, agedays, sd.orig) {
     ),
     by = .(param, sex)
   ]
-  setkeyv(dt.median, c("param", "sex", "agedays"))
+  data.table::setkeyv(dt.median, c("param", "sex", "agedays"))
   return(dt.median)
 }

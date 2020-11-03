@@ -59,7 +59,7 @@ splitinput <- function(df,
       # if min nrow is exceeded, then write.csv the current split file and clear the split dataframe starter (start from 0)
       if (current_nrow > min_nrow) {
         fname_counter_str <- sprintf("%05d", fname_counter) # pad 0s
-        write.csv(
+        utils::write.csv(
           split_df,
           file = file.path(fdir, paste(fname, fname_counter_str, "csv", sep = ".")),
           row.names = FALSE
@@ -67,10 +67,10 @@ splitinput <- function(df,
 
         split_df <- data.frame() # reset split_df
         fname_counter <- fname_counter + 1
-      } else if (name == tail(split_sample_names, 1)) {
+      } else if (name == utils::tail(split_sample_names, 1)) {
         # for last part, just write
         fname_counter_str <- sprintf("%05d", fname_counter) # pad 0s
-        write.csv(
+        utils::write.csv(
           split_df,
           file = file.path(fdir, paste(fname, fname_counter_str, "csv", sep = ".")),
           row.names = FALSE,
@@ -119,7 +119,7 @@ recode_sex <- function(input_data,
                        targetm = 1L,
                        targetf = 2L) {
   # cast to DT for faster processing
-  input_table <- data.table(input_data)
+  input_table <- data.table::data.table(input_data)
   # replace targetcol variables with targetm where sourcecol = sourcem
   input_table[input_table[[sourcecol]] == sourcem, targetcol] <- targetm
   # replace targetcol variables with targetf where sourcecol = sourcef
@@ -171,107 +171,118 @@ recode_sex <- function(input_data,
 #' # Specify all inclusion codes
 #' long_df <- longwide(df, inclusion_types = c("Include", "Exclude-Carried-Forward"))
 longwide <- function(long_df,
-                    id = "id",
-                    subjid = "subjid",
-                    sex = "sex",
-                    agedays = "agedays",
-                    param = "param",
-                    measurement = "measurement",
-                    clean_value = "clean_value",
-                    include_all = FALSE,
-                    inclusion_types = c("Include")) {
-    # selects each column with specified / default variable name
-    obs_df <- select(
-      long_df,
-      id, subjid, sex, agedays,
-      param, measurement, clean_value
+                  id = "id",
+                  subjid = "subjid",
+                  sex = "sex",
+                  agedays = "agedays",
+                  param = "param",
+                  measurement = "measurement",
+                  clean_value = "clean_value",
+                  include_all = FALSE,
+                  inclusion_types = c("Include")) {
+  # selects each column with specified / default variable name
+  obs_df <- dplyr::select(
+    long_df,
+    id, subjid, sex, agedays,
+    param, measurement, clean_value
+  )
+
+  # if all columns could be found,
+  # 7 columns will be present in the correct order. Thus, rename
+  if (ncol(obs_df) == 7) {
+    names(obs_df) <- c(
+      "id",
+      "subjid",
+      "sex",
+      "agedays",
+      "param",
+      "measurement",
+      "clean_value"
     )
-
-    # if all columns could be found,
-    # 7 columns will be present in the correct order. Thus, rename
-    if (ncol(obs_df) == 7) {
-      names(obs_df) <- c(
-        "id",
-        "subjid",
-        "sex",
-        "agedays",
-        "param",
-        "measurement",
-        "clean_value"
-      )
-    } else {
-      # catch error if any variables were not found
-      stop("not all needed columns were present")
-    }
-
-    # extract values flagged with indicated inclusion types:
-    if (include_all == TRUE) {
-      obs_df <- obs_df
-    } else if (include_all == FALSE) {
-      obs_df <- obs_df[obs_df$clean_value %in% inclusion_types, ]
-    } else {
-      stop(paste0(
-        "include_all is not a logical of length 1. It is a ",
-        typeof(include_all), " of length ", length(include_all)
-      ))
-    }
-
-
-    # only include observations at least 24 months old
-    obs_df <- obs_df[obs_df$agedays >= 730, ]
-
-    # calculate age in years
-    obs_df$agey <- round(obs_df$agedays / 365.25, 4)
-
-    # calculate age in months
-    obs_df$agem <- round((obs_df$agey * 12), 4)
-
-    # recode sex to expected ext_bmiz() format
-    obs_df <- recode_sex(
-      input_data = obs_df,
-      sourcecol = "sex",
-      sourcem = "0",
-      sourcef = "1",
-      targetcol = "sex_recoded",
-      targetm = 1L,
-      targetf = 2L
-    )
-
-    clean_df <- obs_df %>%
-      mutate(sex = sex_recoded) %>%
-      mutate(param = as.character(param)) %>%
-      select(subjid, id, agey, agem, agedays, sex, param, measurement)
-
-
-    # check for unique weight and height ids
-    if (any(duplicated(clean_df$id))) {
-      stop("duplicate IDs in long_df")
-    }
-
-    # separate heights and weights using unique ids
-    param_separated <- pivot_wider(clean_df, names_from = param, values_from = measurement)
-
-    # extract heights and weights attached to ids
-    height <- param_separated %>%
-      filter(!is.na(HEIGHTCM)) %>%
-      filter(is.na(WEIGHTKG)) %>%
-      mutate(ht_id = id) %>%
-      select(-id) %>%
-      select(-WEIGHTKG)
-
-    weight <- param_separated %>%
-      filter(is.na(HEIGHTCM)) %>%
-      filter(!is.na(WEIGHTKG)) %>%
-      mutate(wt_id = id) %>%
-      select(-id) %>%
-      select(-HEIGHTCM)
-
-
-    # join based on subjid, age, and sex
-    wide_df <- merge(height, weight, by = c("subjid", "agey", "agem", "agedays", "sex")) %>%
-      mutate(bmi = WEIGHTKG / ((HEIGHTCM * .01)^2)) %>% # calculate bmi
-      mutate(wt = WEIGHTKG, ht = HEIGHTCM) %>% # rename height and weight
-      select(subjid, agey, agem, bmi, sex, wt, wt_id, ht, ht_id, agedays)
-
-    return(wide_df)
+  } else {
+    # catch error if any variables were not found
+    stop("not all needed columns were present")
   }
+
+  # extract values flagged with indicated inclusion types:
+  if (include_all == TRUE) {
+    obs_df <- obs_df
+  } else if (include_all == FALSE) {
+    obs_df <- obs_df[obs_df$clean_value %in% inclusion_types, ]
+  } else {
+    stop(paste0(
+      "include_all is not a logical of length 1. It is a ",
+      typeof(include_all), " of length ", length(include_all)
+    ))
+  }
+
+
+  # only include observations at least 24 months old
+  obs_df <- obs_df[obs_df$agedays >= 730, ]
+
+  # calculate age in years
+  obs_df$agey <- round(obs_df$agedays / 365.25, 4)
+
+  # calculate age in months
+  obs_df$agem <- round((obs_df$agey * 12), 4)
+
+  # recode sex to expected ext_bmiz() format
+  obs_df <- recode_sex(
+    input_data = obs_df,
+    sourcecol = "sex",
+    sourcem = "0",
+    sourcef = "1",
+    targetcol = "sex_recoded",
+    targetm = 1L,
+    targetf = 2L
+  )
+
+  clean_df <- obs_df %>%
+    dplyr::mutate(sex = sex_recoded) %>%
+    dplyr::mutate(param = as.character(param)) %>%
+    dplyr::select(subjid, id, agey, agem, agedays, sex, param, measurement)
+
+
+  # check for unique weight and height ids
+  if (any(duplicated(clean_df$id))) {
+    stop("duplicate IDs in long_df")
+  }
+
+  # separate heights and weights using unique ids
+  param_separated <- tidyr::pivot_wider(clean_df, names_from = param, values_from = measurement)
+
+  # extract heights and weights attached to ids
+  height <- param_separated %>%
+    dplyr::filter(!is.na(HEIGHTCM)) %>%
+    dplyr::filter(is.na(WEIGHTKG)) %>%
+    dplyr::mutate(ht_id = id) %>%
+    dplyr::select(-id) %>%
+    dplyr::select(-WEIGHTKG)
+
+  weight <- param_separated %>%
+    dplyr::filter(is.na(HEIGHTCM)) %>%
+    dplyr::filter(!is.na(WEIGHTKG)) %>%
+    dplyr::mutate(wt_id = id) %>%
+    dplyr::select(-id) %>%
+    dplyr::select(-HEIGHTCM)
+
+
+  # join based on subjid, age, and sex
+  wide_df <- merge(height, weight, by = c("subjid", "agey", "agem", "agedays", "sex")) %>%
+    dplyr::mutate(bmi = WEIGHTKG / ((HEIGHTCM * .01)^2)) %>% # calculate bmi
+    dplyr::mutate(wt = WEIGHTKG, ht = HEIGHTCM) %>% # rename height and weight
+    dplyr::select(subjid, agey, agem, bmi, sex, wt, wt_id, ht, ht_id, agedays)
+
+  return(wide_df)
+}
+
+#' Character strings from unquoted names
+#'
+#' Makes a vector of character strings from a list of valid S names
+#'
+#' @param ...	any number of names separated by commas
+#'
+#' @return character string vector
+#'
+#' @keywords internal
+Cs <- function(...) as.character(sys.call())[-1]
