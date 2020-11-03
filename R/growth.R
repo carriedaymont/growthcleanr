@@ -123,7 +123,7 @@ swap_parameters <- function(param.1 = "WEIGHTKG",
     agedays.other = agedays,
     swap
   )]
-  setkey(valid.other, subjid.other, param.other, agedays.other)
+  setkeyv(valid.other, c("subjid.other", "param.other", "agedays.other"))
   # clear swap field (should retain original type)
   df[, swap := NA]
   # use indexed table for speed -- assign all values in one statement
@@ -435,7 +435,7 @@ cleanbatch <- function(data.df,
     data.df[
       subjid %in% subj.dup & valid(data.df, include.temporary.duplicates = TRUE),
       exclude := (function(df) {
-        setkey(df, agedays)
+        setkeyv(df, "agedays")
         ages <- unique(agedays)
         # no point in looking for measurements carried forward if all measurements are from a single day of life
         if (length(ages) > 1) {
@@ -892,7 +892,7 @@ cleanbatch <- function(data.df,
           agedays.other = agedays,
           tbc.sd
         )]
-        setkey(valid.other, param.other, agedays.other)
+        setkeyv(valid.other, c("param.other", "agedays.other"))
         subj.df[valid.rows, tbc.other.sd := valid.other[list(param, agedays), tbc.sd]]
 
         subj.df[,
@@ -1242,7 +1242,7 @@ cleanbatch <- function(data.df,
         df$tanner.months <- with(df, 6 + 12 * (round(mid.agedays / 365.25)))
 
         # 15e.	Merge with dataset tanner_ht_vel using sex and tanner_months – this will give you min_ht_vel and max_ht_vel
-        setkey(df, sex, tanner.months)
+        setkeyv(df, c("sex", "tanner.months"))
         df <- tanner.ht.vel[df]
 
         # 15f.	Calculate the following:
@@ -1296,11 +1296,11 @@ cleanbatch <- function(data.df,
 
         # i.	Merge using sex and whoagegrp_ht using who_ht_vel_3sd and who_ht_maxvel_3sd; this will give you varaibles whoinc_i_ht and maxwhoinc_i_ht
         #     for various intervals where i is 1,2, 3,4, 6 and corresponds to whoinc_age_ht.
-        setkey(df, sex, whoagegrp.ht)
+        setkeyv(df, c("sex", "whoagegrp.ht"))
         df <- who.ht.vel[df]
 
         # restore original sort order (ensures valid.rows variable applies to correct rows)
-        setkey(df, index)
+        setkeyv(df, "index")
 
         # 15j.	Generate variable who_mindiff_ht=whoinc_i_ht according to the value if whoinc_age_ht; make who_mindiff_ht missing if whoinc_i_ht or whoinc_age_ht is missing.
         df[, who.mindiff.next.ht := ifelse(
@@ -1530,7 +1530,7 @@ cleanbatch <- function(data.df,
       }
     }
 
-    setkey(subj.df, index)
+    setkeyv(subj.df, "index")
     return(subj.df$exclude)
   })(copy(.SD)), by = .(subjid), .SDcols = c("sex", "agedays", "v", "tbc.sd", "exclude")]
 
@@ -1861,7 +1861,7 @@ cleangrowth <- function(subjid,
     }
   }
 
-  setkey(data.all, subjid)
+  setkeyv(data.all, "subjid")
   subjid.unique <- data.all[j = unique(subjid)]
   batches.all <- data.table(
     subjid = subjid.unique,
@@ -1885,7 +1885,7 @@ cleangrowth <- function(subjid,
     colnames(tanner.ht.vel),
     gsub("_", ".", colnames(tanner.ht.vel))
   )
-  setkey(tanner.ht.vel, sex, tanner.months)
+  setkeyv(tanner.ht.vel, c("sex", "tanner.months"))
   # keep track of column names in the tanner data
   tanner.fields <- colnames(tanner.ht.vel)
   tanner.fields <- tanner.fields[!tanner.fields %in% c("sex", "tanner.months")]
@@ -1903,12 +1903,12 @@ cleangrowth <- function(subjid,
   )
   who.max.ht.vel <- fread(who_max_ht_vel_path)
   who.ht.vel <- fread(who_ht_vel_3sd_path)
-  setkey(who.max.ht.vel, sex, whoagegrp_ht)
-  setkey(who.ht.vel, sex, whoagegrp_ht)
+  setkeyv(who.max.ht.vel, c("sex", "whoagegrp_ht"))
+  setkeyv(who.ht.vel, c("sex", "whoagegrp_ht"))
   who.ht.vel <- as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel, by = c("sex", "whoagegrp_ht")))
 
   setnames(who.ht.vel, colnames(who.ht.vel), gsub("_", ".", colnames(who.ht.vel)))
-  setkey(who.ht.vel, sex, whoagegrp.ht)
+  setkeyv(who.ht.vel, c("sex", "whoagegrp.ht"))
   # keep track of column names in the who growth velocity data
   who.fields <- colnames(who.ht.vel)
   who.fields <- who.fields[!who.fields %in% c("sex", "whoagegrp.ht")]
@@ -1968,7 +1968,7 @@ cleangrowth <- function(subjid,
   data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, TRUE)]
 
   # sort by subjid, param, agedays
-  setkey(data.all, subjid, param, agedays)
+  setkeyv(data.all, c("subjid", "param", "agedays"))
 
   # add a new convenience index for bookkeeping
   data.all[, index := 1:.N]
@@ -2057,12 +2057,12 @@ cleangrowth <- function(subjid,
     }
   } else {
     # ensure passed-in medians are sorted correctly
-    setkey(sd.recenter, param, sex, agedays)
+    setkeyv(sd.recenter, c("param", "sex", "agedays"))
   }
   # add sd.recenter to data, and recenter
-  setkey(data.all, param, sex, agedays)
+  setkeyv(data.all, c("param", "sex", "agedays"))
   data.all <- sd.recenter[data.all]
-  setkey(data.all, subjid, param, agedays)
+  setkeyv(data.all, c("subjid", "param", "agedays"))
   data.all[, tbc.sd := sd.orig - sd.median]
 
   if (sdrecentered.filename != "") {
@@ -2282,7 +2282,7 @@ read.anthro <- function(path = "", cdc.only = FALSE) {
   anthro <- rbindlist(l)
 
 
-  setkey(anthro, src, param, sex, age)
+  setkeyv(anthro, c("src", "param", "sex", "age"))
 
   return(function(param, agedays, sex, measurement, csd = FALSE) {
     # For now, we will only use CDC growth reference data, note that the cubically interpolated file
@@ -2464,10 +2464,9 @@ sd.median <- function(param, sex, agedays, sd.orig) {
   # f.	In future steps I will sometimes refer to measprev and measnext which refer to the previous or next wt or ht measurement
   #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject, parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
   dt <- data.table(param, sex, agedays, ageyears = floor(agedays / 365.25), sd.orig)
-  setkey(dt, param, sex, agedays)
+  setkeyv(dt, c("param", "sex", "agedays"))
   # determine ages (in days) we need to cover from min to max age in years
-  agedays.to.cover <- dt[, (floor(min(ageyears) * 365.25):floor(max(ageyears +
-    1) * 365.25))]
+  agedays.to.cover <- dt[, (floor(min(ageyears) * 365.25):floor(max(ageyears + 1) * 365.25))]
   # group all measurements above age 19 together (copied from CD stata code e-mailed 4/3/15)
   dt[ageyears > 19, ageyears := 19]
   dt.median <- dt[
@@ -2487,6 +2486,6 @@ sd.median <- function(param, sex, agedays, sd.orig) {
     ),
     by = .(param, sex)
   ]
-  setkey(dt.median, param, sex, agedays)
+  setkeyv(dt.median, c("param", "sex", "agedays"))
   return(dt.median)
 }

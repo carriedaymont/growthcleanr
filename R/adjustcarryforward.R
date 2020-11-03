@@ -102,7 +102,7 @@ adjustcarryforward <- function(subjid,
 
   data.orig <- data.all
 
-  setkey(data.all, subjid)
+  setkeyv(data.all, "subjid")
 
   subjid.unique <- unique(data.all$subjid)
 
@@ -140,7 +140,7 @@ adjustcarryforward <- function(subjid,
     colnames(tanner.ht.vel),
     gsub("_", ".", colnames(tanner.ht.vel))
   )
-  setkey(tanner.ht.vel, sex, tanner.months)
+  setkeyv(tanner.ht.vel, c("sex", "tanner.months"))
   # keep track of column names in the tanner data
   tanner.fields <- colnames(tanner.ht.vel)
   tanner.fields <- tanner.fields[!tanner.fields %in% c("sex", "tanner.months")]
@@ -158,14 +158,12 @@ adjustcarryforward <- function(subjid,
   )
   who.max.ht.vel <- fread(who_max_ht_vel_path)
   who.ht.vel <- fread(who_ht_vel_3sd_path)
-  setkey(who.max.ht.vel, sex, whoagegrp_ht)
-  setkey(who.ht.vel, sex, whoagegrp_ht)
-  who.ht.vel <- as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel,
-    by = c("sex", "whoagegrp_ht")
-  ))
+  setkeyv(who.max.ht.vel, c("sex", "whoagegrp_ht"))
+  setkeyv(who.ht.vel, c("sex", "whoagegrp_ht"))
+  who.ht.vel <- as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel, by = c("sex", "whoagegrp_ht")))
 
   setnames(who.ht.vel, colnames(who.ht.vel), gsub("_", ".", colnames(who.ht.vel)))
-  setkey(who.ht.vel, sex, whoagegrp.ht)
+  setkeyv(who.ht.vel, c("sex", "whoagegrp.ht"))
   # keep track of column names in the who growth velocity data
   who.fields <- colnames(who.ht.vel)
   who.fields <- who.fields[!who.fields %in% c("sex", "whoagegrp.ht")]
@@ -225,7 +223,7 @@ adjustcarryforward <- function(subjid,
   data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, TRUE)]
 
   # sort by subjid, param, agedays
-  setkey(data.all, subjid, param, agedays)
+  setkeyv(data.all, c("subjid", "param", "agedays"))
 
   # add a new convenience index for bookkeeping
   data.all[, index := 1:.N]
@@ -288,9 +286,9 @@ adjustcarryforward <- function(subjid,
     # END EDIT
   }
   # add sd.recenter to data, and recenter
-  setkey(data.all, param, sex, agedays)
+  setkeyv(data.all, c("param", "sex", "agedays"))
   data.all <- sd.recenter[data.all]
-  setkey(data.all, subjid, param, agedays)
+  setkeyv(data.all, c("subjid", "param", "agedays"))
   data.all[, tbc.sd := sd.orig - sd.median]
 
   # safety check: treat observations where tbc.sd cannot be calculated as missing
@@ -375,7 +373,7 @@ adjustcarryforward <- function(subjid,
         df[, tanner.months := 6 + 12 * (round(mid.agedays / 365.25))]
 
         # 15e.	Merge with dataset tanner_ht_vel using sex and tanner_months – this will give you min_ht_vel and max_ht_vel
-        setkey(df, sex, tanner.months)
+        setkeyv(df, c("sex", "tanner.months"))
         df <- tanner.ht.vel[df]
 
         # 15f.	Calculate the following:
@@ -434,11 +432,11 @@ adjustcarryforward <- function(subjid,
 
         # i.	Merge using sex and whoagegrp_ht using who_ht_vel_3sd and who_ht_maxvel_3sd; this will give you varaibles whoinc_i_ht and maxwhoinc_i_ht
         #     for various intervals where i is 1,2, 3,4, 6 and corresponds to whoinc_age_ht.
-        setkey(df, sex, whoagegrp.ht)
+        setkeyv(df, c("sex", "whoagegrp.ht"))
         df <- who.ht.vel[df]
 
         # restore original sort order (ensures valid.rows variable applies to correct rows)
-        setkey(df, index)
+        setkeyv(df, "index")
 
         # 15j.	Generate variable who_mindiff_ht=whoinc_i_ht according to the value if whoinc_age_ht; make who_mindiff_ht missing if whoinc_i_ht or whoinc_age_ht is missing.
         df[, who.mindiff.next.ht := ifelse(
@@ -693,7 +691,7 @@ adjustcarryforward <- function(subjid,
       }
     }
 
-    setkey(subj.df, index)
+    setkeyv(subj.df, "index")
     return(subj.df$exclude)
   })(copy(.SD)), by = .(subjid), .SDcols = c("sex", "agedays", "v", "tbc.sd", "exclude", "orig.exclude")]
 

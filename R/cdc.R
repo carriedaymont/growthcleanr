@@ -223,8 +223,8 @@ ext_bmiz <- function(data,
     dref <- rbindlist(lapply(1:2, fapprox))
   }
 
-  setkey(data, sex, age)
-  setkey(dref, sex, age)
+  setkeyv(data, c("sex", "age"))
+  setkeyv(dref, c("sex", "age"))
   dt <- dref[data]
 
   dt[, Cs(waz, mwaz) := z_score(dt$wt, dt$wl, dt$wm, dt$ws)]
@@ -319,8 +319,8 @@ ext_bmiz <- function(data,
   )
   dt <- dt[, ..v]
 
-  setkey(dt, seq_)
-  setkey(dorig, seq_)
+  setkeyv(dt, "seq_")
+  setkeyv(dorig, "seq_")
   dtot <- dt[dorig]
   set_cols_first(dtot, names(dorig))
   dtot[, Cs(seq_) := NULL]
