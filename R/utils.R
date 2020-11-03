@@ -41,7 +41,7 @@ splitinput <- function(df,
     }
 
     fname_counter <- 0
-    row_count <- 0
+    # row_count <- 0
     split_df <- data.frame()
 
     # split the data frame by the grouping that user specifies
@@ -170,7 +170,7 @@ recode_sex <- function(input_data,
 #'
 #' # Specify all inclusion codes
 #' long_df <- longwide(df, inclusion_types = c("Include", "Exclude-Carried-Forward"))
-longwide <-function(long_df,
+longwide <- function(long_df,
                     id = "id",
                     subjid = "subjid",
                     sex = "sex",

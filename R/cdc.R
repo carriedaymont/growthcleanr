@@ -6,9 +6,9 @@ z_score <- function(var, l, m, s) {
   ls <- l * s
   invl <- 1 / l
   z <- (((var / m)^l) - 1) / (ls) # z-score formula
-  sdp2 <- (m * (1 + 2 * ls)^(invl)) - m
+  sdp2 <- (m * (1 + 2 * ls)^invl) - m
   # modified z-score (+2)
-  sdm2 <- m - (m * (1 - 2 * ls)^(invl))
+  sdm2 <- m - (m * (1 - 2 * ls)^invl)
   mz <- fifelse(var < m, (var - m) / (0.5 * sdm2), (var - m) / (sdp2 * 0.5))
   return(list(z, mz))
 }
@@ -127,11 +127,6 @@ ext_bmiz <- function(data,
                      bmi = "bmi",
                      adjust.integer.age = TRUE,
                      ref.data.path = "") {
-  library(data.table, quietly = TRUE)
-  library(dplyr, quietly = TRUE)
-  library(Hmisc, quietly = TRUE)
-  library(magrittr, quietly = TRUE)
-  library(labelled, quietly = TRUE)
 
   setDT(data)
 
@@ -141,7 +136,7 @@ ext_bmiz <- function(data,
   )
 
   # needed for merging back with original data
-  data$seq_ <- 1L:nrow(data)
+  data[, seq_ := 1L:nrow(data)]
   dorig <- copy(data)
 
   # Adjust integer values only if specified (default) and all values are integer
@@ -156,15 +151,14 @@ ext_bmiz <- function(data,
     .(seq_, sex, age, wt, ht, bmi)
   ]
 
-  v1 <- Cs(seq_, id, sex, age, wt, ht, bmi)
+  # v1 <- Cs(seq_, id, sex, age, wt, ht, bmi)
 
   dref_path <- ifelse(
     ref.data.path == "",
     system.file("extdata/CDCref_d.csv", package = "growthcleanr"),
     paste0(ref.data.path, "CDCref_d.csv")
   )
-  dref <-
-    fread(dref_path)[`_AGEMOS1` > 23 & denom == "age"]
+  dref <- fread(dref_path)[`_AGEMOS1` > 23 & denom == "age"]
   names(dref) <- tolower(names(dref))
   names(dref) <- gsub("^_", "", names(dref))
 
