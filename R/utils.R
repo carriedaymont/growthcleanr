@@ -119,7 +119,7 @@ recode_sex <- function(input_data,
                        targetm = 1L,
                        targetf = 2L) {
   # cast to DT for faster processing
-  input_table <- data.table::data.table(input_data)
+  input_table <- data.table(input_data)
   # replace targetcol variables with targetm where sourcecol = sourcem
   input_table[input_table[[sourcecol]] == sourcem, targetcol] <- targetm
   # replace targetcol variables with targetf where sourcecol = sourcef
