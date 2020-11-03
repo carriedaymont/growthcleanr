@@ -2,15 +2,20 @@
 % Please edit documentation in R/growth.R
 \name{read.anthro}
 \alias{read.anthro}
-\title{Read anthro}
+\title{Function to calculate z-scores and csd-scores based on anthro tables.}
 \usage{
 read.anthro(path = "", cdc.only = F)
+}
+\arguments{
+\item{path}{Path to supplied reference anthro data. Defaults to package anthro tables.}
+
+\item{cdc.only}{Whether or not only CDC data should be used. Defaults to false.}
 }
 \value{
 Function for calculating BMI based on measurement, age in days, sex, and measurement value.
 }
 \description{
-Read anthro
+Function to calculate z-scores and csd-scores based on anthro tables.
 }
 \examples{
 # Return calculating function with all defaults
