@@ -11,7 +11,7 @@ valid <- function(df,
     exclude < "Exclude" |
       include.temporary.duplicates & exclude == "Exclude-Temporary-Duplicate" |
       include.duplicates & exclude == "Exclude-Duplicate" |
-      include.carryforward &exclude == "Exclude-Carried-Forward"
+      include.carryforward & exclude == "Exclude-Carried-Forward"
   )
 }
 
@@ -275,7 +275,7 @@ cleanbatch <- function(data.df,
   #   ii.	Replace tbc*sd with the values for tbc*sd_sw
   data.df$swap.flag.2 <- swap_parameters(field.name = "swap.flag.1", df = data.df)
   data.df[
-    swap.flag.1 &swap.flag.2,
+    swap.flag.1 &s wap.flag.2,
     `:=`(v = v.sw, tbc.sd = tbc.sd.sw, exclude = "Swapped-Measurements")
   ]
 
@@ -630,7 +630,7 @@ cleanbatch <- function(data.df,
 
   # determine proportion of days with duplication for each parameter ahead of time for efficiency
   dup.ratio.df <- data.df[
-    subjid %in% subj.dup &(valid.rows |temp.dups),
+    subjid %in% subj.dup & (valid.rows | temp.dups),
     list(dup = (.N > 1)),
     by = .(subjid, param, agedays)
   ][,
@@ -660,7 +660,7 @@ cleanbatch <- function(data.df,
   data.df[
     J(subj.param.not.all.dups),
     duplicate := seq_along(abssum2) != which.min(abssum2),
-    by =.(subjid, param, agedays)
+    by = .(subjid, param, agedays)
   ]
   data.df[temp.dups, exclude := "Include"]
   data.df[(valid.rows | temp.dups) & duplicate, exclude := "Exclude-Duplicate"]
@@ -844,7 +844,7 @@ cleanbatch <- function(data.df,
         subj.df[
           valid.rows,
           (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE),
-          by =param
+          by = param
         ]
         subj.df[, `:=`(
           dewma.all = tbc.sd - ewma.all,
