@@ -1649,19 +1649,29 @@ cleanbatch <- function(data.df,
 #' @import foreach
 #' @import doParallel
 #' @examples
-#' # Standard calculation Using Provided Age/Weight Data
-#' colnames(data_stats)<-c("id", "measure", "agedays", "sex", "value")
-#' clean_stats<-cleangrowth(data_stats$id, data_stats$measure, data_stats$agedays, data_stats$sex, data_stats$value)
+#' # Run calculation using a small subset of given data
+#' df_stats <- as.data.frame(syngrowth)
+#' df_stats <- df_stats[df_stats$subjid %in% unique(df_stats[, "subjid"])[1:5], ]
+#'
+#' clean_stats <-cleangrowth(subjid = df_stats$subjid,
+#'                          param = df_stats$param,
+#'                          agedays = df_stats$agedays,
+#'                          sex = df_stats$sex,
+#'                          measurement = df_stats$measurement)
 #'
 #' # Once processed you can filter data based on result value
-#' data_stats<-data_stats[,clean_result:=clean_stats]
-#' clean_data_stats<-data_stats[clean_result="Include"] # only include data marked as "Include"
+#' df_stats <- cbind(df_stats, "clean_result" == clean_stats)
+#' clean_df_stats <- df_stats[, df_stats$clean_result == "Include"]
 #'
-#' # Parallel Processing
-#' # Run using 6 cores and batches
-#' clean_stats<-cleangrowth(data_stats$id, data_stats$measure, data_stats$agedays, data_stats$sex, data_stats$value, parallel = TRUE, num.batches = 6)
-#'
-cleangrowth <- function(subjid,
+#' # Parallel processing: run using 3 cores and batches
+#' df_stats<-cleangrowth(subjid = df_stats$subjid,
+#'                       param = df_stats$param,
+#'                       agedays = df_stats$agedays,
+#'                       sex = df_stats$sex,
+#'                       measurement = df_stats$measurement,
+#'                       parallel = TRUE,
+#'                       num.batches = 2)
+cleangrowth = function(subjid,
                        param,
                        agedays,
                        sex,
@@ -1992,30 +2002,35 @@ cleangrowth <- function(subjid,
 #'
 #' @return Function for calculating BMI based on measurement, age in days, sex, and measurement value.
 #' @export
-read_anthro <- function(path = "", cdc.only = F) {
-  library("data.table", quietly = T)
-
+#' @import data.table
+#' @examples
+#' # Return calculating function with all defaults
+#' afunc <- read.anthro()
+#'
+#' # Return calculating function while specifying a path and using only CDC data
+#' afunc <- read.anthro(path = system.file("extdata", package = "growthcleanr"),
+#'                      cdc.only = TRUE)
+read.anthro = function(path = "", cdc.only = F) {
   # set correct path based on input reference table path (if any)
   weianthro_path <- ifelse(
     path == "",
-    system.file("extdata/weianthro.txt", package = "growthcleanr"),
-    paste(path, "weianthro.txt", sep = "")
+    system.file(file.path("extdata","weianthro.txt"), package = "growthcleanr"),
+    file.path(path, "weianthro.txt")
   )
   lenanthro_path <- ifelse(
     path == "",
-    system.file("extdata/lenanthro.txt", package = "growthcleanr"),
-    paste(path, "lenanthro.txt", sep = "")
+    system.file(file.path("extdata","lenanthro.txt"), package = "growthcleanr"),
+    file.path(path, "lenanthro.txt")
   )
   bmianthro_path <- ifelse(
     path == "",
-    system.file("extdata/bmianthro.txt", package = "growthcleanr"),
-    paste(path, "bmianthro.txt", sep = "")
+    system.file(file.path("extdata","bmianthro.txt"), package = "growthcleanr"),
+    file.path(path, "bmianthro.txt")
   )
   growth_cdc_ext_path <- ifelse(
     path == "",
-    system.file("extdata/growthfile_cdc_ext.csv", package = "growthcleanr"),
-    paste(path, "growthfile_cdc_ext.csv", sep =
-            "")
+    system.file(file.path("extdata","growthfile_cdc_ext.csv"), package = "growthcleanr"),
+    file.path(path, "growthfile_cdc_ext.csv")
   )
 
 
@@ -2157,7 +2172,23 @@ read_anthro <- function(path = "", cdc.only = F) {
 #'@md
 #'
 #' @export
-ewma <- function(agedays, z, ewma.exp, ewma.adjacent = T) {
+#' @examples
+#' # Run on 1 subject, 1 type of parameter
+#' df_stats <- as.data.frame(syngrowth)
+#' df_stats <- df_stats[df_stats$subjid == df_stats$subjid[1] &
+#'                        df_stats$param == "HEIGHTCM", ]
+#'
+#' # Get the uncentered z-scores
+#' measurement_to_z <- read.anthro(cdc.only = TRUE)
+#' sd <- measurement_to_z(df_stats$param,
+#'                        df_stats$agedays,
+#'                        df_stats$sex,
+#'                        df_stats$measurement,
+#'                        TRUE)
+#'
+#' # Calculate exponentially weighted moving average
+#' e_df <- ewma(df_stats$agedays, sd, ewma.exp = -1.5)
+ewma = function(agedays, z, ewma.exp, ewma.adjacent = T) {
   # 6.  EWMA calculation description: Most of the next steps will involve calculating the exponentially weighted moving average for each subject and parameter. I will
   #     describe how to calculate EWMASDs, and will describe how it needs to be varied in subsequent steps.
   # a.	The overall goal of the EWMASD calculation is to identify the difference between the SD-score and what we might predict that DS-score should be, in order to
@@ -2238,9 +2269,26 @@ as_matrix_delta <- function(agedays) {
 #' @return Table of data with median SD-scores per day of life by gender and parameter.
 #'
 #' @export
-sd_median <- function(param, sex, agedays, sd.orig) {
-  library("data.table", quietly = T)
-
+#' @import data.table
+#' @examples
+#' # Run on 1 subject
+#' df_stats <- as.data.frame(syngrowth)
+#' df_stats <- df_stats[df_stats$subjid == df_stats$subjid[1], ]
+#'
+#' # Get the original standard deviations
+#' measurement_to_z <- read.anthro(cdc.only = TRUE)
+#' sd.orig <- measurement_to_z(df_stats$param,
+#'                        df_stats$agedays,
+#'                        df_stats$sex,
+#'                        df_stats$measurement,
+#'                        TRUE)
+#'
+#' # Calculate median standard deviations
+#' sd.m <- sd.median(df_stats$param,
+#'                   df_stats$sex,
+#'                   df_stats$agedays,
+#'                   sd.orig)
+sd.median = function(param, sex, agedays, sd.orig) {
   # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time, we need to account for the fact that
   #     the mean SD-score for the population changes with age.
   # a.  Determine the median cdc*sd for each parameter by year of age (with sexes combined): median*sd.

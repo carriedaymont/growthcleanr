@@ -42,6 +42,24 @@
 #' @rawNamespace import(plyr, except = c(failwith, id, summarize, count, desc, mutate, arrange, rename, is.discrete, summarise, summarize))
 #' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
 #' @import data.table
+#' @examples
+#' # Run on a small subset of given data
+#' df <- as.data.frame(syngrowth)
+#' df <- df[df$subjid %in% unique(df[, "subjid"])[1:5], ]
+#' clean_df <- cbind(df,
+#'                   "clean_value" = cleangrowth(df$subjid,
+#'                                               df$param,
+#'                                               df$agedays,
+#'                                               df$sex,
+#'                                               df$measurement))
+#'
+#' # Adjust carry forward values in cleaned data
+#' adj_clean <- adjustcarryforward(subjid = clean_df$subjid,
+#'                                 param = clean_df$param,
+#'                                 agedays = clean_df$agedays,
+#'                                 sex = clean_df$sex,
+#'                                 measurement = clean_df$measurement,
+#'                                 orig.exclude = clean_df$clean_value)
 adjustcarryforward <- function(subjid,
                                param,
                                agedays,
