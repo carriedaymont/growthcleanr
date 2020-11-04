@@ -214,7 +214,7 @@ adjustcarryforward <- function(subjid,
   if (!quietly) {
     cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
   }
-  measurement.to.z <- read.anthro(ref.data.path, cdc.only = TRUE)
+  measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE)
   data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
 
   # calculate "standard deviation" scores
@@ -281,7 +281,7 @@ adjustcarryforward <- function(subjid,
       "Unit-Error-Possible",
       "Swapped-Measurements"
     )
-    sd.recenter <- data.all[orig.exclude %in% keep.levels, sd.median(param, sex, agedays, sd.orig)]
+    sd.recenter <- data.all[orig.exclude %in% keep.levels, sd_median(param, sex, agedays, sd.orig)]
     # END EDIT
   }
   # add sd.recenter to data, and recenter
