@@ -7,16 +7,7 @@ WORKDIR /usr/src/app
 COPY LICENSE /LICENSE
 COPY README.md /README.md
 
-RUN R -e "install.packages(c( \
-    'argparse', \
-    'bit64', \
-    'data.table', \
-    'doParallel', \
-    'foreach', \
-    ))"
-
-RUN R -e "library(devtools); \
-    devtools::install_github('mitre/growthcleanr')"
+RUN R -e "remotes::install_github('mitre/growthcleanr', dependencies = TRUE)"
 
 ADD exec/gcdriver.R /usr/local/bin/
 RUN chmod +x /usr/local/bin/gcdriver.R
