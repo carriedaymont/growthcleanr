@@ -13,7 +13,8 @@ ewma(agedays, z, ewma.exp, ewma.adjacent = TRUE)
 
 \item{ewma.exp}{Exponent to use for weighting.}
 
-\item{ewma.adjacent}{Specify whether EWMA values excluding adjacent measurements should be calculated.  Defaults to TRUE.}
+\item{ewma.adjacent}{Specify whether EWMA values excluding adjacent measurements should be calculated.
+Defaults to TRUE.}
 }
 \value{
 Data frame with 3 variables:
