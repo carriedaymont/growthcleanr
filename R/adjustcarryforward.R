@@ -40,8 +40,7 @@
 #'
 #' @export
 #' @import data.table
-#' @rawNamespace import(plyr, except = c(failwith, id, summarize, count, desc, mutate, arrange, rename, is.discrete, summarise, summarize))
-#' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
+#'
 #' @examples
 #' # Run on a small subset of given data
 #' df <- as.data.frame(syngrowth)
@@ -109,20 +108,22 @@ adjustcarryforward <- function(subjid,
   #### ADJUSTCF EDIT ####
   # for this purpose, want to subset dataset down to just "Exclude-Carried-Forward" and "Include" - assume all other measurements are invalid
   # want to remove any carried forward values whose non-carried forward is also excluded
-  data.all <- data.all %>%
-    dplyr::mutate(orig.exclude.lag = dplyr::lag(orig.exclude, n = 1)) %>%
-    dplyr::filter(!(
-      orig.exclude == "Exclude-Carried-Forward" &
-        grepl("exclude", orig.exclude.lag, ignore.case = TRUE)
-    )) %>%
-    dplyr::filter(orig.exclude %in% c("Exclude-Carried-Forward", "Include")) %>%
-    dplyr::select(-orig.exclude.lag)
+  data.all <- data.all[,
+    orig.exclude.lag := shift(orig.exclude, n = 1)
+  ][!(
+    orig.exclude == "Exclude-Carried-Forward" &
+      grepl("exclude", orig.exclude.lag, ignore.case = TRUE)
+  )][
+    orig.exclude %in% c("Exclude-Carried-Forward", "Include")
+  ][,
+    orig.exclude.lag := NULL
+  ]
 
   # filter to only subjects with valid carried forwards - n is here to merge back
-  data.all <- data.all %>%
-    dplyr::filter(subjid %in% data.all$subjid[data.all$orig.exclude == "Exclude-Carried-Forward"]) %>%
-    as.data.table()
-
+  data.all <- data.all[,
+    ecf_tmp := any(orig.exclude == "Exclude-Carried-Forward"),
+    by = "subjid"
+  ][(ecf_tmp)][, ecf_tmp := NULL]
   ### END EDIT ####
 
   # load tanner height velocity data. sex variable is defined such that 0=male and 1=female
@@ -160,7 +161,7 @@ adjustcarryforward <- function(subjid,
   who.ht.vel <- fread(who_ht_vel_3sd_path)
   setkeyv(who.max.ht.vel, c("sex", "whoagegrp_ht"))
   setkeyv(who.ht.vel, c("sex", "whoagegrp_ht"))
-  who.ht.vel <- as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel, by = c("sex", "whoagegrp_ht")))
+  who.ht.vel <- as.data.table(merge(who.ht.vel, who.max.ht.vel, by = c("sex", "whoagegrp_ht")))
 
   setnames(who.ht.vel, colnames(who.ht.vel), gsub("_", ".", colnames(who.ht.vel)))
   setkeyv(who.ht.vel, c("sex", "whoagegrp.ht"))
@@ -318,7 +319,10 @@ adjustcarryforward <- function(subjid,
       subj.df[, index := 1:.N]
 
       num.height.excluded <- 0
-      while (TRUE) {
+      newly.excluded <- 0
+      while (newly.excluded > num.height.excluded) {
+        num.height.excluded <- newly.excluded
+
         # use a closure to discard all the extra fields added to df with each iteration
         subj.df[, exclude := (function(df) {
           # initialize fields
@@ -674,15 +678,14 @@ adjustcarryforward <- function(subjid,
         })(copy(.SD))]
 
 
-
         # t.  If there was at least one subject who had a potential exclusion identified in step 15q, repeat steps 15b-15q. If there were no subjects with potential
         #     exclusions identified in step 15q, move on to step 16.
         newly.excluded <- sum(subj.df$exclude %in% c("Include"))
-        if (newly.excluded > num.height.excluded) {
-          num.height.excluded <- newly.excluded
-        } else {
-          break
-        }
+        # if (newly.excluded > num.height.excluded) {
+        #   num.height.excluded <- newly.excluded
+        # } else {
+        #   break
+        # }
       }
 
       setkeyv(subj.df, "index")
@@ -692,12 +695,10 @@ adjustcarryforward <- function(subjid,
     .SDcols = c("sex", "agedays", "v", "tbc.sd", "exclude", "orig.exclude")
   ]
 
+
+
   return(rbind(
-    data.frame(adjustcarryforward = data.all$exclude, n = data.all$n),
-    data.frame(
-      dplyr::filter(data.orig, !n %in% data.all$n) %>%
-        dplyr::mutate(adjustcarryforward = "Missing") %>%
-        dplyr::select(adjustcarryforward, n)
-    )
+    as.data.frame(data.all[, .(adjustcarryforward = exclude, n = n)]),
+    as.data.frame(data.orig[!n %in% data.all[["n"]]][, .(adjustcarryforward = "Missing", n = n)])
   ))
 }
