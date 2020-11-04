@@ -19,140 +19,82 @@
 #' )
 read_anthro <- function(path = NULL, cdc.only = FALSE) {
   # set correct path based on input reference table path (if any)
-  weianthro_path <- ifelse(
-    is.null(path),
-    system.file(file.path("extdata", "weianthro.txt"), package = "growthcleanr"),
-    file.path(path, "weianthro.txt")
-  )
-  lenanthro_path <- ifelse(
-    is.null(path),
-    system.file(file.path("extdata", "lenanthro.txt"), package = "growthcleanr"),
-    file.path(path, "lenanthro.txt")
-  )
-  bmianthro_path <- ifelse(
-    is.null(path),
-    system.file(file.path("extdata", "bmianthro.txt"), package = "growthcleanr"),
-    file.path(path, "bmianthro.txt")
-  )
-  growth_cdc_ext_path <- ifelse(
-    is.null(path),
-    system.file(file.path("extdata", "growthfile_cdc_ext.csv"), package = "growthcleanr"),
-    file.path(path, "growthfile_cdc_ext.csv")
-  )
+  anthro_list <- lapply(
+    X = c("weianthro.txt", "lenanthro.txt", "bmianthro.txt"),
+    dir_path = path,
+    FUN = function(ifile, dir_path) {
+      ifile_path <- if (is.null(dir_path)) {
+        system.file(file.path("extdata", ifile), package = "growthcleanr")
+      } else {
+        file.path(dir_path, ifile)
+      }
 
-
-  growth_cdc_ext <- fread(growth_cdc_ext_path)
-
-  l <- list(
-    with(
-      fread(weianthro_path, header = TRUE),
-      data.frame(
+      fread(ifile_path)[, .(
         src = "WHO",
-        param = "WEIGHTKG",
         sex = sex - 1,
         age,
+        param = c(
+          "weianthro.txt" = "WEIGHTKG",
+          "lenanthro.txt" = "HEIGHTCM",
+          "bmianthro.txt" = "BMI"
+        )[ifile],
         l,
         m,
         s,
-        csdpos = as.double(NA),
-        csdneg = as.double(NA)
-      )
-    ),
-    with(
-      fread(lenanthro_path, header = TRUE),
-      data.frame(
-        src = "WHO",
-        param = "HEIGHTCM",
-        sex = sex - 1,
-        age,
-        l,
-        m,
-        s,
-        csdpos = as.double(NA),
-        csdneg = as.double(NA)
-      )
-    ),
-    with(
-      fread(bmianthro_path, header = TRUE),
-      data.frame(
-        src = "WHO",
-        param = "BMI",
-        sex = sex - 1,
-        age,
-        l,
-        m,
-        s,
-        csdpos = as.double(NA),
-        csdneg = as.double(NA)
-      )
-    ),
-    with(
-      growth_cdc_ext,
-      data.frame(
-        src = "CDC",
-        param = "WEIGHTKG",
-        sex,
-        age = agedays,
-        l = cdc_wt_l,
-        m = cdc_wt_m,
-        s = cdc_wt_s,
-        csdpos = cdc_wt_csd_pos,
-        csdneg = cdc_wt_csd_neg
-      )
-    ),
-    with(
-      growth_cdc_ext,
-      data.frame(
-        src = "CDC",
-        param = "HEIGHTCM",
-        sex,
-        age = agedays,
-        l = cdc_ht_l,
-        m = cdc_ht_m,
-        s = cdc_ht_s,
-        csdpos = cdc_ht_csd_pos,
-        csdneg = cdc_ht_csd_neg
-      )
-    ),
-    with(
-      growth_cdc_ext,
-      data.frame(
-        src = "CDC",
-        param = "BMI",
-        sex,
-        age = agedays,
-        l = cdc_bmi_l,
-        m = cdc_bmi_m,
-        s = cdc_bmi_s,
-        csdpos = cdc_bmi_csd_pos,
-        csdneg = cdc_bmi_csd_neg
-      )
+        csdpos = NA_real_,
+        csdneg = NA_real_
+      )]
+
+    }
+  )
+
+  cdc_wide <-  fread(
+    file = ifelse(
+      is.null(path),
+      system.file(file.path("extdata", "growthfile_cdc_ext.csv"), package = "growthcleanr"),
+      file.path(path, "growthfile_cdc_ext.csv")
     )
-  )
+  )[,
+    c("src", paste("cdc", c("wt", "ht", "hc", "bmi"), "param", sep = "_")) := list(
+      "CDC", "WEIGHTKG", "HEIGHTCM", "hc", "BMI"
+    )
+  ]
 
-  anthro <- rbindlist(l)
+  cdc_long <- melt(
+    data = cdc_wide,
+    id.vars = c("src", "sex", "agedays"),
+    measure.vars = patterns(
+      param = "_param$",
+      l = "_l$",
+      m = "_m$",
+      s = "_s$",
+      csdpos = "_csd_pos$",
+      csdneg = "_csd_neg$"
+    )
+  )[, variable := NULL][param != "hc"]
+  setnames(cdc_long, "agedays", "age")
 
+  anthro_list[[length(anthro_list) + 1]] <- cdc_long
+  anthro <- rbindlist(anthro_list)
 
   setkeyv(anthro, c("src", "param", "sex", "age"))
 
   return(function(param, agedays, sex, measurement, csd = FALSE) {
     # For now, we will only use CDC growth reference data, note that the cubically interpolated file
     # we are using has linear measurments derived from length data for children < 731 days, and height thereafter
-    src <- ifelse(agedays < 731 & !cdc.only, "WHO", "CDC")
 
     # keep column sequence the same fo efficient join
-    dt <- data.table(src, param, sex, agedays, measurement)
+    dt <- data.table(
+      src = fifelse(agedays < 731 & !cdc.only, "WHO", "CDC"),
+      param, sex, agedays, measurement
+    )
     dt <- anthro[dt]
 
-    dt[, ret := as.double(NA)]
     if (csd) {
-      dt[measurement < m, ret := (measurement - m) / csdneg]
-      dt[measurement >= m, ret := (measurement - m) / csdpos]
+      dt[, fifelse(measurement < m, (measurement - m) / csdneg, (measurement - m) / csdpos)]
     } else {
-      dt[l == 0, ret := log(measurement / m) / s]
-      dt[l != 0, ret := (((measurement / m)^l) - 1) / (l * s)]
+      dt[, fifelse(l == 0, log(measurement / m) / s, (((measurement / m)^l) - 1) / (l * s))]
     }
-
-    return(dt$ret)
   })
 }
+
