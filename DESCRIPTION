@@ -13,13 +13,10 @@ Description: Cleans growth data that may contain implausible data based on unit 
 License: MIT + file LICENSE
 Imports: 
     data.table (>= 1.13.0),
-    tidyr (>= 1.1.0),
     plyr (>= 1.8.6),
-    dplyr (>= 1.0.1),
     foreach (>= 1.5.0),
     doParallel (>= 1.0.15),
     labelled (>= 2.5.0),
-    magrittr (>= 1.5)
 Suggests: 
     argparse (>= 2.0.1),
     bit64 (>= 4.0.2),
