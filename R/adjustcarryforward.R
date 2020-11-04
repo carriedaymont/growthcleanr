@@ -72,7 +72,7 @@ adjustcarryforward <- function(subjid,
                                orig.exclude,
                                sd.recenter = NA,
                                ewma.exp = -1.5,
-                               ref.data.path = "",
+                               ref.data.path = NULL,
                                quietly = TRUE,
                                minfactor = 0.5,
                                maxfactor = 2,
@@ -108,33 +108,61 @@ adjustcarryforward <- function(subjid,
   #### ADJUSTCF EDIT ####
   # for this purpose, want to subset dataset down to just "Exclude-Carried-Forward" and "Include" - assume all other measurements are invalid
   # want to remove any carried forward values whose non-carried forward is also excluded
-  data.all <- data.all[,
-    orig.exclude.lag := shift(orig.exclude, n = 1)
-  ][!(
-    orig.exclude == "Exclude-Carried-Forward" &
-      grepl("exclude", orig.exclude.lag, ignore.case = TRUE)
-  )][
-    orig.exclude %in% c("Exclude-Carried-Forward", "Include")
-  ][,
-    orig.exclude.lag := NULL
-  ]
+  # here's what we want to filer out -- anything that's not carried forward/include
+  # we're also going to include strings of carried forward
+  # remove all the weight measurements
+  data.all <- data.all[param %in% c("HEIGHTCM", "LENGTHCM")]
 
   # filter to only subjects with valid carried forwards - n is here to merge back
   data.all <- data.all[,
     ecf_tmp := any(orig.exclude == "Exclude-Carried-Forward"),
     by = "subjid"
   ][(ecf_tmp)][, ecf_tmp := NULL]
+
+  # here's what we want to filter out -- anything that's not carried forward/include
+  # we're also going to include strings of carried forward
+  # but we also need to make sure they're not coming from an excluded value
+
+ # start of string to remove: everything that isn't include/excl-cf
+  st <- which(!data.all$orig.exclude %in% c("Exclude-Carried-Forward", "Include"))
+  # end of string: include or the end of a subject
+  subj_end <- length(data.all$subjid) - match(unique(data.all$subjid), rev(data.all$subjid)) + 1
+  end <- c(which(data.all$orig.exclude == "Include"), subj_end)
+  end <- unique(sort(end))
+
+  # remove anything between start and ends (including start, not including end)
+  to_rem <- unlist(
+    lapply(st, function(x) {
+      to_rem <- c(x:(end[end >= x][1]))
+      if (to_rem[length(to_rem)] %in% subj_end) {
+        # if it's the last value, we want to get rid of that end
+        return(to_rem)
+      } else {
+        # if it's an include, we want to keep it (don't remove)
+        return(to_rem[-length(to_rem)])
+      }
+    })
+  )
+  to_rem <- unique(to_rem)
+  if (length(to_rem) > 0) {
+    data.all <- data.all[-to_rem,]
+  }
+
+  # filter to only subjects with possible carried forwards again
+  data.all <- data.all[,
+    ecf_tmp := any(orig.exclude == "Exclude-Carried-Forward"),
+    by = "subjid"
+  ][(ecf_tmp)][, ecf_tmp := NULL]
+
   ### END EDIT ####
 
   # load tanner height velocity data. sex variable is defined such that 0=male and 1=female
   # recode column names to match syntactic style ("." rather than "_" in variable names)
-  tanner_ht_vel_path <- ifelse(
-    ref.data.path == "",
+  tanner.ht.vel <- fread(ifelse(
+    is.null(ref.data.path),
     system.file("extdata/tanner_ht_vel.csv", package = "growthcleanr"),
     paste0(ref.data.path, "tanner_ht_vel.csv")
-  )
-
-  tanner.ht.vel <- fread(tanner_ht_vel_path)
+  ))
 
   setnames(
     tanner.ht.vel,
@@ -146,22 +174,19 @@ adjustcarryforward <- function(subjid,
   tanner.fields <- colnames(tanner.ht.vel)
   tanner.fields <- tanner.fields[!tanner.fields %in% c("sex", "tanner.months")]
 
-  who_max_ht_vel_path <- ifelse(
-    ref.data.path == "",
-    system.file("extdata/who_ht_maxvel_3sd.csv", package = "growthcleanr"),
-    paste0(ref.data.path, "who_ht_maxvel_3sd.csv")
+  who.ht.vel <- merge(
+    x = fread(ifelse(
+      is.null(ref.data.path),
+      system.file("extdata/who_ht_vel_3sd.csv", package = "growthcleanr"),
+      paste0(ref.data.path, "who_ht_vel_3sd.csv")
+    )),
+    y = fread(ifelse(
+      is.null(ref.data.path),
+      system.file("extdata/who_ht_maxvel_3sd.csv", package = "growthcleanr"),
+      paste0(ref.data.path, "who_ht_maxvel_3sd.csv")
+    )),
+    by = c("sex", "whoagegrp_ht")
   )
-
-  who_ht_vel_3sd_path <- ifelse(
-    ref.data.path == "",
-    system.file("extdata/who_ht_vel_3sd.csv", package = "growthcleanr"),
-    paste0(ref.data.path, "who_ht_vel_3sd.csv")
-  )
-  who.max.ht.vel <- fread(who_max_ht_vel_path)
-  who.ht.vel <- fread(who_ht_vel_3sd_path)
-  setkeyv(who.max.ht.vel, c("sex", "whoagegrp_ht"))
-  setkeyv(who.ht.vel, c("sex", "whoagegrp_ht"))
-  who.ht.vel <- as.data.table(merge(who.ht.vel, who.max.ht.vel, by = c("sex", "whoagegrp_ht")))
 
   setnames(who.ht.vel, colnames(who.ht.vel), gsub("_", ".", colnames(who.ht.vel)))
   setkeyv(who.ht.vel, c("sex", "whoagegrp.ht"))
@@ -211,16 +236,12 @@ adjustcarryforward <- function(subjid,
   #     median). These SD-scores, rather than z-scores, now form the basis for the algorithm.
 
   # calculate z scores
-  if (!quietly) {
-    cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
-  }
+  if (!quietly) cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
   measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE)
   data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
 
   # calculate "standard deviation" scores
-  if (!quietly) {
-    cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
-  }
+  if (!quietly) cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
   data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, TRUE)]
 
   # sort by subjid, param, agedays
@@ -241,7 +262,7 @@ adjustcarryforward <- function(subjid,
   # Mark missing values for exclusion
   data.all[,
     exclude := factor(
-      x = ifelse(is.na(v) | agedays < 0, "Missing", "No Change"),
+      x = fifelse(is.na(v) | agedays < 0, "Missing", "No Change"),
       levels = exclude.levels,
       ordered = TRUE
     )
@@ -266,9 +287,7 @@ adjustcarryforward <- function(subjid,
   # f.	In future steps I will sometimes refer to measprev and measnext which refer to the previous or next wt or ht measurement
   #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject, parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
 
-  if (!quietly) {
-    cat(sprintf("[%s] Re-centering data...\n", Sys.time()))
-  }
+  if (!quietly) cat(sprintf("[%s] Re-centering data...\n", Sys.time()))
 
   # see function definition below for explanation of the re-centering process
   # returns a data table indexed by param, sex, agedays
