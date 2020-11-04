@@ -396,9 +396,9 @@ cleangrowth <- function(subjid,
     dir.create(log.path, showWarnings = FALSE)
 
     ret.df <- plyr::ddply(
-      data.all,
-      .(batch),
-      cleanbatch,
+      .data = data.all,
+      .variables = "batch",
+      .fun = cleanbatch,
       .parallel = parallel,
       .paropts = list(.packages = "data.table"),
       log.path = log.path,
