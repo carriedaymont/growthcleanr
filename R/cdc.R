@@ -1,31 +1,3 @@
-#' Function for LMS formula with modified (m) z-scores
-#'
-#' @keywords internal
-#' @noRd
-z_score <- function(var, l, m, s) {
-  ls <- l * s
-  invl <- 1 / l
-  z <- (((var / m)^l) - 1) / (ls) # z-score formula
-  sdp2 <- (m * (1 + 2 * ls)^invl) - m
-  # modified z-score (+2)
-  sdm2 <- m - (m * (1 - 2 * ls)^invl)
-  mz <- fifelse(var < m, (var - m) / (0.5 * sdm2), (var - m) / (sdp2 * 0.5))
-  return(list(z, mz))
-}
-
-#' Function to reorder columns of data table
-#'
-#' @keywords internal
-#' @noRd
-set_cols_first <- function(DT, cols, intersection = TRUE) {
-  # thanks to hutils
-  if (intersection) {
-    setcolorder(DT, c(intersect(cols, names(DT)), setdiff(names(DT), cols)))
-  } else {
-    setcolorder(DT, c(cols, setdiff(names(DT), cols)))
-  }
-}
-
 #' ext_bmiz
 #'
 #' \code{ext_bmiz} Calculates the sigma (scale parameter for the half-normal
@@ -91,6 +63,7 @@ set_cols_first <- function(DT, cols, intersection = TRUE) {
 #' @export
 #' @import data.table
 #' @importFrom labelled set_variable_labels
+#' @importFrom stats approx pnorm qnorm
 #'
 #' @examples
 #' # Run on a small subset of given data
@@ -363,3 +336,34 @@ ext_bmiz <- function(data,
 
   return(dtot[])
 }
+
+#' Function for LMS formula with modified (m) z-scores
+#'
+#' @import data.table
+#' @keywords internal
+#' @noRd
+z_score <- function(var, l, m, s) {
+  ls <- l * s
+  invl <- 1 / l
+  z <- (((var / m)^l) - 1) / (ls) # z-score formula
+  sdp2 <- (m * (1 + 2 * ls)^invl) - m
+  # modified z-score (+2)
+  sdm2 <- m - (m * (1 - 2 * ls)^invl)
+  mz <- fifelse(var < m, (var - m) / (0.5 * sdm2), (var - m) / (sdp2 * 0.5))
+  return(list(z, mz))
+}
+
+#' Function to reorder columns of data table
+#'
+#' @import data.table
+#' @keywords internal
+#' @noRd
+set_cols_first <- function(DT, cols, intersection = TRUE) {
+  # thanks to hutils
+  if (intersection) {
+    setcolorder(DT, c(intersect(cols, names(DT)), setdiff(names(DT), cols)))
+  } else {
+    setcolorder(DT, c(cols, setdiff(names(DT), cols)))
+  }
+}
+
