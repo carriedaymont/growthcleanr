@@ -184,13 +184,13 @@ these next steps:
 ```R
 # Use the built-in utility function to convert the input observations to wide
 # format for BMI calculation
-cleaned_data_wide <- longwide(cleaned_data)
+cleaned_data_wide <- long_wide(cleaned_data)
 
 # Compute Z-scores and percentiles
 cleaned_data_bmi <- ext_bmiz(cleaned_data_wide)
 ```
 
-The `longwide()` function defaults to converting only records included by
+The `long_wide()` function defaults to converting only records included by
 `cleangrowth()`, with options to change this default, and `ext_bmiz()` will
 return the wide version of the cleaned data with many metrics added. Both of
 these functions are [described in detail below](#bmi).
@@ -809,12 +809,12 @@ from the output of `cleangrowth()` into input for `ext_bmiz()`, but has options 
 support independent use as well.
 
 Using the `syngrowth` example dataset, to convert the data after it has been cleaned by
-`cleangrowth()` for use with `ext_bmiz()`, use `longwide()`:
+`cleangrowth()` for use with `ext_bmiz()`, use `long_wide()`:
 
 ```R
 # Use the built-in utility function to convert the input observations to wide
 # format for BMI calculation
-cleaned_data_wide <- longwide(cleaned_data)
+cleaned_data_wide <- long_wide(cleaned_data)
 
 # Compute Z-scores and percentiles
 cleaned_data_bmi <- ext_bmiz(cleaned_data_wide)
@@ -853,7 +853,7 @@ In this example, the subject identifiers previously marked as `subjid` are now i
 `id` column; individual identifiers for observations of a single parameter are not
 present.
 
-`longwide()` can be called with name mapping parameters if your input set uses different
+`long_wide()` can be called with name mapping parameters if your input set uses different
 column names. For example, if `my_cleaned_data` specifies age in days as `aged` and
 parameter type as `type`, specify each, with quotes:
 
@@ -866,16 +866,16 @@ parameter type as `type`, specify each, with quotes:
 4: 1512 775155   0    1071 HEIGHTCM       92.50           Include
 5: 1519 775155   0    1071 WEIGHTKG       14.70           Include
 6: 1513 775155   0    1253 HEIGHTCM       96.20           Include
-> longwide(my_cleaned_data, agedays="aged", param="type")
+> long_wide(my_cleaned_data, agedays="aged", param="type")
 ```
 
-By default, `longwide()` will only transform records flagged by `cleangrowth()` for
+By default, `long_wide()` will only transform records flagged by `cleangrowth()` for
 inclusion. To include more records, specify each category assigned by `cleangrowth()`
 using the `inclusion_types` option. For example, to include carried forward values along
 with included records for the BMI calculation:
 
 ```R
-> cleaned_data_wide_cf <- longwide(cleaned_data,
+> cleaned_data_wide_cf <- long_wide(cleaned_data,
                                    inclusion_types=c("Include",
                                                      "Exclude-Carried-Forward"))
 ```
@@ -883,13 +883,13 @@ with included records for the BMI calculation:
 An additional option, `include_all`, set to `FALSE` by default, will include all
 observations for transformation.
 
-See `?longwide` for full details.
+See `?long_wide` for full details.
 
-With wide data in hand, output taken directly from `longwide()` can be passed to `ext_bmiz()`.
+With wide data in hand, output taken directly from `long_wide()` can be passed to `ext_bmiz()`.
 Alternatively, you can provide a similarly formatted data frame directly to `ext_bmiz()`.
 
 Note that `ext_bmiz()` expects the `sex` variable to be coded as a numeric value of `1`
-(male) or `2` (female). `longwide()` will handle this given the expected input values of
+(male) or `2` (female). `long_wide()` will handle this given the expected input values of
 `0` (male) or `1` (female).
 
 If you are using different input data for `ext_bmiz()`, ensure the `sex` variable in
@@ -947,9 +947,9 @@ viewed in RStudio with `View(cleaned_data_bmi)`, or on the console:
 > labels(cleaned_data_bmi)
 ```
 
-Like `longwide()`, `ext_bmiz()` also includes options for mapping alternate column
+Like `long_wide()`, `ext_bmiz()` also includes options for mapping alternate column
 names, for age, weight, height, and BMI. The default column names are the same as the
-output from `longwide()` for convenience. If you have different column names, specify
+output from `long_wide()` for convenience. If you have different column names, specify
 the column names without quotes. For example, for a dataset using "heightcm" and
 "weightkg" instead of "ht" and "wt":
 

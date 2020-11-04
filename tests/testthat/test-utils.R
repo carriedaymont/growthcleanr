@@ -1,4 +1,4 @@
-test_that("splitinput splits files correctly with default values", {
+test_that("split_input splits files correctly with default values", {
   create_df <- function(num_ids, num_obs) {
     df <- data.frame(matrix(NA, nrow = num_ids * num_obs, ncol = 5))
     colnames(df)[1] <- "subjid"
@@ -12,7 +12,7 @@ test_that("splitinput splits files correctly with default values", {
   num_obs <- 7
   df <- create_df(num_ids, num_obs)
   # where to put output
-  fcount <- splitinput(df,
+  fcount <- split_input(df,
     fname = "df",
     fdir = tempdir()
   )
@@ -49,7 +49,7 @@ test_that("splitinput splits files correctly with default values", {
   file.remove(list.files(tempdir(), full.names = T)[f_log])
 })
 
-test_that("splitinput splits files correctly with custom values", {
+test_that("split_input splits files correctly with custom values", {
   create_df <- function(num_ids, num_obs) {
     df <- data.frame(matrix(NA, nrow = num_ids * num_obs, ncol = 5))
     colnames(df)[1] <- "subjid"
@@ -66,8 +66,8 @@ test_that("splitinput splits files correctly with custom values", {
   num_ids <- 1
   num_obs <- 20
   df <- create_df(num_ids, num_obs)
-  # run splitinput with new name, less than the default observations
-  fcount <- splitinput(df,
+  # run split_input with new name, less than the default observations
+  fcount <- split_input(df,
     fname = "onesub",
     fdir = tempdir()
   )
@@ -95,7 +95,7 @@ test_that("splitinput splits files correctly with custom values", {
   remove_files(f_log)
 
   # try reducing the amount of minimum rows
-  fcount <- splitinput(df,
+  fcount <- split_input(df,
     min_nrow = 2,
     fname = "lessrows",
     fdir = tempdir()
@@ -111,7 +111,7 @@ test_that("splitinput splits files correctly with custom values", {
   df <- create_df(2, 10)
   df$X2 <- c(1:(2 * 10)) # creating fake observations
   df <- df[sample(1:nrow(df), nrow(df)), ] # reorder
-  fcount <- splitinput(df,
+  fcount <- split_input(df,
     min_nrow = 5,
     fname = "multless",
     fdir = tempdir()
@@ -146,11 +146,11 @@ test_that("splitinput splits files correctly with custom values", {
   remove_files(f_log)
 })
 
-test_that("splitinput throws errors when expected", {
-  # run splitinput with several wrong directory names
-  expect_error(splitinput(data.frame(), fdir = "hello"))
-  expect_error(splitinput(data.frame(), fdir = T))
-  expect_error(splitinput(data.frame(), fdir = data.frame()))
+test_that("split_input throws errors when expected", {
+  # run split_input with several wrong directory names
+  expect_error(split_input(data.frame(), fdir = "hello"))
+  expect_error(split_input(data.frame(), fdir = T))
+  expect_error(split_input(data.frame(), fdir = data.frame()))
 })
 
 test_that("recode_sex works as expected with defaults", {
@@ -217,7 +217,7 @@ test_that("recode_sex works as expected with custom inputs", {
   )
 })
 
-test_that("longwide works as expected with default values", {
+test_that("long_wide works as expected with default values", {
   # use synthetic data, running cleaning on a subset
   data("syngrowth")
   sub_syn <-
@@ -233,8 +233,8 @@ test_that("longwide works as expected with default values", {
     )
   )
 
-  # run longwide on changed data
-  wide_syn <- longwide(sub_syn)
+  # run long_wide on changed data
+  wide_syn <- long_wide(sub_syn)
 
   # check that it has the correct amount of columns
   expect_equal(ncol(wide_syn), 10)
@@ -262,7 +262,7 @@ test_that("longwide works as expected with default values", {
   # check that it includes specified inclusion types
   expect(
     all(sub_syn$clean_value[sub_syn$id %in% obs_ids] == "Include"),
-    "longwide() includes inclusion values that were not specified"
+    "long_wide() includes inclusion values that were not specified"
   )
 
   # check that all sexes have been correctly recoded
@@ -329,7 +329,7 @@ test_that("longwide works as expected with default values", {
   }
 })
 
-test_that("longwide works as expected with custom values", {
+test_that("long_wide works as expected with custom values", {
   # just checking the custom-ness, so use a smaller subset for speed
   # use synthetic data, running cleaning on a subset
   data("syngrowth")
@@ -346,8 +346,8 @@ test_that("longwide works as expected with custom values", {
     )
   )
 
-  # run longwide on changed data with all exclusion types included
-  wide_syn <- longwide(sub_syn,
+  # run long_wide on changed data with all exclusion types included
+  wide_syn <- long_wide(sub_syn,
     clean_value = "cv",
     include_all = T
   )
@@ -373,13 +373,13 @@ test_that("longwide works as expected with custom values", {
   )
 
 
-  # run longwide on changed data with some exclusion types included
+  # run long_wide on changed data with some exclusion types included
   inc_types <- c(
     "Include",
     "Exclude-Carried-Forward",
     "Exclude-Duplicate"
   )
-  wide_syn <- longwide(sub_syn,
+  wide_syn <- long_wide(sub_syn,
     clean_value = "cv",
     inclusion_types = inc_types
   )
@@ -409,11 +409,11 @@ test_that("longwide works as expected with custom values", {
   obs_ids <- c(wide_syn$wt_id, wide_syn$ht_id)
   expect(
     all(sub_syn$clean_value[sub_syn$id %in% obs_ids] == inc_types),
-    "longwide() includes inclusion values that were not specified"
+    "long_wide() includes inclusion values that were not specified"
   )
 })
 
-test_that("longwide throws errors correctly", {
+test_that("long_wide throws errors correctly", {
   # use synthetic data, running cleaning on a very small subset
   data("syngrowth")
   sub_syn <-
@@ -430,12 +430,12 @@ test_that("longwide throws errors correctly", {
   )
 
   # test with deleting a necessary column
-  expect_error(longwide(sub_syn[, -2]))
+  expect_error(long_wide(sub_syn[, -2]))
 
   # test include_all not being correct
-  expect_error(longwide(sub_syn, include_all = "hello"))
+  expect_error(long_wide(sub_syn, include_all = "hello"))
 
   # test duplicated ids
   sub_syn$id <- 1
-  expect_error(longwide(sub_syn))
+  expect_error(long_wide(sub_syn))
 })
