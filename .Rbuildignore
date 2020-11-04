@@ -6,3 +6,4 @@
 ^output$
 .dockerignore
 Dockerfile
+^README\.Rmd$
