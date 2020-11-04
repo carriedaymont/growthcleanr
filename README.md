@@ -3,6 +3,12 @@
 
 # growthcleanr
 
+<!-- badges: start -->
+
+[![R build
+status](https://github.com/carriedaymont/growthcleanr/workflows/R-CMD-check/badge.svg)](https://github.com/carriedaymont/growthcleanr/actions)
+<!-- badges: end -->
+
 R package for cleaning data from Electronic Health Record systems,
 focused on cleaning height and weight measurements.
 

@@ -7,3 +7,4 @@
 .dockerignore
 Dockerfile
 ^README\.Rmd$
+^\.github$
