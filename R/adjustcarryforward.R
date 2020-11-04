@@ -458,8 +458,7 @@ adjustcarryforward <- function(subjid,
             max_ht.exp_under,
             max_ht.exp_over
           )]
-          df[, maxdiff.next.ht := maxfactor * max.ht.vel * (delta.agedays.next /
-            365.25)^ht.exp + banddiff_plus]
+          df[, maxdiff.next.ht := maxfactor * max.ht.vel * (delta.agedays.next / 365.25)^ht.exp + banddiff_plus]
 
           # 15g.	Generate variable whoagegrp_ht=agedays/30.4375 rounded to the nearest integer
           df[, whoagegrp.ht := round(agedays / 30.4375)]
