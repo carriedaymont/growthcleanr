@@ -15,7 +15,7 @@ adjustcarryforward(
   orig.exclude,
   sd.recenter = NA,
   ewma.exp = -1.5,
-  ref.data.path = "",
+  ref.data.path = NULL,
   quietly = TRUE,
   minfactor = 0.5,
   maxfactor = 2,

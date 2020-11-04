@@ -96,7 +96,7 @@ df <- cbind(df,
     df$measurement
   )
 )
-df <- longwide(df) # convert to wide format for ext_bmiz
+df <- long_wide(df) # convert to wide format for ext_bmiz
 
 # Calling the function with default column names
 d_bmi <- ext_bmiz(df)

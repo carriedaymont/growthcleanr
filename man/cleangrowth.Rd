@@ -22,7 +22,7 @@ cleangrowth(
   sdrecentered.filename = "",
   include.carryforward = FALSE,
   ewma.exp = -1.5,
-  ref.data.path = "",
+  ref.data.path = NULL,
   log.path = ".",
   parallel = FALSE,
   num.batches = NA,
