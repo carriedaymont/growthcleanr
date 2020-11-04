@@ -36,7 +36,7 @@ split_input <- function(df,
                        min_nrow = 10000,
                        keepcol = "subjid") {
   # first, check if the given directory exists
-  fdir <- normalizePath(fdir)
+  fdir <- normalizePath(fdir, mustWork = TRUE)
   if (!dir.exists(fdir)) {
     stop("invalid directory")
   }
