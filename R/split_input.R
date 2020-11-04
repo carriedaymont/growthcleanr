@@ -68,7 +68,7 @@ split_input <- function(df,
 
       split_df <- data.frame() # reset split_df
       fname_counter <- fname_counter + 1
-    } else if (name == split_sample_names[nrow(split_sample_names), ]) {
+    } else if (name == split_sample_names[length(split_sample_names)]) {
       # for last part, just write
       fname_counter_str <- sprintf("%05d", fname_counter) # pad 0s
       fwrite(
