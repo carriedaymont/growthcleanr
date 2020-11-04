@@ -8,3 +8,4 @@
 Dockerfile
 ^README\.Rmd$
 ^\.github$
+^\.lintr$
