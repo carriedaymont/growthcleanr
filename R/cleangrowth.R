@@ -61,7 +61,7 @@
 #' *  'Exclude-Carried-Forward', 'Exclude-SD-Cutoff', 'Exclude-EWMA-Extreme', 'Exclude-EWMA-Extreme-Pair',
 #' *  'Exclude-Duplicate',
 #' *  'Exclude-EWMA-8', 'Exclude-EWMA-9', 'Exclude-EWMA-10', 'Exclude-EWMA-11', 'Exclude-EWMA-12',
-  #   'Exclude-EWMA-13', 'Exclude-EWMA-14',
+#'    'Exclude-EWMA-13', 'Exclude-EWMA-14',
 #' *  'Exclude-Min-Height-Change', 'Exclude-Max-Height-Change',
 #' *  'Exclude-Pair-Delta-17', 'Exclude-Pair-Delta-18', 'Exclude-Pair-Delta-19',
 #' *  'Exclude-Single-Outlier', 'Exclude-Too-Many-Errors', 'Exclude-Too-Many-Errors-Other-Parameter'
