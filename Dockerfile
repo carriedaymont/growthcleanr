@@ -12,10 +12,7 @@ RUN R -e "install.packages(c( \
     'bit64', \
     'data.table', \
     'doParallel', \
-    'dplyr', \
     'foreach', \
-    'Hmisc', \
-    'plyr' \
     ))"
 
 RUN R -e "library(devtools); \
