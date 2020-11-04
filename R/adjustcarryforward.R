@@ -103,10 +103,11 @@ adjustcarryforward <- function(subjid,
 
   setkeyv(data.all, "subjid")
 
-  subjid.unique <- unique(data.all$subjid)
+  # subjid.unique <- unique(data.all$subjid)
 
   #### ADJUSTCF EDIT ####
-  # for this purpose, want to subset dataset down to just "Exclude-Carried-Forward" and "Include" - assume all other measurements are invalid
+  # for this purpose, want to subset dataset down to just "Exclude-Carried-Forward" and "Include"
+  #     - assume all other measurements are invalid
   # want to remove any carried forward values whose non-carried forward is also excluded
   # here's what we want to filer out -- anything that's not carried forward/include
   # we're also going to include strings of carried forward
@@ -145,7 +146,7 @@ adjustcarryforward <- function(subjid,
   )
   to_rem <- unique(to_rem)
   if (length(to_rem) > 0) {
-    data.all <- data.all[-to_rem,]
+    data.all <- data.all[-to_rem, ]
   }
 
   # filter to only subjects with possible carried forwards again
@@ -196,43 +197,68 @@ adjustcarryforward <- function(subjid,
 
   # 1.  General principles
   # a.	All steps are done separately for each parameter unless otherwise noted
-  # b.	All steps are done sorted by subject, parameter, and age (in days) for nonexcluded and nonmissing values only unless otherwise noted. This is very important.
+  # b.	All steps are done sorted by subject, parameter, and age (in days) for
+  #     nonexcluded and nonmissing values only unless otherwise noted. This is very important.
   #     Sorting needs to be redone with each step to account for excluded and transformed  values.
-  # c.	The next value refers to the value with the next highest age for the same parameter and the same subject, and the previous value refers to the value with the
+  # c.	The next value refers to the value with the next highest age for the same parameter and
+  #     the same subject, and the previous value refers to the value with the
   #     next lowest age for the same parameter and the same subject.
-  # d.	You will need to set up a method for keeping track of whether a value is missing or excluded (and in what step). I use variables called exc_* that are =0
-  #     if a value is to be included, =1 if missing, and =2 or higher if it is to be excluded, with each number indicating a different step. I also set up
-  #     parameter-specific subjid_* variables that are = to subjid for included values and are blank if the value is missing or should be excluded. These subjid_*
+  # d.	You will need to set up a method for keeping track of whether a value is missing
+  #     or excluded (and in what step). I use variables called exc_* that are =0
+  #     if a value is to be included, =1 if missing, and =2 or higher if it is to be excluded,
+  #     with each number indicating a different step. I also set up
+  #     parameter-specific subjid_* variables that are = to subjid for included values
+  #     and are blank if the value is missing or should be excluded. These subjid_*
   #     variables need to be updated with each step.
-  # e.  All steps assume that data are sorted by subjid_*, parameter, and age (in days) for nonexcluded and nonmissing values only
-  #     unless otherwise noted. Sorting needs to be redone after any transformations or exclusions to account for excluded and
+  # e.  All steps assume that data are sorted by subjid_*, parameter, and age (in days)
+  #     for nonexcluded and nonmissing values only
+  #     unless otherwise noted. Sorting needs to be redone after any transformations or
+  #     exclusions to account for excluded and
   #     transformed values.
-  # f.  The next value refers to the nonexcluded nonmissing value with the next highest age for the same parameter and the same
-  #     subject, and the previous value refers to the nonexcluded nonmissing value with the next lowest age for the same parameter
+  # f.  The next value refers to the nonexcluded nonmissing value with the next highest
+  #     age for the same parameter and the same
+  #     subject, and the previous value refers to the nonexcluded nonmissing value
+  #     with the next lowest age for the same parameter
   #     and the same subject.
-  # g.  exc_* should only be replaced with a  higher value if exc_*==0 at the time of replacement, unless otherwise specified.
+  # g.  exc_* should only be replaced with a  higher value if exc_*==0 at the time of replacement,
+  #     unless otherwise specified.
 
 
-  # NOTE: in the R code below exclusion is documented as a series of factor levels, where all levels occuring before "Exclude" in the sequence are considered
-  # to be valid measurements.  We use the built in sorting of the data.table object and subsets rather than re-sorting at each step
+  # NOTE: in the R code below exclusion is documented as a series of factor levels,
+  # where all levels occuring before "Exclude" in the sequence are considered
+  # to be valid measurements.  We use the built in sorting of the data.table object and subsets
+  # rather than re-sorting at each step
   # to ensure that only valid measurements are used at the beginning of each step.
-  # Also, unlike the Stata code, the measurement parameter (weight vs. height) is recorded as a factor in the data frame, rather than as a variable name
+  # Also, unlike the Stata code, the measurement parameter (weight vs. height) is recorded
+  # as a factor in the data frame, rather than as a variable name
 
   # 2.  Data set-up
-  # a.	I always code sex as 0=Male, 1=Female, so I recoded the variable sex that way and left a variable sexorigcode the way the data was sent to me (1=Female 2=Male)
+  # a.	I always code sex as 0=Male, 1=Female, so I recoded the variable sex that way
+  #     and left a variable sexorigcode the way the data was sent to me (1=Female 2=Male)
   # b.	Remove rows that are duplicates for subjid, param, and measurement from further analysis
   #     NOTE: this step is not needed -- handled automatically by "temporary duplicate" step.
-  # c.  I generated separate variables for weight (wt) and height (ht), as well as exc_* and subjid_* variables. Set exc_*=0 if value is not missing
-  #     and exc_*=1 if value is missing. In all future steps, exc_* should only be changed if it is 0. This helps to keep track of which step excluded a value.
-  #     I also kept the measurement variable there and untouched because sometimes wt and ht got transformed to something else.
-  # d.	I made tables based on CDC growth curve parameters that include data for each day that I will send separately. The LMS parameters for each day are
-  #     cubically interpolated from the values by month available on the CDC website. Create wt and ht z-scores for each value of each parameter (Z: WtZ and HtZ).
-  # e.	There are variables in the table labelled cdc_*_csd_pos and cdc_*_csd_neg. For each age and sex, these correspond to ½ of the absolute value of the
-  #     median and the value with a z-score of +2 (csd_pos) and -2 (csd_neg). These can be created to generate a score similar to the z-score but with an
-  #     important difference. The z-scores created using the LMS method account for skewness in the distribution of the parameters (particularly weight), which
-  #     can lead to small changes in z-score with large changes in weight in subjects with very high weight, and relatively large changes in z-score for smaller
-  #     changes in weight in subjects with low weights.  The score we will create can be called an SD-score (SDorig: WtSDorig and HtSDorig that is calculated by
-  #     dividing the difference between the value and the median by the SD score (use csd_pos if the value is above the median, csd_neg if the value is below the
+  # c.  I generated separate variables for weight (wt) and height (ht), as well as exc_*
+  #     and subjid_* variables. Set exc_*=0 if value is not missing
+  #     and exc_*=1 if value is missing. In all future steps, exc_* should only be changed if it is 0.
+  #     This helps to keep track of which step excluded a value.
+  #     I also kept the measurement variable there and untouched because sometimes wt
+  #     and ht got transformed to something else.
+  # d.	I made tables based on CDC growth curve parameters that include data for each day
+  #     that I will send separately. The LMS parameters for each day are
+  #     cubically interpolated from the values by month available on the CDC website.
+  #     Create wt and ht z-scores for each value of each parameter (Z: WtZ and HtZ).
+  # e.	There are variables in the table labelled cdc_*_csd_pos and cdc_*_csd_neg.
+  #     For each age and sex, these correspond to ½ of the absolute value of the
+  #     median and the value with a z-score of +2 (csd_pos) and -2 (csd_neg).
+  #     These can be created to generate a score similar to the z-score but with an
+  #     important difference. The z-scores created using the LMS method account for skewness
+  #     in the distribution of the parameters (particularly weight), which
+  #     can lead to small changes in z-score with large changes in weight in subjects
+  #     with very high weight, and relatively large changes in z-score for smaller
+  #     changes in weight in subjects with low weights.
+  #     The score we will create can be called an SD-score (SDorig: WtSDorig and HtSDorig that is calculated by
+  #     dividing the difference between the value and the median by the SD score
+  #     (use csd_pos if the value is above the median, csd_neg if the value is below the
   #     median). These SD-scores, rather than z-scores, now form the basis for the algorithm.
 
   # calculate z scores
@@ -274,18 +300,24 @@ adjustcarryforward <- function(subjid,
   # define field names needed by helper functions
   ewma.fields <- c("ewma.all", "ewma.before", "ewma.after")
 
-  # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time, we need to account for the fact that
+  # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time,
+  #     we need to account for the fact that
   #     the mean SD-score for the population changes with age.
   # a.	Determine the median cdc*sd for each parameter by year of age (with sexes combined): median*sd.
-  # b.	The median*sd should be considered to apply to midyear-age, defined as the age in days with the same value as the integer
+  # b.	The median*sd should be considered to apply to midyear-age, defined as the age in days
+  #     with the same value as the integer
   #     portion of (365.25*year + 365.25/2).
-  # c.	Linearly interpolate median*sd for each parameter between each midyear-age, naming the interpolated values rc*sd.
+  # c.	Linearly interpolate median*sd for each parameter between each midyear-age,
+  #     naming the interpolated values rc*sd.
   # d.	For ages below the first midyear-age, let rc*sd equal the median*sd for the earliest year.
   #     For ages above the last midyear_age, let rc*sd equal the median*sd for the last year.
-  # e.	Subtract rcsd_* from SDorig to create the recentered SD-score.  This recentered SD-score, labeled tbc*sd
+  # e.	Subtract rcsd_* from SDorig to create the recentered SD-score.
+  #     This recentered SD-score, labeled tbc*sd
   #     (stands for "to be cleaned") will be used for most of the rest of the analyses.
-  # f.	In future steps I will sometimes refer to measprev and measnext which refer to the previous or next wt or ht measurement
-  #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject, parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
+  # f.	In future steps I will sometimes refer to measprev and measnext which refer
+  #     to the previous or next wt or ht measurement
+  #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject,
+  #     parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
 
   if (!quietly) cat(sprintf("[%s] Re-centering data...\n", Sys.time()))
 
@@ -318,11 +350,16 @@ adjustcarryforward <- function(subjid,
 
   ######### START FLAGGING #########
 
-  # 15.  Exclude heights based on absolute differences in measurement. The key to this step is that once we identify pairs of measurements with implausible
-  #      amounts of absolute difference between them, we have to determine which of the two values in the pair is less likely to be representative and should
-  #      be excluded. For subjects/parameters with 3 or more measurements, this is done by looking at the dewma_* of each of the 2 values in a pair using a ewma that
-  #      excludes the other value in the pair. For subjects/parameters with 2 or more measurements, this is done by looking at the absolute value of the tbc*sd.
-  #      The Tanner height velocity reference is used for measurements taken at >2yo, WHO will be used for <2yo. For a few pairs of measurements either could be used;
+  # 15.  Exclude heights based on absolute differences in measurement.
+  #      The key to this step is that once we identify pairs of measurements with implausible
+  #      amounts of absolute difference between them, we have to determine which of the two values
+  #      in the pair is less likely to be representative and should
+  #      be excluded. For subjects/parameters with 3 or more measurements,
+  #      this is done by looking at the dewma_* of each of the 2 values in a pair using a ewma that
+  #      excludes the other value in the pair. For subjects/parameters with 2 or more measurements,
+  #      this is done by looking at the absolute value of the tbc*sd.
+  #      The Tanner height velocity reference is used for measurements taken at >2yo,
+  #      WHO will be used for <2yo. For a few pairs of measurements either could be used;
   #      WHO will be used if difference between ages is < 9 months.
   if (!quietly) {
     cat(sprintf(
@@ -374,11 +411,13 @@ adjustcarryforward <- function(subjid,
             abs.tbc.sd = abs(tbc.sd)
           )]
 
-          # 15a.  As with steps 11 and 14, only one value will be excluded per round, and the step will be repeated until there are no more values to exclude
+          # 15a.  As with steps 11 and 14, only one value will be excluded per round,
+          #     and the step will be repeated until there are no more values to exclude
           # b.  For each height, calculate the d_age=agedays of next value-agedays of current value
           # NOTE: obtain next measurement, ewma.before and abs.tbc.sd as well since they are needed later
 
-          # for efficiency, bring get.next inline here (working on valid rows within a single parameter for a single subject)
+          # for efficiency, bring get.next inline here (working on valid rows within
+          #     a single parameter for a single subject)
           # structure c(field.name[-1], NA) == get.next
           df[, `:=`(
             agedays.next = c(agedays[-1], NA),
@@ -395,7 +434,8 @@ adjustcarryforward <- function(subjid,
           # only calculate for rows that relate to height (may speed up subsequent processing)
           df[, tanner.months := 6 + 12 * (round(mid.agedays / 365.25))]
 
-          # 15e.	Merge with dataset tanner_ht_vel using sex and tanner_months – this will give you min_ht_vel and max_ht_vel
+          # 15e.	Merge with dataset tanner_ht_vel using sex and tanner_months
+          #      this will give you min_ht_vel and max_ht_vel
           setkeyv(df, c("sex", "tanner.months"))
           df <- tanner.ht.vel[df]
 
@@ -453,7 +493,8 @@ adjustcarryforward <- function(subjid,
             )
           )]
 
-          # i.	Merge using sex and whoagegrp_ht using who_ht_vel_3sd and who_ht_maxvel_3sd; this will give you varaibles whoinc_i_ht and maxwhoinc_i_ht
+          # i.	Merge using sex and whoagegrp_ht using who_ht_vel_3sd and who_ht_maxvel_3sd;
+          #     this will give you varaibles whoinc_i_ht and maxwhoinc_i_ht
           #     for various intervals where i is 1,2, 3,4, 6 and corresponds to whoinc_age_ht.
           setkeyv(df, c("sex", "whoagegrp.ht"))
           df <- who.ht.vel[df]
@@ -461,7 +502,8 @@ adjustcarryforward <- function(subjid,
           # restore original sort order (ensures valid.rows variable applies to correct rows)
           setkeyv(df, "index")
 
-          # 15j.	Generate variable who_mindiff_ht=whoinc_i_ht according to the value if whoinc_age_ht; make who_mindiff_ht missing if whoinc_i_ht or whoinc_age_ht is missing.
+          # 15j.	Generate variable who_mindiff_ht=whoinc_i_ht according to the value if whoinc_age_ht;
+          #     make who_mindiff_ht missing if whoinc_i_ht or whoinc_age_ht is missing.
           df[, who.mindiff.next.ht := ifelse(
             delta.agedays.next < 20,
             NA,
@@ -484,7 +526,8 @@ adjustcarryforward <- function(subjid,
             )
           )]
 
-          # 15k.	Generate variable who_maxdiff_ht=max_whoinc_i_ht according to the value if whoinc_age_ht; make who_maxdiff_ht missing if max_whoinc_i_ht or
+          # 15k.	Generate variable who_maxdiff_ht=max_whoinc_i_ht according to the value if whoinc_age_ht;
+          #     make who_maxdiff_ht missing if max_whoinc_i_ht or
           #     whoinc_age_ht is missing.
           df[, who.maxdiff.next.ht := ifelse(
             delta.agedays.next < 20,
@@ -509,8 +552,10 @@ adjustcarryforward <- function(subjid,
           )]
 
           # 15l.	Scale allowed value based on d_agedays_ht:
-          #   1.	replace who_mindiff_`p'=who_mindiff_`p'*d_agedays_`p'/(whoinc_age_`p'*30.4375) if d_agedays_`p'<(whoinc_age_`p'*30.4375)
-          #   2.	replace who_maxdiff_`p'=who_maxdiff_`p'*d_agedays_`p'/(whoinc_age_`p'*30.4375) if d_agedays_`p'>(whoinc_age_`p'*30.4375)
+          #   1.	replace who_mindiff_`p'=who_mindiff_`p'*d_agedays_`p'/(whoinc_age_`p'*30.4375)
+          #     if d_agedays_`p'<(whoinc_age_`p'*30.4375)
+          #   2.	replace who_maxdiff_`p'=who_maxdiff_`p'*d_agedays_`p'/(whoinc_age_`p'*30.4375)
+          #     if d_agedays_`p'>(whoinc_age_`p'*30.4375)
           df[
             delta.agedays.next < whoinc.age.ht * 30.4375,
             `:=`(
@@ -519,11 +564,16 @@ adjustcarryforward <- function(subjid,
             )
           ]
 
-          # 15m.	Replace mindiff_ht/maxdiff_ht with adjusted WHO value if Tanner value is missing or if both are present and age difference is < 9 months:
-          #   1.	replace mindiff_`p'=0.5*who_mindiff_`p'-3 if who_mindiff_`p' is not missing & d_agedays_`p'<(9*30.4375)
-          #   2.	replace maxdiff_`p'=2*who_maxdiff_`p'+3 if who_maxdiff_`p' is not missing & d_agedays_`p'<(9*30.4375)
-          #   3.	replace mindiff_`p'=0.5*who_mindiff_`p'-3 if mindiff_`p' is missing & who_mindiff_`p' is not missing
-          #   4.	replace maxdiff_`p'=2*who_maxdiff_`p'+3 if maxdiff_`p is missing & who_maxdiff_`p' is not missing
+          # 15m.	Replace mindiff_ht/maxdiff_ht with adjusted WHO value
+          #      if Tanner value is missing or if both are present and age difference is < 9 months:
+          #   1.	replace mindiff_`p'=0.5*who_mindiff_`p'-3
+          #     if who_mindiff_`p' is not missing & d_agedays_`p'<(9*30.4375)
+          #   2.	replace maxdiff_`p'=2*who_maxdiff_`p'+3
+          #     if who_maxdiff_`p' is not missing & d_agedays_`p'<(9*30.4375)
+          #   3.	replace mindiff_`p'=0.5*who_mindiff_`p'-3
+          #     if mindiff_`p' is missing & who_mindiff_`p' is not missing
+          #   4.	replace maxdiff_`p'=2*who_maxdiff_`p'+3
+          #     if maxdiff_`p is missing & who_maxdiff_`p' is not missing
 
           # refactored logic slightly for efficiency
           df[
@@ -542,7 +592,8 @@ adjustcarryforward <- function(subjid,
           # 15n.	Determine the min/maxdiffs for the previous age: mindiff_prev_ht, maxdiff_prev_ht
           # NOTE: obtain previous height, ewma.after value and abs.tbc.sd as well since they are needed in next steps
 
-          # for efficiency, bring get.prev inline here (working on valid rows within a single parameter for a single subject)
+          # for efficiency, bring get.prev inline here (working on valid rows
+          #  within a single parameter for a single subject)
           # structure c(NA, tbc.sd[-.N]) == get.prev
           df[, `:=`(
             v.prev = c(NA, v[-.N]),
@@ -552,14 +603,16 @@ adjustcarryforward <- function(subjid,
             maxdiff.prev.ht = c(NA, maxdiff.next.ht[-.N])
           )]
 
-          # 15o.	Determine d_prev_ht=ht-htprev (set to missing for the first value for a subject) and d_next_ht=htnext-ht (set to missing for the last value for a subject)
+          # 15o.	Determine d_prev_ht=ht-htprev (set to missing for the first value for a subject)
+          #     and d_next_ht=htnext-ht (set to missing for the last value for a subject)
           df[, `:=`(
             delta.prev.ht = v - v.prev,
             delta.next.ht = v.next - v
           )]
 
           # 15p.  Perform a EWMA calculation with the following modifications:
-          #  i.	  Generate a variable pair=1 if (d_prev_ht<mindiff_prev_ht OR d_ht<mindiff_ht OR d_prev_ht>maxdiff_prev_ht  OR d_ht>maxdiff_ht) AND exc_ht==0
+          #  i.	  Generate a variable pair=1 if (d_prev_ht<mindiff_prev_ht OR d_ht<mindiff_ht
+          #     OR d_prev_ht>maxdiff_prev_ht  OR d_ht>maxdiff_ht) AND exc_ht==0
           df[, pair := na_as_false(
             delta.prev.ht < mindiff.prev.ht |
               delta.next.ht < mindiff.next.ht |
@@ -567,7 +620,8 @@ adjustcarryforward <- function(subjid,
               delta.next.ht > maxdiff.next.ht
           )]
 
-          # for efficiency, bring get.prev and get.next inline here (working on valid rows within a single parameter for a single subject)
+          # for efficiency, bring get.prev and get.next inline here (working on valid rows
+          #     within a single parameter for a single subject)
           # structure c(NA, field.name[-.N]) == get.prev
           # structure c(field.name[-1], NA) == get.next
           df[, `:=`(
@@ -575,25 +629,31 @@ adjustcarryforward <- function(subjid,
             pair.next = c(pair[-1], FALSE)
           )]
 
-          #  ii.	Generate bef_g_aftm1=1 if |Δewma_htbef| for the value of interest is greater than |Δewma_htaft| for the previous value
-          #       AND the value of interest is not the first height value for that subject AND pair==1 AND pair for the previous value==1
+          #  ii.	Generate bef_g_aftm1=1 if |Δewma_htbef| for the value of interest is greater
+          #       than |Δewma_htaft| for the previous value
+          #       AND the value of interest is not the first height value for that subject
+          #       AND pair==1 AND pair for the previous value==1
 
-          #  iii.	Generate aft_g_befp1=1 if |Δewma_htaft| for the value of interest is greater than |Δewma_htbef| for the next value
-          #       AND the value of interest is not the last height value for that subject AND pair==1 AND pair for the next value==1
+          #  iii.	Generate aft_g_befp1=1 if |Δewma_htaft| for the value of interest is greater
+          #       than |Δewma_htbef| for the next value
+          #       AND the value of interest is not the last height value for that subject
+          #       AND pair==1 AND pair for the next value==1
           # NOTE: pair.next will be NA last height, which will result in a FALSE value below
           df[, `:=`(
             bef.g.aftm1 = na_as_false(abs(dewma.before) > abs(dewma.after.prev) & pair & pair.prev),
             aft.g.befp1 = na_as_false(abs(dewma.after) > abs(dewma.before.next) & pair & pair.next)
           )]
 
-          #  iv.	Determine tbchtsd for each value as well as the one before prev_tbchtsd and after next_tbchtsd it
+          #  iv.	Determine tbchtsd for each value as well as the one before prev_tbchtsd
+          #     and after next_tbchtsd it
           # NOTE: done previously for efficiency
 
           # 15p.v.  Determine the total number of ht values for each subject (tot_ht)
           # NOTE: all rows are valid due to constraint in subj.df[...] statement
           num.valid <- .N
 
-          # 15q.	Identify a value for possible exclusion if one of the following sets of criteria are met. For values identified by each set of criteria determine
+          # 15q.	Identify a value for possible exclusion if one of the following sets
+          #       of criteria are met. For values identified by each set of criteria determine
           #       the value of temp_diff using the formula given
           #   i.	d_prev_ht<mindiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
           #     a.  (temp_diff=|dewma_ht_bef|)
@@ -658,8 +718,10 @@ adjustcarryforward <- function(subjid,
           ]
 
           # r.  If there is only one potential exclusion identified in step 15j for a subject and parameter,
-          #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi  and exc_ht=16 if it met criteria iii, iv, vii, or viii
-          # NOTE: these exclusions are assigned in the code above as 'Exclude-Min-Height-Change' and 'Exclude-Max-Height-Change'
+          #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi and exc_ht=16
+          #     if it met criteria iii, iv, vii, or viii
+          # NOTE: these exclusions are assigned in the code above as 'Exclude-Min-Height-Change'
+          #     and 'Exclude-Max-Height-Change'
 
           ##### ADJUSTCF EDIT #####
           # if you're outside of the bands OR if you are not a carry forward then you have no change
@@ -684,8 +746,10 @@ adjustcarryforward <- function(subjid,
             df[rep, exclude := temp.exclude]
           }
 
-          # s.  If there is more than one potential exclusion identified in step 14h for a subject and parameter, determine which value has the largest temp_diff and
-          #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi and exc_ht=16 for that value if it met criteria iii,  iv, vii, or viii.
+          # s.  If there is more than one potential exclusion identified in step 14h
+          #     for a subject and parameter, determine which value has the largest temp_diff and
+          #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi
+          #     and exc_ht=16 for that value if it met criteria iii,  iv, vii, or viii.
 
           if (num.exclude > 1) {
             # first order by decreasing temp.diff (where rep=TRUE)
@@ -697,7 +761,8 @@ adjustcarryforward <- function(subjid,
         })(copy(.SD))]
 
 
-        # t.  If there was at least one subject who had a potential exclusion identified in step 15q, repeat steps 15b-15q. If there were no subjects with potential
+        # t.  If there was at least one subject who had a potential exclusion identified in step 15q,
+        #     repeat steps 15b-15q. If there were no subjects with potential
         #     exclusions identified in step 15q, move on to step 16.
         newly.excluded <- sum(subj.df$exclude %in% c("Include"))
         # if (newly.excluded > num.height.excluded) {

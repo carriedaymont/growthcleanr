@@ -76,7 +76,7 @@ long_wide <- function(long_df,
     x = obs_df,
     old = cols,
     new = c(
-      "id", "subjid", "sex","agedays",
+      "id", "subjid", "sex", "agedays",
       "param", "measurement", "clean_value"
     )
   )
@@ -153,5 +153,3 @@ long_wide <- function(long_df,
 
   return(out)
 }
-
-

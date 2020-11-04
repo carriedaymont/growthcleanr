@@ -1,7 +1,8 @@
 #' Function to identify switches (step 6):
 #'  7.  Identify switches (weight and height each recorded as the other parameter)
 #' Utility function to find the value associated with the opposite parameter
-#' For example, if param.1='WEIGHTKG' and param.2='HEIGHTCM', then a vector of height values observed on the same day as the weight values is returned and vice versa.
+#' For example, if param.1='WEIGHTKG' and param.2='HEIGHTCM',
+#'     then a vector of height values observed on the same day as the weight values is returned and vice versa.
 #'
 #' @import data.table
 #'

@@ -5,7 +5,8 @@
 #' @param agedays Vector of age in days for each z score (potentially transformed to adjust weighting).
 #' @param z Input vector of numeric z-score data.
 #' @param ewma.exp Exponent to use for weighting.
-#' @param ewma.adjacent Specify whether EWMA values excluding adjacent measurements should be calculated.  Defaults to TRUE.
+#' @param ewma.adjacent Specify whether EWMA values excluding adjacent measurements should be calculated.
+#'     Defaults to TRUE.
 #'
 #' @return Data frame with 3 variables:
 #' * The first variable (ewma.all) contains the EWMA at observation time
@@ -36,25 +37,35 @@
 #' # Calculate exponentially weighted moving average
 #' e_df <- ewma(df_stats$agedays, sd, ewma.exp = -1.5)
 ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE) {
-  # 6.  EWMA calculation description: Most of the next steps will involve calculating the exponentially weighted moving average for each subject and parameter. I will
-  #     describe how to calculate EWMASDs, and will describe how it needs to be varied in subsequent steps.
-  # a.	The overall goal of the EWMASD calculation is to identify the difference between the SD-score and what we might predict that DS-score should be, in order to
+  # 6.  EWMA calculation description: Most of the next steps will involve calculating
+  #     the exponentially weighted moving average for each subject and parameter.
+  #     I will describe how to calculate EWMASDs, and will describe
+  #     how it needs to be varied in subsequent steps.
+  # a.	The overall goal of the EWMASD calculation is to identify the difference
+  #     between the SD-score and what we might predict that DS-score should be, in order to
   #     determine whether it should be excluded.
-  # b.	Only nonmissing SD-scores for a parameter that are not designated for exclusion are included in the following calculations.
-  # c.	For each SD-score SDi and associated agedaysi calculate the following for every other z-score (SDj…SDn) and associated agedays (agedaysj…agedaysn)  for the
+  # b.	Only nonmissing SD-scores for a parameter that are not designated for exclusion
+  #     are included in the following calculations.
+  # c.	For each SD-score SDi and associated agedaysi calculate the following for every
+  #     other z-score (SDj…SDn) and associated agedays (agedaysj…agedaysn)  for the
   #     same subject and parameter
   #   i.	ΔAgej=agedaysj-agedaysi
   #   ii.	EWMAZ=SDi=[Σj→n(SDj*((5+ΔAgej)^-1.5))]/[ Σj→n((5+ΔAgej)^-1.5)]
-  #   iii.	For most EWMASD calculations, there are 3 EWMASDs that need to be calculated. I will note if not all of these need to be done for a given step.
+  #   iii.	For most EWMASD calculations, there are 3 EWMASDs that need to be calculated.
+  #     I will note if not all of these need to be done for a given step.
   #     1.	EWMASDall calculated as above
-  #     2.	EWMAZbef calculated excluding the SD-score just before the SD-score of interest (sorted by agedays). For the first observation for a parameter for a
+  #     2.	EWMAZbef calculated excluding the SD-score just before
+  #     the SD-score of interest (sorted by agedays). For the first observation for a parameter for a
   #         subject, this should be identical to EWMASDall rather than missing.
-  #     3.	EWMAZaft calculated excluding the z-score just after the SD-score of interest (sorted by agedays). For the lastobservation for a parameter for a subject,
+  #     3.	EWMAZaft calculated excluding the z-score just after
+  #     the SD-score of interest (sorted by agedays). For the lastobservation for a parameter for a subject,
   #         this should be identical to EWMASDall rather than missing.
   #   iv.	For each of the three EWMASDs, calculate the dewma_*=SD-EWMASD
-  # d.	EWMASDs and ΔEWMASDs will change if a value is excluded or manipulated using one of the methods below, therefore EWMASDs and ΔEWMASDs be recalculated for each
+  # d.	EWMASDs and ΔEWMASDs will change if a value is excluded or manipulated using one of
+  #     the methods below, therefore EWMASDs and ΔEWMASDs be recalculated for each
   #     step where they are needed.
-  # e.	For these calculations, use variables that allow for precise storage of numbers (in Stata this is called 'double') because otherwise rounding errors can cause
+  # e.	For these calculations, use variables that allow for precise storage of numbers
+  #     (in Stata this is called 'double') because otherwise rounding errors can cause
   #     problems in a few circumstances
 
   n <- length(agedays)

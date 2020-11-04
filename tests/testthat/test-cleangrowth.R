@@ -27,12 +27,9 @@ test_that("growthcleanr works as expected on synthetic data", {
 
   # Check counts of exclusions by category
   catcount <- function(df, category) {
-    return(as.numeric(df %>% filter(clean_value == category) %>% select(n)))
+    return(as.numeric(df[clean_value == category, N]))
   }
-  exclusions <-
-    cleaned_data %>%
-    group_by(clean_value) %>%
-    tally(sort = TRUE)
+  exclusions <- cleaned_data[, .N, by = "clean_value"][order(-N)]
   expect_equal(1505, catcount(exclusions, "Include"))
   expect_equal(275, catcount(exclusions, "Exclude-Carried-Forward"))
   expect_equal(1, catcount(exclusions, "Exclude-EWMA-11"))

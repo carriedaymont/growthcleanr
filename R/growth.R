@@ -60,7 +60,8 @@
 #' * 'Include', 'Unit-Error-High', 'Unit-Error-Low', 'Swapped-Measurements', 'Missing',
 #' *  'Exclude-Carried-Forward', 'Exclude-SD-Cutoff', 'Exclude-EWMA-Extreme', 'Exclude-EWMA-Extreme-Pair',
 #' *  'Exclude-Duplicate',
-#' *  'Exclude-EWMA-8', 'Exclude-EWMA-9', 'Exclude-EWMA-10', 'Exclude-EWMA-11', 'Exclude-EWMA-12', 'Exclude-EWMA-13', 'Exclude-EWMA-14',
+#' *  'Exclude-EWMA-8', 'Exclude-EWMA-9', 'Exclude-EWMA-10', 'Exclude-EWMA-11', 'Exclude-EWMA-12',
+  #   'Exclude-EWMA-13', 'Exclude-EWMA-14',
 #' *  'Exclude-Min-Height-Change', 'Exclude-Max-Height-Change',
 #' *  'Exclude-Pair-Delta-17', 'Exclude-Pair-Delta-18', 'Exclude-Pair-Delta-19',
 #' *  'Exclude-Single-Outlier', 'Exclude-Too-Many-Errors', 'Exclude-Too-Many-Errors-Other-Parameter'
@@ -195,43 +196,69 @@ cleangrowth <- function(subjid,
 
   # 1.  General principles
   # a.	All steps are done separately for each parameter unless otherwise noted
-  # b.	All steps are done sorted by subject, parameter, and age (in days) for nonexcluded and nonmissing values only unless otherwise noted. This is very important.
-  #     Sorting needs to be redone with each step to account for excluded and transformed  values.
-  # c.	The next value refers to the value with the next highest age for the same parameter and the same subject, and the previous value refers to the value with the
+  # b.	All steps are done sorted by subject, parameter, and age (in days) for nonexcluded
+  #     and nonmissing values only unless otherwise noted. This is very important.
+  #     Sorting needs to be redone with each step to account for excluded and transformed values.
+  # c.	The next value refers to the value with the next highest age for the same parameter
+  #     and the same subject, and the previous value refers to the value with the
   #     next lowest age for the same parameter and the same subject.
-  # d.	You will need to set up a method for keeping track of whether a value is missing or excluded (and in what step). I use variables called exc_* that are =0
-  #     if a value is to be included, =1 if missing, and =2 or higher if it is to be excluded, with each number indicating a different step. I also set up
-  #     parameter-specific subjid_* variables that are = to subjid for included values and are blank if the value is missing or should be excluded. These subjid_*
+  # d.	You will need to set up a method for keeping track of whether a value is missing or
+  #     excluded (and in what step). I use variables called exc_* that are =0
+  #     if a value is to be included, =1 if missing, and =2 or higher if it is to be excluded,
+  #     with each number indicating a different step. I also set up
+  #     parameter-specific subjid_* variables that are = to subjid for included values and are
+  #     blank if the value is missing or should be excluded. These subjid_*
   #     variables need to be updated with each step.
-  # e.  All steps assume that data are sorted by subjid_*, parameter, and age (in days) for nonexcluded and nonmissing values only
-  #     unless otherwise noted. Sorting needs to be redone after any transformations or exclusions to account for excluded and
+  # e.  All steps assume that data are sorted by subjid_*, parameter, and age (in days)
+  #     for nonexcluded and nonmissing values only
+  #     unless otherwise noted. Sorting needs to be redone after any transformations or
+  #     exclusions to account for excluded and
   #     transformed values.
-  # f.  The next value refers to the nonexcluded nonmissing value with the next highest age for the same parameter and the same
-  #     subject, and the previous value refers to the nonexcluded nonmissing value with the next lowest age for the same parameter
+  # f.  The next value refers to the nonexcluded nonmissing value with the next highest
+  #     age for the same parameter and the same
+  #     subject, and the previous value refers to the nonexcluded nonmissing value with
+  #     the next lowest age for the same parameter
   #     and the same subject.
-  # g.  exc_* should only be replaced with a  higher value if exc_*==0 at the time of replacement, unless otherwise specified.
+  # g.  exc_* should only be replaced with a  higher value if exc_*==0 at the time of
+  #     replacement, unless otherwise specified.
 
 
-  # NOTE: in the R code below exclusion is documented as a series of factor levels, where all levels occuring before 'Exclude' in the sequence are considered
-  # to be valid measurements.  We use the built in sorting of the data.table object and subsets rather than re-sorting at each step
+  # NOTE: in the R code below exclusion is documented as a series of factor levels,
+  # where all levels occuring before 'Exclude' in the sequence are considered
+  # to be valid measurements.  We use the built in sorting of the data.table object
+  # and subsets rather than re-sorting at each step
   # to ensure that only valid measurements are used at the beginning of each step.
-  # Also, unlike the Stata code, the measurement parameter (weight vs. height) is recorded as a factor in the data frame, rather than as a variable name
+  # Also, unlike the Stata code, the measurement parameter (weight vs. height)
+  # is recorded as a factor in the data frame, rather than as a variable name
 
   # 2.  Data set-up
-  # a.	I always code sex as 0=Male, 1=Female, so I recoded the variable sex that way and left a variable sexorigcode the way the data was sent to me (1=Female 2=Male)
+  # a.	I always code sex as 0=Male, 1=Female, so I recoded the variable sex that way
+  #     and left a variable sexorigcode the way the data was sent to me (1=Female 2=Male)
   # b.	Remove rows that are duplicates for subjid, param, and measurement from further analysis
   #     NOTE: this step is not needed -- handled automatically by "temporary duplicate" step.
-  # c.  I generated separate variables for weight (wt) and height (ht), as well as exc_* and subjid_* variables. Set exc_*=0 if value is not missing
-  #     and exc_*=1 if value is missing. In all future steps, exc_* should only be changed if it is 0. This helps to keep track of which step excluded a value.
-  #     I also kept the measurement variable there and untouched because sometimes wt and ht got transformed to something else.
-  # d.	I made tables based on CDC growth curve parameters that include data for each day that I will send separately. The LMS parameters for each day are
-  #     cubically interpolated from the values by month available on the CDC website. Create wt and ht z-scores for each value of each parameter (Z: WtZ and HtZ).
-  # e.	There are variables in the table labelled cdc_*_csd_pos and cdc_*_csd_neg. For each age and sex, these correspond to ½ of the absolute value of the
-  #     median and the value with a z-score of +2 (csd_pos) and -2 (csd_neg). These can be created to generate a score similar to the z-score but with an
-  #     important difference. The z-scores created using the LMS method account for skewness in the distribution of the parameters (particularly weight), which
-  #     can lead to small changes in z-score with large changes in weight in subjects with very high weight, and relatively large changes in z-score for smaller
-  #     changes in weight in subjects with low weights.  The score we will create can be called an SD-score (SDorig: WtSDorig and HtSDorig that is calculated by
-  #     dividing the difference between the value and the median by the SD score (use csd_pos if the value is above the median, csd_neg if the value is below the
+  # c.  I generated separate variables for weight (wt) and height (ht), as well as exc_*
+  #     and subjid_* variables. Set exc_*=0 if value is not missing
+  #     and exc_*=1 if value is missing. In all future steps, exc_* should only be changed
+  #     if it is 0. This helps to keep track of which step excluded a value.
+  #     I also kept the measurement variable there and untouched because sometimes wt
+  #     and ht got transformed to something else.
+  # d.	I made tables based on CDC growth curve parameters that include data for each day
+  #     that I will send separately. The LMS parameters for each day are
+  #     cubically interpolated from the values by month available on the CDC website.
+  #     Create wt and ht z-scores for each value of each parameter (Z: WtZ and HtZ).
+  # e.	There are variables in the table labelled cdc_*_csd_pos and cdc_*_csd_neg.
+  #     For each age and sex, these correspond to ½ of the absolute value of the
+  #     median and the value with a z-score of +2 (csd_pos) and -2 (csd_neg).
+  #     These can be created to generate a score similar to the z-score but with an
+  #     important difference. The z-scores created using the LMS method account for skewness
+  #     in the distribution of the parameters (particularly weight), which
+  #     can lead to small changes in z-score with large changes in weight in subjects
+  #     with very high weight, and relatively large changes in z-score for smaller
+  #     changes in weight in subjects with low weights.
+  #     The score we will create can be called an SD-score (SDorig: WtSDorig and HtSDorig
+  #     that is calculated by
+  #     dividing the difference between the value and the median by the SD score
+  #     (use csd_pos if the value is above the median, csd_neg if the value is below the
   #     median). These SD-scores, rather than z-scores, now form the basis for the algorithm.
 
   # calculate z scores
@@ -302,18 +329,25 @@ cleangrowth <- function(subjid,
   # define field names needed by helper functions
   ewma.fields <- c("ewma.all", "ewma.before", "ewma.after")
 
-  # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time, we need to account for the fact that
+  # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time,
+  #     we need to account for the fact that
   #     the mean SD-score for the population changes with age.
   # a.	Determine the median cdc*sd for each parameter by year of age (with sexes combined): median*sd.
-  # b.	The median*sd should be considered to apply to midyear-age, defined as the age in days with the same value as the integer
+  # b.	The median*sd should be considered to apply to midyear-age,
+  #     defined as the age in days with the same value as the integer
   #     portion of (365.25*year + 365.25/2).
-  # c.	Linearly interpolate median*sd for each parameter between each midyear-age, naming the interpolated values rc*sd.
+  # c.	Linearly interpolate median*sd for each parameter between each midyear-age,
+  #     naming the interpolated values rc*sd.
   # d.	For ages below the first midyear-age, let rc*sd equal the median*sd for the earliest year.
   #     For ages above the last midyear_age, let rc*sd equal the median*sd for the last year.
-  # e.	Subtract rcsd_* from SDorig to create the recentered SD-score.  This recentered SD-score, labeled tbc*sd
+  # e.	Subtract rcsd_* from SDorig to create the recentered SD-score.
+  #     This recentered SD-score, labeled tbc*sd
   #     (stands for "to be cleaned") will be used for most of the rest of the analyses.
-  # f.	In future steps I will sometimes refer to measprev and measnext which refer to the previous or next wt or ht measurement
-  #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject, parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
+  # f.	In future steps I will sometimes refer to measprev
+  #     and measnext which refer to the previous or next wt or ht measurement
+  #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject,
+  #     parameter, and agedays.
+  #     SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
 
   if (!quietly) cat(sprintf("[%s] Re-centering data...\n", Sys.time()))
 

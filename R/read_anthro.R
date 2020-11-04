@@ -97,4 +97,3 @@ read_anthro <- function(path = NULL, cdc.only = FALSE) {
     }
   })
 }
-

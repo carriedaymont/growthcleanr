@@ -34,18 +34,24 @@
 #'   sd.orig
 #' )
 sd_median <- function(param, sex, agedays, sd.orig) {
-  # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time, we need to account for the fact that
+  # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time,
+  #     we need to account for the fact that
   #     the mean SD-score for the population changes with age.
   # a.  Determine the median cdc*sd for each parameter by year of age (with sexes combined): median*sd.
-  # b.	The median*sd should be considered to apply to midyear-age, defined as the age in days with the same value as the integer
+  # b.	The median*sd should be considered to apply to midyear-age,
+  #     defined as the age in days with the same value as the integer
   #     portion of (365.25*year + 365.25/2).
-  # c.	Linearly interpolate median*sd for each parameter between each midyear-age, naming the interpolated values rc*sd.
+  # c.	Linearly interpolate median*sd for each parameter between each midyear-age,
+  #     naming the interpolated values rc*sd.
   # d.	For ages below the first midyear-age, let rc*sd equal the median*sd for the earliest year.
   #     For ages above the last midyear_age, let rc*sd equal the median*sd for the last year.
-  # e.	Subtract rcsd_* from SDorig to create the recentered SD-score.  This recentered SD-score, labeled tbc*sd
+  # e.	Subtract rcsd_* from SDorig to create the recentered SD-score.
+  #     This recentered SD-score, labeled tbc*sd
   #     (stands for "to be cleaned") will be used for most of the rest of the analyses.
-  # f.	In future steps I will sometimes refer to measprev and measnext which refer to the previous or next wt or ht measurement
-  #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject, parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
+  # f.	In future steps I will sometimes refer to measprev and measnext which
+  #     refer to the previous or next wt or ht measurement
+  #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject,
+  #     parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
   dt <- data.table(param, sex, agedays, ageyears = floor(agedays / 365.25), sd.orig)
   setkeyv(dt, c("param", "sex", "agedays"))
   # determine ages (in days) we need to cover from min to max age in years
