@@ -78,7 +78,7 @@
 #'     df$measurement
 #'   )
 #' )
-#' df <- longwide(df) # convert to wide format for ext_bmiz
+#' df <- long_wide(df) # convert to wide format for ext_bmiz
 #'
 #' # Calling the function with default column names
 #' d_bmi <- ext_bmiz(df)
@@ -306,7 +306,13 @@ ext_bmiz <- function(data,
   setkeyv(dt, "seq_")
   setkeyv(dorig, "seq_")
   dtot <- dt[dorig]
-  set_cols_first(dtot, names(dorig))
+  setcolorder(
+    x = dtot,
+    neworder = c(
+      intersect(names(dorig), names(dtot)),
+      setdiff(names(dtot), names(dorig))
+    )
+  )
   dtot[, Cs(seq_) := NULL]
 
   # Add labels for convenience
@@ -340,6 +346,7 @@ ext_bmiz <- function(data,
 #' Function for LMS formula with modified (m) z-scores
 #'
 #' @import data.table
+#'
 #' @keywords internal
 #' @noRd
 z_score <- function(var, l, m, s) {
@@ -352,18 +359,3 @@ z_score <- function(var, l, m, s) {
   mz <- fifelse(var < m, (var - m) / (0.5 * sdm2), (var - m) / (sdp2 * 0.5))
   return(list(z, mz))
 }
-
-#' Function to reorder columns of data table
-#'
-#' @import data.table
-#' @keywords internal
-#' @noRd
-set_cols_first <- function(DT, cols, intersection = TRUE) {
-  # thanks to hutils
-  if (intersection) {
-    setcolorder(DT, c(intersect(cols, names(DT)), setdiff(names(DT), cols)))
-  } else {
-    setcolorder(DT, c(cols, setdiff(names(DT), cols)))
-  }
-}
-
