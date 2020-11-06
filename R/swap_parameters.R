@@ -12,6 +12,11 @@ swap_parameters <- function(param.1 = "WEIGHTKG",
                             param.2 = "HEIGHTCM",
                             field.name = "tbc.sd",
                             df) {
+  # ==== Dealing with "undefined global functions or variables" ==== #
+  ## Only for variable which couldn't be quoted everywhere
+  swap <- subjid <- param <- agedays <- NULL
+  # ==== Dealing with "undefined global functions or variables" ==== #
+
   valid.rows <- valid(df)
   # copy swap field to a new value for convenience in the code below
   df$swap <- df[, field.name, with = FALSE]
@@ -28,8 +33,8 @@ swap_parameters <- function(param.1 = "WEIGHTKG",
   )]
   setkeyv(valid.other, c("subjid.other", "param.other", "agedays.other"))
   # clear swap field (should retain original type)
-  df[, swap := NA]
+  df[, "swap" := NA]
   # use indexed table for speed -- assign all values in one statement
-  df[valid.rows, swap := valid.other[list(subjid, param, agedays), swap]]
+  df[valid.rows, "swap" := valid.other[list(subjid, param, agedays), swap]]
   return(df$swap)
 }

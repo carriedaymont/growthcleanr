@@ -18,6 +18,11 @@
 #'   cdc.only = TRUE
 #' )
 read_anthro <- function(path = NULL, cdc.only = FALSE) {
+  # ==== Dealing with "undefined global functions or variables" ==== #
+  ## Only for variable which couldn't be quoted everywhere
+  m <- csdneg <- csdpos <- m <- s <- l <- NULL
+  # ==== Dealing with "undefined global functions or variables" ==== #
+
   # set correct path based on input reference table path (if any)
   anthro_list <- lapply(
     X = c("weianthro.txt", "lenanthro.txt", "bmianthro.txt"),

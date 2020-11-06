@@ -34,6 +34,11 @@
 #'   sd.orig
 #' )
 sd_median <- function(param, sex, agedays, sd.orig) {
+  # ==== Dealing with "undefined global functions or variables" ==== #
+  ## Only for variable which couldn't be quoted everywhere
+  ageyears <- NULL
+  # ==== Dealing with "undefined global functions or variables" ==== #
+
   # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time,
   #     we need to account for the fact that
   #     the mean SD-score for the population changes with age.
@@ -57,11 +62,11 @@ sd_median <- function(param, sex, agedays, sd.orig) {
   # determine ages (in days) we need to cover from min to max age in years
   agedays.to.cover <- dt[, (floor(min(ageyears) * 365.25):floor(max(ageyears + 1) * 365.25))]
   # group all measurements above age 19 together (copied from CD stata code e-mailed 4/3/15)
-  dt[ageyears > 19, ageyears := 19]
+  dt[ageyears > 19, "ageyears" := 19]
   dt.median <- dt[
     !is.na(sd.orig),
     list(sex = c(0, 1), sd.median = rep(stats::median(sd.orig), 2)),
-    by = .(param, ageyears)
+    by = c("param", "ageyears")
   ]
   dt.median <- dt.median[,
     list(
@@ -73,7 +78,7 @@ sd_median <- function(param, sex, agedays, sd.orig) {
         rule = 2
       )$y
     ),
-    by = .(param, sex)
+    by = c("param", "sex")
   ]
   setkeyv(dt.median, c("param", "sex", "agedays"))
   return(dt.median)

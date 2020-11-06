@@ -51,6 +51,11 @@ long_wide <- function(long_df,
                   include_all = FALSE,
                   inclusion_types = c("Include"),
                   na.rm = TRUE) {
+  # ==== Dealing with "undefined global functions or variables" ==== #
+  ## Only for variable which couldn't be quoted everywhere
+  agey <- ht <- wt <- bmi <- NULL
+  # ==== Dealing with "undefined global functions or variables" ==== #
+
   if (!is.logical(include_all)) {
    stop(paste0(
       "include_all is not a logical of length 1. It is a ",
@@ -96,7 +101,7 @@ long_wide <- function(long_df,
   obs_df[, "agey" := round(agedays / 365.25, 4)]
 
   # calculate age in months
-  obs_df[, "agem" := round((agey * 12), 4)]
+  obs_df[, "agem" := round(agey * 12, 4)]
 
   # recode sex to expected ext_bmiz() format
   obs_df <- recode_sex(
