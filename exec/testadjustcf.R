@@ -190,9 +190,6 @@ if (args$maxrecs > 0) {
   dm_filt <- dm
 }
 
-# # Create outdir if necessary; ignore warnings if it already exists
-# dir.create(file.path(outdir), showWarnings = FALSE)
-
 dm_filt$n <- as.numeric(rownames(dm_filt))
 
 subjid <- with(dm_filt, subjid)
