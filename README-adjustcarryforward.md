@@ -31,17 +31,12 @@ file:
 Note that the column names should be as described for `cleaned_data` the Example 
 under Quickstart.
 
-The sweep script is executed from the command line on the cleaned data file for 
-Windows as follows:
+First navigate to the growthcleanr package directory in the command line. Then execute
+the sweep script is executed from the command line on the cleaned data file for as follows (with the assumption that cleaned.csv is in your current directory; otherwise, make 
+sure to specify the path relative to your current directory):
 
 ```bash
 % Rscript exec/testadjustcf.R cleaned.csv
-```
-
-For Macs/Linux, the script is executed with the following command:
-
-```bash
-% Rscript testadjustcf.R cleaned.csv
 ```
 
 By default, the script will generate a range of values with nine steps for the
