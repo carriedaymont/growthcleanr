@@ -10,8 +10,8 @@ ext_bmiz(
   wt = "wt",
   ht = "ht",
   bmi = "bmi",
-  adjust.integer.age = T,
-  ref.data.path = ""
+  adjust.integer.age = TRUE,
+  ref.data.path = NULL
 )
 }
 \arguments{
@@ -84,13 +84,29 @@ in this package for convenience. If you are developing this package, use
 directory if necessary.
 }
 \examples{
+# Run on a small subset of given data
+df <- as.data.frame(syngrowth)
+df <- df[df$subjid \%in\% unique(df[, "subjid"])[1:5], ]
+df <- cbind(df,
+  "clean_value" = cleangrowth(
+    df$subjid,
+    df$param,
+    df$agedays,
+    df$sex,
+    df$measurement
+  )
+)
+df <- long_wide(df) # convert to wide format for ext_bmiz
+
 # Calling the function with default column names
-d_bmi <- ext_bmiz(inputdata)
+d_bmi <- ext_bmiz(df)
 
 # Specifying different column names; note that quotes are used
-d_bmi <- ext_bmiz(inputdata, age="agemos", wt="weightkg", ht="heightcm")
+dfc <- df
+colnames(dfc)[colnames(dfc) \%in\% c("age", "wt", "ht")] <- c("agemos", "weightkg", "heightcm")
+d_bmi <- ext_bmiz(dfc, age = "agemos", wt = "weightkg", ht = "heightcm")
 
 # Disabling conversion of all-integer age in months to (age + 0.5)
-d_bmi <- ext_bmiz(inputdata, adjust.integer.age=F)
-
+colnames(df)[colnames(df) \%in\% "age"] <- "agem"
+d_bmi <- ext_bmiz(df, adjust.integer.age = FALSE)
 }

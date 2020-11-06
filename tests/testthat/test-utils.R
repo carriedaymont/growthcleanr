@@ -1,4 +1,4 @@
-test_that("splitinput splits files correctly with default values", {
+test_that("split_input splits files correctly with default values", {
   create_df <- function(num_ids, num_obs) {
     df <- data.frame(matrix(NA, nrow = num_ids * num_obs, ncol = 5))
     colnames(df)[1] <- "subjid"
@@ -12,20 +12,25 @@ test_that("splitinput splits files correctly with default values", {
   num_obs <- 7
   df <- create_df(num_ids, num_obs)
   # where to put output
-  fcount <- splitinput(df,
-                       fname = "df",
-                       fdir = tempdir())
+  fcount <- split_input(df,
+    fname = "df",
+    fdir = tempdir()
+  )
 
   # check that it yielded the correct number of files, with the correct name
   f_log <- grepl("df.*.csv", list.files(tempdir()))
-  expect_equal(sum(f_log),
-               ceiling(num_ids * num_obs / 10000))
+  expect_equal(
+    sum(f_log),
+    ceiling(num_ids * num_obs / 10000)
+  )
 
   # check file contents
-  sp_list <- lapply(list.files(tempdir())[f_log],
-                    function(x) {
-                      read.csv(paste0(tempdir(), "/", x))
-                    })
+  sp_list <- lapply(
+    list.files(tempdir())[f_log],
+    function(x) {
+      read.csv(paste0(tempdir(), "/", x))
+    }
+  )
 
   # check that each, except the last, is above the default limit
   # also check that all columns are accounted for
@@ -44,7 +49,7 @@ test_that("splitinput splits files correctly with default values", {
   file.remove(list.files(tempdir(), full.names = T)[f_log])
 })
 
-test_that("splitinput splits files correctly with custom values", {
+test_that("split_input splits files correctly with custom values", {
   create_df <- function(num_ids, num_obs) {
     df <- data.frame(matrix(NA, nrow = num_ids * num_obs, ncol = 5))
     colnames(df)[1] <- "subjid"
@@ -61,21 +66,26 @@ test_that("splitinput splits files correctly with custom values", {
   num_ids <- 1
   num_obs <- 20
   df <- create_df(num_ids, num_obs)
-  # run splitinput with new name, less than the default observations
-  fcount <- splitinput(df,
-                       fname = "onesub",
-                       fdir = tempdir())
+  # run split_input with new name, less than the default observations
+  fcount <- split_input(df,
+    fname = "onesub",
+    fdir = tempdir()
+  )
 
   # check that it yielded the correct number of files, with the correct name
   f_log <- grepl("onesub.*.csv", list.files(tempdir()))
-  expect_equal(sum(f_log),
-               ceiling(num_ids * num_obs / 10000))
+  expect_equal(
+    sum(f_log),
+    ceiling(num_ids * num_obs / 10000)
+  )
 
   # check file contents
-  sp_list <- lapply(list.files(tempdir())[f_log],
-                    function(x) {
-                      read.csv(paste0(tempdir(), "/", x))
-                    })
+  sp_list <- lapply(
+    list.files(tempdir())[f_log],
+    function(x) {
+      read.csv(paste0(tempdir(), "/", x))
+    }
+  )
 
   # check that the only file has all the observations
   expect_equal(nrow(sp_list[[1]]), num_ids * num_obs)
@@ -85,10 +95,11 @@ test_that("splitinput splits files correctly with custom values", {
   remove_files(f_log)
 
   # try reducing the amount of minimum rows
-  fcount <- splitinput(df,
-                       min_nrow = 2,
-                       fname = "lessrows",
-                       fdir = tempdir())
+  fcount <- split_input(df,
+    min_nrow = 2,
+    fname = "lessrows",
+    fdir = tempdir()
+  )
 
   # check that it did not split the file
   f_log <- grepl("lessrows.*.csv", list.files(tempdir()))
@@ -100,20 +111,23 @@ test_that("splitinput splits files correctly with custom values", {
   df <- create_df(2, 10)
   df$X2 <- c(1:(2 * 10)) # creating fake observations
   df <- df[sample(1:nrow(df), nrow(df)), ] # reorder
-  fcount <- splitinput(df,
-                       min_nrow = 5,
-                       fname = "multless",
-                       fdir = tempdir())
+  fcount <- split_input(df,
+    min_nrow = 5,
+    fname = "multless",
+    fdir = tempdir()
+  )
 
   # check that it yielded the correct number of files, with the correct name
   f_log <- grepl("multless.*.csv", list.files(tempdir()))
   expect_equal(sum(f_log), 2)
 
   # check file contents
-  sp_list <- lapply(list.files(tempdir())[f_log],
-                    function(x) {
-                      read.csv(paste0(tempdir(), "/", x))
-                    })
+  sp_list <- lapply(
+    list.files(tempdir())[f_log],
+    function(x) {
+      read.csv(paste0(tempdir(), "/", x))
+    }
+  )
 
   # check that each file is above the limit
   # also check that all columns are accounted for
@@ -132,11 +146,11 @@ test_that("splitinput splits files correctly with custom values", {
   remove_files(f_log)
 })
 
-test_that("splitinput throws errors when expected", {
-  # run splitinput with several wrong directory names
-  expect_error(splitinput(data.frame(), fdir = "hello"))
-  expect_error(splitinput(data.frame(), fdir = T))
-  expect_error(splitinput(data.frame(), fdir = data.frame()))
+test_that("split_input throws errors when expected", {
+  # run split_input with several wrong directory names
+  expect_error(split_input(data.frame(), fdir = "hello"))
+  expect_error(split_input(data.frame(), fdir = T))
+  expect_error(split_input(data.frame(), fdir = data.frame()))
 })
 
 test_that("recode_sex works as expected with defaults", {
@@ -151,8 +165,10 @@ test_that("recode_sex works as expected with defaults", {
   r_df <- recode_sex(df)
 
   # check that column names are correct
-  expect(all(colnames(r_df) %in% c("sex", "sex_recoded")),
-         "column names incorrect")
+  expect(
+    all(colnames(r_df) %in% c("sex", "sex_recoded")),
+    "column names incorrect"
+  )
 
   # all observations are accounted for
   expect_equal(df$sex, r_df$sex)
@@ -182,20 +198,26 @@ test_that("recode_sex works as expected with custom inputs", {
   )
 
   # check that column names are correct
-  expect(all(colnames(r_df) %in% c("sex_type", "sex_r")),
-         "column names incorrect")
+  expect(
+    all(colnames(r_df) %in% c("sex_type", "sex_r")),
+    "column names incorrect"
+  )
 
   # all observations are accounted for
   expect_equal(df$sex_type, r_df$sex_type)
 
   # check that sex was recoded according to specifications
-  expect_equal(r_df$sex_r[r_df$sex_type == "M"],
-               rep("m", sum(df$sex_type == "M")))
-  expect_equal(r_df$sex_r[r_df$sex_type == "F"],
-               rep("f", sum(df$sex_type == "F")))
+  expect_equal(
+    r_df$sex_r[r_df$sex_type == "M"],
+    rep("m", sum(df$sex_type == "M"))
+  )
+  expect_equal(
+    r_df$sex_r[r_df$sex_type == "F"],
+    rep("f", sum(df$sex_type == "F"))
+  )
 })
 
-test_that("longwide works as expected with default values", {
+test_that("long_wide works as expected with default values", {
   # use synthetic data, running cleaning on a subset
   data("syngrowth")
   sub_syn <-
@@ -211,32 +233,36 @@ test_that("longwide works as expected with default values", {
     )
   )
 
-  # run longwide on changed data
-  wide_syn <- longwide(sub_syn)
+  # run long_wide on changed data
+  wide_syn <- long_wide(sub_syn)
 
   # check that it has the correct amount of columns
   expect_equal(ncol(wide_syn), 10)
 
   # check that all subjects are accounted for
-  expect(all(unique(sub_syn$subjid) %in% unique(wide_syn$subjid)),
-         "not all subjects appear in wide format")
+  expect(
+    all(unique(sub_syn$subjid) %in% unique(wide_syn$subjid)),
+    "not all subjects appear in wide format"
+  )
 
   obs_ids <- c(wide_syn$wt_id, wide_syn$ht_id)
 
   # check that all subjects' measurements with at least two occurrences appear
   all_obs <- sapply(unique(sub_syn$subjid), function(i) {
     sub_group <- sub_syn[sub_syn$clean_value == "Include" &
-                           sub_syn$agedays >= 730, ]
+      sub_syn$agedays >= 730, ]
     sum(table(sub_group$agedays[sub_group$subjid == i]) >= 2)
   })
   total_obs <- sum(all_obs)
-  expect(total_obs <= nrow(wide_syn),
-         "observations are dropped in wide format")
+  expect(
+    total_obs <= nrow(wide_syn),
+    "observations are dropped in wide format"
+  )
 
   # check that it includes specified inclusion types
   expect(
     all(sub_syn$clean_value[sub_syn$id %in% obs_ids] == "Include"),
-    "longwide() includes inclusion values that were not specified"
+    "long_wide() includes inclusion values that were not specified"
   )
 
   # check that all sexes have been correctly recoded
@@ -258,18 +284,21 @@ test_that("longwide works as expected with default values", {
 
     # check ages
     expect_equal(wide_syn$agey[w_idx], round(ht_sub$agedays[ht_idx] / 365.25), 4)
-    expect_equal(wide_syn$agem[w_idx],
-                 round(round(ht_sub$agedays[ht_idx] / 365.25), 4) * 12, 4)
+    expect_equal(
+      wide_syn$agem[w_idx],
+      round(round(ht_sub$agedays[ht_idx] / 365.25), 4) * 12, 4
+    )
     expect_equal(wide_syn$agedays[w_idx], ht_sub$agedays[ht_idx])
 
     # check height
     expect_equal(wide_syn$ht[w_idx], ht_sub$measurement[ht_idx])
 
     # check bmi
-    expect_equal(wide_syn$bmi[w_idx],
-                 sub_syn$measurement[sub_syn$id == wide_syn$wt_id[w_idx]] /
-                   ((ht_sub$measurement[ht_idx] * .01) ^ 2))
-
+    expect_equal(
+      wide_syn$bmi[w_idx],
+      sub_syn$measurement[sub_syn$id == wide_syn$wt_id[w_idx]] /
+        ((ht_sub$measurement[ht_idx] * .01)^2)
+    )
   }
 
   # check weight ids
@@ -281,24 +310,26 @@ test_that("longwide works as expected with default values", {
 
     # check ages
     expect_equal(wide_syn$agey[w_idx], round(wt_sub$agedays[wt_idx] / 365.25), 4)
-    expect_equal(wide_syn$agem[w_idx],
-                 round(round(wt_sub$agedays[wt_idx] / 365.25), 4) * 12, 4)
+    expect_equal(
+      wide_syn$agem[w_idx],
+      round(round(wt_sub$agedays[wt_idx] / 365.25), 4) * 12, 4
+    )
     expect_equal(wide_syn$agedays[w_idx], wt_sub$agedays[wt_idx])
 
     # check height
     expect_equal(wide_syn$wt[w_idx], wt_sub$measurement[wt_idx])
 
     # check bmi
-    expect_equal(wide_syn$bmi[w_idx],
-                 wt_sub$measurement[wt_idx] /
-                   ((sub_syn$measurement[sub_syn$id == wide_syn$ht_id[w_idx]] *
-                       .01) ^ 2))
-
+    expect_equal(
+      wide_syn$bmi[w_idx],
+      wt_sub$measurement[wt_idx] /
+        ((sub_syn$measurement[sub_syn$id == wide_syn$ht_id[w_idx]] *
+          .01)^2)
+    )
   }
-
 })
 
-test_that("longwide works as expected with custom values", {
+test_that("long_wide works as expected with custom values", {
   # just checking the custom-ness, so use a smaller subset for speed
   # use synthetic data, running cleaning on a subset
   data("syngrowth")
@@ -315,17 +346,20 @@ test_that("longwide works as expected with custom values", {
     )
   )
 
-  # run longwide on changed data with all exclusion types included
-  wide_syn <- longwide(sub_syn,
-                       clean_value = "cv",
-                       include_all = T)
+  # run long_wide on changed data with all exclusion types included
+  wide_syn <- long_wide(sub_syn,
+    clean_value = "cv",
+    include_all = T
+  )
 
   # check that it has the correct amount of columns
   expect_equal(ncol(wide_syn), 10)
 
   # check that all subjects are accounted for
-  expect(all(unique(sub_syn$subjid) %in% unique(wide_syn$subjid)),
-         "not all subjects appear in wide format")
+  expect(
+    all(unique(sub_syn$subjid) %in% unique(wide_syn$subjid)),
+    "not all subjects appear in wide format"
+  )
 
   # check that all subjects' measurements with at least two occurrences appear
   all_obs <- sapply(unique(sub_syn$subjid), function(i) {
@@ -333,45 +367,53 @@ test_that("longwide works as expected with custom values", {
   })
   total_obs <- sum(all_obs)
 
-  expect(total_obs <= nrow(wide_syn),
-         "observations are dropped in wide format")
+  expect(
+    total_obs <= nrow(wide_syn),
+    "observations are dropped in wide format"
+  )
 
 
-  # run longwide on changed data with some exclusion types included
-  inc_types <- c("Include",
-                 "Exclude-Carried-Forward",
-                 "Exclude-Duplicate")
-  wide_syn <- longwide(sub_syn,
-                       clean_value = "cv",
-                       inclusion_types = inc_types)
+  # run long_wide on changed data with some exclusion types included
+  inc_types <- c(
+    "Include",
+    "Exclude-Carried-Forward",
+    "Exclude-Duplicate"
+  )
+  wide_syn <- long_wide(sub_syn,
+    clean_value = "cv",
+    inclusion_types = inc_types
+  )
 
   # check that it has the correct amount of columns
   expect_equal(ncol(wide_syn), 10)
 
   # check that all subjects are accounted for
-  expect(all(unique(sub_syn$subjid) %in% unique(wide_syn$subjid)),
-         "not all subjects appear in wide format with custom")
+  expect(
+    all(unique(sub_syn$subjid) %in% unique(wide_syn$subjid)),
+    "not all subjects appear in wide format with custom"
+  )
 
   # check that all subjects' measurements with at least two occurrences appear
   all_obs <- sapply(unique(sub_syn$subjid), function(i) {
     sub_group <- sub_syn[sub_syn$clean_value %in% inc_types &
-                           sub_syn$agedays >= 730, ]
+      sub_syn$agedays >= 730, ]
     sum(table(sub_group$agedays[sub_group$subjid == i]) >= 2)
   })
   total_obs <- sum(all_obs)
-  expect(total_obs <= nrow(wide_syn),
-         "observations are dropped in wide format")
+  expect(
+    total_obs <= nrow(wide_syn),
+    "observations are dropped in wide format"
+  )
 
   # check that it includes specified inclusion types
   obs_ids <- c(wide_syn$wt_id, wide_syn$ht_id)
   expect(
     all(sub_syn$clean_value[sub_syn$id %in% obs_ids] == inc_types),
-    "longwide() includes inclusion values that were not specified"
+    "long_wide() includes inclusion values that were not specified"
   )
-
 })
 
-test_that("longwide throws errors correctly", {
+test_that("long_wide throws errors correctly", {
   # use synthetic data, running cleaning on a very small subset
   data("syngrowth")
   sub_syn <-
@@ -388,12 +430,12 @@ test_that("longwide throws errors correctly", {
   )
 
   # test with deleting a necessary column
-  expect_error(longwide(sub_syn[, -2]))
+  expect_error(long_wide(sub_syn[, -2]))
 
   # test include_all not being correct
-  expect_error(longwide(sub_syn, include_all = "hello"))
+  expect_error(long_wide(sub_syn, include_all = "hello"))
 
   # test duplicated ids
   sub_syn$id <- 1
-  expect_error(longwide(sub_syn))
+  expect_error(long_wide(sub_syn))
 })
