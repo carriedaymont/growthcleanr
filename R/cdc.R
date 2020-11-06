@@ -103,7 +103,10 @@ ext_bmiz <- function(data,
   `_AGEMOS1` <- denom <- agemos <- sex <- mref <- sref <- sex <- NULL
   wl <- wm <- ws <- bl <- bm <- bs <- hl <- hm <- hs <- NULL
   waz <- mwaz <- haz <- mhaz <- bz <- mbz <- s <- m <- l <- p95 <- NULL
-  bp <- ebp <- ebz <- agey <- seq_ <- NULL
+  bp <- ebp <- ebz <- agey <- seq_ <- agemos2 <- z1 <- bmip95 <- NULL
+  sigma <- adist1 <- aperc1 <- adj_dist1 <- adj_perc1 <- bmip <- NULL
+  bmiz <- mod_bmiz <- mod_waz <- mod_haz <- ext_bmip <- bmi_l <- NULL
+  bmi_m <- bmi_s <- wp <- hp <- p97 <- sev_obese <- obese <- NULL
   # ==== Dealing with "undefined global functions or variables" ==== #
   setDT(data)
 

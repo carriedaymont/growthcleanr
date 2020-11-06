@@ -53,7 +53,7 @@ long_wide <- function(long_df,
                   na.rm = TRUE) {
   # ==== Dealing with "undefined global functions or variables" ==== #
   ## Only for variable which couldn't be quoted everywhere
-  agey <- ht <- wt <- bmi <- NULL
+  agey <- ht <- wt <- bmi <- sex_recoded <- agem <- NULL
   # ==== Dealing with "undefined global functions or variables" ==== #
 
   if (!is.logical(include_all)) {
@@ -116,7 +116,7 @@ long_wide <- function(long_df,
 
   clean_df <- obs_df[,
     `:=`("sex" = sex_recoded, param = as.character(param))
-  ][, .(subjid, id, agey, agem, agedays, sex, param, measurement)]
+  ][, c("subjid", "id", "agey", "agem", "agedays", "sex", "param", "measurement")]
 
   # check for unique weight and height ids
   if (anyDuplicated(clean_df$id)) {

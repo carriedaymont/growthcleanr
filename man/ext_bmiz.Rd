@@ -11,7 +11,7 @@ ext_bmiz(
   ht = "ht",
   bmi = "bmi",
   adjust.integer.age = TRUE,
-  ref.data.path = ""
+  ref.data.path = NULL
 )
 }
 \arguments{

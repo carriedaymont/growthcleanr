@@ -86,6 +86,14 @@ adjustcarryforward <- function(subjid,
   ## Only for variable which couldn't be quoted everywhere
   v <- sd.orig <- sd.median <- tbc.sd <- agedays.next <- mid.agedays <- min.ht.vel <- NULL
   delta.agedays.next <- ht.exp <- max.ht.vel <- mindiff.next.ht <- temp.exclude <- NULL
+  ecf_tmp <- ewma.all <- ewma.before <- ewma.after <- abs.tbc.sd <- whoinc.1.ht <- NULL
+  whoinc.2.ht <- whoinc.3.ht <- whoinc.4.ht <- whoinc.6.ht <- max.whoinc.1.ht <- NULL
+  max.whoinc.2.ht <- max.whoinc.3.ht <- max.whoinc.4.ht <- max.whoinc.6.ht <- NULL
+  whoinc.age.ht <- whoinc.age.ht <- who.mindiff.next.ht <- who.maxdiff.next.ht <- NULL
+  dewma.after <- maxdiff.next.ht <- v.prev <- v.next <- delta.prev.ht <- NULL
+  mindiff.prev.ht <- delta.next.ht <- maxdiff.prev.ht <- pair <- dewma.after.prev <- NULL
+  pair.prev <- dewma.before.next <- pair.next <- bef.g.aftm1 <- aft.g.befp1 <- NULL
+  abs.tbc.sd.prev <- abs.tbc.sd.next <- exclude <- n <- dewma.before <- NULL
   # ==== Dealing with "undefined global functions or variables" ==== #
 
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
@@ -781,10 +789,8 @@ adjustcarryforward <- function(subjid,
     .SDcols = c("sex", "agedays", "v", "tbc.sd", "exclude", "orig.exclude")
   ]
 
-
-
   return(rbind(
-    as.data.frame(data.all[, .(adjustcarryforward = exclude, n = n)]),
-    as.data.frame(data.orig[!n %in% data.all[["n"]]][, .(adjustcarryforward = "Missing", n = n)])
+    as.data.frame(data.all[, list(adjustcarryforward = exclude, n = n)]),
+    as.data.frame(data.orig[!n %in% data.all[["n"]]][, list(adjustcarryforward = "Missing", n = n)])
   ))
 }

@@ -36,7 +36,7 @@
 sd_median <- function(param, sex, agedays, sd.orig) {
   # ==== Dealing with "undefined global functions or variables" ==== #
   ## Only for variable which couldn't be quoted everywhere
-  ageyears <- NULL
+  ageyears <- sd.median <- NULL
   # ==== Dealing with "undefined global functions or variables" ==== #
 
   # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time,

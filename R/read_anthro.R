@@ -20,7 +20,8 @@
 read_anthro <- function(path = NULL, cdc.only = FALSE) {
   # ==== Dealing with "undefined global functions or variables" ==== #
   ## Only for variable which couldn't be quoted everywhere
-  m <- csdneg <- csdpos <- m <- s <- l <- NULL
+  patterns <- NULL # use internally by data.table but not properly exported by it.
+  m <- csdneg <- csdpos <- m <- s <- l <- sex <- age <- param <- NULL
   # ==== Dealing with "undefined global functions or variables" ==== #
 
   # set correct path based on input reference table path (if any)
@@ -34,7 +35,7 @@ read_anthro <- function(path = NULL, cdc.only = FALSE) {
         file.path(dir_path, ifile)
       }
 
-      fread(ifile_path)[, .(
+      fread(ifile_path)[, list(
         src = "WHO",
         sex = sex - 1,
         age,
@@ -76,7 +77,7 @@ read_anthro <- function(path = NULL, cdc.only = FALSE) {
       csdpos = "_csd_pos$",
       csdneg = "_csd_neg$"
     )
-  )[, variable := NULL][param != "hc"]
+  )[, "variable" := NULL][param != "hc"]
   setnames(cdc_long, "agedays", "age")
 
   anthro_list[[length(anthro_list) + 1]] <- cdc_long

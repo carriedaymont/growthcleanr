@@ -123,6 +123,11 @@ cleangrowth <- function(subjid,
                         parallel = FALSE,
                         num.batches = NA,
                         quietly = TRUE) {
+  # ==== Dealing with "undefined global functions or variables" ==== #
+  ## Only for variable which couldn't be quoted everywhere
+  z.orig <- v <- sd.orig <- index <- exclude <- tbc.sd <- sd.median <- NULL
+  # ==== Dealing with "undefined global functions or variables" ==== #
+
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
   data.all <- data.table(
     line = seq_along(measurement),

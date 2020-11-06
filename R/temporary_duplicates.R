@@ -34,7 +34,7 @@ temporary_duplicates <- function(df) {
   # only operate on valid rows (but include rows that may have previously been flagged as a "temporary duplicate")
   valid.rows <- valid(df, include.temporary.duplicates = TRUE)
   # make a small copy of df with only the fields we need for efficiency
-  df <- df[j = .(tbc.sd), keyby = c("subjid", "param", "agedays", "index")]
+  df <- df[j = list(tbc.sd), keyby = c("subjid", "param", "agedays", "index")]
   # initialize some useful fields
   df[, `:=`(
     "median.sd" = NA_real_,

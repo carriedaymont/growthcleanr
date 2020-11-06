@@ -37,11 +37,26 @@ cleanbatch <- function(data.df,
                        error.load.mincount) {
   # ==== Dealing with "undefined global functions or variables" ==== #
   ## Only for variable which couldn't be quoted everywhere
-  # v <- exclude <- param <- agedays <- sex <- v.sw <- sd.median <- tbc.sd <- NULL
-  # v.orig <- subjid <- ewma.all <- dup.ratio <- duplicate <- duplicates.this.day <- NULL
-  # median.other.sd <- delta <- delta.agedays.prev <- temp.exclude <- dewma.all <- NULL
-  # delta.agedays.next <- agedays.next <- mid.agedays <- min.ht.vel <- ht.exp <- NULL
-  # max.ht.vel <- mindiff.next.ht <- NULL
+  J <- NULL # use internally by data.table but not properly exported by it.
+  v <- exclude <- param <- agedays <- sex <- v.sw <- sd.median <- tbc.sd <- NULL
+  v.orig <- subjid <- ewma.all <- dup.ratio <- duplicate <- duplicates.this.day <- NULL
+  median.other.sd <- delta <- delta.agedays.prev <- temp.exclude <- dewma.all <- NULL
+  delta.agedays.next <- agedays.next <- mid.agedays <- min.ht.vel <- ht.exp <- NULL
+  max.ht.vel <- mindiff.next.ht <- valid.interior.measurement <- tbc.sd.sw <- NULL
+  ewma.before <- ewma.after <- swap.flag.1 <- swap.flag.2 <- tbc.sd.d <- NULL
+  delta.next.sd <- delta.prev.sd <- v.d <- tbc.sd.t <- v.t <- prev.v <- z.orig <- NULL
+  ewma.before <- ewma.after <- dup <- abssum2 <- tbc.sd.max <- tbc.sd.min <- NULL
+  v.minus <- v.plus <- tbc.sd.prev <- tbc.sd.minus <- tbc.sd.plus <- tbc.sd.next <- NULL
+  dewma.before <- dewma.after <- dprev.sd <- dprev.sd.plus <- dprev.sd.minus <- NULL
+  dnext.sd <- dnext.sd.plus <- dnext.sd.minus <- first.of.three.or.more <- NULL
+  last.of.three.or.more <- abs.2ndlast.sd <- tbc.other.sd <- ewma.before <- NULL
+  ewma.after <- abs.tbc.sd <- whoinc.1.ht <- whoinc.2.ht <- whoinc.3.ht <- NULL
+  whoinc.4.ht <- whoinc.6.ht <- max.whoinc.1.ht <- max.whoinc.2.ht <- NULL
+  max.whoinc.3.ht <- max.whoinc.4.ht <- max.whoinc.6.ht <- whoinc.age.ht <- NULL
+  who.mindiff.next.ht <- who.maxdiff.next.ht <- maxdiff.next.ht <- v.prev <- NULL
+  v.next <- delta.prev.ht <- mindiff.prev.ht <- delta.next.ht <- maxdiff.prev.ht <- NULL
+  pair <- dewma.after.prev <- pair.prev <- dewma.before.next <- pair.next <- NULL
+  bef.g.aftm1 <- aft.g.befp1 <- abs.tbc.sd.prev <- abs.tbc.sd.next <- tbc.other.sd <- NULL
   # ==== Dealing with "undefined global functions or variables" ==== #
 
   data.df <- data.table(data.df, key = c("subjid", "param", "agedays", "index"))
@@ -87,7 +102,7 @@ cleanbatch <- function(data.df,
   #      I intentionally did not allow values that were the first or last for a subject/parameter
   #      to be replaced as a switch.
   # NOTE: this additional constraint related to first and last values is implemented below via the code
-  # swap.flag.1 := if(.N>2) c(FALSE, rep(TRUE, .N-2), FALSE) else FALSE, by=.(subjid,param)
+  # swap.flag.1 := if(.N>2) c(FALSE, rep(TRUE, .N-2), FALSE) else FALSE, by=list(subjid,param)
 
   if (!quietly) {
     cat(sprintf(
@@ -218,7 +233,7 @@ cleanbatch <- function(data.df,
         "delta.prev.sd" = tbc.sd - c(NA, tbc.sd[-.N]),
         "delta.next.sd" = tbc.sd - c(tbc.sd[-1], NA)
       ),
-      by = .(subjid, param)
+      by = c("subjid", "param")
     ]
 
     # 8e.	Identify a value as a unit error if one of the following sets of criteria are met:
