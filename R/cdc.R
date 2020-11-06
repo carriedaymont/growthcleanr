@@ -97,8 +97,14 @@ ext_bmiz <- function(data,
                      ht = "ht",
                      bmi = "bmi",
                      adjust.integer.age = TRUE,
-                     ref.data.path = "") {
-
+                     ref.data.path = NULL) {
+  # ==== Dealing with "undefined global functions or variables" ==== #
+  ## Only for variable which couldn't be quoted everywhere
+  `_AGEMOS1` <- denom <- agemos <- sex <- mref <- sref <- sex <- NULL
+  wl <- wm <- ws <- bl <- bm <- bs <- hl <- hm <- hs <- NULL
+  waz <- mwaz <- haz <- mhaz <- bz <- mbz <- s <- m <- l <- p95 <- NULL
+  bp <- ebp <- ebz <- agey <- seq_ <- NULL
+  # ==== Dealing with "undefined global functions or variables" ==== #
   setDT(data)
 
   setnames(data,
@@ -107,27 +113,27 @@ ext_bmiz <- function(data,
   )
 
   # needed for merging back with original data
-  data[, seq_ := 1L:nrow(data)]
+  data[, "seq_" := 1L:nrow(data)]
   dorig <- copy(data)
 
   # Adjust integer values only if specified (default) and all values are integer
   if (adjust.integer.age) {
     if (isTRUE(all.equal(data$age, round(data$age)))) {
-      data[, age := age + 0.5]
+      data[, "age" := age + 0.5]
     }
   }
 
   data <- data[
     between(age, 24, 240) & !(is.na(wt) & is.na(ht)),
-    .(seq_, sex, age, wt, ht, bmi)
+    c("seq_", "sex", "age", "wt", "ht", "bmi")
   ]
 
   # v1 <- Cs(seq_, id, sex, age, wt, ht, bmi)
 
   dref_path <- ifelse(
-    ref.data.path == "",
+    is.null(ref.data.path),
     system.file("extdata/CDCref_d.csv", package = "growthcleanr"),
-    paste0(ref.data.path, "CDCref_d.csv")
+    file.path(ref.data.path, "CDCref_d.csv")
   )
   dref <- fread(dref_path)[`_AGEMOS1` > 23 & denom == "age"]
   names(dref) <- tolower(names(dref))
@@ -135,39 +141,39 @@ ext_bmiz <- function(data,
 
   d20 <- dref[
     agemos2 == 240,
-    .(
-      sex,
-      agemos2,
-      lwt2,
-      mwt2,
-      swt2,
-      lbmi2,
-      mbmi2,
-      sbmi2,
-      lht2,
-      mht2,
-      sht2
+    c(
+      "sex",
+      "agemos2",
+      "lwt2",
+      "mwt2",
+      "swt2",
+      "lbmi2",
+      "mbmi2",
+      "sbmi2",
+      "lht2",
+      "mht2",
+      "sht2"
     )
   ]
   names(d20) <- gsub("2", "", names(d20))
 
-  dref <- dref[, .(
-    sex,
-    agemos1,
-    lwt1,
-    mwt1,
-    swt1,
-    lbmi1,
-    mbmi1,
-    sbmi1,
-    lht1,
-    mht1,
-    sht1
+  dref <- dref[, c(
+    "sex",
+    "agemos1",
+    "lwt1",
+    "mwt1",
+    "swt1",
+    "lbmi1",
+    "mbmi1",
+    "sbmi1",
+    "lht1",
+    "mht1",
+    "sht1"
   )]
   names(dref) <- gsub("1", "", names(dref))
 
   dref <- rbindlist(list(dref, d20))
-  adj_bmi_met <- dref[agemos == 240, .(sex, mbmi, sbmi)]
+  adj_bmi_met <- dref[agemos == 240, c("sex", "mbmi", "sbmi")]
   setnames(adj_bmi_met, Cs(sex, mref, sref))
 
   dref <- dref[adj_bmi_met, on = "sex"]
@@ -182,7 +188,7 @@ ext_bmiz <- function(data,
       fapp <- function(vars, ...) {
         stats::approx(.d$age, vars, xout = uages)$y
       }
-      data.frame(sapply(.d[, ..v], fapp))
+      data.frame(sapply(.d[, .SD, .SDcols = v], fapp))
     }
     dref <- rbindlist(lapply(1:2, fapprox))
   }
@@ -201,24 +207,24 @@ ext_bmiz <- function(data,
 
   dt[,
     `:=`(
-      bp = 100 * stats::pnorm(bz),
-      p95 = m * (1 + l * s * stats::qnorm(0.95))^(1 / l),
-      p97 = m * (1 + l * s * stats::qnorm(0.97))^(1 / l),
-      wp = 100 * stats::pnorm(waz),
-      hp = 100 * stats::pnorm(haz),
-      z1 = ((bmi / m) - 1) / s
+      "bp" = 100 * stats::pnorm(bz),
+      "p95" = m * (1 + l * s * stats::qnorm(0.95))^(1 / l),
+      "p97" = m * (1 + l * s * stats::qnorm(0.97))^(1 / l),
+      "wp" = 100 * stats::pnorm(waz),
+      "hp" = 100 * stats::pnorm(haz),
+      "z1" = ((bmi / m) - 1) / s
     )
   ]
-  dt[, `:=`(bmip95 = 100 * (bmi / p95))]
+  dt[, `:=`("bmip95" = 100 * (bmi / p95))]
   dt[,
     `:=`(
-      bmip95 = 100 * (bmi / p95),
-      dist1 = z1 * m * s,
-      adist1 = z1 * sref * mref,
-      perc1 = z1 * 100 * s,
-      aperc1 = z1 * 100 * sref,
-      obese = 1L * (bmi >= p95),
-      sev_obese = 1L * (bmip95 >= 120)
+      "bmip95" = 100 * (bmi / p95),
+      "dist1" = z1 * m * s,
+      "adist1" = z1 * sref * mref,
+      "perc1" = z1 * 100 * s,
+      "aperc1" = z1 * 100 * sref,
+      "obese" = 1L * (bmi >= p95),
+      "sev_obese" = 1L * (bmip95 >= 120)
     )
   ]
 
@@ -248,16 +254,15 @@ ext_bmiz <- function(data,
   # )
 
   ## now create Extended z-score for BMI >=95th P
-  dt[, `:=`(ebz = bz, ebp = bp, agey = age / 12)]
-  dt[, sigma := fifelse(
+  dt[, `:=`("ebz" = bz, "ebp" = bp, "agey" = age / 12)]
+  dt[, "sigma" := fifelse(
     sex == 1,
     0.3728 + 0.5196 * agey - 0.0091 * agey^2,
     0.8334 + 0.3712 * agey - 0.0011 * agey^2
   )]
-  dt[bp >= 95, ebp := 90 + 10 * stats::pnorm((bmi - p95) / sigma)]
-  dt[bp >= 95, ebz := stats::qnorm(ebp / 100)]
-  dt[bp > 99 &
-    is.infinite(ebz), ebz := 8.21] # highest poss value is 8.20945
+  dt[bp >= 95, "ebp" := 90 + 10 * stats::pnorm((bmi - p95) / sigma)]
+  dt[bp >= 95, "ebz" := stats::qnorm(ebp / 100)]
+  dt[bp > 99 & is.infinite(ebz), "ebz" := 8.21] # highest poss value is 8.20945
 
   x <- Cs(agey, mref, sref, sex, wt, ht, bmi)
   dt[, (x) := NULL]
@@ -265,18 +270,11 @@ ext_bmiz <- function(data,
     dt,
     Cs(adist1, aperc1, bp, bz, mbz, mwaz, mhaz, ebp, ebz, l, m, s),
     Cs(
-      adj_dist1,
-      adj_perc1,
-      bmip,
-      bmiz,
-      mod_bmiz,
-      mod_waz,
-      mod_haz,
-      ext_bmip,
-      ext_bmiz,
-      bmi_l,
-      bmi_m,
-      bmi_s
+      adj_dist1,  adj_perc1,
+      bmip, bmiz,
+      mod_bmiz, mod_waz,  mod_haz,
+      ext_bmip, ext_bmiz,
+      bmi_l, bmi_m, bmi_s
     )
   )
 
@@ -284,25 +282,18 @@ ext_bmiz <- function(data,
 
   v <- Cs(
     seq_,
-    bmiz,
-    bmip,
-    waz,
-    wp,
-    haz,
-    hp,
-    p95,
-    p97,
+    bmiz, bmip,
+    waz, wp,
+    haz, hp,
+    p95, p97,
     bmip95,
-    mod_bmiz,
-    mod_waz,
-    mod_haz,
+    mod_bmiz, mod_waz,  mod_haz,
     sigma,
-    ext_bmip,
-    ext_bmiz,
+    ext_bmip, ext_bmiz,
     sev_obese,
     obese
   )
-  dt <- dt[, ..v]
+  dt <- dt[, .SD, .SDcols = v]
 
   setkeyv(dt, "seq_")
   setkeyv(dorig, "seq_")
