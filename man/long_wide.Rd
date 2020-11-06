@@ -19,6 +19,8 @@ long_wide(
 )
 }
 \arguments{
+\item{long_df}{A data frame to be transformed. Expects columns: id, subjid, sex, agedays, param, measurement, and clean_value.}
+
 \item{id}{name of observation ID column}
 
 \item{subjid}{name of subject ID column}
@@ -36,8 +38,6 @@ long_wide(
 \item{inclusion_types}{Vector indicating which exclusion codes from the cleaning algorithm should be included in the data, given that include_all is FALSE. For all options, see growthcleanr::cleangrowth(). Defaults to c("Include").}
 
 \item{na.rm}{exclude rows where bli was not computed due to missing values.}
-
-\item{data}{A data frame to be transformed. Expects columns: id, subjid, sex, agedays, param, measurement, and clean_value.}
 }
 \value{
 Returns a data frame transformed from long to wide. Includes only values flagged with indicated inclusion types. Note that, for each subject, heights without corresponding weights for a given age (and vice versa) will be dropped.

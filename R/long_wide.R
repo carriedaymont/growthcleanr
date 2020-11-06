@@ -2,7 +2,7 @@
 #'
 #' \code{long_wide} transforms data from long to wide format. Ideal for transforming output from growthcleanr::cleangrowth() into a format suitable for growthcleanr::ext_bmiz().
 #'
-#' @param data A data frame to be transformed. Expects columns: id, subjid, sex, agedays, param, measurement, and clean_value.
+#' @param long_df A data frame to be transformed. Expects columns: id, subjid, sex, agedays, param, measurement, and clean_value.
 #' @param id name of observation ID column
 #' @param subjid name of subject ID column
 #' @param sex name of sex descriptor column
