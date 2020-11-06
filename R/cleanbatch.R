@@ -1722,5 +1722,5 @@ cleanbatch <- function(data.df,
   if (!quietly & parallel) {
     sink()
   }
-  return(data.df[j = .(line, exclude, tbc.sd, tbc.other.sd, param)]) # debugging
+  return(data.df[j = c("line", "exclude", "tbc.sd", "tbc.other.sd", "param")]) # debugging
 }
