@@ -35,6 +35,15 @@ cleanbatch <- function(data.df,
                        lt3.exclude.mode,
                        error.load.threshold,
                        error.load.mincount) {
+  # ==== Dealing with "undefined global functions or variables" ==== #
+  ## Only for variable which couldn't be quoted everywhere
+  # v <- exclude <- param <- agedays <- sex <- v.sw <- sd.median <- tbc.sd <- NULL
+  # v.orig <- subjid <- ewma.all <- dup.ratio <- duplicate <- duplicates.this.day <- NULL
+  # median.other.sd <- delta <- delta.agedays.prev <- temp.exclude <- dewma.all <- NULL
+  # delta.agedays.next <- agedays.next <- mid.agedays <- min.ht.vel <- ht.exp <- NULL
+  # max.ht.vel <- mindiff.next.ht <- NULL
+  # ==== Dealing with "undefined global functions or variables" ==== #
+
   data.df <- data.table(data.df, key = c("subjid", "param", "agedays", "index"))
 
   if (!quietly & parallel) {
@@ -59,7 +68,7 @@ cleanbatch <- function(data.df,
   }
 
   # save a copy of all original measurement values before any transformation
-  data.df[, v.orig := v]
+  data.df[, "v.orig" := v]
 
   if (!quietly) {
     cat(sprintf(
@@ -87,15 +96,15 @@ cleanbatch <- function(data.df,
     ))
   }
 
-  data.df[, v.sw := swap_parameters(field.name = "v", df = data.df)]
+  data.df[, "v.sw" := swap_parameters(field.name = "v", df = data.df)]
   # calculate "standard deviation" score for the "swapped" parameter and recenter
-  data.df[, tbc.sd.sw := measurement.to.z(param, agedays, sex, v.sw, TRUE) - sd.median]
+  data.df[, "tbc.sd.sw" := measurement.to.z(param, agedays, sex, v.sw, TRUE) - sd.median]
 
   # 7b.  Perform a EWMA calculation.
   #   i.	In addition to the standard all/bef/aft dewma_* variables calculate
   #     all/bef/aft dewma_*_sw variables by subtracting EWMASD from tbc*sd_sw
-  data.df[, (ewma.fields) := as.double(NaN)]
-  data.df[valid(exclude), (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE), by = .(subjid, param)]
+  data.df[, (ewma.fields) := NA_real_]
+  data.df[valid(exclude), (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE), by = c("subjid", "param")]
 
 
   # 7c.  Label pairs of height/weight measurements recorded on the same day as a switch
@@ -109,17 +118,17 @@ cleanbatch <- function(data.df,
   #
 
   # initialize swap.flag.1
-  data.df[, `:=`(valid.interior.measurement = FALSE, swap.flag.1 = FALSE)]
+  data.df[, `:=`("valid.interior.measurement" = FALSE, "swap.flag.1" = FALSE)]
 
   # flag interior measurements
   data.df[
     valid(data.df),
-    valid.interior.measurement := if (.N > 2) {
+    "valid.interior.measurement" := if (.N > 2) {
       c(FALSE, rep(TRUE, .N - 2), FALSE)
     } else {
       FALSE
     },
-    by = .(subjid, param)
+    by = c("subjid", "param")
   ]
   data.df[
     valid.interior.measurement &
@@ -146,7 +155,7 @@ cleanbatch <- function(data.df,
             abs(tbc.sd.sw - ewma.before) < 0.5 &
             abs(tbc.sd.sw - ewma.after) < 0.5
       ),
-    swap.flag.1 := TRUE
+    "swap.flag.1" := TRUE
   ]
 
 
@@ -157,7 +166,7 @@ cleanbatch <- function(data.df,
   data.df$swap.flag.2 <- swap_parameters(field.name = "swap.flag.1", df = data.df)
   data.df[
     swap.flag.1 & swap.flag.2,
-    `:=`(v = v.sw, tbc.sd = tbc.sd.sw, exclude = "Swapped-Measurements")
+    `:=`("v" = v.sw, "tbc.sd" = tbc.sd.sw, "exclude" = "Swapped-Measurements")
   ]
 
   # look for possible unit errors
@@ -174,8 +183,8 @@ cleanbatch <- function(data.df,
     }
     valid.rows <- valid(data.df)
     data.df[, `:=`(
-      v.d = v / ifelse(param == "WEIGHTKG", 2.204622, 2.54),
-      v.t = v * ifelse(param == "WEIGHTKG", 2.204622, 2.54)
+      "v.d" = v / ifelse(param == "WEIGHTKG", 2.204622, 2.54),
+      "v.t" = v * ifelse(param == "WEIGHTKG", 2.204622, 2.54)
     )]
 
     # 8b.  Calculate SD scores for each transformed variable and recenter these (tbc*sd_d_2 and tbc_*sd_t_2)
@@ -193,8 +202,8 @@ cleanbatch <- function(data.df,
     #     all/bef/aft variables for  dewma_*_d_2 and dewma_*_t_2  by subtracting EWMASD from
     #         tbc*sd_d_2 and tbc_*_sd_t_2
     # NOTE: the additional dewma fields are calculated in the tests below
-    data.df[, (ewma.fields) := as.double(NaN)]
-    data.df[valid(exclude), (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE), by = .(subjid, param)]
+    data.df[, (ewma.fields) := NA_real_]
+    data.df[valid(exclude), (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE), by = c("subjid", "param")]
 
     # 8d.  Also calculate d_prevsd_*=tbc*sd-tbc*sdprev and d_nextsd_*=tbc*sdi-tbc*sdnext.
     #     d_prevsd_* will be missing for the first value and d_nextsd_* should be
@@ -202,12 +211,12 @@ cleanbatch <- function(data.df,
     #     or last for a subject/parameter to be replaced as unit errors.
     # structure c(NA, field.name[-.N]) == get.prev
     # structure c(field.name[-1], NA) == get.next
-    data.df[, `:=`(delta.prev.sd = as.double(NaN), delta.next.sd = as.double(NaN))]
+    data.df[, `:=`("delta.prev.sd" = NA_real_, "delta.next.sd" = NA_real_)]
     data.df[
       valid.rows,
       `:=`(
-        delta.prev.sd = tbc.sd - c(NA, tbc.sd[-.N]),
-        delta.next.sd = tbc.sd - c(tbc.sd[-1], NA)
+        "delta.prev.sd" = tbc.sd - c(NA, tbc.sd[-.N]),
+        "delta.next.sd" = tbc.sd - c(tbc.sd[-1], NA)
       ),
       by = .(subjid, param)
     ]
@@ -260,9 +269,9 @@ cleanbatch <- function(data.df,
               !is.na(delta.prev.sd) & delta.prev.sd > 4
         ),
       `:=`(
-        v = v.d,
-        tbc.sd = tbc.sd.d,
-        exclude = "Unit-Error-High"
+        "v" = v.d,
+        "tbc.sd" = tbc.sd.d,
+        "exclude" = "Unit-Error-High"
       )
     ]
 
@@ -293,9 +302,9 @@ cleanbatch <- function(data.df,
               !is.na(delta.prev.sd) & delta.prev.sd < -4
         ),
       `:=`(
-        v = v.t,
-        tbc.sd = tbc.sd.t,
-        exclude = "Unit-Error-Low"
+        "v" = v.t,
+        "tbc.sd" = tbc.sd.t,
+        "exclude" = "Unit-Error-Low"
       )
     ]
   }
@@ -323,17 +332,17 @@ cleanbatch <- function(data.df,
     # for efficiency, bring get.prev and get.next inline here (working on valid rows
     #     within a single parameter for a single subject)
     # structure c(NA, field.name[-.N]) == get.prev
-    data.df[, prev.v := as.double(NaN)]
-    data.df[valid(data.df), prev.v := c(NA, v.orig[-.N]), by = .(subjid, param)]
+    data.df[, "prev.v" := NA_real_]
+    data.df[valid(data.df), "prev.v" := c(NA, v.orig[-.N]), by = c("subjid", "param")]
 
     # optimize "carry forward" for children without duplicates.
     data.df[!(subjid %in% subj.dup) &
-      v.orig == prev.v, exclude := "Exclude-Carried-Forward"]
+      v.orig == prev.v, "exclude" := "Exclude-Carried-Forward"]
 
     # need to handle children with duplicate measurements on same day separately
     data.df[
       subjid %in% subj.dup & valid(data.df, include.temporary.duplicates = TRUE),
-      exclude := (function(df) {
+      "exclude" := (function(df) {
         setkeyv(df, "agedays")
         ages <- unique(agedays)
         # no point in looking for measurements carried forward
@@ -346,19 +355,19 @@ cleanbatch <- function(data.df,
             # if a measurement for the current age is found in the set of measurements
             #     from the previous age, then mark it as carried forward
             df[agedays == ages[i] &
-              v.orig %in% all.prev.v, exclude := "Exclude-Carried-Forward"]
+              v.orig %in% all.prev.v, "exclude" := "Exclude-Carried-Forward"]
           }
         }
         return(df$exclude)
       })(copy(.SD)),
       .SDcols = c("agedays", "exclude", "v.orig"),
-      by = .(subjid, param)
+      by = c("subjid", "param")
     ]
   }
 
   # 9d.  Replace exc_*=0 if exc_*==2 & redo step 5 (temporary duplicates)
-  data.df[exclude == "Exclude-Temporary-Duplicate", exclude := "Include"]
-  data.df[temporary_duplicates(data.df), exclude := "Exclude-Temporary-Duplicate"]
+  data.df[exclude == "Exclude-Temporary-Duplicate", "exclude" := "Include"]
+  data.df[temporary_duplicates(data.df), "exclude" := "Exclude-Temporary-Duplicate"]
 
   # 10.  Exclude extreme errors with SD cutoffs. For this, a cutoff of |SD|>25 is used.
   #      Because of differences in SD and z score, there are some very extreme values with
@@ -379,12 +388,12 @@ cleanbatch <- function(data.df,
       valid(data.df, include.temporary.duplicates = TRUE) & abs(tbc.sd) > sd.extreme |
         exclude %in% c("Include", "Exclude-Temporary-Duplicate") & abs(z.orig) > z.extreme
     ),
-    exclude := "Exclude-SD-Cutoff"
+    "exclude" := "Exclude-SD-Cutoff"
   ]
 
   # 10d. Redo temporary duplicates as in step 5.
-  data.df[exclude == "Exclude-Temporary-Duplicate", exclude := "Include"]
-  data.df[temporary_duplicates(data.df), exclude := "Exclude-Temporary-Duplicate"]
+  data.df[exclude == "Exclude-Temporary-Duplicate", "exclude" := "Include"]
+  data.df[temporary_duplicates(data.df), "exclude" := "Exclude-Temporary-Duplicate"]
 
   # 11.  Exclude extreme errors with EWMA
   # a.	Erroneous measurements can distort the EWMA for measurements around them.
@@ -402,28 +411,34 @@ cleanbatch <- function(data.df,
     ))
   }
   data.df <- data.df[,
-    exclude := (function(df) {
-      num.ewma.excluded <- 0
+    "exclude" := (function(df) {
       # optimization: determine whether this subject has any duplicates
       has.duplicates <- subjid %in% subj.dup
-      while (TRUE) {
-        df[, (ewma.fields) := as.double(NaN)]
+      num.ewma.excluded <- 0
+      newly.excluded <- NULL
+      while (is.null(newly.excluded) || newly.excluded > num.ewma.excluded) {
+        if (!is.null(newly.excluded)) num.ewma.excluded <- newly.excluded
+
+        df[, (ewma.fields) := NA_real_]
         df[valid(exclude), (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE)]
 
         # note: at this point, only one ewma exists per param on a given day for a subject,
         #     so sort(ewma.all)[1] will returns the non-missing ewma.all
         # restrict to children with possible duplicates for efficiency
         if (has.duplicates) {
-          df[, `:=`(
-            ewma.all = sort(ewma.all)[1],
-            ewma.before = sort(ewma.before)[1],
-            ewma.after = sort(ewma.after)[1]
-          ), by = .(agedays)]
+          df[,
+             `:=`(
+              "ewma.all" = sort(ewma.all)[1],
+              "ewma.before" = sort(ewma.before)[1],
+              "ewma.after" = sort(ewma.after)[1]
+            ),
+            by = "agedays"
+          ]
         }
         df[, `:=`(
-          dewma.all = tbc.sd - ewma.all,
-          dewma.before = tbc.sd - ewma.before,
-          dewma.after = tbc.sd - ewma.after
+          "dewma.all" = tbc.sd - ewma.all,
+          "dewma.before" = tbc.sd - ewma.before,
+          "dewma.after" = tbc.sd - ewma.after
         )]
 
         # 11c.  Identify all values that meet all of the following criteria as potential exclusions:
@@ -445,7 +460,7 @@ cleanbatch <- function(data.df,
         # 11d.  If there is only one potential exclusion identified in step 11c
         #     for a subject and parameter, replace exc_*=5 for that value
         if (num.exclude == 1) {
-          df[rep, exclude := "Exclude-EWMA-Extreme"]
+          df[rep, "exclude" := "Exclude-EWMA-Extreme"]
         }
         # 11e.  If there is more than one potential exclusion identified in step 11c
         #     for a subject and parameter, calculate abssum_*=|tbc*sd+dewma_*| for each exclusion and
@@ -453,7 +468,7 @@ cleanbatch <- function(data.df,
         if (num.exclude > 1) {
           # first order by decreasing abssum
           worst.row <- with(df, order(rep, abs(tbc.sd + (tbc.sd - ewma.all)), decreasing = TRUE))[1]
-          df[worst.row, exclude := "Exclude-EWMA-Extreme"]
+          df[worst.row, "exclude" := "Exclude-EWMA-Extreme"]
         }
 
         # 11f.  For subjects/parameters with only 2 values, calculate abstbc*sd=|tbc*sd|
@@ -472,34 +487,29 @@ cleanbatch <- function(data.df,
         ))
         num.exclude <- sum(rep)
         if (num.exclude == 1) {
-          df[rep, exclude := "Exclude-EWMA-Extreme-Pair"]
+          df[rep, "exclude" := "Exclude-EWMA-Extreme-Pair"]
         }
         if (num.exclude > 1) {
           # first order by decreasing abssum
           worst.row <- with(df, order(rep, abs(tbc.sd), decreasing = TRUE))[1]
-          df[worst.row, exclude := "Exclude-EWMA-Extreme-Pair"]
+          df[worst.row, "exclude" := "Exclude-EWMA-Extreme-Pair"]
         }
 
         # 11h.  Recalculate temporary duplicates as in step 5
         # optimize: only perform these steps if this subject is known to have duplicate measurements
         if (has.duplicates) {
-          df[exclude == "Exclude-Temporary-Duplicate", exclude := "Include"]
-          df[temporary_duplicates(df), exclude := "Exclude-Temporary-Duplicate"]
+          df[exclude == "Exclude-Temporary-Duplicate", "exclude" := "Include"]
+          df[temporary_duplicates(df), "exclude" := "Exclude-Temporary-Duplicate"]
         }
 
         # 11i.  If there was at least one subject who had a potential exclusion identified in step 11c,
         #     repeat steps 11b-11g. If there were no subjects with potential
         #     exclusions identified in step 11c, move on to step 12.
         newly.excluded <- sum(df$exclude %in% c("Exclude-EWMA-Extreme", "Exclude-EWMA-Extreme-Pair"))
-        if (newly.excluded > num.ewma.excluded) {
-          num.ewma.excluded <- newly.excluded
-        } else {
-          break
-        }
       }
       return(df$exclude)
     })(copy(.SD)),
-    by = .(subjid, param),
+    by = c("subjid", "param"),
     .SDcols = c("index", "sex", "agedays", "tbc.sd", "exclude")
   ]
 
@@ -515,7 +525,7 @@ cleanbatch <- function(data.df,
   if (!quietly) {
     cat(sprintf("[%s] Exclude duplicates based on EWMA...\n", Sys.time()))
   }
-  data.df[exclude == "Exclude-Temporary-Duplicate", exclude := "Include"]
+  data.df[exclude == "Exclude-Temporary-Duplicate", "exclude" := "Include"]
 
   # 12b. Select which duplicate to include in EWMA calculations using the same criteria as in step 5.
   #      However, do not include values in these medians that were excluded in steps 9-11
@@ -527,15 +537,15 @@ cleanbatch <- function(data.df,
 
   # This is functionally the same as re-doing the "temporary duplicate" step before doing the EWMA
   temp.dups <- temporary_duplicates(data.df)
-  data.df[temp.dups, exclude := "Exclude-Temporary-Duplicate"]
+  data.df[temp.dups, "exclude" := "Exclude-Temporary-Duplicate"]
 
   # prepare a list of valid rows and initialize variables for convenience
   valid.rows <- valid(data.df)
   data.df[, `:=`(
-    ewma.all = as.double(NaN),
-    abssum2 = as.double(NaN),
-    median.other.sd = as.double(NaN),
-    duplicate = FALSE
+    "ewma.all" = NA_real_,
+    "abssum2" = NA_real_,
+    "median.other.sd" = NA_real_,
+    "duplicate" = FALSE
   )]
 
   # 12c.	Calculate a EWMA step for all subjects/parameters with duplicates and at least
@@ -548,10 +558,10 @@ cleanbatch <- function(data.df,
   dup.ratio.df <- data.df[
     subjid %in% subj.dup & (valid.rows | temp.dups),
     list(dup = (.N > 1)),
-    by = .(subjid, param, agedays)
+    by = c("subjid", "param", "agedays")
   ][,
     list(dup.ratio = mean(dup)),
-    keyby = .(subjid, param)
+    keyby = c("subjid", "param")
   ]
   # identify subject/parameters where there isduplication
   #     but at least one day with no duplicates for that parameter
@@ -562,27 +572,27 @@ cleanbatch <- function(data.df,
   # perform ewma for subjects with duplicates
   data.df[
     subjid %in% subj.dup & valid.rows,
-    ewma.all := ewma(agedays, tbc.sd, ewma.exp, ewma.adjacent = FALSE),
-    by = .(subjid, param)
+    "ewma.all" := ewma(agedays, tbc.sd, ewma.exp, ewma.adjacent = FALSE),
+    by = c("subjid", "param")
   ]
   # note: at this point, only one ewma.all exists per param on a given day for a subject,
   #     so sort(ewma.all)[1] will returns the non-missing ewma.all
-  data.df[subjid %in% subj.dup, ewma.all := sort(ewma.all)[1], by = .(subjid, param, agedays)]
+  data.df[subjid %in% subj.dup, "ewma.all" := sort(ewma.all)[1], by = c("subjid", "param", "agedays")]
 
   # iv.  Calculate abssum2_*=|2*dewma_*|+|tbc*sd|
   #     (note that this is different from how we calculated abssum_* in step 11).
   # NOTE: only children with more than one ageday with valid measurements will have a valid ewma from above
-  data.df[, abssum2 := 2 * abs(tbc.sd - ewma.all) + abs(tbc.sd)]
+  data.df[, "abssum2" := 2 * abs(tbc.sd - ewma.all) + abs(tbc.sd)]
 
   # 12d.  For each subject/parameter/age with duplicates and at least one non-duplicate value:
   #   i.  Replace exc_*=7 for all values except the value that has the smallest abssum2_*.
   data.df[
     J(subj.param.not.all.dups),
-    duplicate := seq_along(abssum2) != which.min(abssum2),
-    by = .(subjid, param, agedays)
+    "duplicate" := seq_along(abssum2) != which.min(abssum2),
+    by = c("subjid", "param", "agedays")
   ]
-  data.df[temp.dups, exclude := "Include"]
-  data.df[(valid.rows | temp.dups) & duplicate, exclude := "Exclude-Duplicate"]
+  data.df[temp.dups, "exclude" := "Include"]
+  data.df[(valid.rows | temp.dups) & duplicate, "exclude" := "Exclude-Duplicate"]
   #  ii.  Determine dup_tot_* (# of days with duplicates for that subject/parameter)
   #       and nodup_tot_* (# of days with nonexlcuded
   #       non-duplicates for that subject/parameter).
@@ -594,8 +604,8 @@ cleanbatch <- function(data.df,
 
   data.df[
     J(dup.ratio.df[dup.ratio > 1 / 2, list(subjid, param)]),
-    exclude := (function(df) {
-      df[, `:=`(tbc.sd.min = as.double(NaN), tbc.sd.max = as.double(NaN))]
+    "exclude" := (function(df) {
+      df[, `:=`("tbc.sd.min" = NA_real_, "tbc.sd.max" = NA_real_)]
       df[
         valid(
           exclude,
@@ -603,8 +613,8 @@ cleanbatch <- function(data.df,
           include.temporary.duplicates = TRUE
         ),
         `:=`(
-          tbc.sd.min = min(tbc.sd),
-          tbc.sd.max = max(tbc.sd)
+          "tbc.sd.min" = min(tbc.sd),
+          "tbc.sd.max" = max(tbc.sd)
         )
       ]
       df[
@@ -616,12 +626,12 @@ cleanbatch <- function(data.df,
             NA
           )
         ),
-        exclude := "Exclude-Duplicate"
+        "exclude" := "Exclude-Duplicate"
       ]
       return(df$exclude)
     })(copy(.SD)),
     .SDcols = c("exclude", "tbc.sd"),
-    by = .(subjid, param, agedays)
+    by = c("subjid", "param", "agedays")
   ]
 
   # 12e.	For each subject/parameter/age with duplicates and no nonduplicate values:
@@ -639,62 +649,62 @@ cleanbatch <- function(data.df,
   # calculate median for other parameter (restrict to subjects with all duplication for at least one parameter)
   data.df[
     subjid %in% subj.all.dups,
-    exclude := (function(subj.df) {
+    "exclude" := (function(subj.df) {
       # flag days that have duplicates / potentially valid parameters
       subj.df[, `:=`(
-        duplicates.this.day = FALSE,
-        duplicate = FALSE,
-        tbc.sd.min = as.double(NaN),
-        tbc.sd.max = as.double(NaN)
+        "duplicates.this.day" = FALSE,
+        "duplicate" = FALSE,
+        "tbc.sd.min" = NA_real_,
+        "tbc.sd.max" = NA_real_
       )]
       valid.rows <- valid(
         subj.df,
         include.duplicates = TRUE,
         include.temporary.duplicates = TRUE
       )
-      subj.df[valid.rows, duplicates.this.day := (.N > 1), by = .(param, agedays)]
+      subj.df[valid.rows, "duplicates.this.day" := (.N > 1), by = c("param", "agedays")]
       for (p in subj.df[j = unique(param)]) {
         median.sd <- subj.df[param != p & !duplicates.this.day, stats::median(tbc.sd)]
-        subj.df[param == p, median.other.sd := median.sd]
+        subj.df[param == p, "median.other.sd" := median.sd]
       }
       # safety check -- assign median.other.sd==0 to ensure "which.min" functions correctly below
       subj.df[is.na(median.other.sd), median.other.sd := 0]
       # identify rows as duplicate where |tbc*sd-median_tbcOsd| is not at the minimum value
       subj.df[
         duplicates.this.day == TRUE,
-        duplicate := seq_along(median.other.sd) != which.min(abs(tbc.sd - median.other.sd)),
-        by = .(param, agedays)
+        "duplicate" := seq_along(median.other.sd) != which.min(abs(tbc.sd - median.other.sd)),
+        by = c("param", "agedays")
       ]
-      subj.df[duplicates.this.day & !duplicate, exclude := "Include"]
-      subj.df[duplicates.this.day & duplicate, exclude := "Exclude-Duplicate"]
+      subj.df[duplicates.this.day & !duplicate, "exclude" := "Include"]
+      subj.df[duplicates.this.day & duplicate, "exclude" := "Exclude-Duplicate"]
       subj.df[
         duplicates.this.day == TRUE,
         `:=`(
-          tbc.sd.min = min(tbc.sd),
-          tbc.sd.max = max(tbc.sd)
+          "tbc.sd.min" = min(tbc.sd),
+          "tbc.sd.max" = max(tbc.sd)
         ),
-        by = .(param, agedays)
+        by = c("param", "agedays")
       ]
       subj.df[
-        tbc.sd.max - tbc.sd.min > ifelse(param == "HEIGHTCM",
+        tbc.sd.max - tbc.sd.min > fifelse(param == "HEIGHTCM",
           3,
-          ifelse(
+          fifelse(
             param == "WEIGHTKG",
-            ifelse(tbc.sd.min < 10, 0.25, ifelse(tbc.sd.min < 30, 0.5, 1)),
-            NA
+            fifelse(tbc.sd.min < 10, 0.25, fifelse(tbc.sd.min < 30, 0.5, 1)),
+            NA_real_
           )
         ),
-        exclude := "Exclude-Duplicate"
+        "exclude" := "Exclude-Duplicate"
       ]
 
       # identify kids who had an SD or EWMA extreme excluded
       #     that was a duplicate and re-label as "Exclude-Duplicate"
-      subj.df[, duplicates.this.day := FALSE]
+      subj.df[, "duplicates.this.day" := FALSE]
       # consider any non-missing measurement when determining presence of duplicates
       subj.df[
         exclude != "Missing",
-        duplicates.this.day := (.N > 1),
-        by = .(param, agedays)
+        "duplicates.this.day" := (.N > 1),
+        by = c("param", "agedays")
       ]
       subj.df[
         duplicates.this.day &
@@ -703,30 +713,33 @@ cleanbatch <- function(data.df,
             "Exclude-EWMA-Extreme",
             "Exclude-EWMA-Extreme-Pair"
           ),
-        exclude := "Exclude-Duplicate"
+        "exclude" := "Exclude-Duplicate"
       ]
 
       return(subj.df$exclude)
     })(copy(.SD)),
     .SDcols = c("param", "agedays", "exclude", "tbc.sd"),
-    by = .(subjid)
+    by = "subjid"
   ]
 
   # 12f.  For any values that were excluded with exc_*=4, 5, or 6 that are also duplicates, replace exc_*=7.
   data.df[
     subjid %in% subj.dup,
-    exclude := (function(subj.df) {
+    "exclude" := (function(subj.df) {
       if (.N > 1) {
-        subj.df[exclude %in% c(
-          "Exclude-SD-Cutoff",
-          "Exclude-EWMA-Extreme",
-          "Exclude-EWMA-Extreme-Pair"
-        ), exclude := "Exclude-Duplicate"]
+        subj.df[
+          exclude %in% c(
+            "Exclude-SD-Cutoff",
+            "Exclude-EWMA-Extreme",
+            "Exclude-EWMA-Extreme-Pair"
+          ),
+          "exclude" := "Exclude-Duplicate"
+        ]
       }
       return(subj.df$exclude)
     })(copy(.SD)),
-    .SDcols = c("exclude"),
-    by = .(subjid, param, agedays)
+    .SDcols = "exclude",
+    by = c("subjid", "param", "agedays")
   ]
 
   # 13.  Calculate plus/minus measurements with allowable errors and corresponding recentered SD scores
@@ -738,11 +751,11 @@ cleanbatch <- function(data.df,
   #    iv.	ht_minus=ht-1
   # b.	Foreach of the above calculated and then recenter the SD score for the new value,
   #     generating tbc*sd_plus and tbc*sd_minus
-  data.df[, delta := ifelse(param == "WEIGHTKG", .05 * v, 1)]
-  data.df[, `:=`(v.minus = v - delta, v.plus = v + delta)]
+  data.df[, "delta" := ifelse(param == "WEIGHTKG", .05 * v, 1)]
+  data.df[, `:=`("v.minus" = v - delta, "v.plus" = v + delta)]
   data.df[, `:=`(
-    tbc.sd.minus = measurement.to.z(param, agedays, sex, v.minus, TRUE),
-    tbc.sd.plus = measurement.to.z(param, agedays, sex, v.plus, TRUE)
+    "tbc.sd.minus" = measurement.to.z(param, agedays, sex, v.minus, TRUE),
+    "tbc.sd.plus" = measurement.to.z(param, agedays, sex, v.plus, TRUE)
   )]
 
   # 14.  Exclude moderate errors based on EWMA
@@ -756,31 +769,34 @@ cleanbatch <- function(data.df,
     cat(sprintf("[%s] Exclude moderate errors based on EWMA...\n", Sys.time()))
   }
   data.df[,
-    exclude := (function(subj.df) {
+    "exclude" := (function(subj.df) {
       num.ewma.excluded <- 0
-      while (TRUE) {
+      newly.excluded <- NULL
+      while (is.null(newly.excluded) || newly.excluded > num.ewma.excluded) {
+        if (!is.null(newly.excluded)) num.ewma.excluded <- newly.excluded
+
         valid.rows <- valid(subj.df)
         # initialize fields
         subj.df[, `:=`(
-          ewma.all = as.double(NaN),
-          ewma.before = as.double(NaN),
-          ewma.after = as.double(NaN),
-          tbc.sd.prev = as.double(NaN),
-          tbc.sd.next = as.double(NaN),
-          delta.agedays.prev = as.integer(NaN),
-          delta.agedays.next = as.integer(NaN),
-          abs.2ndlast.sd = as.double(NaN),
-          tbc.other.sd = as.double(NaN)
+          "ewma.all" = NA_real_,
+          "ewma.before" = NA_real_,
+          "ewma.after" = NA_real_,
+          "tbc.sd.prev" = NA_real_,
+          "tbc.sd.next" = NA_real_,
+          "delta.agedays.prev" = NA_integer_,
+          "delta.agedays.next" = NA_integer_,
+          "abs.2ndlast.sd" = NA_real_,
+          "tbc.other.sd" = NA_real_
         )]
         subj.df[
           valid.rows,
           (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE),
-          by = param
+          by = "param"
         ]
         subj.df[, `:=`(
-          dewma.all = tbc.sd - ewma.all,
-          dewma.before = tbc.sd - ewma.before,
-          dewma.after = tbc.sd - ewma.after
+          "dewma.all" = tbc.sd - ewma.all,
+          "dewma.before" = tbc.sd - ewma.before,
+          "dewma.after" = tbc.sd - ewma.after
         )]
 
         # 14c.	Calculate d_prevsd=tbc*sd-tbc*sdprev; d_prevsd_minus=tbc*sd_minus-tbc*sdprev;
@@ -792,46 +808,54 @@ cleanbatch <- function(data.df,
         #     (working on valid rows within a single parameter for a single subject)
         # structure c(NA, field.name[-.N]) == get.prev
         # structure c(field.name[-1], NA) == get.next
-        subj.df[valid.rows, `:=`(
-          tbc.sd.prev = c(NA, tbc.sd[-.N]),
-          tbc.sd.next = c(tbc.sd[-1], NA)
-        ), by = param]
+        subj.df[
+          valid.rows,
+          `:=`(
+            "tbc.sd.prev" = c(NA, tbc.sd[-.N]),
+            "tbc.sd.next" = c(tbc.sd[-1], NA)
+          ),
+          by = "param"
+        ]
         subj.df[, `:=`(
-          dprev.sd = tbc.sd - tbc.sd.prev,
-          dprev.sd.minus = tbc.sd.minus - tbc.sd.prev,
-          dprev.sd.plus = tbc.sd.plus - tbc.sd.prev,
-          dnext.sd = tbc.sd - tbc.sd.next,
-          dnext.sd.minus = tbc.sd.minus - tbc.sd.next,
-          dnext.sd.plus = tbc.sd.plus - tbc.sd.next
+          "dprev.sd" = tbc.sd - tbc.sd.prev,
+          "dprev.sd.minus" = tbc.sd.minus - tbc.sd.prev,
+          "dprev.sd.plus" = tbc.sd.plus - tbc.sd.prev,
+          "dnext.sd" = tbc.sd - tbc.sd.next,
+          "dnext.sd.minus" = tbc.sd.minus - tbc.sd.next,
+          "dnext.sd.plus" = tbc.sd.plus - tbc.sd.next
         )]
 
         # 14d.	Calculate d_agedays_prev=agedays-agedaysprev and d_agedays_next=agedaysnext-agedays
-        subj.df[valid.rows, `:=`(
-          delta.agedays.prev = as.integer(agedays - c(NA, agedays[-.N])),
-          delta.agedays.next = as.integer(agedays - c(agedays[-1], NA))
-        ), by = param]
+        subj.df[
+          valid.rows,
+          `:=`(
+            "delta.agedays.prev" = as.integer(agedays - c(NA_integer_, agedays[-.N])),
+            "delta.agedays.next" = as.integer(agedays - c(agedays[-1], NA_integer_))
+          ),
+          by = "param"
+        ]
 
         # 14e.	Generate abs_2ndlast_sd=|tbc*sd| for the second-to-last measurement for a subject/parameter
         # assign this value (if defined) to all agedays for that subject
         subj.df[
           valid.rows,
-          abs.2ndlast.sd := ifelse(.N >= 2, abs(tbc.sd[.N - 1]), as.double(NaN)),
-          by = param
+          "abs.2ndlast.sd" := ifelse(.N >= 2, abs(tbc.sd[.N - 1]), NA_real_),
+          by = "param"
         ]
 
         # 14f.	Calculate tbcOsd which is the tbc*sd for the OTHER parameter for the same subject
         #     and ageday  with exc_*==0 (this may be missing).
         # NOTE: move this simplified version of swap_parameters here for efficiency
         valid.other <- subj.df[valid.rows, list(
-          param.other = ifelse(param == "WEIGHTKG", "HEIGHTCM", "WEIGHTKG"),
+          param.other = fifelse(param == "WEIGHTKG", "HEIGHTCM", "WEIGHTKG"),
           agedays.other = agedays,
           tbc.sd
         )]
         setkeyv(valid.other, c("param.other", "agedays.other"))
-        subj.df[valid.rows, tbc.other.sd := valid.other[list(param, agedays), tbc.sd]]
+        subj.df[valid.rows, "tbc.other.sd" := valid.other[list(param, agedays), tbc.sd]]
 
         subj.df[,
-          exclude := (function(df) {
+          "exclude" := (function(df) {
             # 14g.  Calculate median_tbcOsd which is the median_tbc*sd for the OTHER parameter
             #     for the same subject with exc_*==0 (this may be missing)
             # also assign param variable for use in subsequent steps
@@ -880,7 +904,7 @@ cleanbatch <- function(data.df,
                 dnext.sd.plus < -1 &
                 dnext.sd.minus < -1
               ),
-              temp.exclude := "Exclude-EWMA-8"
+              "temp.exclude" := "Exclude-EWMA-8"
             ]
 
             # 14h.ii.	Replace temp_exc_*=9 if the value is the first of 3 or more measurements
@@ -891,10 +915,8 @@ cleanbatch <- function(data.df,
 
             # take advantage of other variables we have calculated to infer that a row is
             # the first of three or more valid measurements for a paramete
-            df$first.of.three.or.more <- FALSE
-            df$last.of.three.or.more <- FALSE
-            df[is.na(delta.agedays.prev) & num.valid >= 3, first.of.three.or.more := TRUE]
-            df[is.na(delta.agedays.next) & num.valid >= 3, last.of.three.or.more := TRUE]
+            df[, "first.of.three.or.more" := is.na(delta.agedays.prev) & num.valid >= 3]
+            df[, "last.of.three.or.more" := is.na(delta.agedays.next) & num.valid >= 3]
 
             df[
               first.of.three.or.more & delta.agedays.next < 365.25 &
@@ -913,7 +935,7 @@ cleanbatch <- function(data.df,
                     dnext.sd.minus < -1
                   )
                 ),
-              temp.exclude := "Exclude-EWMA-9"
+              "temp.exclude" := "Exclude-EWMA-9"
             ]
 
             # 14h.iii.	Replace temp_exc_*=10 if the value is the first of 3 or more measurements
@@ -941,7 +963,7 @@ cleanbatch <- function(data.df,
                     dnext.sd.minus < -1
                   )
                 ),
-              temp.exclude := "Exclude-EWMA-10"
+              "temp.exclude" := "Exclude-EWMA-10"
             ]
 
             # 14h.iv.	Replace temp_exc_*=11 if the value is the last of 3 or more measurements
@@ -966,7 +988,7 @@ cleanbatch <- function(data.df,
                     dprev.sd.minus < -1
                   )
                 ),
-              temp.exclude := "Exclude-EWMA-11"
+              "temp.exclude" := "Exclude-EWMA-11"
             ]
 
             # 14h.v.	Replace temp_exc_*=12 if the value is the last of 3 or more measurements
@@ -993,7 +1015,7 @@ cleanbatch <- function(data.df,
                     dprev.sd.minus < -1
                   )
                 ),
-              temp.exclude := "Exclude-EWMA-12"
+              "temp.exclude" := "Exclude-EWMA-12"
             ]
 
             # 14h.vi.	Replace temp_exc_*=13 if the value is the last of 3 or more measurements
@@ -1035,7 +1057,7 @@ cleanbatch <- function(data.df,
                     )
                   )
                 ),
-              temp.exclude := "Exclude-EWMA-13"
+              "temp.exclude" := "Exclude-EWMA-13"
             ]
 
             # 14h.vii.	Replace temp_exc_*=14 if the value is the last of 3 or more measurements
@@ -1074,7 +1096,7 @@ cleanbatch <- function(data.df,
                     )
                   )
                 ),
-              temp.exclude := "Exclude-EWMA-14"
+              "temp.exclude" := "Exclude-EWMA-14"
             ]
 
             # 14i.	If there is only one potential exclusion identified in step 14h
@@ -1082,7 +1104,7 @@ cleanbatch <- function(data.df,
             rep <- !is.na(df$temp.exclude)
             num.exclude <- sum(rep)
             if (num.exclude == 1) {
-              df[rep, exclude := temp.exclude]
+              df[rep, "exclude" := temp.exclude]
             }
 
             # 14j.	If there is more than one potential exclusion identified in step 14h
@@ -1091,28 +1113,23 @@ cleanbatch <- function(data.df,
             if (num.exclude > 1) {
               # first order by decreasing abssum  (where rep=TRUE)
               worst.row <- with(df, order(rep, abs(tbc.sd + dewma.all), decreasing = TRUE))[1]
-              df[worst.row, exclude := temp.exclude]
+              df[worst.row, "exclude" := temp.exclude]
             }
 
             return(df$exclude)
           })(copy(.SD)),
-          by = param
+          by = "param"
         ]
 
         # k.	If there was at least one subject who had a potential exclusion identified in step 14h,
         #     repeat steps 14b-14j. If there were no subjects with potential
         #     exclusions identified in step 14h, move on to step 15.
         newly.excluded <- sum(subj.df$exclude >= "Exclude-EWMA-8" & subj.df$exclude <= "Exclude-EWMA-14")
-        if (newly.excluded > num.ewma.excluded) {
-          num.ewma.excluded <- newly.excluded
-        } else {
-          break
-        }
       }
 
       return(subj.df$exclude)
     })(copy(.SD)),
-    by = subjid,
+    by = "subjid",
     .SDcols = c(
       "index",
       "sex",
@@ -1145,388 +1162,388 @@ cleanbatch <- function(data.df,
       Sys.time()
     ))
   }
-  data.df[param == "HEIGHTCM", exclude := (function(subj.df) {
-    # assign some book keeping variables
-    # subj.df[, `:=`(subjid = subjid, param='HEIGHTCM',index=1:.N)]
-    subj.df[, index := 1:.N]
+  data.df[
+    param == "HEIGHTCM",
+    exclude := (function(subj.df) {
+      # assign some book keeping variables
+      # subj.df[, `:=`(subjid = subjid, param='HEIGHTCM',index=1:.N)]
+      subj.df[, "index" := 1:.N]
 
-    num.height.excluded <- 0
-    while (TRUE) {
-      # use a closure to discard all the extra fields added to df with each iteration
-      subj.df[valid(exclude), exclude := (function(df) {
-        # with each iteration we are operating only on valid rows to allow simplification of code below
+      num.height.excluded <- 0
+      newly.excluded <- NULL
+      while (is.null(newly.excluded) || newly.excluded > num.height.excluded) {
+        if (!is.null(newly.excluded)) num.height.excluded <- newly.excluded
 
-        # initialize fields
-        df[, (ewma.fields) := as.double(NaN)]
-        df[, `:=`(
-          v.prev = as.double(NaN),
-          v.next = as.double(NaN),
-          dewma.after.prev = as.double(NaN),
-          dewma.before.next = as.double(NaN),
-          abs.tbc.sd.prev = as.double(NaN),
-          abs.tbc.sd.next = as.double(NaN),
-          agedays.next = as.integer(NaN),
-          abs.2ndlast.sd = as.double(NaN),
-          mindiff.prev.ht = as.double(NaN),
-          mindiff.next.ht = as.double(NaN),
-          maxdiff.prev.ht = as.double(NaN),
-          maxdiff.next.ht = as.double(NaN),
-          pair.prev = FALSE,
-          pair.next = FALSE
-        )]
+        # use a closure to discard all the extra fields added to df with each iteration
+        subj.df[valid(exclude), "exclude" := (function(df) {
+          # with each iteration we are operating only on valid rows to allow simplification of code below
 
-        # ewma fields are needed later -- calculate now for efficiency
-        df[, (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE)]
+          # initialize fields
+          df[, (ewma.fields) := NA_real_]
+          df[, `:=`(
+            "v.prev" = NA_real_,
+            "v.next" = NA_real_,
+            "dewma.after.prev" = NA_real_,
+            "dewma.before.next" = NA_real_,
+            "abs.tbc.sd.prev" = NA_real_,
+            "abs.tbc.sd.next" = NA_real_,
+            "agedays.next" = NA_integer_,
+            "abs.2ndlast.sd" = NA_real_,
+            "mindiff.prev.ht" = NA_real_,
+            "mindiff.next.ht" = NA_real_,
+            "maxdiff.prev.ht" = NA_real_,
+            "maxdiff.next.ht" = NA_real_,
+            "pair.prev" = FALSE,
+            "pair.next" = FALSE
+          )]
 
-        # calculate some usefule values (e.g. dewma values and tbc.sd) for use in later steps
-        df[, `:=`(
-          dewma.all = tbc.sd - ewma.all,
-          dewma.before = tbc.sd - ewma.before,
-          dewma.after = tbc.sd - ewma.after,
-          abs.tbc.sd = abs(tbc.sd)
-        )]
+          # ewma fields are needed later -- calculate now for efficiency
+          df[, (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE)]
 
-        # 15a.  As with steps 11 and 14, only one value will be excluded per round,
-        #     and the step will be repeated until there are no more values to exclude
-        # b.  For each height, calculate the d_age=agedays of next value-agedays of current value
-        # NOTE: obtain next measurement, ewma.before and abs.tbc.sd as well since they are needed later
+          # calculate some usefule values (e.g. dewma values and tbc.sd) for use in later steps
+          df[, `:=`(
+            "dewma.all" = tbc.sd - ewma.all,
+            "dewma.before" = tbc.sd - ewma.before,
+            "dewma.after" = tbc.sd - ewma.after,
+            "abs.tbc.sd" = abs(tbc.sd)
+          )]
 
-        # for efficiency, bring get.next inline here (working on valid rows within a single parameter
-        #     for a single subject)
-        # structure c(field.name[-1], NA) == get.next
-        df[, `:=`(
-          agedays.next = c(agedays[-1], NA),
-          v.next = c(v[-1], NA),
-          dewma.before.next = c(dewma.before[-1], NA),
-          abs.tbc.sd.next = c(abs.tbc.sd[-1], NA)
-        )]
-        df$delta.agedays.next <- with(df, agedays.next - agedays)
+          # 15a.  As with steps 11 and 14, only one value will be excluded per round,
+          #     and the step will be repeated until there are no more values to exclude
+          # b.  For each height, calculate the d_age=agedays of next value-agedays of current value
+          # NOTE: obtain next measurement, ewma.before and abs.tbc.sd as well since they are needed later
 
-        # 15c.	For each height, calculate mid_agedays=0.5*(agedays of next value + agedays of current value)
-        df$mid.agedays <- 0.5 * (df$agedays.next + df$agedays)
+          # for efficiency, bring get.next inline here (working on valid rows within a single parameter
+          #     for a single subject)
+          # structure c(field.name[-1], NA) == get.next
+          df[, `:=`(
+            "agedays.next" = c(agedays[-1], NA),
+            "v.next" = c(v[-1], NA),
+            "dewma.before.next" = c(dewma.before[-1], NA),
+            "abs.tbc.sd.next" = c(abs.tbc.sd[-1], NA)
+          )]
+          df$delta.agedays.next <- with(df, agedays.next - agedays)
 
-        # 15d.	Generate variable tanner_months= 6+12*(round(mid_agedays/365.25))
-        # only calculate for rows that relate to height (may speed up subsequent processing)
-        df$tanner.months <- with(df, 6 + 12 * (round(mid.agedays / 365.25)))
+          # 15c.	For each height, calculate mid_agedays=0.5*(agedays of next value + agedays of current value)
+          df$mid.agedays <- 0.5 * (df$agedays.next + df$agedays)
 
-        # 15e.	Merge with dataset tanner_ht_vel using sex and tanner_months
-        #     – this will give you min_ht_vel and max_ht_vel
-        setkeyv(df, c("sex", "tanner.months"))
-        df <- tanner.ht.vel[df]
+          # 15d.	Generate variable tanner_months= 6+12*(round(mid_agedays/365.25))
+          # only calculate for rows that relate to height (may speed up subsequent processing)
+          df$tanner.months <- with(df, 6 + 12 * (round(mid.agedays / 365.25)))
 
-        # 15f.	Calculate the following:
-        #   i.	mindiff_ht=0.5*min_ht_vel*(d_agedays/365.25)^2-3 if d_agedays<365.25
-        #   ii.	replace mindiff_ht=0.5*min_ht_vel-3 if d_agedays>365.25
-        df[, ht.exp := ifelse(delta.agedays.next < 365.25, 2, 0)]
-        df[, `:=`(
-          maxdiff.next.ht = as.double(NA),
-          mindiff.next.ht = as.double(NaN)
-        )]
-        df[, mindiff.next.ht := 0.5 * min.ht.vel * (delta.agedays.next /
-          365.25)^ht.exp - 3]
+          # 15e.	Merge with dataset tanner_ht_vel using sex and tanner_months
+          #     – this will give you min_ht_vel and max_ht_vel
+          setkeyv(df, c("sex", "tanner.months"))
+          df <- tanner.ht.vel[df]
 
-        # 15f.iii.	maxdiff_ht=2*max_ht_vel*(d_agedays/365.25)^1.5+5.5 if d_agedays>365.25
-        #   iv.	replace maxdiff_ht=2*max_ht_vel*(d_agedays/365.25)^0.33+5.5 if d_agedays<365.25
-        df[, ht.exp := ifelse(delta.agedays.next < 365.25, 0.33, 1.5)]
-        df[, maxdiff.next.ht := 2 * max.ht.vel * (delta.agedays.next /
-          365.25)^ht.exp + 5.5]
+          # 15f.	Calculate the following:
+          #   i.	mindiff_ht=0.5*min_ht_vel*(d_agedays/365.25)^2-3 if d_agedays<365.25
+          #   ii.	replace mindiff_ht=0.5*min_ht_vel-3 if d_agedays>365.25
+          df[, "ht.exp" := ifelse(delta.agedays.next < 365.25, 2, 0)]
+          df[, `:=`(
+            "maxdiff.next.ht" = NA_real_,
+            "mindiff.next.ht" = NA_real_
+          )]
+          df[, "mindiff.next.ht" := 0.5 * min.ht.vel * (delta.agedays.next / 365.25)^ht.exp - 3]
 
-        # 15g.	Generate variable whoagegrp_ht=agedays/30.4375 rounded to the nearest integer
-        df[, whoagegrp.ht := round(agedays / 30.4375)]
+          # 15f.iii.	maxdiff_ht=2*max_ht_vel*(d_agedays/365.25)^1.5+5.5 if d_agedays>365.25
+          #   iv.	replace maxdiff_ht=2*max_ht_vel*(d_agedays/365.25)^0.33+5.5 if d_agedays<365.25
+          df[, "ht.exp" := ifelse(delta.agedays.next < 365.25, 0.33, 1.5)]
+          df[, "maxdiff.next.ht" := 2 * max.ht.vel * (delta.agedays.next / 365.25)^ht.exp + 5.5]
 
-        # 15h.	Generate variable whoinc_age_ht based on values of d_agedays_ht according the the following table
-        #   d_agedays_ht	whoinc_age_ht
-        #   20-45	        1
-        #   46-75	        2
-        #   76-106	      3
-        #   107-152	      4
-        #   153-198	      6
-        #   All others	  missing
-        df[, whoinc.age.ht := ifelse(delta.agedays.next < 20,
-          NA,
-          ifelse(
-            delta.agedays.next <= 45,
-            1,
+          # 15g.	Generate variable whoagegrp_ht=agedays/30.4375 rounded to the nearest integer
+          df[, "whoagegrp.ht" := round(agedays / 30.4375)]
+
+          # 15h.	Generate variable whoinc_age_ht based on values of d_agedays_ht according the the following table
+          #   d_agedays_ht	whoinc_age_ht
+          #   20-45	        1
+          #   46-75	        2
+          #   76-106	      3
+          #   107-152	      4
+          #   153-198	      6
+          #   All others	  missing
+          df[, "whoinc.age.ht" := ifelse(delta.agedays.next < 20,
+            NA_real_,
             ifelse(
-              delta.agedays.next <= 75,
-              2,
+              delta.agedays.next <= 45,
+              1,
               ifelse(
-                delta.agedays.next <= 106,
-                3,
+                delta.agedays.next <= 75,
+                2,
                 ifelse(
-                  delta.agedays.next <= 152,
-                  4,
-                  ifelse(delta.agedays.next <= 198, 6, NA)
+                  delta.agedays.next <= 106,
+                  3,
+                  ifelse(
+                    delta.agedays.next <= 152,
+                    4,
+                    ifelse(delta.agedays.next <= 198, 6, NA_real_)
+                  )
                 )
               )
             )
-          )
-        )]
+          )]
 
-        # i.	Merge using sex and whoagegrp_ht using who_ht_vel_3sd and who_ht_maxvel_3sd;
-        #     this will give you varaibles whoinc_i_ht and maxwhoinc_i_ht
-        #     for various intervals where i is 1,2, 3,4, 6 and corresponds to whoinc_age_ht.
-        setkeyv(df, c("sex", "whoagegrp.ht"))
-        df <- who.ht.vel[df]
+          # i.	Merge using sex and whoagegrp_ht using who_ht_vel_3sd and who_ht_maxvel_3sd;
+          #     this will give you varaibles whoinc_i_ht and maxwhoinc_i_ht
+          #     for various intervals where i is 1,2, 3,4, 6 and corresponds to whoinc_age_ht.
+          setkeyv(df, c("sex", "whoagegrp.ht"))
+          df <- who.ht.vel[df]
 
-        # restore original sort order (ensures valid.rows variable applies to correct rows)
-        setkeyv(df, "index")
+          # restore original sort order (ensures valid.rows variable applies to correct rows)
+          setkeyv(df, "index")
 
-        # 15j.	Generate variable who_mindiff_ht=whoinc_i_ht according to the value if whoinc_age_ht;
-        #     make who_mindiff_ht missing if whoinc_i_ht or whoinc_age_ht is missing.
-        df[, who.mindiff.next.ht := ifelse(
-          delta.agedays.next < 20,
-          NA,
-          ifelse(
-            delta.agedays.next <= 45,
-            whoinc.1.ht,
+          # 15j.	Generate variable who_mindiff_ht=whoinc_i_ht according to the value if whoinc_age_ht;
+          #     make who_mindiff_ht missing if whoinc_i_ht or whoinc_age_ht is missing.
+          df[, "who.mindiff.next.ht" := ifelse(
+            delta.agedays.next < 20,
+            NA_real_,
             ifelse(
-              delta.agedays.next <= 75,
-              whoinc.2.ht,
+              delta.agedays.next <= 45,
+              whoinc.1.ht,
               ifelse(
-                delta.agedays.next <= 106,
-                whoinc.3.ht,
+                delta.agedays.next <= 75,
+                whoinc.2.ht,
                 ifelse(
-                  delta.agedays.next <= 152,
-                  whoinc.4.ht,
-                  ifelse(delta.agedays.next <= 198, whoinc.6.ht, NA)
+                  delta.agedays.next <= 106,
+                  whoinc.3.ht,
+                  ifelse(
+                    delta.agedays.next <= 152,
+                    whoinc.4.ht,
+                    ifelse(delta.agedays.next <= 198, whoinc.6.ht, NA_real_)
+                  )
                 )
               )
             )
-          )
-        )]
+          )]
 
-        # 15k.	Generate variable who_maxdiff_ht=max_whoinc_i_ht according to the value
-        #      if whoinc_age_ht; make who_maxdiff_ht missing if max_whoinc_i_ht or
-        #     whoinc_age_ht is missing.
-        df[, who.maxdiff.next.ht := ifelse(
-          delta.agedays.next < 20,
-          NA,
-          ifelse(
-            delta.agedays.next <= 45,
-            max.whoinc.1.ht,
+          # 15k.	Generate variable who_maxdiff_ht=max_whoinc_i_ht according to the value
+          #      if whoinc_age_ht; make who_maxdiff_ht missing if max_whoinc_i_ht or
+          #     whoinc_age_ht is missing.
+          df[, "who.maxdiff.next.ht" := ifelse(
+            delta.agedays.next < 20,
+            NA_real_,
             ifelse(
-              delta.agedays.next <= 75,
-              max.whoinc.2.ht,
+              delta.agedays.next <= 45,
+              max.whoinc.1.ht,
               ifelse(
-                delta.agedays.next <= 106,
-                max.whoinc.3.ht,
+                delta.agedays.next <= 75,
+                max.whoinc.2.ht,
                 ifelse(
-                  delta.agedays.next <= 152,
-                  max.whoinc.4.ht,
-                  ifelse(delta.agedays.next <= 198, max.whoinc.6.ht, NA)
+                  delta.agedays.next <= 106,
+                  max.whoinc.3.ht,
+                  ifelse(
+                    delta.agedays.next <= 152,
+                    max.whoinc.4.ht,
+                    ifelse(delta.agedays.next <= 198, max.whoinc.6.ht, NA_real_)
+                  )
                 )
               )
             )
+          )]
+
+          # 15l.	Scale allowed value based on d_agedays_ht:
+          #   1.	replace who_mindiff_`p'=who_mindiff_`p'*d_agedays_`p'/(whoinc_age_`p'*30.4375)
+          #     if d_agedays_`p'<(whoinc_age_`p'*30.4375)
+          #   2.	replace who_maxdiff_`p'=who_maxdiff_`p'*d_agedays_`p'/(whoinc_age_`p'*30.4375)
+          #     if d_agedays_`p'>(whoinc_age_`p'*30.4375)
+          df[
+            delta.agedays.next < whoinc.age.ht * 30.4375,
+            `:=`(
+              "who.mindiff.next.ht" = who.mindiff.next.ht * delta.agedays.next / (whoinc.age.ht * 30.4375),
+              "who.maxdiff.next.ht" = who.maxdiff.next.ht * delta.agedays.next / (whoinc.age.ht * 30.4375)
+            )
+          ]
+
+          # 15m.	Replace mindiff_ht/maxdiff_ht with adjusted WHO value if Tanner value
+          #     is missing or if both are present and age difference is < 9 months:
+          #   1.	replace mindiff_`p'=0.5*who_mindiff_`p'-3 if who_mindiff_`p'
+          #     is not missing & d_agedays_`p'<(9*30.4375)
+          #   2.	replace maxdiff_`p'=2*who_maxdiff_`p'+3 if who_maxdiff_`p'
+          #     is not missing & d_agedays_`p'<(9*30.4375)
+          #   3.	replace mindiff_`p'=0.5*who_mindiff_`p'-3 if mindiff_`p'
+          #     is missing & who_mindiff_`p' is not missing
+          #   4.	replace maxdiff_`p'=2*who_maxdiff_`p'+3 if maxdiff_`p
+          #     is missing & who_maxdiff_`p' is not missing
+
+          # refactored logic slightly for efficiency
+          df[
+            !is.na(who.mindiff.next.ht) & (delta.agedays.next < 9 * 30.4375 | is.na(mindiff.next.ht)),
+            `:=`(
+              "mindiff.next.ht" = 0.5 * who.mindiff.next.ht - 3,
+              "maxdiff.next.ht" = 2.0 * who.maxdiff.next.ht + 3
+            )
+          ]
+
+          # 15m.5.  replace mindiff_`p'=-3 if mindiff_`p' is missing
+          df[is.na(mindiff.next.ht), "mindiff.next.ht" := -3]
+
+          # 15n.	Determine the min/maxdiffs for the previous age: mindiff_prev_ht, maxdiff_prev_ht
+          # NOTE: obtain previous height, ewma.after value and abs.tbc.sd as well
+          #     since they are needed in next steps
+
+          # for efficiency, bring get.prev inline here (working on valid rows within a single parameter
+          #     for a single subject)
+          # structure c(NA, tbc.sd[-.N]) == get.prev
+          df[, `:=`(
+            "v.prev" = c(NA, v[-.N]),
+            "dewma.after.prev" = c(NA, dewma.after[-.N]),
+            "abs.tbc.sd.prev" = c(NA, abs.tbc.sd[-.N]),
+            "mindiff.prev.ht" = c(NA, mindiff.next.ht[-.N]),
+            "maxdiff.prev.ht" = c(NA, maxdiff.next.ht[-.N])
+          )]
+
+          # 15o.	Determine d_prev_ht=ht-htprev (set to missing for the first value for a subject)
+          #     and d_next_ht=htnext-ht (set to missing for the last value for a subject)
+          df[, `:=`(
+            "delta.prev.ht" = v - v.prev,
+            "delta.next.ht" = v.next - v
+          )]
+
+          # 15p.  Perform a EWMA calculation with the following modifications:
+          #  i.	  Generate a variable pair=1 if (d_prev_ht<mindiff_prev_ht OR d_ht<mindiff_ht OR
+          #     d_prev_ht>maxdiff_prev_ht  OR d_ht>maxdiff_ht) AND exc_ht==0
+          df[, "pair" := na_as_false(
+            delta.prev.ht < mindiff.prev.ht |
+              delta.next.ht < mindiff.next.ht |
+              delta.prev.ht > maxdiff.prev.ht |
+              delta.next.ht > maxdiff.next.ht
+          )]
+
+          # for efficiency, bring get.prev and get.next inline here (working on valid rows within
+          #     a single parameter for a single subject)
+          # structure c(NA, field.name[-.N]) == get.prev
+          # structure c(field.name[-1], NA) == get.next
+          df[, `:=`(
+            "pair.prev" = c(FALSE, pair[-.N]),
+            "pair.next" = c(pair[-1], FALSE)
+          )]
+
+          #  ii.	Generate bef_g_aftm1=1 if |Δewma_htbef| for the value of interest is greater
+          #       than |Δewma_htaft| for the previous value
+          #       AND the value of interest is not the first height value for that subject
+          #       AND pair==1 AND pair for the previous value==1
+
+          #  iii.	Generate aft_g_befp1=1 if |Δewma_htaft| for the value of interest is greater
+          #       than |Δewma_htbef| for the next value
+          #       AND the value of interest is not the last height value for that subject
+          #       AND pair==1 AND pair for the next value==1
+          # NOTE: pair.next will be NA last height, which will result in a FALSE value below
+          df[, `:=`(
+            "bef.g.aftm1" = na_as_false(abs(dewma.before) > abs(dewma.after.prev) & pair & pair.prev),
+            "aft.g.befp1" = na_as_false(abs(dewma.after) > abs(dewma.before.next) & pair & pair.next)
+          )]
+
+          #  iv.	Determine tbchtsd for each value as well as the one before prev_tbchtsd and after next_tbchtsd it
+          # NOTE: done previously for efficiency
+
+          # 15p.v.  Determine the total number of ht values for each subject (tot_ht)
+          # NOTE: all rows are valid due to constraint in subj.df[...] statement
+          num.valid <- .N
+
+          # 15q.	Identify a value for possible exclusion if one of the following sets of criteria are met.
+          #     For values identified by each set of criteria determine
+          #       the value of temp_diff using the formula given
+          #   i.	d_prev_ht<mindiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
+          #     a.  (temp_diff=|dewma_ht_bef|)
+          df[, "temp.diff" := NA_real_]
+          df$temp.exclude <- factor(NA, levels = exclude.levels, ordered = TRUE)
+          df[
+            delta.prev.ht < mindiff.prev.ht & bef.g.aftm1,
+            `:=`(
+              "temp.diff" = abs(dewma.before),
+              "temp.exclude" = "Exclude-Min-Height-Change"
+            )
+          ]
+
+          #   ii.	d_ht<mindiff_ht & aft_g_befp1_ht==1 & exc_ht==0 & mindiff_ht is not missing
+          #     a.	(temp_diff=|dewma_ht_aft|)
+          df[
+            delta.next.ht < mindiff.next.ht & aft.g.befp1,
+            `:=`(
+              "temp.diff" = abs(dewma.after),
+              "temp.exclude" = "Exclude-Min-Height-Change"
+            )
+          ]
+
+          #   iii.	d_prev_ht>maxdiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
+          #     a.  (temp_diff=|dewma_ht_bef|)
+          df[
+            delta.prev.ht > maxdiff.prev.ht & bef.g.aftm1,
+            `:=`(
+              "temp.diff" = abs(dewma.before),
+              "temp.exclude" = "Exclude-Max-Height-Change"
+            )
+          ]
+
+          #   iv.	d_ht>maxdiff_ht & aft_g_befp1_ht==1 & exc_ht==0 & mindiff_ht is not missing
+          #     a.  (temp_diff=|dewma_ht_aft|)
+          df[
+            delta.next.ht > maxdiff.next.ht & aft.g.befp1,
+            `:=`(
+              "temp.diff" = abs(dewma.after),
+              "temp.exclude" = "Exclude-Max-Height-Change"
+            )
+          ]
+
+          #   v.	d_prev_ht<mindiff_prev_ht & tot_ht==2 & |tbchtsd|>|prev_tbchtsd|
+          #     a. for v-viii temp_diff is kept as missing
+          #   vi. d_ht<mindiff_ht & tot_ht==2 & |tbchtsd|>|next_tbchtsd|
+          df[
+            delta.prev.ht < mindiff.prev.ht & num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev |
+            delta.next.ht < mindiff.next.ht & num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
+            "temp.exclude" := "Exclude-Min-Height-Change"
+          ]
+
+          #   vii.	d_prev_ht>maxdiff_prev_ht & tot_ht==2 & |tbchtsd|>|prev_tbchtsd|
+          #   viii. d_ht>maxdiff_ht & tot_ht==2 & |tbchtsd|>|next_tbchtsd|
+          df[
+            delta.prev.ht > maxdiff.prev.ht & num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev |
+              delta.next.ht > maxdiff.next.ht & num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
+            "temp.exclude" := "Exclude-Max-Height-Change"
+          ]
+
+          # r.  If there is only one potential exclusion identified in step 15j for a subject and parameter,
+          #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi  and exc_ht=16
+          #     if it met criteria iii, iv, vii, or viii
+          # NOTE: these exclusions are assigned in the code above as 'Exclude-Min-Height-Change'
+          #     and 'Exclude-Max-Height-Change'
+          rep <- !is.na(df$temp.exclude)
+          num.exclude <- sum(rep)
+          if (num.exclude == 1) {
+            df[rep, "exclude" := temp.exclude]
+          }
+
+          # s.  If there is more than one potential exclusion identified in step 14h for a subject
+          #     and parameter, determine which value has the largest temp_diff and
+          #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi and exc_ht=16
+          #     for that value if it met criteria iii,  iv, vii, or viii.
+
+          if (num.exclude > 1) {
+            # first order by decreasing temp.diff (where rep=TRUE)
+            worst.row <- order(rep, df$temp.diff, decreasing = TRUE)[1]
+            df[worst.row, "exclude" := temp.exclude]
+          }
+
+          return(df$exclude)
+        })(copy(.SD))]
+
+        # t.  If there was at least one subject who had a potential exclusion identified in step 15q,
+        #     repeat steps 15b-15q. If there were no subjects with potential
+        #     exclusions identified in step 15q, move on to step 16.
+        newly.excluded <- sum(
+          subj.df$exclude %in% c(
+            "Exclude-Min-Height-Change",
+            "Exclude-Max-Height-Change"
           )
-        )]
-
-        # 15l.	Scale allowed value based on d_agedays_ht:
-        #   1.	replace who_mindiff_`p'=who_mindiff_`p'*d_agedays_`p'/(whoinc_age_`p'*30.4375)
-        #     if d_agedays_`p'<(whoinc_age_`p'*30.4375)
-        #   2.	replace who_maxdiff_`p'=who_maxdiff_`p'*d_agedays_`p'/(whoinc_age_`p'*30.4375)
-        #     if d_agedays_`p'>(whoinc_age_`p'*30.4375)
-        df[
-          delta.agedays.next < whoinc.age.ht * 30.4375,
-          `:=`(
-            who.mindiff.next.ht = who.mindiff.next.ht * delta.agedays.next / (whoinc.age.ht * 30.4375),
-            who.maxdiff.next.ht = who.maxdiff.next.ht * delta.agedays.next / (whoinc.age.ht * 30.4375)
-          )
-        ]
-
-        # 15m.	Replace mindiff_ht/maxdiff_ht with adjusted WHO value if Tanner value
-        #     is missing or if both are present and age difference is < 9 months:
-        #   1.	replace mindiff_`p'=0.5*who_mindiff_`p'-3 if who_mindiff_`p'
-        #     is not missing & d_agedays_`p'<(9*30.4375)
-        #   2.	replace maxdiff_`p'=2*who_maxdiff_`p'+3 if who_maxdiff_`p'
-        #     is not missing & d_agedays_`p'<(9*30.4375)
-        #   3.	replace mindiff_`p'=0.5*who_mindiff_`p'-3 if mindiff_`p'
-        #     is missing & who_mindiff_`p' is not missing
-        #   4.	replace maxdiff_`p'=2*who_maxdiff_`p'+3 if maxdiff_`p
-        #     is missing & who_maxdiff_`p' is not missing
-
-        # refactored logic slightly for efficiency
-        df[
-          !is.na(who.mindiff.next.ht) &
-            (delta.agedays.next < 9 * 30.4375 | is.na(mindiff.next.ht)),
-          `:=`(
-            mindiff.next.ht = 0.5 * who.mindiff.next.ht - 3,
-            maxdiff.next.ht = 2.0 * who.maxdiff.next.ht + 3
-          )
-        ]
-
-        # 15m.5.  replace mindiff_`p'=-3 if mindiff_`p' is missing
-        df[is.na(mindiff.next.ht), mindiff.next.ht := -3]
-
-        # 15n.	Determine the min/maxdiffs for the previous age: mindiff_prev_ht, maxdiff_prev_ht
-        # NOTE: obtain previous height, ewma.after value and abs.tbc.sd as well
-        #     since they are needed in next steps
-
-        # for efficiency, bring get.prev inline here (working on valid rows within a single parameter
-        #     for a single subject)
-        # structure c(NA, tbc.sd[-.N]) == get.prev
-        df[, `:=`(
-          v.prev = c(NA, v[-.N]),
-          dewma.after.prev = c(NA, dewma.after[-.N]),
-          abs.tbc.sd.prev = c(NA, abs.tbc.sd[-.N]),
-          mindiff.prev.ht = c(NA, mindiff.next.ht[-.N]),
-          maxdiff.prev.ht = c(NA, maxdiff.next.ht[-.N])
-        )]
-
-        # 15o.	Determine d_prev_ht=ht-htprev (set to missing for the first value for a subject)
-        #     and d_next_ht=htnext-ht (set to missing for the last value for a subject)
-        df[, `:=`(
-          delta.prev.ht = v - v.prev,
-          delta.next.ht = v.next - v
-        )]
-
-        # 15p.  Perform a EWMA calculation with the following modifications:
-        #  i.	  Generate a variable pair=1 if (d_prev_ht<mindiff_prev_ht OR d_ht<mindiff_ht OR
-        #     d_prev_ht>maxdiff_prev_ht  OR d_ht>maxdiff_ht) AND exc_ht==0
-        df[, pair := na_as_false(
-          delta.prev.ht < mindiff.prev.ht |
-            delta.next.ht < mindiff.next.ht |
-            delta.prev.ht > maxdiff.prev.ht |
-            delta.next.ht > maxdiff.next.ht
-        )]
-
-        # for efficiency, bring get.prev and get.next inline here (working on valid rows within
-        #     a single parameter for a single subject)
-        # structure c(NA, field.name[-.N]) == get.prev
-        # structure c(field.name[-1], NA) == get.next
-        df[, `:=`(
-          pair.prev = c(FALSE, pair[-.N]),
-          pair.next = c(pair[-1], FALSE)
-        )]
-
-        #  ii.	Generate bef_g_aftm1=1 if |Δewma_htbef| for the value of interest is greater
-        #       than |Δewma_htaft| for the previous value
-        #       AND the value of interest is not the first height value for that subject
-        #       AND pair==1 AND pair for the previous value==1
-
-        #  iii.	Generate aft_g_befp1=1 if |Δewma_htaft| for the value of interest is greater
-        #       than |Δewma_htbef| for the next value
-        #       AND the value of interest is not the last height value for that subject
-        #       AND pair==1 AND pair for the next value==1
-        # NOTE: pair.next will be NA last height, which will result in a FALSE value below
-        df[, `:=`(
-          bef.g.aftm1 = na_as_false(abs(dewma.before) > abs(dewma.after.prev) & pair & pair.prev),
-          aft.g.befp1 = na_as_false(abs(dewma.after) > abs(dewma.before.next) & pair & pair.next)
-        )]
-
-        #  iv.	Determine tbchtsd for each value as well as the one before prev_tbchtsd and after next_tbchtsd it
-        # NOTE: done previously for efficiency
-
-        # 15p.v.  Determine the total number of ht values for each subject (tot_ht)
-        # NOTE: all rows are valid due to constraint in subj.df[...] statement
-        num.valid <- .N
-
-        # 15q.	Identify a value for possible exclusion if one of the following sets of criteria are met.
-        #     For values identified by each set of criteria determine
-        #       the value of temp_diff using the formula given
-        #   i.	d_prev_ht<mindiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
-        #     a.  (temp_diff=|dewma_ht_bef|)
-        df[, temp.diff := as.double(NaN)]
-        df$temp.exclude <- factor(NA, levels = exclude.levels, ordered = TRUE)
-        df[
-          delta.prev.ht < mindiff.prev.ht & bef.g.aftm1,
-          `:=`(
-            temp.diff = abs(dewma.before),
-            temp.exclude = "Exclude-Min-Height-Change"
-          )
-        ]
-
-        #   ii.	d_ht<mindiff_ht & aft_g_befp1_ht==1 & exc_ht==0 & mindiff_ht is not missing
-        #     a.	(temp_diff=|dewma_ht_aft|)
-        df[
-          delta.next.ht < mindiff.next.ht & aft.g.befp1,
-          `:=`(
-            temp.diff = abs(dewma.after),
-            temp.exclude = "Exclude-Min-Height-Change"
-          )
-        ]
-
-        #   iii.	d_prev_ht>maxdiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
-        #     a.  (temp_diff=|dewma_ht_bef|)
-        df[
-          delta.prev.ht > maxdiff.prev.ht & bef.g.aftm1,
-          `:=`(
-            temp.diff = abs(dewma.before),
-            temp.exclude = "Exclude-Max-Height-Change"
-          )
-        ]
-
-        #   iv.	d_ht>maxdiff_ht & aft_g_befp1_ht==1 & exc_ht==0 & mindiff_ht is not missing
-        #     a.  (temp_diff=|dewma_ht_aft|)
-        df[
-          delta.next.ht > maxdiff.next.ht & aft.g.befp1,
-          `:=`(
-            temp.diff = abs(dewma.after),
-            temp.exclude = "Exclude-Max-Height-Change"
-          )
-        ]
-
-        #   v.	d_prev_ht<mindiff_prev_ht & tot_ht==2 & |tbchtsd|>|prev_tbchtsd|
-        #     a. for v-viii temp_diff is kept as missing
-        #   vi. d_ht<mindiff_ht & tot_ht==2 & |tbchtsd|>|next_tbchtsd|
-        df[
-          delta.prev.ht < mindiff.prev.ht & num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev |
-          delta.next.ht < mindiff.next.ht & num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
-          temp.exclude := "Exclude-Min-Height-Change"
-        ]
-
-        #   vii.	d_prev_ht>maxdiff_prev_ht & tot_ht==2 & |tbchtsd|>|prev_tbchtsd|
-        #   viii. d_ht>maxdiff_ht & tot_ht==2 & |tbchtsd|>|next_tbchtsd|
-        df[
-          delta.prev.ht > maxdiff.prev.ht & num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev |
-            delta.next.ht > maxdiff.next.ht & num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
-          temp.exclude := "Exclude-Max-Height-Change"
-        ]
-
-        # r.  If there is only one potential exclusion identified in step 15j for a subject and parameter,
-        #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi  and exc_ht=16
-        #     if it met criteria iii, iv, vii, or viii
-        # NOTE: these exclusions are assigned in the code above as 'Exclude-Min-Height-Change'
-        #     and 'Exclude-Max-Height-Change'
-        rep <- !is.na(df$temp.exclude)
-        num.exclude <- sum(rep)
-        if (num.exclude == 1) {
-          df[rep, exclude := temp.exclude]
-        }
-
-        # s.  If there is more than one potential exclusion identified in step 14h for a subject
-        #     and parameter, determine which value has the largest temp_diff and
-        #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi and exc_ht=16
-        #     for that value if it met criteria iii,  iv, vii, or viii.
-
-        if (num.exclude > 1) {
-          # first order by decreasing temp.diff (where rep=TRUE)
-          worst.row <- order(rep, df$temp.diff, decreasing = TRUE)[1]
-          df[worst.row, exclude := temp.exclude]
-        }
-
-        return(df$exclude)
-      })(copy(.SD))]
-
-      # t.  If there was at least one subject who had a potential exclusion identified in step 15q,
-      #     repeat steps 15b-15q. If there were no subjects with potential
-      #     exclusions identified in step 15q, move on to step 16.
-      newly.excluded <- sum(
-        subj.df$exclude %in% c(
-          "Exclude-Min-Height-Change",
-          "Exclude-Max-Height-Change"
         )
-      )
-      if (newly.excluded > num.height.excluded) {
-        num.height.excluded <- newly.excluded
-      } else {
-        break
       }
-    }
 
-    setkeyv(subj.df, "index")
-    return(subj.df$exclude)
-  })(copy(.SD)), by = .(subjid), .SDcols = c("sex", "agedays", "v", "tbc.sd", "exclude")]
+      setkeyv(subj.df, "index")
+      return(subj.df$exclude)
+    })(copy(.SD)),
+    by = "subjid",
+    .SDcols = c("sex", "agedays", "v", "tbc.sd", "exclude")
+  ]
 
   # 16.  Exclude measurements for subjects/parameters with only 1 or 2 measurements with exc_*=0.
   #      This step uses a variety of criteria, including the tbc*sd of the other parameter.
@@ -1538,7 +1555,7 @@ cleanbatch <- function(data.df,
   }
   data.df$tbc.other.sd <- swap_parameters(df = data.df)
   data.df[,
-    exclude := (function(df) {
+    "exclude" := (function(df) {
       valid.rows <- which(valid(df))
       # calculate median SD for other parameter (used in steps below)
       median.tbc.other.sd <- stats::median(df$tbc.other.sd)
@@ -1629,23 +1646,17 @@ cleanbatch <- function(data.df,
           valid.rows &
             (
               abs(tbc.sd) > 3 &
-                abs(
-                  tbc.sd - ifelse(
-                    !is.na(tbc.other.sd),
-                    tbc.other.sd,
-                    median.tbc.other.sd
-                  )
-                ) > 5 |
+                abs(tbc.sd - ifelse(!is.na(tbc.other.sd), tbc.other.sd, median.tbc.other.sd)) > 5 |
                 abs(tbc.sd) > 5 & is.na(tbc.other.sd) & is.na(median.tbc.other.sd)
             ),
-          exclude := "Exclude-Single-Outlier"
+          "exclude" := "Exclude-Single-Outlier"
         ]
       }
 
       # ensure factor levels didn't accidentally get mangled
       return(factor(df$exclude, levels = exclude.levels, ordered = TRUE))
     })(copy(.SD)),
-    by = .(subjid, param),
+    by = c("subjid", "param"),
     .SDcols = c("agedays", "tbc.sd", "tbc.other.sd", "exclude", "param")
   ] # added param here for debugging, i think it's dropped otherwise
 
@@ -1679,8 +1690,8 @@ cleanbatch <- function(data.df,
   }
   # NOTE: restrict analysis to non-missing rows
   data.df[
-    exclude != "Missing",
-    exclude := (function(subj.df) {
+    "exclude" != "Missing",
+    "exclude" := (function(subj.df) {
       inc.exc <- subj.df[,
         list(
           exclude.count = sum(
@@ -1692,27 +1703,27 @@ cleanbatch <- function(data.df,
           ),
           include.count = sum(valid(exclude))
         ),
-        keyby = param
+        keyby = "param"
       ]
       for (p in unique(subj.df$param)) {
-        exclude.count.this.parameter <- inc.exc[param == p, exclude.count]
-        exclude.count.other.parameter <- sum(inc.exc[param != p, exclude.count])
+        exclude.count.this.parameter <- inc.exc[param == p, c("exclude.count")]
+        exclude.count.other.parameter <- sum(inc.exc[param != p, c("exclude.count")])
         if (
-          exclude.count.this.parameter > error.load.threshold * inc.exc[param == p, include.count] &
+          exclude.count.this.parameter > error.load.threshold * inc.exc[param == p, c("include.count")] &
             exclude.count.this.parameter >= error.load.mincount
         ) {
-          subj.df[param == p & valid(exclude), exclude := "Exclude-Too-Many-Errors"]
+          subj.df[param == p & valid(exclude), "exclude" := "Exclude-Too-Many-Errors"]
         } else if (
-          exclude.count.other.parameter > sum(inc.exc[param != p, include.count]) &
+          exclude.count.other.parameter > sum(inc.exc[param != p, c("include.count")]) &
             exclude.count.other.parameter >= error.load.mincount
         ) {
-          subj.df[param == p & valid(exclude), exclude := "Exclude-Too-Many-Errors-Other-Parameter"]
+          subj.df[param == p & valid(exclude), "exclude" := "Exclude-Too-Many-Errors-Other-Parameter"]
         }
       }
       # ensure factor levels didn't accidentally get mangled
       return(factor(subj.df$exclude, levels = exclude.levels, ordered = TRUE))
     })(copy(.SD)),
-    by = subjid,
+    by = "subjid",
     .SDcols = c("param", "exclude")
   ]
 

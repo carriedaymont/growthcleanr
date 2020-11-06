@@ -82,6 +82,12 @@ adjustcarryforward <- function(subjid,
                                min_ht.exp_over = 0,
                                max_ht.exp_under = 0.33,
                                max_ht.exp_over = 1.5) {
+  # ==== Dealing with "undefined global functions or variables" ==== #
+  ## Only for variable which couldn't be quoted everywhere
+  v <- sd.orig <- sd.median <- tbc.sd <- agedays.next <- mid.agedays <- min.ht.vel <- NULL
+  delta.agedays.next <- ht.exp <- max.ht.vel <- mindiff.next.ht <- temp.exclude <- NULL
+  # ==== Dealing with "undefined global functions or variables" ==== #
+
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
   data.all <- data.table(
     line = seq_along(measurement),
@@ -375,27 +381,27 @@ adjustcarryforward <- function(subjid,
       subj.df[, "index" := 1:.N]
 
       num.height.excluded <- 0
-      newly.excluded <- 0
-      while (newly.excluded > num.height.excluded) {
-        num.height.excluded <- newly.excluded
+      newly.excluded <- NULL
+      while (is.null(newly.excluded) || newly.excluded > num.height.excluded) {
+        if (!is.null(newly.excluded)) num.height.excluded <- newly.excluded
 
         # use a closure to discard all the extra fields added to df with each iteration
         subj.df[, "exclude" := (function(df) {
           # initialize fields
-          df[, (ewma.fields) := as.double(NaN)]
+          df[, (ewma.fields) := NA_real_]
           df[, `:=`(
-            "v.prev" = as.double(NaN),
-            "v.next" = as.double(NaN),
-            "dewma.after.prev" = as.double(NaN),
-            "dewma.before.next" = as.double(NaN),
-            "abs.tbc.sd.prev" = as.double(NaN),
-            "abs.tbc.sd.next" = as.double(NaN),
-            "agedays.next" = as.integer(NaN),
-            "abs.2ndlast.sd" = as.double(NaN),
-            "mindiff.prev.ht" = as.double(NaN),
-            "mindiff.next.ht" = as.double(NaN),
-            "maxdiff.prev.ht" = as.double(NaN),
-            "maxdiff.next.ht" = as.double(NaN),
+            "v.prev" = NA_real_,
+            "v.next" = NA_real_,
+            "dewma.after.prev" = NA_real_,
+            "dewma.before.next" = NA_real_,
+            "abs.tbc.sd.prev" = NA_real_,
+            "abs.tbc.sd.next" = NA_real_,
+            "agedays.next" = NA_integer_,
+            "abs.2ndlast.sd" = NA_real_,
+            "mindiff.prev.ht" = NA_real_,
+            "mindiff.next.ht" = NA_real_,
+            "maxdiff.prev.ht" = NA_real_,
+            "maxdiff.next.ht" = NA_real_,
             "pair.prev" = FALSE,
             "pair.next" = FALSE
           )]
@@ -454,7 +460,7 @@ adjustcarryforward <- function(subjid,
 
           # 15f.iii.	maxdiff_ht=2*max_ht_vel*(d_agedays/365.25)^1.5+5.5 if d_agedays>365.25
           #   iv.	replace maxdiff_ht=2*max_ht_vel*(d_agedays/365.25)^0.33+5.5 if d_agedays<365.25
-          df[," ht.exp" := ifelse(delta.agedays.next < 365.25,
+          df[, "ht.exp" := ifelse(delta.agedays.next < 365.25,
             max_ht.exp_under,
             max_ht.exp_over
           )]
@@ -771,7 +777,7 @@ adjustcarryforward <- function(subjid,
       setkeyv(subj.df, "index")
       return(subj.df$exclude)
     })(copy(.SD)),
-    by = .(subjid),
+    by = "subjid",
     .SDcols = c("sex", "agedays", "v", "tbc.sd", "exclude", "orig.exclude")
   ]
 
