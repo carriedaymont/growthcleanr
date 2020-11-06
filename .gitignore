@@ -44,3 +44,4 @@ packrat/src/
 output
 
 .lintr
+logs/
