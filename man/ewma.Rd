@@ -33,8 +33,9 @@ and the subsequent observation.
 \examples{
 # Run on 1 subject, 1 type of parameter
 df_stats <- as.data.frame(syngrowth)
-df_stats <- df_stats[df_stats$subjid == df_stats$subjid[1] &
-  df_stats$param == "HEIGHTCM", ]
+df_stats <- df_stats[
+  df_stats$subjid == df_stats$subjid[1] & df_stats$param == "HEIGHTCM",
+]
 
 # Get the uncentered z-scores
 measurement_to_z <- read_anthro(cdc.only = TRUE)

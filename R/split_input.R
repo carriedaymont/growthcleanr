@@ -16,20 +16,18 @@
 #'
 #' @export
 #' @examples
-#' \donttest{
 #' # Run on given data
 #' df <- as.data.frame(syngrowth)
 #'
 #' # Run with all defaults
-#' split_input(df)
+#' split_input(df, fdir = tempdir())
 #'
 #' # Specifying the name, directory and minimum row size
 #' split_input(df, fname = "syngrowth", fdir = tempdir(), min_nrow = 5000)
 #'
 #' # Specifying a different subject ID column
 #' colnames(df)[colnames(df) == "subjid"] <- "sub_id"
-#' split_input(df, keepcol = "sub_id")
-#' }
+#' split_input(df, keepcol = "sub_id", fdir = tempdir())
 split_input <- function(df,
                        fname = deparse(substitute(df)),
                        fdir = ".",
