@@ -94,28 +94,28 @@
 #'                       measurement = df_stats$measurement,
 #'                       parallel = TRUE,
 #'                       num.batches = 2)
-cleangrowth = function(subjid,
-                       param,
-                       agedays,
-                       sex,
-                       measurement,
-                       recover.unit.error = F,
-                       sd.extreme = 25,
-                       z.extreme = 25,
-                       lt3.exclude.mode = "default",
-                       height.tolerance.cm = 2.5,
-                       error.load.mincount = 2,
-                       error.load.threshold = 0.5,
-                       sd.recenter = NA,
-                       sdmedian.filename = "",
-                       sdrecentered.filename = "",
-                       include.carryforward = F,
-                       ewma.exp = -1.5,
-                       ref.data.path = "",
-                       log.path = ".",
-                       parallel = F,
-                       num.batches = NA,
-                       quietly = T) {
+cleangrowth <- function(subjid,
+                        param,
+                        agedays,
+                        sex,
+                        measurement,
+                        recover.unit.error = F,
+                        sd.extreme = 25,
+                        z.extreme = 25,
+                        lt3.exclude.mode = "default",
+                        height.tolerance.cm = 2.5,
+                        error.load.mincount = 2,
+                        error.load.threshold = 0.5,
+                        sd.recenter = NA,
+                        sdmedian.filename = "",
+                        sdrecentered.filename = "",
+                        include.carryforward = F,
+                        ewma.exp = -1.5,
+                        ref.data.path = "",
+                        log.path = ".",
+                        parallel = F,
+                        num.batches = NA,
+                        quietly = T) {
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
   data.all = data.table(
     line = seq_along(measurement),
@@ -1940,7 +1940,7 @@ cleangrowth = function(subjid,
 #' # Return calculating function while specifying a path and using only CDC data
 #' afunc <- read.anthro(path = system.file("extdata", package = "growthcleanr"),
 #'                      cdc.only = TRUE)
-read.anthro = function(path = "", cdc.only = F) {
+read_anthro <- function(path = "", cdc.only = F) {
   # set correct path based on input reference table path (if any)
   weianthro_path <- ifelse(
     path == "",
@@ -2117,7 +2117,7 @@ read.anthro = function(path = "", cdc.only = F) {
 #'
 #' # Calculate exponentially weighted moving average
 #' e_df <- ewma(df_stats$agedays, sd, ewma.exp = -1.5)
-ewma = function(agedays, z, ewma.exp, ewma.adjacent = T) {
+ewma <- function(agedays, z, ewma.exp, ewma.adjacent = T) {
   # 6.  EWMA calculation description: Most of the next steps will involve calculating the exponentially weighted moving average for each subject and parameter. I will
   #     describe how to calculate EWMASDs, and will describe how it needs to be varied in subsequent steps.
   # a.	The overall goal of the EWMASD calculation is to identify the difference between the SD-score and what we might predict that DS-score should be, in order to
@@ -2214,7 +2214,7 @@ as.matrix.delta = function(agedays) {
 #'                   df_stats$sex,
 #'                   df_stats$agedays,
 #'                   sd.orig)
-sd.median = function(param, sex, agedays, sd.orig) {
+sd_median <- function(param, sex, agedays, sd.orig) {
   # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time, we need to account for the fact that
   #     the mean SD-score for the population changes with age.
   # a.  Determine the median cdc*sd for each parameter by year of age (with sexes combined): median*sd.
