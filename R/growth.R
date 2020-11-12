@@ -237,7 +237,7 @@ cleangrowth <- function(subjid,
   # calculate z scores
   if (!quietly)
     cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
-  measurement.to.z = read.anthro(ref.data.path, cdc.only = T)
+  measurement.to.z = read_anthro(ref.data.path, cdc.only = T)
   data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
 
   # calculate "standard deviation" scores
@@ -316,7 +316,7 @@ cleangrowth <- function(subjid,
   # see function definition below for explanation of the re-centering process
   # returns a data table indexed by param, sex, agedays
   if (!is.data.table(sd.recenter)) {
-    sd.recenter = data.all[exclude < 'Exclude', sd.median(param, sex, agedays, sd.orig)]
+    sd.recenter = data.all[exclude < 'Exclude', sd_median(param, sex, agedays, sd.orig)]
     if (sdmedian.filename != "") {
       write.csv(sd.recenter, sdmedian.filename, row.names = F)
       if (!quietly)
@@ -1935,10 +1935,10 @@ cleangrowth <- function(subjid,
 #' @import data.table
 #' @examples
 #' # Return calculating function with all defaults
-#' afunc <- read.anthro()
+#' afunc <- read_anthro()
 #'
 #' # Return calculating function while specifying a path and using only CDC data
-#' afunc <- read.anthro(path = system.file("extdata", package = "growthcleanr"),
+#' afunc <- read_anthro(path = system.file("extdata", package = "growthcleanr"),
 #'                      cdc.only = TRUE)
 read_anthro <- function(path = "", cdc.only = F) {
   # set correct path based on input reference table path (if any)
@@ -2108,7 +2108,7 @@ read_anthro <- function(path = "", cdc.only = F) {
 #'                        df_stats$param == "HEIGHTCM", ]
 #'
 #' # Get the uncentered z-scores
-#' measurement_to_z <- read.anthro(cdc.only = TRUE)
+#' measurement_to_z <- read_anthro(cdc.only = TRUE)
 #' sd <- measurement_to_z(df_stats$param,
 #'                        df_stats$agedays,
 #'                        df_stats$sex,
@@ -2202,7 +2202,7 @@ as.matrix.delta = function(agedays) {
 #' df_stats <- df_stats[df_stats$subjid == df_stats$subjid[1], ]
 #'
 #' # Get the original standard deviations
-#' measurement_to_z <- read.anthro(cdc.only = TRUE)
+#' measurement_to_z <- read_anthro(cdc.only = TRUE)
 #' sd.orig <- measurement_to_z(df_stats$param,
 #'                        df_stats$agedays,
 #'                        df_stats$sex,
@@ -2210,7 +2210,7 @@ as.matrix.delta = function(agedays) {
 #'                        TRUE)
 #'
 #' # Calculate median standard deviations
-#' sd.m <- sd.median(df_stats$param,
+#' sd.m <- sd_median(df_stats$param,
 #'                   df_stats$sex,
 #'                   df_stats$agedays,
 #'                   sd.orig)
