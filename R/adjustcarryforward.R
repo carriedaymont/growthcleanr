@@ -17,6 +17,7 @@ na.as.false = function(v) {
 #'   'HEIGHTCM' vs. 'LENGTHCM' only affects z-score calculations between ages 24 to 35 months (730 to 1095 days).
 #'   All linear measurements below 731 days of life (age 0-23 months) are interpreted as supine length, and
 #'   all linear measurements above 1095 days of life (age 36+ months) are interpreted as standing height.
+#'   Note: at the moment, all LENGTHCM will be converted to HEIGHTCM. In the future, the algorithm will be updated to consider this difference.
 #' @param agedays Numeric vector containing the age in days at each measurement.
 #' @param sex Vector identifying the gender of the subject, may be 'M', 'm', or 0 for males, vs. 'F',
 #'  'f' or 1 for females.
@@ -234,6 +235,10 @@ adjustcarryforward <- function(subjid,
   #     changes in weight in subjects with low weights.  The score we will create can be called an SD-score (SDorig: WtSDorig and HtSDorig that is calculated by
   #     dividing the difference between the value and the median by the SD score (use csd_pos if the value is above the median, csd_neg if the value is below the
   #     median). These SD-scores, rather than z-scores, now form the basis for the algorithm.
+
+  # recategorize linear parameters as 'HEIGHTCM'
+  # NOTE: this will be changed in future to consider this difference
+  data.all[param == 'LENGTHCM', param := 'HEIGHTCM']
 
   # calculate z scores
   if (!quietly)
