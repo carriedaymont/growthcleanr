@@ -274,9 +274,6 @@ adjustcarryforward <- function(subjid,
   levels = exclude.levels,
   ordered = T)] # why is this ordered??
 
-  # after calculating z scores, for convenience, recategorize linear parameters as 'HEIGHTCM'
-  data.all[param == 'LENGTHCM', param := 'HEIGHTCM']
-
   # define field names needed by helper functions
   ewma.fields = c('ewma.all', 'ewma.before', 'ewma.after')
 
