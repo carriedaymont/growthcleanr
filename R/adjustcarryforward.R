@@ -691,7 +691,7 @@ adjustcarryforward <- function(subjid,
   return(rbind(
     data.frame(adjustcarryforward = data.all$exclude, n = data.all$n),
     data.frame(
-      filter(data.orig,!n %in% data.all$n) %>% mutate(adjustcarryforward = "Missing")  %>% select(adjustcarryforward, n)
+      filter(data.orig,!n %in% data.all$n) %>% mutate(adjustcarryforward = "Not Considered")  %>% select(adjustcarryforward, n)
     )
   ))
 }
