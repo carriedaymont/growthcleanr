@@ -24,6 +24,12 @@ na.as.false = function(v) {
 #' @param measurement Numeric vector containing the actual measurement data.  Weight must be in
 #'   kilograms (kg), and linear measurements (height vs. length) in centimeters (cm).
 #' @param orig.exclude Vector of exclusion assessment results from cleangrowth()
+#'
+#' @param option_reinclusion numeric of 1 - 3, deals with the reinclusion step of 15, corresponding to the following options:
+#'        1. when reevaluating, drop the most deviant value and reevaluate all, exposing any reincluded carry-forwards (CFs) to exclusions in future reevaluations
+#'        2. when reevaluating, drop the most deviant value and remove reincluded CF from consideration, such that the remaining, previously errored ones are compared to the original include and CFs determined reincluded CFs are protected
+#'        3. when reevaluating, drop the most deviant value and remove reincluded CF from consideration except for the last one, as well as the original include.This results that the remaining, previously errored ones are compared to the last reeincluded CF.
+#'
 #' @param sd.recenter Data frame or table with median SD-scores per day of life
 #' @param ewma.exp Exponent to use for weighting measurements in the exponentially weighted moving
 #'  average calculations. Defaults to -1.5. This exponent should be negative in order to weight growth
@@ -55,6 +61,7 @@ adjustcarryforward <- function(subjid,
                                sex,
                                measurement,
                                orig.exclude,
+                               option_reinclusion = 1,
                                sd.recenter = NA,
                                ewma.exp = -1.5,
                                ref.data.path = "",
@@ -639,34 +646,48 @@ adjustcarryforward <- function(subjid,
         # NOTE: these exclusions are assigned in the code above as 'Exclude-Min-Height-Change' and 'Exclude-Max-Height-Change'
 
         ##### ADJUSTCF EDIT #####
-        # if you're outside of the bands OR if you are not a carry forward then you have no change
-        df$temp.exclude <- sapply(1:nrow(df), function(x) {
-          ifelse(
-            (
-              df$temp.exclude[x] %in% c(
-                'Exclude-Min-Height-Change',
-                'Exclude-Max-Height-Change'
-              )
-            ) |
-              (df$orig.exclude[x] != "Exclude-Carried-Forward"),
-            'No Change',
-            'Include'
-          )
-        })
-        ##### END EDIT #####
+        # # if you're outside of the bands OR if you are not a carry forward then you have no change
+        # df$temp.exclude <- sapply(1:nrow(df), function(x) {
+        #   ifelse(
+        #     (
+        #       df$temp.exclude[x] %in% c(
+        #         'Exclude-Min-Height-Change',
+        #         'Exclude-Max-Height-Change'
+        #       )
+        #     ) |
+        #       (df$orig.exclude[x] != "Exclude-Carried-Forward"),
+        #     'No Change',
+        #     'Include'
+        #   )
+        # })
 
-        rep = df$temp.exclude == "Include"
-        num.exclude = sum(rep)
-        if (num.exclude == 1)
-          df[rep, exclude := temp.exclude]
+        # FIGURE OUT WHERE THE EXCLUSIONS ARE HAPPENING!!
+        # STOP HERE
+
+        # count the amount of error codes we get
+        all_exclude = !is.na(df$temp.exclude)
+        num.exclude = sum(all_exclude)
+
+        # if there's only one, all of the groups agree
+        if (num.exclude == 1){
+          df[all_exclude, exclude := temp.exclude]
+        }
 
         # s.  If there is more than one potential exclusion identified in step 14h for a subject and parameter, determine which value has the largest temp_diff and
         #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi and exc_ht=16 for that value if it met criteria iii,  iv, vii, or viii.
 
         if (num.exclude > 1) {
-          # first order by decreasing temp.diff (where rep=T)
-          worst.row = order(rep, df$temp.diff, decreasing = T)[1]
-          df[worst.row, exclude := temp.exclude]
+          # first order by decreasing temp.diff (where all_exclude=T)
+          # you want to exclude the worst that has not already been excluded
+          ex_ord <- order(all_exclude, df$temp.diff, decreasing = T)
+
+          worst.row = ex_ord[
+            df[ex_ord, "exclude"] == "No Change" & all_exclude[ex_ord]
+            ][1]
+
+          if (!is.na(worst.row)){
+            df[worst.row, exclude := temp.exclude]
+          }
         }
 
         return(df$exclude)
@@ -678,18 +699,46 @@ adjustcarryforward <- function(subjid,
 
       # t.  If there was at least one subject who had a potential exclusion identified in step 15q, repeat steps 15b-15q. If there were no subjects with potential
       #     exclusions identified in step 15q, move on to step 16.
-      newly.excluded = sum(subj.df$exclude %in% c('Include'))
+      newly.excluded = sum(
+        subj.df$exclude %in% c(
+          'Exclude-Min-Height-Change',
+          'Exclude-Max-Height-Change'
+        )
+      )
+      # # if we're going to reevaluate, we're going to do the same
+      # if (options_reinclusion == 1){
+      #
+      # }
+
+
       if (newly.excluded > num.height.excluded) {
         num.height.excluded = newly.excluded
       } else {
         break
       }
+
+      ##### END EDIT #####
     }
 
     setkey(subj.df, index)
     return(subj.df$exclude)
   })(copy(.SD)), by = .(subjid), .SDcols = c('sex', 'agedays', 'v', 'tbc.sd', 'exclude', 'orig.exclude')]
 
+  ##### ADJUSTCF EDIT #####
+  # process what came from step 15
+
+  # if you're outside of the bands OR if you are not a carry forward then you have no change
+  data.all[
+    !(
+      data.all$exclude %in% c(
+        'Exclude-Min-Height-Change',
+        'Exclude-Max-Height-Change'
+      )
+    ) &
+    (data.all$orig.exclude == "Exclude-Carried-Forward"), exclude := "Include"]
+  data.all[data.all$orig.exclude != "Exclude-Carried-Forward", exclude := "No Change"]
+
+  # return results
   return(rbind(
     data.frame(adjustcarryforward = data.all$exclude, n = data.all$n),
     data.frame(
