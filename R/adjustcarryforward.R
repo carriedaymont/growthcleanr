@@ -348,7 +348,16 @@ adjustcarryforward <- function(subjid,
     num.height.excluded = 0
     while (T) {
       # use a closure to discard all the extra fields added to df with each iteration
-      subj.df[, exclude := (function (df) {
+      subj.df[!grepl("Exclude", exclude), exclude := (function (df) {
+        # # remove things that are excluded
+        # orig_subj_exclude <- df$exclude
+        # names(orig_subj_exclude) <- df$index
+        #
+        # df <- df[!df$exclude %in% c(
+        #   'Exclude-Min-Height-Change',
+        #   'Exclude-Max-Height-Change'
+        # ),]
+
         # initialize fields
         df[, (ewma.fields) := as.double(NaN)]
         df[, `:=`(
@@ -661,9 +670,6 @@ adjustcarryforward <- function(subjid,
         #   )
         # })
 
-        # FIGURE OUT WHERE THE EXCLUSIONS ARE HAPPENING!!
-        # STOP HERE
-
         # count the amount of error codes we get
         all_exclude = !is.na(df$temp.exclude)
         num.exclude = sum(all_exclude)
@@ -677,19 +683,10 @@ adjustcarryforward <- function(subjid,
         #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi and exc_ht=16 for that value if it met criteria iii,  iv, vii, or viii.
 
         if (num.exclude > 1) {
-          # first order by decreasing temp.diff (where all_exclude=T)
-          # you want to exclude the worst that has not already been excluded
-          ex_ord <- order(all_exclude, df$temp.diff, decreasing = T)
-
-          worst.row = ex_ord[
-            df[ex_ord, "exclude"] == "No Change" & all_exclude[ex_ord]
-            ][1]
-
-          if (!is.na(worst.row)){
-            df[worst.row, exclude := temp.exclude]
-          }
+          # first order by decreasing temp.diff (where rep=T)
+          worst.row = order(all_exclude, df$temp.diff, decreasing = T)[1]
+          df[worst.row, exclude := temp.exclude]
         }
-
         return(df$exclude)
 
 
