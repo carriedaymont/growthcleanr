@@ -733,7 +733,9 @@ adjustcarryforward <- function(subjid,
       )
     ) &
     (data.all$orig.exclude == "Exclude-Carried-Forward"), exclude := "Include"]
-  data.all[data.all$orig.exclude != "Exclude-Carried-Forward", exclude := "No Change"]
+  data.all[
+    data.all$exclude %in% c('Exclude-Min-Height-Change','Exclude-Max-Height-Change'),
+    exclude := "No Change"]
 
   # return results
   return(rbind(
