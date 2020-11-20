@@ -633,6 +633,7 @@ adjustcarryforward <- function(subjid,
 
   # ADJUSTCF EDIT:
   # we're going to run this twice, in 2 different ways:
+  # 0. no change
   # 1. when deciding to exclude values, if we have a string of carried forwards,
   #    drop the most deviant value, and all CFs in the same string, and move on as
   #    normal
@@ -641,88 +642,138 @@ adjustcarryforward <- function(subjid,
   #    after the first that is flagged for exclusion when comparing to the Include
   #    before and after
 
-  data.all[param == 'HEIGHTCM', exclude := (function(subj.df) {
-    # assign some book keeping variables
-    #subj.df[, `:=`(subjid = subjid, param='HEIGHTCM',index=1:.N)]
-    subj.df[, index := 1:.N]
+  all_opts <- paste0("exclude_opt_",0:2)
 
-    num.height.excluded = 0
-    while (T) {
-      # use a closure to discard all the extra fields added to df with each iteration
-      subj.df[!grepl("Exclude", exclude), exclude := (function (df) {
-        # do steps 15a - 15q (functionalized for ease)
-        df <- calc_temp_exclusion_15(df)
+  for (opt in all_opts){
+    data.all[param == 'HEIGHTCM', (opt) := (function(subj.df) {
+      # assign some book keeping variables
+      #subj.df[, `:=`(subjid = subjid, param='HEIGHTCM',index=1:.N)]
+      subj.df[, index := 1:.N]
 
-        # r.  If there is only one potential exclusion identified in step 15j for a subject and parameter,
-        #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi  and exc_ht=16 if it met criteria iii, iv, vii, or viii
-        # NOTE: these exclusions are assigned in the code above as 'Exclude-Min-Height-Change' and 'Exclude-Max-Height-Change'
+      num.height.excluded = 0
+      while (T) {
+        # use a closure to discard all the extra fields added to df with each iteration
+        subj.df[!grepl("Exclude", exclude), exclude := (function (df) {
+          # do steps 15a - 15q (functionalized for ease)
+          eval_df <- calc_temp_exclusion_15(copy(df))
 
-        # count the amount of error codes we get
-        all_exclude = !is.na(df$temp.exclude)
-        num.exclude = sum(all_exclude)
+          # r.  If there is only one potential exclusion identified in step 15j for a subject and parameter,
+          #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi  and exc_ht=16 if it met criteria iii, iv, vii, or viii
+          # NOTE: these exclusions are assigned in the code above as 'Exclude-Min-Height-Change' and 'Exclude-Max-Height-Change'
 
-        # if there's only one, all of the groups agree
-        if (num.exclude == 1){
-          df[all_exclude, exclude := temp.exclude]
+          # count the amount of error codes we get
+          all_exclude = !is.na(eval_df$temp.exclude)
+          num.exclude = sum(all_exclude)
+
+          # if there's only one, all of the groups agree
+          # s.  If there is more than one potential exclusion identified in step 14h for a subject and parameter, determine which value has the largest temp_diff and
+          #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi and exc_ht=16 for that value if it met criteria iii,  iv, vii, or viii.
+
+          if (opt == "exclude_opt_0"){
+            # option 0: normal
+            if (num.exclude == 1){
+              eval_df[all_exclude, exclude := temp.exclude]
+            } else if (num.exclude > 1) {
+              # first order by decreasing temp.diff (where rep=T)
+              worst.row = order(all_exclude, eval_df$temp.diff, decreasing = T)[1]
+              eval_df[worst.row, exclude := temp.exclude]
+            }
+          } else if (opt == "exclude_opt_1"){
+            # option 1: if there's a carried forward after, we want to exclude that too, until the next include
+            if (num.exclude == 1){
+              wh_exclude <- which(all_exclude)
+              if (
+                eval_df[wh_exclude, "orig.exclude"] == "Exclude-Carried-Forward" &
+                wh_exclude != nrow(eval_df) &
+                eval_df[wh_exclude+1, "orig.exclude"] == "Exclude-Carried-Forward"
+              ){
+                # find the next include OR the row end
+                next_incl <- which(
+                  eval_df$orig.exclude[(wh_exclude+1):nrow(eval_df)] == "Include"
+                )[1]+wh_exclude
+                if (is.na(next_incl)){
+                  next_incl <- nrow(eval_df)+1
+                }
+
+
+                # mark all the CFs after for exclusion
+                all_exclude[wh_exclude:(next_incl-1)] <- T
+                # also copy all the temp.excludes
+                eval_df$temp.exclude[(wh_exclude+1):(next_incl-1)] <-
+                  eval_df$temp.exclude[wh_exclude]
+              }
+
+              # exclude all the carried forwards before the next include
+              eval_df[all_exclude, exclude := temp.exclude]
+            } else if (num.exclude > 1) {
+              # first order by decreasing temp.diff (where rep=T)
+              worst.row = order(all_exclude, eval_df$temp.diff, decreasing = T)[1]
+
+              # option 1: if there's a carried forward after, we want to exclude that too, until the next include
+              wh_exclude <- worst.row
+              if (
+                eval_df[wh_exclude, "orig.exclude"] == "Exclude-Carried-Forward" &
+                wh_exclude != nrow(eval_df) &
+                eval_df[wh_exclude+1, "orig.exclude"] == "Exclude-Carried-Forward"
+              ){
+                # find the next include OR the row end
+                next_incl <- which(
+                  eval_df$orig.exclude[(wh_exclude+1):nrow(eval_df)] == "Include"
+                )[1]+wh_exclude
+                if (is.na(next_incl)){
+                  next_incl <- nrow(eval_df)+1
+                }
+
+                # mark all the CFs after for exclusion
+                worst.row <- c(worst.row:(next_incl-1))
+                # also copy all the temp.excludes
+                eval_df$temp.exclude[(wh_exclude+1):(next_incl-1)] <-
+                  eval_df$temp.exclude[wh_exclude]
+              }
+
+              eval_df[worst.row, exclude := temp.exclude]
+            }
+          }
+
+          return(eval_df$exclude)
+
+        })(copy(.SD))]
+
+        # t.  If there was at least one subject who had a potential exclusion identified in step 15q, repeat steps 15b-15q. If there were no subjects with potential
+        #     exclusions identified in step 15q, move on to step 16.
+        newly.excluded = sum(
+          subj.df$exclude %in% c(
+            'Exclude-Min-Height-Change',
+            'Exclude-Max-Height-Change'
+          )
+        )
+
+        if (newly.excluded > num.height.excluded) {
+          num.height.excluded = newly.excluded
+        } else {
+          break
         }
+      }
+      setkey(subj.df, index)
+      return(subj.df$exclude)
+    })(copy(.SD)), by = .(subjid), .SDcols = c('sex', 'agedays', 'v', 'tbc.sd', 'exclude', 'orig.exclude')]
 
-        # s.  If there is more than one potential exclusion identified in step 14h for a subject and parameter, determine which value has the largest temp_diff and
-        #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi and exc_ht=16 for that value if it met criteria iii,  iv, vii, or viii.
+    # process what came from step 15
 
-        if (num.exclude > 1) {
-          # first order by decreasing temp.diff (where rep=T)
-          worst.row = order(all_exclude, df$temp.diff, decreasing = T)[1]
-          df[worst.row, exclude := temp.exclude]
-        }
-        return(df$exclude)
-
-
-      })(copy(.SD))]
-
-
-
-      # t.  If there was at least one subject who had a potential exclusion identified in step 15q, repeat steps 15b-15q. If there were no subjects with potential
-      #     exclusions identified in step 15q, move on to step 16.
-      newly.excluded = sum(
-        subj.df$exclude %in% c(
+    # if you're outside of the bands OR if you are not a carry forward then you have no change
+    data.all[
+      !(
+        data.all[, get(opt)] %in% c(
           'Exclude-Min-Height-Change',
           'Exclude-Max-Height-Change'
         )
-      )
-      # # if we're going to reevaluate, we're going to do the same
-      # if (options_reinclusion == 1){
-      #
-      # }
+      ) &
+        (data.all$orig.exclude == "Exclude-Carried-Forward"), (opt) := "Include"]
+    data.all[
+      data.all[, get(opt)] %in% c('Exclude-Min-Height-Change','Exclude-Max-Height-Change'),
+      (opt) := "No Change"]
 
-
-      if (newly.excluded > num.height.excluded) {
-        num.height.excluded = newly.excluded
-      } else {
-        break
-      }
-
-      ##### END EDIT #####
-    }
-
-    setkey(subj.df, index)
-    return(subj.df$exclude)
-  })(copy(.SD)), by = .(subjid), .SDcols = c('sex', 'agedays', 'v', 'tbc.sd', 'exclude', 'orig.exclude')]
-
-  ##### ADJUSTCF EDIT #####
-  # process what came from step 15
-
-  # if you're outside of the bands OR if you are not a carry forward then you have no change
-  data.all[
-    !(
-      data.all$exclude %in% c(
-        'Exclude-Min-Height-Change',
-        'Exclude-Max-Height-Change'
-      )
-    ) &
-    (data.all$orig.exclude == "Exclude-Carried-Forward"), exclude := "Include"]
-  data.all[
-    data.all$exclude %in% c('Exclude-Min-Height-Change','Exclude-Max-Height-Change'),
-    exclude := "No Change"]
+  }
 
   # return results
   return(rbind(
