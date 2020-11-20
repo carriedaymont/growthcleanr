@@ -9,6 +9,303 @@ na.as.false = function(v) {
   v
 }
 
+# function to calculate temporary exclusion for step 15 (a - q)
+calc_temp_exclusion_15 <- function(df){
+  # initialize fields
+  df[, (ewma.fields) := as.double(NaN)]
+  df[, `:=`(
+    v.prev = as.double(NaN),
+    v.next = as.double(NaN),
+    dewma.after.prev = as.double(NaN),
+    dewma.before.next = as.double(NaN),
+    abs.tbc.sd.prev = as.double(NaN),
+    abs.tbc.sd.next = as.double(NaN),
+    agedays.next = as.integer(NaN),
+    abs.2ndlast.sd = as.double(NaN),
+    mindiff.prev.ht = as.double(NaN),
+    mindiff.next.ht = as.double(NaN),
+    maxdiff.prev.ht = as.double(NaN),
+    maxdiff.next.ht = as.double(NaN),
+    pair.prev = F,
+    pair.next = F
+  )]
+
+  # ewma fields are needed later -- calculate now for efficiency
+  df[, (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, T)]
+
+  # calculate some useful values (e.g. dewma values and tbc.sd) for use in later steps
+  df[, `:=`(
+    dewma.all = tbc.sd - ewma.all,
+    dewma.before = tbc.sd - ewma.before,
+    dewma.after = tbc.sd - ewma.after,
+    abs.tbc.sd = abs(tbc.sd)
+  )]
+
+  # 15a.  As with steps 11 and 14, only one value will be excluded per round, and the step will be repeated until there are no more values to exclude
+  # b.  For each height, calculate the d_age=agedays of next value-agedays of current value
+  # NOTE: obtain next measurement, ewma.before and abs.tbc.sd as well since they are needed later
+
+  # for efficiency, bring get.next inline here (working on valid rows within a single parameter for a single subject)
+  # structure c(field.name[-1], NA) == get.next
+  df[, `:=`(
+    agedays.next = c(agedays[-1], NA),
+    v.next = c(v[-1], NA),
+    dewma.before.next = c(dewma.before[-1], NA),
+    abs.tbc.sd.next = c(abs.tbc.sd[-1], NA)
+  )]
+  df[, delta.agedays.next := agedays.next - agedays]
+
+  # 15c.	For each height, calculate mid_agedays=0.5*(agedays of next value + agedays of current value)
+  df[, mid.agedays := 0.5 * (agedays.next + agedays)]
+
+  # 15d.	Generate variable tanner_months= 6+12*(round(mid_agedays/365.25))
+  # only calculate for rows that relate to height (may speed up subsequent processing)
+  df[, tanner.months := 6 + 12 * (round(mid.agedays / 365.25))]
+
+  # 15e.	Merge with dataset tanner_ht_vel using sex and tanner_months – this will give you min_ht_vel and max_ht_vel
+  setkey(df, sex, tanner.months)
+  df = tanner.ht.vel[df]
+
+  # 15f.	Calculate the following:
+  #   i.	mindiff_ht=0.5*min_ht_vel*(d_agedays/365.25)^2-3 if d_agedays<365.25
+  #   ii.	replace mindiff_ht=0.5*min_ht_vel-3 if d_agedays>365.25
+  df[, ht.exp := ifelse(delta.agedays.next < 365.25,
+                        min_ht.exp_under,
+                        min_ht.exp_over)]
+  df[, `:=`(maxdiff.next.ht = as.double(NA),
+            mindiff.next.ht = as.double(NaN))]
+  df[, mindiff.next.ht := minfactor * min.ht.vel * (delta.agedays.next /
+                                                      365.25) ^ ht.exp - banddiff]
+
+  # 15f.iii.	maxdiff_ht=2*max_ht_vel*(d_agedays/365.25)^1.5+5.5 if d_agedays>365.25
+  #   iv.	replace maxdiff_ht=2*max_ht_vel*(d_agedays/365.25)^0.33+5.5 if d_agedays<365.25
+  df[, ht.exp := ifelse(delta.agedays.next < 365.25,
+                        max_ht.exp_under,
+                        max_ht.exp_over)]
+  df[, maxdiff.next.ht := maxfactor * max.ht.vel * (delta.agedays.next /
+                                                      365.25) ^ ht.exp + banddiff_plus]
+
+  # 15g.	Generate variable whoagegrp_ht=agedays/30.4375 rounded to the nearest integer
+  df[, whoagegrp.ht := round(agedays / 30.4375)]
+
+  # 15h.	Generate variable whoinc_age_ht based on values of d_agedays_ht according the the following table
+  #   d_agedays_ht	whoinc_age_ht
+  #   20-45	        1
+  #   46-75	        2
+  #   76-106	      3
+  #   107-152	      4
+  #   153-198	      6
+  #   All others	  missing
+  df[, whoinc.age.ht :=
+       ifelse(delta.agedays.next < 20 ,
+              NA,
+              ifelse(
+                delta.agedays.next <= 45,
+                1,
+                ifelse(
+                  delta.agedays.next <= 75,
+                  2,
+                  ifelse(
+                    delta.agedays.next <= 106,
+                    3,
+                    ifelse(
+                      delta.agedays.next <= 152,
+                      4,
+                      ifelse(delta.agedays.next <= 198, 6, NA)
+                    )
+                  )
+                )
+              ))]
+
+  # i.	Merge using sex and whoagegrp_ht using who_ht_vel_3sd and who_ht_maxvel_3sd; this will give you varaibles whoinc_i_ht and maxwhoinc_i_ht
+  #     for various intervals where i is 1,2, 3,4, 6 and corresponds to whoinc_age_ht.
+  setkey(df, sex, whoagegrp.ht)
+  df = who.ht.vel[df]
+
+  # restore original sort order (ensures valid.rows variable applies to correct rows)
+  setkey(df, index)
+
+  # 15j.	Generate variable who_mindiff_ht=whoinc_i_ht according to the value if whoinc_age_ht; make who_mindiff_ht missing if whoinc_i_ht or whoinc_age_ht is missing.
+  df[, who.mindiff.next.ht := ifelse(
+    delta.agedays.next < 20 ,
+    NA,
+    ifelse(
+      delta.agedays.next <= 45,
+      whoinc.1.ht,
+      ifelse(
+        delta.agedays.next <= 75,
+        whoinc.2.ht,
+        ifelse(
+          delta.agedays.next <= 106,
+          whoinc.3.ht,
+          ifelse(
+            delta.agedays.next <= 152,
+            whoinc.4.ht,
+            ifelse(delta.agedays.next <= 198, whoinc.6.ht, NA)
+          )
+        )
+      )
+    )
+  )]
+
+  # 15k.	Generate variable who_maxdiff_ht=max_whoinc_i_ht according to the value if whoinc_age_ht; make who_maxdiff_ht missing if max_whoinc_i_ht or
+  #     whoinc_age_ht is missing.
+  df[, who.maxdiff.next.ht := ifelse(
+    delta.agedays.next < 20 ,
+    NA,
+    ifelse(
+      delta.agedays.next <= 45,
+      max.whoinc.1.ht,
+      ifelse(
+        delta.agedays.next <= 75,
+        max.whoinc.2.ht,
+        ifelse(
+          delta.agedays.next <= 106,
+          max.whoinc.3.ht,
+          ifelse(
+            delta.agedays.next <= 152,
+            max.whoinc.4.ht,
+            ifelse(delta.agedays.next <= 198, max.whoinc.6.ht, NA)
+          )
+        )
+      )
+    )
+  )]
+
+  # 15l.	Scale allowed value based on d_agedays_ht:
+  #   1.	replace who_mindiff_`p'=who_mindiff_`p'*d_agedays_`p'/(whoinc_age_`p'*30.4375) if d_agedays_`p'<(whoinc_age_`p'*30.4375)
+  #   2.	replace who_maxdiff_`p'=who_maxdiff_`p'*d_agedays_`p'/(whoinc_age_`p'*30.4375) if d_agedays_`p'>(whoinc_age_`p'*30.4375)
+  df[delta.agedays.next < whoinc.age.ht * 30.4375,
+     `:=`(
+       who.mindiff.next.ht = who.mindiff.next.ht * delta.agedays.next / (whoinc.age.ht *
+                                                                           30.4375),
+       who.maxdiff.next.ht = who.maxdiff.next.ht * delta.agedays.next /
+         (whoinc.age.ht * 30.4375)
+     )]
+
+  # 15m.	Replace mindiff_ht/maxdiff_ht with adjusted WHO value if Tanner value is missing or if both are present and age difference is < 9 months:
+  #   1.	replace mindiff_`p'=0.5*who_mindiff_`p'-3 if who_mindiff_`p' is not missing & d_agedays_`p'<(9*30.4375)
+  #   2.	replace maxdiff_`p'=2*who_maxdiff_`p'+3 if who_maxdiff_`p' is not missing & d_agedays_`p'<(9*30.4375)
+  #   3.	replace mindiff_`p'=0.5*who_mindiff_`p'-3 if mindiff_`p' is missing & who_mindiff_`p' is not missing
+  #   4.	replace maxdiff_`p'=2*who_maxdiff_`p'+3 if maxdiff_`p is missing & who_maxdiff_`p' is not missing
+
+  # refactored logic slightly for efficiency
+  df[!is.na(who.mindiff.next.ht) &
+       (delta.agedays.next < 9 * 30.4375 |
+          is.na(mindiff.next.ht)),
+     `:=`(
+       mindiff.next.ht = minfactor * who.mindiff.next.ht - banddiff,
+       maxdiff.next.ht = maxfactor * who.maxdiff.next.ht + banddiff
+     )]
+
+  # 15m.5.  replace mindiff_`p'=-3 if mindiff_`p' is missing
+  df[is.na(mindiff.next.ht), mindiff.next.ht := -3]
+
+  # 15n.	Determine the min/maxdiffs for the previous age: mindiff_prev_ht, maxdiff_prev_ht
+  # NOTE: obtain previous height, ewma.after value and abs.tbc.sd as well since they are needed in next steps
+
+  # for efficiency, bring get.prev inline here (working on valid rows within a single parameter for a single subject)
+  # structure c(NA, tbc.sd[-.N]) == get.prev
+  df[, `:=`(
+    v.prev = c(NA, v[-.N]),
+    dewma.after.prev = c(NA, dewma.after[-.N]),
+    abs.tbc.sd.prev = c(NA, abs.tbc.sd[-.N]),
+    mindiff.prev.ht = c(NA, mindiff.next.ht[-.N]),
+    maxdiff.prev.ht = c(NA, maxdiff.next.ht[-.N])
+  )]
+
+  # 15o.	Determine d_prev_ht=ht-htprev (set to missing for the first value for a subject) and d_next_ht=htnext-ht (set to missing for the last value for a subject)
+  df[, `:=`(delta.prev.ht = v - v.prev,
+            delta.next.ht = v.next - v)]
+
+  # 15p.  Perform a EWMA calculation with the following modifications:
+  #  i.	  Generate a variable pair=1 if (d_prev_ht<mindiff_prev_ht OR d_ht<mindiff_ht OR d_prev_ht>maxdiff_prev_ht  OR d_ht>maxdiff_ht) AND exc_ht==0
+  df[, pair := na.as.false(
+    delta.prev.ht < mindiff.prev.ht |
+      delta.next.ht < mindiff.next.ht |
+      delta.prev.ht > maxdiff.prev.ht |
+      delta.next.ht > maxdiff.next.ht
+  )]
+
+  # for efficiency, bring get.prev and get.next inline here (working on valid rows within a single parameter for a single subject)
+  # structure c(NA, field.name[-.N]) == get.prev
+  # structure c(field.name[-1], NA) == get.next
+  df[, `:=`(pair.prev = c(F, pair[-.N]),
+            pair.next = c(pair[-1], F))]
+
+  #  ii.	Generate bef_g_aftm1=1 if |Δewma_htbef| for the value of interest is greater than |Δewma_htaft| for the previous value
+  #       AND the value of interest is not the first height value for that subject AND pair==1 AND pair for the previous value==1
+
+  #  iii.	Generate aft_g_befp1=1 if |Δewma_htaft| for the value of interest is greater than |Δewma_htbef| for the next value
+  #       AND the value of interest is not the last height value for that subject AND pair==1 AND pair for the next value==1
+  # NOTE: pair.next will be NA last height, which will result in a FALSE value below
+  df[, `:=`(
+    bef.g.aftm1 = na.as.false(
+      abs(dewma.before) > abs(dewma.after.prev)  & pair & pair.prev
+    ),
+    aft.g.befp1 = na.as.false(
+      abs(dewma.after)  > abs(dewma.before.next) & pair & pair.next
+    )
+  )]
+
+  #  iv.	Determine tbchtsd for each value as well as the one before prev_tbchtsd and after next_tbchtsd it
+  # NOTE: done previously for efficiency
+
+  # 15p.v.  Determine the total number of ht values for each subject (tot_ht)
+  # NOTE: all rows are valid due to constraint in subj.df[...] statement
+  num.valid = .N
+
+  # 15q.	Identify a value for possible exclusion if one of the following sets of criteria are met. For values identified by each set of criteria determine
+  #       the value of temp_diff using the formula given
+  #   i.	d_prev_ht<mindiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
+  #     a.  (temp_diff=|dewma_ht_bef|)
+  df[, temp.diff := as.double(NaN)]
+  df[, temp.exclude := factor(NA, levels = exclude.levels, ordered =
+                                T)]
+  df[delta.prev.ht < mindiff.prev.ht & bef.g.aftm1,
+     `:=`(temp.diff = abs(dewma.before),
+          temp.exclude = 'Exclude-Min-Height-Change')]
+
+  #   ii.	d_ht<mindiff_ht & aft_g_befp1_ht==1 & exc_ht==0 & mindiff_ht is not missing
+  #     a.	(temp_diff=|dewma_ht_aft|)
+  df[delta.next.ht < mindiff.next.ht & aft.g.befp1,
+     `:=`(temp.diff = abs(dewma.after),
+          temp.exclude = 'Exclude-Min-Height-Change')]
+
+  #   iii.	d_prev_ht>maxdiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
+  #     a.  (temp_diff=|dewma_ht_bef|)
+  df[delta.prev.ht > maxdiff.prev.ht & bef.g.aftm1,
+     `:=`(temp.diff = abs(dewma.before),
+          temp.exclude = 'Exclude-Max-Height-Change')]
+
+  #   iv.	d_ht>maxdiff_ht & aft_g_befp1_ht==1 & exc_ht==0 & mindiff_ht is not missing
+  #     a.  (temp_diff=|dewma_ht_aft|)
+  df[delta.next.ht > maxdiff.next.ht & aft.g.befp1,
+     `:=`(temp.diff = abs(dewma.after),
+          temp.exclude = 'Exclude-Max-Height-Change')]
+
+  #   v.	d_prev_ht<mindiff_prev_ht & tot_ht==2 & |tbchtsd|>|prev_tbchtsd|
+  #     a. for v-viii temp_diff is kept as missing
+  #   vi. d_ht<mindiff_ht & tot_ht==2 & |tbchtsd|>|next_tbchtsd|
+  df[delta.prev.ht < mindiff.prev.ht &
+       num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev
+     |
+       delta.next.ht < mindiff.next.ht &
+       num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
+     temp.exclude := 'Exclude-Min-Height-Change']
+
+  #   vii.	d_prev_ht>maxdiff_prev_ht & tot_ht==2 & |tbchtsd|>|prev_tbchtsd|
+  #   viii. d_ht>maxdiff_ht & tot_ht==2 & |tbchtsd|>|next_tbchtsd|
+  df[delta.prev.ht > maxdiff.prev.ht &
+       num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev
+     |
+       delta.next.ht > maxdiff.next.ht &
+       num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
+     temp.exclude := 'Exclude-Max-Height-Change']
+
+  return(df)
+}
+
 #' adjustcarryforward
 #' \code{adjustcarryforward} Uses absolute height velocity to identify values
 #' excluded as carried forward values for reinclusion.
@@ -24,12 +321,6 @@ na.as.false = function(v) {
 #' @param measurement Numeric vector containing the actual measurement data.  Weight must be in
 #'   kilograms (kg), and linear measurements (height vs. length) in centimeters (cm).
 #' @param orig.exclude Vector of exclusion assessment results from cleangrowth()
-#'
-#' @param option_reinclusion numeric of 1 - 3, deals with the reinclusion step of 15, corresponding to the following options:
-#'        1. when reevaluating, drop the most deviant value and reevaluate all, exposing any reincluded carry-forwards (CFs) to exclusions in future reevaluations
-#'        2. when reevaluating, drop the most deviant value and remove reincluded CF from consideration, such that the remaining, previously errored ones are compared to the original include and CFs determined reincluded CFs are protected
-#'        3. when reevaluating, drop the most deviant value and remove reincluded CF from consideration except for the last one, as well as the original include.This results that the remaining, previously errored ones are compared to the last reeincluded CF.
-#'
 #' @param sd.recenter Data frame or table with median SD-scores per day of life
 #' @param ewma.exp Exponent to use for weighting measurements in the exponentially weighted moving
 #'  average calculations. Defaults to -1.5. This exponent should be negative in order to weight growth
@@ -61,7 +352,6 @@ adjustcarryforward <- function(subjid,
                                sex,
                                measurement,
                                orig.exclude,
-                               option_reinclusion = 1,
                                sd.recenter = NA,
                                ewma.exp = -1.5,
                                ref.data.path = "",
@@ -340,6 +630,17 @@ adjustcarryforward <- function(subjid,
       "[%s] Exclude heights based on growth velocity...\n",
       Sys.time()
     ))
+
+  # ADJUSTCF EDIT:
+  # we're going to run this twice, in 2 different ways:
+  # 1. when deciding to exclude values, if we have a string of carried forwards,
+  #    drop the most deviant value, and all CFs in the same string, and move on as
+  #    normal
+  # 2. when deciding to exclude values, if the most deviant in a string of carried
+  #    forwards is flagged, check all the CFs in that string from 1:N. exclude all
+  #    after the first that is flagged for exclusion when comparing to the Include
+  #    before and after
+
   data.all[param == 'HEIGHTCM', exclude := (function(subj.df) {
     # assign some book keeping variables
     #subj.df[, `:=`(subjid = subjid, param='HEIGHTCM',index=1:.N)]
@@ -349,326 +650,12 @@ adjustcarryforward <- function(subjid,
     while (T) {
       # use a closure to discard all the extra fields added to df with each iteration
       subj.df[!grepl("Exclude", exclude), exclude := (function (df) {
-        # # remove things that are excluded
-        # orig_subj_exclude <- df$exclude
-        # names(orig_subj_exclude) <- df$index
-        #
-        # df <- df[!df$exclude %in% c(
-        #   'Exclude-Min-Height-Change',
-        #   'Exclude-Max-Height-Change'
-        # ),]
-
-        # initialize fields
-        df[, (ewma.fields) := as.double(NaN)]
-        df[, `:=`(
-          v.prev = as.double(NaN),
-          v.next = as.double(NaN),
-          dewma.after.prev = as.double(NaN),
-          dewma.before.next = as.double(NaN),
-          abs.tbc.sd.prev = as.double(NaN),
-          abs.tbc.sd.next = as.double(NaN),
-          agedays.next = as.integer(NaN),
-          abs.2ndlast.sd = as.double(NaN),
-          mindiff.prev.ht = as.double(NaN),
-          mindiff.next.ht = as.double(NaN),
-          maxdiff.prev.ht = as.double(NaN),
-          maxdiff.next.ht = as.double(NaN),
-          pair.prev = F,
-          pair.next = F
-        )]
-
-        # ewma fields are needed later -- calculate now for efficiency
-        df[, (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, T)]
-
-        # calculate some usefule values (e.g. dewma values and tbc.sd) for use in later steps
-        df[, `:=`(
-          dewma.all = tbc.sd - ewma.all,
-          dewma.before = tbc.sd - ewma.before,
-          dewma.after = tbc.sd - ewma.after,
-          abs.tbc.sd = abs(tbc.sd)
-        )]
-
-        # 15a.  As with steps 11 and 14, only one value will be excluded per round, and the step will be repeated until there are no more values to exclude
-        # b.  For each height, calculate the d_age=agedays of next value-agedays of current value
-        # NOTE: obtain next measurement, ewma.before and abs.tbc.sd as well since they are needed later
-
-        # for efficiency, bring get.next inline here (working on valid rows within a single parameter for a single subject)
-        # structure c(field.name[-1], NA) == get.next
-        df[, `:=`(
-          agedays.next = c(agedays[-1], NA),
-          v.next = c(v[-1], NA),
-          dewma.before.next = c(dewma.before[-1], NA),
-          abs.tbc.sd.next = c(abs.tbc.sd[-1], NA)
-        )]
-        df[, delta.agedays.next := agedays.next - agedays]
-
-        # 15c.	For each height, calculate mid_agedays=0.5*(agedays of next value + agedays of current value)
-        df[, mid.agedays := 0.5 * (agedays.next + agedays)]
-
-        # 15d.	Generate variable tanner_months= 6+12*(round(mid_agedays/365.25))
-        # only calculate for rows that relate to height (may speed up subsequent processing)
-        df[, tanner.months := 6 + 12 * (round(mid.agedays / 365.25))]
-
-        # 15e.	Merge with dataset tanner_ht_vel using sex and tanner_months – this will give you min_ht_vel and max_ht_vel
-        setkey(df, sex, tanner.months)
-        df = tanner.ht.vel[df]
-
-        # 15f.	Calculate the following:
-        #   i.	mindiff_ht=0.5*min_ht_vel*(d_agedays/365.25)^2-3 if d_agedays<365.25
-        #   ii.	replace mindiff_ht=0.5*min_ht_vel-3 if d_agedays>365.25
-        df[, ht.exp := ifelse(delta.agedays.next < 365.25,
-                              min_ht.exp_under,
-                              min_ht.exp_over)]
-        df[, `:=`(maxdiff.next.ht = as.double(NA),
-                  mindiff.next.ht = as.double(NaN))]
-        df[, mindiff.next.ht := minfactor * min.ht.vel * (delta.agedays.next /
-                                                            365.25) ^ ht.exp - banddiff]
-
-        # 15f.iii.	maxdiff_ht=2*max_ht_vel*(d_agedays/365.25)^1.5+5.5 if d_agedays>365.25
-        #   iv.	replace maxdiff_ht=2*max_ht_vel*(d_agedays/365.25)^0.33+5.5 if d_agedays<365.25
-        df[, ht.exp := ifelse(delta.agedays.next < 365.25,
-                              max_ht.exp_under,
-                              max_ht.exp_over)]
-        df[, maxdiff.next.ht := maxfactor * max.ht.vel * (delta.agedays.next /
-                                                            365.25) ^ ht.exp + banddiff_plus]
-
-        # 15g.	Generate variable whoagegrp_ht=agedays/30.4375 rounded to the nearest integer
-        df[, whoagegrp.ht := round(agedays / 30.4375)]
-
-        # 15h.	Generate variable whoinc_age_ht based on values of d_agedays_ht according the the following table
-        #   d_agedays_ht	whoinc_age_ht
-        #   20-45	        1
-        #   46-75	        2
-        #   76-106	      3
-        #   107-152	      4
-        #   153-198	      6
-        #   All others	  missing
-        df[, whoinc.age.ht :=
-             ifelse(delta.agedays.next < 20 ,
-                    NA,
-                    ifelse(
-                      delta.agedays.next <= 45,
-                      1,
-                      ifelse(
-                        delta.agedays.next <= 75,
-                        2,
-                        ifelse(
-                          delta.agedays.next <= 106,
-                          3,
-                          ifelse(
-                            delta.agedays.next <= 152,
-                            4,
-                            ifelse(delta.agedays.next <= 198, 6, NA)
-                          )
-                        )
-                      )
-                    ))]
-
-        # i.	Merge using sex and whoagegrp_ht using who_ht_vel_3sd and who_ht_maxvel_3sd; this will give you varaibles whoinc_i_ht and maxwhoinc_i_ht
-        #     for various intervals where i is 1,2, 3,4, 6 and corresponds to whoinc_age_ht.
-        setkey(df, sex, whoagegrp.ht)
-        df = who.ht.vel[df]
-
-        # restore original sort order (ensures valid.rows variable applies to correct rows)
-        setkey(df, index)
-
-        # 15j.	Generate variable who_mindiff_ht=whoinc_i_ht according to the value if whoinc_age_ht; make who_mindiff_ht missing if whoinc_i_ht or whoinc_age_ht is missing.
-        df[, who.mindiff.next.ht := ifelse(
-          delta.agedays.next < 20 ,
-          NA,
-          ifelse(
-            delta.agedays.next <= 45,
-            whoinc.1.ht,
-            ifelse(
-              delta.agedays.next <= 75,
-              whoinc.2.ht,
-              ifelse(
-                delta.agedays.next <= 106,
-                whoinc.3.ht,
-                ifelse(
-                  delta.agedays.next <= 152,
-                  whoinc.4.ht,
-                  ifelse(delta.agedays.next <= 198, whoinc.6.ht, NA)
-                )
-              )
-            )
-          )
-        )]
-
-        # 15k.	Generate variable who_maxdiff_ht=max_whoinc_i_ht according to the value if whoinc_age_ht; make who_maxdiff_ht missing if max_whoinc_i_ht or
-        #     whoinc_age_ht is missing.
-        df[, who.maxdiff.next.ht := ifelse(
-          delta.agedays.next < 20 ,
-          NA,
-          ifelse(
-            delta.agedays.next <= 45,
-            max.whoinc.1.ht,
-            ifelse(
-              delta.agedays.next <= 75,
-              max.whoinc.2.ht,
-              ifelse(
-                delta.agedays.next <= 106,
-                max.whoinc.3.ht,
-                ifelse(
-                  delta.agedays.next <= 152,
-                  max.whoinc.4.ht,
-                  ifelse(delta.agedays.next <= 198, max.whoinc.6.ht, NA)
-                )
-              )
-            )
-          )
-        )]
-
-        # 15l.	Scale allowed value based on d_agedays_ht:
-        #   1.	replace who_mindiff_`p'=who_mindiff_`p'*d_agedays_`p'/(whoinc_age_`p'*30.4375) if d_agedays_`p'<(whoinc_age_`p'*30.4375)
-        #   2.	replace who_maxdiff_`p'=who_maxdiff_`p'*d_agedays_`p'/(whoinc_age_`p'*30.4375) if d_agedays_`p'>(whoinc_age_`p'*30.4375)
-        df[delta.agedays.next < whoinc.age.ht * 30.4375,
-           `:=`(
-             who.mindiff.next.ht = who.mindiff.next.ht * delta.agedays.next / (whoinc.age.ht *
-                                                                                 30.4375),
-             who.maxdiff.next.ht = who.maxdiff.next.ht * delta.agedays.next /
-               (whoinc.age.ht * 30.4375)
-           )]
-
-        # 15m.	Replace mindiff_ht/maxdiff_ht with adjusted WHO value if Tanner value is missing or if both are present and age difference is < 9 months:
-        #   1.	replace mindiff_`p'=0.5*who_mindiff_`p'-3 if who_mindiff_`p' is not missing & d_agedays_`p'<(9*30.4375)
-        #   2.	replace maxdiff_`p'=2*who_maxdiff_`p'+3 if who_maxdiff_`p' is not missing & d_agedays_`p'<(9*30.4375)
-        #   3.	replace mindiff_`p'=0.5*who_mindiff_`p'-3 if mindiff_`p' is missing & who_mindiff_`p' is not missing
-        #   4.	replace maxdiff_`p'=2*who_maxdiff_`p'+3 if maxdiff_`p is missing & who_maxdiff_`p' is not missing
-
-        # refactored logic slightly for efficiency
-        df[!is.na(who.mindiff.next.ht) &
-             (delta.agedays.next < 9 * 30.4375 |
-                is.na(mindiff.next.ht)),
-           `:=`(
-             mindiff.next.ht = minfactor * who.mindiff.next.ht - banddiff,
-             maxdiff.next.ht = maxfactor * who.maxdiff.next.ht + banddiff
-           )]
-
-        # 15m.5.  replace mindiff_`p'=-3 if mindiff_`p' is missing
-        df[is.na(mindiff.next.ht), mindiff.next.ht := -3]
-
-        # 15n.	Determine the min/maxdiffs for the previous age: mindiff_prev_ht, maxdiff_prev_ht
-        # NOTE: obtain previous height, ewma.after value and abs.tbc.sd as well since they are needed in next steps
-
-        # for efficiency, bring get.prev inline here (working on valid rows within a single parameter for a single subject)
-        # structure c(NA, tbc.sd[-.N]) == get.prev
-        df[, `:=`(
-          v.prev = c(NA, v[-.N]),
-          dewma.after.prev = c(NA, dewma.after[-.N]),
-          abs.tbc.sd.prev = c(NA, abs.tbc.sd[-.N]),
-          mindiff.prev.ht = c(NA, mindiff.next.ht[-.N]),
-          maxdiff.prev.ht = c(NA, maxdiff.next.ht[-.N])
-        )]
-
-        # 15o.	Determine d_prev_ht=ht-htprev (set to missing for the first value for a subject) and d_next_ht=htnext-ht (set to missing for the last value for a subject)
-        df[, `:=`(delta.prev.ht = v - v.prev,
-                  delta.next.ht = v.next - v)]
-
-        # 15p.  Perform a EWMA calculation with the following modifications:
-        #  i.	  Generate a variable pair=1 if (d_prev_ht<mindiff_prev_ht OR d_ht<mindiff_ht OR d_prev_ht>maxdiff_prev_ht  OR d_ht>maxdiff_ht) AND exc_ht==0
-        df[, pair := na.as.false(
-          delta.prev.ht < mindiff.prev.ht |
-            delta.next.ht < mindiff.next.ht |
-            delta.prev.ht > maxdiff.prev.ht |
-            delta.next.ht > maxdiff.next.ht
-        )]
-
-        # for efficiency, bring get.prev and get.next inline here (working on valid rows within a single parameter for a single subject)
-        # structure c(NA, field.name[-.N]) == get.prev
-        # structure c(field.name[-1], NA) == get.next
-        df[, `:=`(pair.prev = c(F, pair[-.N]),
-                  pair.next = c(pair[-1], F))]
-
-        #  ii.	Generate bef_g_aftm1=1 if |Δewma_htbef| for the value of interest is greater than |Δewma_htaft| for the previous value
-        #       AND the value of interest is not the first height value for that subject AND pair==1 AND pair for the previous value==1
-
-        #  iii.	Generate aft_g_befp1=1 if |Δewma_htaft| for the value of interest is greater than |Δewma_htbef| for the next value
-        #       AND the value of interest is not the last height value for that subject AND pair==1 AND pair for the next value==1
-        # NOTE: pair.next will be NA last height, which will result in a FALSE value below
-        df[, `:=`(
-          bef.g.aftm1 = na.as.false(
-            abs(dewma.before) > abs(dewma.after.prev)  & pair & pair.prev
-          ),
-          aft.g.befp1 = na.as.false(
-            abs(dewma.after)  > abs(dewma.before.next) & pair & pair.next
-          )
-        )]
-
-        #  iv.	Determine tbchtsd for each value as well as the one before prev_tbchtsd and after next_tbchtsd it
-        # NOTE: done previously for efficiency
-
-        # 15p.v.  Determine the total number of ht values for each subject (tot_ht)
-        # NOTE: all rows are valid due to constraint in subj.df[...] statement
-        num.valid = .N
-
-        # 15q.	Identify a value for possible exclusion if one of the following sets of criteria are met. For values identified by each set of criteria determine
-        #       the value of temp_diff using the formula given
-        #   i.	d_prev_ht<mindiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
-        #     a.  (temp_diff=|dewma_ht_bef|)
-        df[, temp.diff := as.double(NaN)]
-        df[, temp.exclude := factor(NA, levels = exclude.levels, ordered =
-                                      T)]
-        df[delta.prev.ht < mindiff.prev.ht & bef.g.aftm1,
-           `:=`(temp.diff = abs(dewma.before),
-                temp.exclude = 'Exclude-Min-Height-Change')]
-
-        #   ii.	d_ht<mindiff_ht & aft_g_befp1_ht==1 & exc_ht==0 & mindiff_ht is not missing
-        #     a.	(temp_diff=|dewma_ht_aft|)
-        df[delta.next.ht < mindiff.next.ht & aft.g.befp1,
-           `:=`(temp.diff = abs(dewma.after),
-                temp.exclude = 'Exclude-Min-Height-Change')]
-
-        #   iii.	d_prev_ht>maxdiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
-        #     a.  (temp_diff=|dewma_ht_bef|)
-        df[delta.prev.ht > maxdiff.prev.ht & bef.g.aftm1,
-           `:=`(temp.diff = abs(dewma.before),
-                temp.exclude = 'Exclude-Max-Height-Change')]
-
-        #   iv.	d_ht>maxdiff_ht & aft_g_befp1_ht==1 & exc_ht==0 & mindiff_ht is not missing
-        #     a.  (temp_diff=|dewma_ht_aft|)
-        df[delta.next.ht > maxdiff.next.ht & aft.g.befp1,
-           `:=`(temp.diff = abs(dewma.after),
-                temp.exclude = 'Exclude-Max-Height-Change')]
-
-        #   v.	d_prev_ht<mindiff_prev_ht & tot_ht==2 & |tbchtsd|>|prev_tbchtsd|
-        #     a. for v-viii temp_diff is kept as missing
-        #   vi. d_ht<mindiff_ht & tot_ht==2 & |tbchtsd|>|next_tbchtsd|
-        df[delta.prev.ht < mindiff.prev.ht &
-             num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev
-           |
-             delta.next.ht < mindiff.next.ht &
-             num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
-           temp.exclude := 'Exclude-Min-Height-Change']
-
-        #   vii.	d_prev_ht>maxdiff_prev_ht & tot_ht==2 & |tbchtsd|>|prev_tbchtsd|
-        #   viii. d_ht>maxdiff_ht & tot_ht==2 & |tbchtsd|>|next_tbchtsd|
-        df[delta.prev.ht > maxdiff.prev.ht &
-             num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev
-           |
-             delta.next.ht > maxdiff.next.ht &
-             num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
-           temp.exclude := 'Exclude-Max-Height-Change']
+        # do steps 15a - 15q (functionalized for ease)
+        df <- calc_temp_exclusion_15(df)
 
         # r.  If there is only one potential exclusion identified in step 15j for a subject and parameter,
         #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi  and exc_ht=16 if it met criteria iii, iv, vii, or viii
         # NOTE: these exclusions are assigned in the code above as 'Exclude-Min-Height-Change' and 'Exclude-Max-Height-Change'
-
-        ##### ADJUSTCF EDIT #####
-        # # if you're outside of the bands OR if you are not a carry forward then you have no change
-        # df$temp.exclude <- sapply(1:nrow(df), function(x) {
-        #   ifelse(
-        #     (
-        #       df$temp.exclude[x] %in% c(
-        #         'Exclude-Min-Height-Change',
-        #         'Exclude-Max-Height-Change'
-        #       )
-        #     ) |
-        #       (df$orig.exclude[x] != "Exclude-Carried-Forward"),
-        #     'No Change',
-        #     'Include'
-        #   )
-        # })
 
         # count the amount of error codes we get
         all_exclude = !is.na(df$temp.exclude)
