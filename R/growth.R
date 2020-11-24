@@ -1648,6 +1648,7 @@ cleanbatch <- function(data.df,
 #' @rawNamespace import(plyr, except = c(failwith, id, summarize, count, desc, mutate, arrange, rename, is.discrete, summarise, summarize))
 #' @import foreach
 #' @import doParallel
+#' @import parallel
 #' @examples
 #' # Run calculation using a small subset of given data
 #' df_stats <- as.data.frame(syngrowth)
@@ -1707,10 +1708,16 @@ cleangrowth <- function(subjid,
 
   # if parallel processing is desired, load additional modules
   if (parallel) {
-    registerDoParallel(cores = num.batches)
     if (is.na(num.batches)) {
       num.batches <- getDoParWorkers()
     }
+    # variables needed for parallel workers
+    var_for_par <- c("temporary_duplicates", "valid", "swap_parameters",
+                     "na_as_false")
+
+    cl <- makeCluster(num.batches)
+    clusterExport(cl = cl, varlist = var_for_par)
+    registerDoParallel(cl)
   } else {
     if (is.na(num.batches))
       num.batches <- 1
@@ -1968,7 +1975,8 @@ cleangrowth <- function(subjid,
       .(batch),
       cleanbatch,
       .parallel = parallel,
-      .paropts = list(.packages = "data.table"),
+      .paropts = list(.packages = "data.table",
+                      .export = var_for_par),
       log.path = log.path,
       quietly = quietly,
       parallel = parallel,
@@ -1986,7 +1994,7 @@ cleangrowth <- function(subjid,
       error.load.threshold = error.load.threshold,
       error.load.mincount = error.load.mincount
     )
-    stopImplicitCluster()
+    stopCluster(cl)
   }
   if (!quietly)
     cat(sprintf("[%s] Done!\n", Sys.time()))
