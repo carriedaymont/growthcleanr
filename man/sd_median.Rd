@@ -21,3 +21,22 @@ Table of data with median SD-scores per day of life by gender and parameter.
 \description{
 Calculate median SD score by age for each parameter.
 }
+\examples{
+# Run on 1 subject
+df_stats <- as.data.frame(syngrowth)
+df_stats <- df_stats[df_stats$subjid == df_stats$subjid[1], ]
+
+# Get the original standard deviations
+measurement_to_z <- read_anthro(cdc.only = TRUE)
+sd.orig <- measurement_to_z(df_stats$param,
+                       df_stats$agedays,
+                       df_stats$sex,
+                       df_stats$measurement,
+                       TRUE)
+
+# Calculate median standard deviations
+sd.m <- sd_median(df_stats$param,
+                  df_stats$sex,
+                  df_stats$agedays,
+                  sd.orig)
+}

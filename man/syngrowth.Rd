@@ -4,10 +4,8 @@
 \name{syngrowth}
 \alias{syngrowth}
 \title{syngrowth}
-\format{
-A data frame with six variables: \code{id}, \code{subjid},
-\code{sex}, \code{agedays}, \code{param}, and \code{measurement}
-}
+\format{A data frame with six variables: \code{id}, \code{subjid},
+\code{sex}, \code{agedays}, \code{param}, and \code{measurement}}
 \usage{
 syngrowth
 }

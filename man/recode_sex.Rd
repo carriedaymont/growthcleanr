@@ -36,3 +36,16 @@ Returns a data table with recoded sex variables.
 \code{recode_sex} recodes a binary sex variable for a given source column in a data frame or data table.
 Useful in transforming output from growthcleanr::cleangrowth() into a format suitable for growthcleanr::ext_bmiz().
 }
+\examples{
+# Run on given data
+df <- as.data.frame(syngrowth)
+
+# Run with all defaults
+df_r <- recode_sex(df)
+
+# Specify different targets
+df_rt <- recode_sex(df, targetcol = "sexr", targetm = "Male", targetf = "Female")
+
+# Specify different inputs
+df_ri <- recode_sex(df_rt, sourcecol = "sexr", sourcem = "Male", sourcef = "Female")
+}

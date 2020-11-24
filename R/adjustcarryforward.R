@@ -42,6 +42,24 @@
 #' @rawNamespace import(plyr, except = c(failwith, id, summarize, count, desc, mutate, arrange, rename, is.discrete, summarise, summarize))
 #' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
 #' @import data.table
+#' @examples
+#' # Run on a small subset of given data
+#' df <- as.data.frame(syngrowth)
+#' df <- df[df$subjid %in% unique(df[, "subjid"])[1:5], ]
+#' clean_df <- cbind(df,
+#'                   "clean_value" = cleangrowth(df$subjid,
+#'                                               df$param,
+#'                                               df$agedays,
+#'                                               df$sex,
+#'                                               df$measurement))
+#'
+#' # Adjust carry forward values in cleaned data
+#' adj_clean <- adjustcarryforward(subjid = clean_df$subjid,
+#'                                 param = clean_df$param,
+#'                                 agedays = clean_df$agedays,
+#'                                 sex = clean_df$sex,
+#'                                 measurement = clean_df$measurement,
+#'                                 orig.exclude = clean_df$clean_value)
 adjustcarryforward <- function(subjid,
                                param,
                                agedays,
@@ -191,7 +209,7 @@ adjustcarryforward <- function(subjid,
   # calculate z scores
   if (!quietly)
     cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
-  measurement.to.z <- read.anthro(ref.data.path, cdc.only = T)
+  measurement.to.z <- read_anthro(ref.data.path, cdc.only = T)
   data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
 
   # calculate "standard deviation" scores
@@ -255,7 +273,7 @@ adjustcarryforward <- function(subjid,
       "Unit-Error-Possible",
       "Swapped-Measurements"
     )
-    sd.recenter <- data.all[orig.exclude %in% keep.levels, sd.median(param, sex, agedays, sd.orig)]
+    sd.recenter <- data.all[orig.exclude %in% keep.levels, sd_median(param, sex, agedays, sd.orig)]
     # END EDIT
   }
   # add sd.recenter to data, and recenter
