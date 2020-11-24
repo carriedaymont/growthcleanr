@@ -8,3 +8,5 @@
 ^output$
 .dockerignore
 Dockerfile
+^\.github$
+^\.lintr$
