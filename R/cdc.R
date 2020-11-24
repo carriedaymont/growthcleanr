@@ -1,3 +1,38 @@
+#' Function for LMS formula with modified (m) z-scores
+#'
+#' @keywords internal
+#' @noRd
+z_score <- function(var, l, m, s) {
+  ls <- l * s
+  invl <- 1 / l
+  z <- (((var / m) ^ l) - 1) / (ls) # z-score formula
+  sdp2 <- (m * (1 + 2 * ls) ^ (invl)) - m
+  # modified z-score (+2)
+  sdm2 <- m - (m * (1 - 2 * ls) ^ (invl))
+  mz <- fifelse(var < m, (var - m) / (0.5 * sdm2), (var - m) / (sdp2 * 0.5))
+  return(list(z, mz))
+}
+
+#' Function to reorder columns of data table
+#'
+#' @keywords internal
+#' @noRd
+set_cols_first <- function(DT, cols, intersection = TRUE)
+{
+  # thanks to hutils
+  if (intersection) {
+    return(setcolorder(DT, c(
+      intersect(cols, names(DT)),
+      setdiff(names(DT), cols)
+    )))
+  }
+  else {
+    return(setcolorder(DT, c(cols, setdiff(
+      names(DT), cols
+    ))))
+  }
+}
+
 #' ext_bmiz
 #'
 #' \code{ext_bmiz} Calculates the sigma (scale parameter for the half-normal
@@ -83,33 +118,11 @@ ext_bmiz <- function(data,
                      bmi = "bmi",
                      adjust.integer.age = T,
                      ref.data.path = "") {
-  set_cols_first <- function (DT, cols, intersection = TRUE)
-  {
-    # thanks to hutils
-    if (intersection) {
-      return(setcolorder(DT, c(
-        intersect(cols, names(DT)),
-        setdiff(names(DT), cols)
-      )))
-    }
-    else {
-      return(setcolorder(DT, c(cols, setdiff(
-        names(DT), cols
-      ))))
-    }
-  }
-
-  z_score = function(var, l, m, s) {
-    # LMS formula with modified (m) z-scores
-    ls = l * s
-    invl = 1 / l
-    z = (((var / m) ^ l) - 1) / (ls) # z-score formula
-    sdp2 = (m * (1 + 2 * ls) ^ (invl)) - m
-    # modified z-score (+2)
-    sdm2 = m - (m * (1 - 2 * ls) ^ (invl))
-    mz = fifelse(var < m, (var - m) / (0.5 * sdm2), (var - m) / (sdp2 * 0.5))
-    return(list(z, mz))
-  }
+  library(data.table, quietly = T)
+  library(dplyr, quietly = T)
+  library(Hmisc, quietly = T)
+  library(magrittr, quietly = T)
+  library(labelled, quietly = T)
 
   setDT(data)
 
@@ -171,17 +184,17 @@ ext_bmiz <- function(data,
              sht1)]
   names(dref) <- gsub('1', '', names(dref))
 
-  dref = rbindlist(list(dref, d20))
+  dref <- rbindlist(list(dref, d20))
   adj_bmi_met <-
     dref[agemos == 240, .(sex, mbmi, sbmi)] %>% setnames(., Cs(sex, mref, sref))
 
   dref <- dref[adj_bmi_met, on = 'sex']
-  v = Cs(sex, age, wl, wm, ws, bl, bm, bs, hl, hm, hs, mref, sref)
+  v <- Cs(sex, age, wl, wm, ws, bl, bm, bs, hl, hm, hs, mref, sref)
   setnames(dref, v)
 
   # interpolate reference data to match each agemos in input data
   if (length(setdiff(data$age, dref$age)) > 0) {
-    uages = unique(data$age)
+    uages <- unique(data$age)
     fapprox <- function(i) {
       .d <- dref[sex == i]
       fapp <- function(vars, ...)
@@ -203,7 +216,7 @@ ext_bmiz <- function(data,
   setnames(dt, Cs(bl, bm, bs), Cs(l, m, s))
   dt[, Cs(wl, wm, ws, hl, hm, hs) := NULL]
 
-  dt = mutate(
+  dt <- mutate(
     dt,
     bp = 100 * pnorm(bz),
     p95 = m * (1 + l * s * qnorm(0.95)) ^ (1 / l),
@@ -263,7 +276,7 @@ ext_bmiz <- function(data,
 
   # Note: removing distance from median metrics; can restore
 
-  v = Cs(
+  v <- Cs(
     seq_,
     bmiz,
     bmip,
