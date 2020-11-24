@@ -1,4 +1,4 @@
-Package: growthcleanr
+liPackage: growthcleanr
 Type: Package
 Title: Growth Measurements Cleaner
 Version: 1.2.2
@@ -17,6 +17,7 @@ Imports:
     dplyr (>= 1.0.1),
     foreach (>= 1.5.0),
     doParallel (>= 1.0.15),
+    parallel (>=4.0.3),
     Hmisc (>= 4.4-0),
     labelled (>= 2.5.0),
     magrittr (>= 1.5)

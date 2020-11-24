@@ -66,6 +66,7 @@ following packages:
 * `data.table`
 * `foreach`
 * `doParallel`
+* `parallel`
 * `dplyr`
 * `Hmisc`
 * `labelled`
