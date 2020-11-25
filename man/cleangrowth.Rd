@@ -135,7 +135,7 @@ clean_stats <-cleangrowth(subjid = df_stats$subjid,
 df_stats <- cbind(df_stats, "clean_result" = clean_stats)
 clean_df_stats <- df_stats[df_stats$clean_result == "Include",]
 
-# Parallel processing: run using 3 cores and batches
+# Parallel processing: run using 2 cores and batches
 clean_stats <- cleangrowth(subjid = df_stats$subjid,
                            param = df_stats$param,
                            agedays = df_stats$agedays,

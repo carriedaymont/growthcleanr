@@ -1664,7 +1664,7 @@ cleanbatch <- function(data.df,
 #' df_stats <- cbind(df_stats, "clean_result" = clean_stats)
 #' clean_df_stats <- df_stats[df_stats$clean_result == "Include",]
 #'
-#' # Parallel processing: run using 3 cores and batches
+#' # Parallel processing: run using 2 cores and batches
 #' clean_stats <- cleangrowth(subjid = df_stats$subjid,
 #'                            param = df_stats$param,
 #'                            agedays = df_stats$agedays,
@@ -1716,7 +1716,7 @@ cleangrowth <- function(subjid,
                      "na_as_false")
 
     cl <- makeCluster(num.batches)
-    clusterExport(cl = cl, varlist = var_for_par)
+    clusterExport(cl = cl, varlist = var_for_par, envir = environment())
     registerDoParallel(cl)
   } else {
     if (is.na(num.batches))
@@ -1975,8 +1975,7 @@ cleangrowth <- function(subjid,
       .(batch),
       cleanbatch,
       .parallel = parallel,
-      .paropts = list(.packages = "data.table",
-                      .export = var_for_par),
+      .paropts = list(.packages = "data.table"),
       log.path = log.path,
       quietly = quietly,
       parallel = parallel,
