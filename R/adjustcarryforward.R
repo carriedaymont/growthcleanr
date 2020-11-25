@@ -306,6 +306,50 @@ calc_temp_exclusion_15 <- function(df){
   return(df)
 }
 
+# function to check every carried forward in a string one by one
+check_cf_string <- function(eval_df, wh_exclude){
+  # find the next include OR the row end
+  next_incl <- which(
+    eval_df$orig.exclude[(wh_exclude+1):nrow(eval_df)] == "Include"
+  )[1]+wh_exclude
+  if (is.na(next_incl)){
+    next_incl <- nrow(eval_df)+1
+  }
+
+  # find the include this is based on
+  first_incl <- which(
+    eval_df$orig.exclude[1:wh_exclude] == "Include"
+  )
+  first_incl <- first_incl[length(first_incl)]
+
+  # now we want to test all of the ones in the string
+  verdict <- "Include"
+  cf_ind <- first_incl+1
+  while(verdict == "Include" & cf_ind < next_incl){
+    # build the dataframe for evaluation
+    sub_df <- copy(
+      if (next_incl != nrow(df)){
+        df[c(first_incl, cf_ind, next_incl),]
+      } else {
+        df[c(first_incl, cf_ind),]
+      }
+    )
+
+    eval_sub <- calc_temp_exclusion_15(copy(sub_df))
+
+    verdict <-
+      if (is.na(eval_sub$temp.exclude[2])){
+        "Include"
+      } else {
+        "Exclude"
+      }
+
+    cf_ind <- cf_ind + 1
+  }
+
+  return(list("verdict" = verdict, "cf_ind" = cf_ind, "next_incl" = next_incl))
+}
+
 #' adjustcarryforward
 #' \code{adjustcarryforward} Uses absolute height velocity to identify values
 #' excluded as carried forward values for reinclusion.
@@ -637,12 +681,19 @@ adjustcarryforward <- function(subjid,
   # 1. when deciding to exclude values, if we have a string of carried forwards,
   #    drop the most deviant value, and all CFs in the same string, and move on as
   #    normal
-  # 2. when deciding to exclude values, if the most deviant in a string of carried
-  #    forwards is flagged, check all the CFs in that string from 1:N. exclude all
-  #    after the first that is flagged for exclusion when comparing to the Include
-  #    before and after
+  # 2. when deciding to exclude values, if the most deviant in a
+  # string of carried forwards is flagged, check all the CFs in that
+  # string from 1:N. exclude all after the first that is flagged for
+  # exclusion when comparing to the Include before and after. do not
+  # remove things designated as include.
+  # 3. when deciding to exclude values, if the most deviant in a
+  # string of carried forwards is flagged, check all the CFs in that
+  # string from 1:N. exclude all after the first that is flagged for
+  # exclusion when comparing to the Include before and after. make sure
+  # remove things designated as include.
 
-  all_opts <- paste0("exclude_opt_",0:2)
+
+  all_opts <- paste0("exclude_opt_",0:3)
 
   for (opt in all_opts){
     data.all[param == 'HEIGHTCM', (opt) := (function(subj.df) {
@@ -739,59 +790,25 @@ adjustcarryforward <- function(subjid,
             # 2. when deciding to exclude values, if the most deviant in a
             # string of carried forwards is flagged, check all the CFs in that
             # string from 1:N. exclude all after the first that is flagged for
-            # exclusion when comparing to the Include before and after
+            # exclusion when comparing to the Include before and after. do not
+            # remove things designated as include.
 
-            # does not protect the includes
-
-            # STOP HERE
-
-            #NOTE: WHAT TO DO IF NO INCLUDE NEXT
             # after you've evaluated them, do you reevaluate the ones you've kept?
             if (num.exclude == 1){
               wh_exclude <- which(all_exclude)
               if (
                 eval_df[wh_exclude, "orig.exclude"] == "Exclude-Carried-Forward" &
-                (eval_df[wh_exclude+1, "orig.exclude"] == "Exclude-Carried-Forward" |
+                ((wh_exclude != nrow(eval_df) &
+                  eval_df[wh_exclude+1, "orig.exclude"] == "Exclude-Carried-Forward")
+                 |
                  eval_df[wh_exclude-1, "orig.exclude"] == "Exclude-Carried-Forward")
               ){
-                # find the next include OR the row end
-                next_incl <- which(
-                  eval_df$orig.exclude[(wh_exclude+1):nrow(eval_df)] == "Include"
-                )[1]+wh_exclude
-                if (is.na(next_incl)){
-                  next_incl <- nrow(eval_df)+1
-                }
+                # check all the carried forwards in a string
+                res <- check_cf_string(wh_exclude, copy(eval_df))
 
-                # find the include this is based on
-                first_incl <- which(
-                  eval_df$orig.exclude[1:wh_exclude] == "Include"
-                )
-                first_incl <- first_incl[length(first_incl)]
-
-                # now we want to test all of the ones in the string
-                verdict <- "Include"
-                cf_ind <- first_incl+1
-                while(verdict == "Include" & cf_ind < next_incl){
-                  # build the dataframe for evaluation
-                  sub_df <- copy(
-                    if (next_incl != nrow(df)){
-                      df[c(first_incl, cf_ind, next_incl),]
-                    } else {
-                      df[c(first_incl, cf_ind),]
-                    }
-                  )
-
-                  eval_sub <- calc_temp_exclusion_15(copy(sub_df))
-
-                  verdict <-
-                    if (is.na(eval_sub$temp.exclude[2])){
-                      "Include"
-                    } else {
-                      "Exclude"
-                    }
-
-                  cf_ind <- cf_ind + 1
-                }
+                verdict <- res$verdict
+                cf_ind <- res$cf_ind
+                next_incl <- res$next_incl
 
                 if (verdict == "Exclude"){
                   # mark all the CFs after for exclusion
@@ -799,11 +816,9 @@ adjustcarryforward <- function(subjid,
                   # also copy all the temp.excludes
                   eval_df$temp.exclude[(cf_ind-1):(next_incl-1)] <-
                     eval_df$temp.exclude[(cf_ind-1)]
-                } else {
-
                 }
-
-                # if the verdict is include, we want to mark all of them to keep?
+                # if the verdict is include, don't need to do anything
+                # (assuming that the verdict will never result in all include)
               }
 
               # exclude all the carried forwards before the next include
@@ -812,26 +827,30 @@ adjustcarryforward <- function(subjid,
               # first order by decreasing temp.diff (where rep=T)
               worst.row = order(all_exclude, eval_df$temp.diff, decreasing = T)[1]
 
-              # option 1: if there's a carried forward after, we want to exclude that too, until the next include
               wh_exclude <- worst.row
               if (
                 eval_df[wh_exclude, "orig.exclude"] == "Exclude-Carried-Forward" &
-                wh_exclude != nrow(eval_df) &
-                eval_df[wh_exclude+1, "orig.exclude"] == "Exclude-Carried-Forward"
+                ((wh_exclude != nrow(eval_df) &
+                  eval_df[wh_exclude+1, "orig.exclude"] == "Exclude-Carried-Forward")
+                 |
+                 eval_df[wh_exclude-1, "orig.exclude"] == "Exclude-Carried-Forward")
               ){
-                # find the next include OR the row end
-                next_incl <- which(
-                  eval_df$orig.exclude[(wh_exclude+1):nrow(eval_df)] == "Include"
-                )[1]+wh_exclude
-                if (is.na(next_incl)){
-                  next_incl <- nrow(eval_df)+1
-                }
+                # check all the carried forwards in a string
+                res <- check_cf_string(wh_exclude, copy(eval_df))
 
-                # mark all the CFs after for exclusion
-                worst.row <- c(worst.row:(next_incl-1))
-                # also copy all the temp.excludes
-                eval_df$temp.exclude[(wh_exclude+1):(next_incl-1)] <-
-                  eval_df$temp.exclude[wh_exclude]
+                verdict <- res$verdict
+                cf_ind <- res$cf_ind
+                next_incl <- res$next_incl
+
+                if (verdict == "Exclude"){
+                  # mark all the CFs after for exclusion
+                  worst.row <- c((cf_ind-1):(next_incl-1))
+                  # also copy all the temp.excludes
+                  eval_df$temp.exclude[(cf_ind-1):(next_incl-1)] <-
+                    eval_df$temp.exclude[(cf_ind-1)]
+                }
+                # if the verdict is include, don't need to do anything
+                # (assuming that the verdict will never result in all include)
               }
 
               eval_df[worst.row, exclude := temp.exclude]
