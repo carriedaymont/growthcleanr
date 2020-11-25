@@ -1714,7 +1714,8 @@ cleangrowth <- function(subjid,
     }
     # variables needed for parallel workers
     var_for_par <- c("temporary_duplicates", "valid", "swap_parameters",
-                     "na_as_false")
+                     "na_as_false", "ewma", "read_anthro", "as_matrix_delta",
+                     "sd_median")
 
     cl <- makeCluster(num.batches)
     clusterExport(cl = cl, varlist = var_for_par, envir = environment())
