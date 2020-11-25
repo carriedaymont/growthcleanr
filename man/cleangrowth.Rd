@@ -60,6 +60,8 @@ matching same ageday measurements for the other parameter. Options include "defa
 and "flag.both" (in case of two measurements of one type without matching values for the other parameter, flag both
 for exclusion if beyond threshold)}
 
+\item{height.tolerance.cm}{maximum decrease in height tolerated for sequential measurements}
+
 \item{error.load.mincount}{minimum count of exclusions on parameter before
 considering excluding all measurements. Defaults to 2.}
 

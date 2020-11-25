@@ -1598,6 +1598,7 @@ cleanbatch <- function(data.df,
 #' matching same ageday measurements for the other parameter. Options include "default" (standard growthcleanr approach),
 #' and "flag.both" (in case of two measurements of one type without matching values for the other parameter, flag both
 #' for exclusion if beyond threshold)
+#' @param height.tolerance.cm maximum decrease in height tolerated for sequential measurements
 #' @param error.load.mincount minimum count of exclusions on parameter before
 #' considering excluding all measurements. Defaults to 2.
 #' @param error.load.threshold threshold of percentage of excluded measurement count to included measurement

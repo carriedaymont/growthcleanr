@@ -9,7 +9,7 @@
 #' @param df data frame to split
 #' @param fname new name for each of the split files to start with
 #' @param fdir directory to put each of the split files (default working directory)
-#' @param min_row minimum number of rows for each split file (default 10000)
+#' @param min_nrow minimum number of rows for each split file (default 10000)
 #' @param keepcol the column name (default "subjid") to use to keep records with the same values together in the same single split file
 #'
 #' @return the count number referring to the last split file written
@@ -144,6 +144,7 @@ recode_sex <- function(input_data,
 #' @param agedays name of age (in days) descriptor column
 #' @param param name of parameter column to identify each type of measurement
 #' @param measurement name of measurement column containing the actual measurement data
+#' @param clean_value name of column of cleaned values from growthcleanr::cleangrowth()
 #' @param include_all Determines whether the function keeps all exclusion codes. If TRUE, all exclusion types are kept and the inclusion_types argument is ignored. Defaults to FALSE.
 #' @param inclusion_types Vector indicating which exclusion codes from the cleaning algorithm should be included in the data, given that include_all is FALSE. For all options, see growthcleanr::cleangrowth(). Defaults to c("Include").
 #'

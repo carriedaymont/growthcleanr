@@ -32,6 +32,8 @@ longwide(
 
 \item{measurement}{name of measurement column containing the actual measurement data}
 
+\item{clean_value}{name of column of cleaned values from growthcleanr::cleangrowth()}
+
 \item{include_all}{Determines whether the function keeps all exclusion codes. If TRUE, all exclusion types are kept and the inclusion_types argument is ignored. Defaults to FALSE.}
 
 \item{inclusion_types}{Vector indicating which exclusion codes from the cleaning algorithm should be included in the data, given that include_all is FALSE. For all options, see growthcleanr::cleangrowth(). Defaults to c("Include").}
