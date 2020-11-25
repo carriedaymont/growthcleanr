@@ -33,11 +33,11 @@
 splitinput <-
   function(df,
            fname = deparse(substitute(df)),
-           fdir = "",
+           fdir = ".",
            min_nrow = 10000,
            keepcol = 'subjid') {
     # first, check if the given directory exists
-    if (fdir != "" & is.character(fdir) & !dir.exists(fdir)){
+    if (fdir != "." & is.character(fdir) & !dir.exists(fdir)){
       stop("invalid directory")
     }
 

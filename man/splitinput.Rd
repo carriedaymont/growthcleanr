@@ -7,7 +7,7 @@
 splitinput(
   df,
   fname = deparse(substitute(df)),
-  fdir = "",
+  fdir = ".",
   min_nrow = 10000,
   keepcol = "subjid"
 )
