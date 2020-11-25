@@ -21,6 +21,8 @@ Imports:
     Hmisc (>= 4.4-0),
     labelled (>= 2.5.0),
     magrittr (>= 1.5)
+Depends:
+    R (>= 2.10)
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
