@@ -60,6 +60,8 @@ matching same ageday measurements for the other parameter. Options include "defa
 and "flag.both" (in case of two measurements of one type without matching values for the other parameter, flag both
 for exclusion if beyond threshold)}
 
+\item{height.tolerance.cm}{maximum decrease in height tolerated for sequential measurements}
+
 \item{error.load.mincount}{minimum count of exclusions on parameter before
 considering excluding all measurements. Defaults to 2.}
 
@@ -132,15 +134,15 @@ clean_stats <-cleangrowth(subjid = df_stats$subjid,
                          measurement = df_stats$measurement)
 
 # Once processed you can filter data based on result value
-df_stats <- cbind(df_stats, "clean_result" == clean_stats)
-clean_df_stats <- df_stats[, df_stats$clean_result == "Include"]
+df_stats <- cbind(df_stats, "clean_result" = clean_stats)
+clean_df_stats <- df_stats[df_stats$clean_result == "Include",]
 
-# Parallel processing: run using 3 cores and batches
-df_stats<-cleangrowth(subjid = df_stats$subjid,
-                      param = df_stats$param,
-                      agedays = df_stats$agedays,
-                      sex = df_stats$sex,
-                      measurement = df_stats$measurement,
-                      parallel = TRUE,
-                      num.batches = 2)
+# Parallel processing: run using 2 cores and batches
+clean_stats <- cleangrowth(subjid = df_stats$subjid,
+                           param = df_stats$param,
+                           agedays = df_stats$agedays,
+                           sex = df_stats$sex,
+                           measurement = df_stats$measurement,
+                           parallel = TRUE,
+                           num.batches = 2)
 }

@@ -1598,6 +1598,7 @@ cleanbatch <- function(data.df,
 #' matching same ageday measurements for the other parameter. Options include "default" (standard growthcleanr approach),
 #' and "flag.both" (in case of two measurements of one type without matching values for the other parameter, flag both
 #' for exclusion if beyond threshold)
+#' @param height.tolerance.cm maximum decrease in height tolerated for sequential measurements
 #' @param error.load.mincount minimum count of exclusions on parameter before
 #' considering excluding all measurements. Defaults to 2.
 #' @param error.load.threshold threshold of percentage of excluded measurement count to included measurement
@@ -1648,6 +1649,7 @@ cleanbatch <- function(data.df,
 #' @rawNamespace import(plyr, except = c(failwith, id, summarize, count, desc, mutate, arrange, rename, is.discrete, summarise, summarize))
 #' @import foreach
 #' @import doParallel
+#' @import parallel
 #' @examples
 #' # Run calculation using a small subset of given data
 #' df_stats <- as.data.frame(syngrowth)
@@ -1660,17 +1662,17 @@ cleanbatch <- function(data.df,
 #'                          measurement = df_stats$measurement)
 #'
 #' # Once processed you can filter data based on result value
-#' df_stats <- cbind(df_stats, "clean_result" == clean_stats)
-#' clean_df_stats <- df_stats[, df_stats$clean_result == "Include"]
+#' df_stats <- cbind(df_stats, "clean_result" = clean_stats)
+#' clean_df_stats <- df_stats[df_stats$clean_result == "Include",]
 #'
-#' # Parallel processing: run using 3 cores and batches
-#' df_stats<-cleangrowth(subjid = df_stats$subjid,
-#'                       param = df_stats$param,
-#'                       agedays = df_stats$agedays,
-#'                       sex = df_stats$sex,
-#'                       measurement = df_stats$measurement,
-#'                       parallel = TRUE,
-#'                       num.batches = 2)
+#' # Parallel processing: run using 2 cores and batches
+#' clean_stats <- cleangrowth(subjid = df_stats$subjid,
+#'                            param = df_stats$param,
+#'                            agedays = df_stats$agedays,
+#'                            sex = df_stats$sex,
+#'                            measurement = df_stats$measurement,
+#'                            parallel = TRUE,
+#'                            num.batches = 2)
 cleangrowth <- function(subjid,
                         param,
                         agedays,
@@ -1707,10 +1709,17 @@ cleangrowth <- function(subjid,
 
   # if parallel processing is desired, load additional modules
   if (parallel) {
-    registerDoParallel(cores = num.batches)
     if (is.na(num.batches)) {
       num.batches <- getDoParWorkers()
     }
+    # variables needed for parallel workers
+    var_for_par <- c("temporary_duplicates", "valid", "swap_parameters",
+                     "na_as_false", "ewma", "read_anthro", "as_matrix_delta",
+                     "sd_median")
+
+    cl <- makeCluster(num.batches)
+    clusterExport(cl = cl, varlist = var_for_par, envir = environment())
+    registerDoParallel(cl)
   } else {
     if (is.na(num.batches))
       num.batches <- 1
@@ -1986,7 +1995,7 @@ cleangrowth <- function(subjid,
       error.load.threshold = error.load.threshold,
       error.load.mincount = error.load.mincount
     )
-    stopImplicitCluster()
+    stopCluster(cl)
   }
   if (!quietly)
     cat(sprintf("[%s] Done!\n", Sys.time()))

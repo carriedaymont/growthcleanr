@@ -1,5 +1,7 @@
 # growthcleanr
 
+![R-CMD-check](https://github.com/carriedaymont/growthcleanr/workflows/R-CMD-check/badge.svg?branch=main)
+
 R package for cleaning data from Electronic Health Record systems, focused on
 cleaning height and weight measurements.
 
@@ -66,6 +68,7 @@ following packages:
 * `data.table`
 * `foreach`
 * `doParallel`
+* `parallel`
 * `dplyr`
 * `Hmisc`
 * `labelled`

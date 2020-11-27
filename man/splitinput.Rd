@@ -7,7 +7,7 @@
 splitinput(
   df,
   fname = deparse(substitute(df)),
-  fdir = "",
+  fdir = ".",
   min_nrow = 10000,
   keepcol = "subjid"
 )
@@ -19,9 +19,9 @@ splitinput(
 
 \item{fdir}{directory to put each of the split files (default working directory)}
 
-\item{keepcol}{the column name (default "subjid") to use to keep records with the same values together in the same single split file}
+\item{min_nrow}{minimum number of rows for each split file (default 10000)}
 
-\item{min_row}{minimum number of rows for each split file (default 10000)}
+\item{keepcol}{the column name (default "subjid") to use to keep records with the same values together in the same single split file}
 }
 \value{
 the count number referring to the last split file written

@@ -131,12 +131,6 @@ ext_bmiz <- function(data,
                      bmi = "bmi",
                      adjust.integer.age = T,
                      ref.data.path = "") {
-  library(data.table, quietly = T)
-  library(dplyr, quietly = T)
-  library(Hmisc, quietly = T)
-  library(magrittr, quietly = T)
-  library(labelled, quietly = T)
-
   setDT(data)
 
   setnames(data,
