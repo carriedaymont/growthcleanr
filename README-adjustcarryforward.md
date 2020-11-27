@@ -28,7 +28,8 @@ file:
 ```R
 > fwrite(cleaned_data, "cleaned.csv", row.names = F)
 ```
-Note that the column names should be as described for `cleaned_data` the Example 
+
+Note that the column names should be as described for `cleaned_data` the Example
 under Quickstart.
 
 The sweep script is executed from the command line on the cleaned data file:
@@ -51,18 +52,18 @@ following parameters, where the min and max surround the default value:
 `max_ht.exp_under` | 0.33 | 0 | 0.66
 `max_ht.exp_over` | 1.5 | 0 | 3
 
-The determination of these values depends on the search type (specified with the 
+The determination of these values depends on the search type (specified with the
 option `--searchtype`:
-* `random` (default): Values will be generated randomly, with equal amounts of values 
+* `random` (default): Values will be generated randomly, with equal amounts of values
 on either side of the midpoint. The midpoint is always included.
-  * Note that if an even number is specified for `--gridlength`, one will be added to 
+  * Note that if an even number is specified for `--gridlength`, one will be added to
   include the midpoint in the run.
   * A random seed can be specified with `--seed` (default 7).
 * `line-grid`: Values will be evenly distributed along the range for each parameter.
 If the `--gridlength` specified is odd, this will include the midpoint.
 * `full-grid`: Values for each included parameter will evenly distributed along the
 range for each parameter and in a full combination between all parameters.
-  * Thus, the amount of runs done will be the `--gridlength`^(number of included 
+  * Thus, the amount of runs done will be the `--gridlength`^(number of included
 parameters).
   * Default includes a full grid search among all parameters. To specify use of only specific parameters, use the `--param` option, which specifies a CSV of the following format:
   | parameter | include | value |
@@ -85,9 +86,9 @@ parameters).
   * Warning: this will take much longer!
 
 The default number of sweep steps is 9; this can be changed with the option
-`--gridlength`. 
+`--gridlength`.
 
-For example, for a 9-step sweep with the default search type, `random`, the parameters 
+For example, for a 9-step sweep with the default search type, `random`, the parameters
 passed to the function in each pass will be:
 
 ```R
