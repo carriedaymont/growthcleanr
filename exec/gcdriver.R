@@ -1,57 +1,59 @@
 #!/usr/bin/env Rscript
 
-library(argparse)
+library(argparser)
 library(data.table)
 
 library(growthcleanr)
 
-parser <-
-  ArgumentParser(description = 'CLI driver for growthcleanr')
-parser$add_argument(
-  'infile',
-  metavar = 'INFILE',
+parser <- arg_parser("CLI driver for growthcleanr")
+
+parser <- add_argument(parser,
+  "infile",
   type = "character",
   nargs = 1,
-  help = 'input file'
+  help = "input file"
 )
-parser$add_argument(
-  'outfile',
-  metavar = 'OUTFILE',
-  type = 'character',
+parser <- add_argument(parser,
+  "outfile",
+  type = "character",
   nargs = 1,
-  help = 'output file'
+  help = "output file"
 )
-parser$add_argument(
-  '--sdrecenter',
-  type = 'character',
+parser <- add_argument(
+  parser,
+  "--sdrecenter",
+  type = "character",
   nargs = 1,
-  default = '',
-  help = 'sd.recenter data file'
+  default = "",
+  help = "sd.recenter data file"
 )
-parser$add_argument('--quietly',
-                    default = F,
-                    action = 'store_true',
-                    help = 'Disable verbose output')
-args <- parser$parse_args()
+parser <- add_argument(parser,
+  "--quietly",
+  flag = TRUE,
+  help = "Disable verbose output"
+)
 
-logfile <- sprintf('output/log/log-%s.txt', args$infile)
+argv <- parse_args(parser)
+print(argv)
 
-if (args$sdrecenter != '') {
-  sdrecenter <- fread(args$sdrecenter)
+logfile <- sprintf("output/log/log-%s.txt", argv$infile)
+
+if (argv$sdrecenter != "") {
+  sdrecenter <- fread(argv$sdrecenter)
 } else {
-  sdrecenter <- ''
+  sdrecenter <- ""
 }
 
-df_in <- fread(args$infile)
+df_in <- fread(argv$infile)
 df_out <- df_in[, exclude :=
-                  cleangrowth(
-                    subjid,
-                    param,
-                    agedays,
-                    sex,
-                    measurement,
-                    sd.recenter = sdrecenter,
-                    log.path = logfile,
-                    quietly = args$quietly
-                  )]
-fwrite(df_out, args$outfile, row.names = FALSE)
+  cleangrowth(
+    subjid,
+    param,
+    agedays,
+    sex,
+    measurement,
+    sd.recenter = sdrecenter,
+    log.path = logfile,
+    quietly = argv$quietly
+  )]
+fwrite(df_out, argv$outfile, row.names = FALSE)
