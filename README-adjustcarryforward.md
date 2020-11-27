@@ -81,7 +81,6 @@ parameters).
   `min_ht.exp_over` | F |  |
   `max_ht.exp_under` | F | .5 |
   `max_ht.exp_over` | F |  |
-
   * The first column specifies all the parameter names; the second specifies a
   true or false value for whether or not the parameter should be included; the
   third specifies a constant value to be used for not included parameters, left
