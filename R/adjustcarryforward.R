@@ -390,6 +390,24 @@ check_cf_string <- function(eval_df, wh_exclude){
 #' @rawNamespace import(plyr, except = c(failwith, id, summarize, count, desc, mutate, arrange, rename, is.discrete, summarise, summarize))
 #' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
 #' @import data.table
+#' @examples
+#' # Run on a small subset of given data
+#' df <- as.data.frame(syngrowth)
+#' df <- df[df$subjid %in% unique(df[, "subjid"])[1:5], ]
+#' clean_df <- cbind(df,
+#'                   "clean_value" = cleangrowth(df$subjid,
+#'                                               df$param,
+#'                                               df$agedays,
+#'                                               df$sex,
+#'                                               df$measurement))
+#'
+#' # Adjust carry forward values in cleaned data
+#' adj_clean <- adjustcarryforward(subjid = clean_df$subjid,
+#'                                 param = clean_df$param,
+#'                                 agedays = clean_df$agedays,
+#'                                 sex = clean_df$sex,
+#'                                 measurement = clean_df$measurement,
+#'                                 orig.exclude = clean_df$clean_value)
 adjustcarryforward <- function(subjid,
                                param,
                                agedays,
@@ -409,7 +427,7 @@ adjustcarryforward <- function(subjid,
                                max_ht.exp_under = 0.33,
                                max_ht.exp_over = 1.5) {
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
-  data.all = data.table(
+  data.all <- data.table(
     line = seq_along(measurement),
     subjid = as.factor(subjid),
     param,
@@ -422,14 +440,14 @@ adjustcarryforward <- function(subjid,
   )
 
   ### ADJUSTCF EDIT
-  data.all = data.all[, n := 1:.N]
+  data.all <- data.all[, n := 1:.N]
   ### ENDEDIT
 
-  data.orig = data.all
+  data.orig <- data.all
 
   setkey(data.all, subjid)
 
-  subjid.unique = unique(data.all$subjid)
+  subjid.unique <- unique(data.all$subjid)
 
   #### ADJUSTCF EDIT ####
   # for this purpose, want to subset dataset down to just "Exclude-Carried-Forward" and "Include" - assume all other measurements are invalid
@@ -500,15 +518,15 @@ adjustcarryforward <- function(subjid,
             "")
   )
 
-  tanner.ht.vel = fread(tanner_ht_vel_path)
+  tanner.ht.vel <- fread(tanner_ht_vel_path)
 
   setnames(tanner.ht.vel,
            colnames(tanner.ht.vel),
            gsub('_', '.', colnames(tanner.ht.vel)))
   setkey(tanner.ht.vel, sex, tanner.months)
   # keep track of column names in the tanner data
-  tanner.fields = colnames(tanner.ht.vel)
-  tanner.fields = tanner.fields[!tanner.fields %in% c('sex', 'tanner.months')]
+  tanner.fields <- colnames(tanner.ht.vel)
+  tanner.fields <- tanner.fields[!tanner.fields %in% c('sex', 'tanner.months')]
 
   who_max_ht_vel_path <- ifelse(
     ref.data.path == "",
@@ -523,18 +541,18 @@ adjustcarryforward <- function(subjid,
     paste(ref.data.path, "who_ht_vel_3sd.csv", sep =
             "")
   )
-  who.max.ht.vel = fread(who_max_ht_vel_path)
-  who.ht.vel = fread(who_ht_vel_3sd_path)
+  who.max.ht.vel <- fread(who_max_ht_vel_path)
+  who.ht.vel <- fread(who_ht_vel_3sd_path)
   setkey(who.max.ht.vel, sex, whoagegrp_ht)
   setkey(who.ht.vel, sex, whoagegrp_ht)
-  who.ht.vel = as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel, by =
+  who.ht.vel <- as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel, by =
                                                 c('sex', 'whoagegrp_ht')))
 
   setnames(who.ht.vel, colnames(who.ht.vel), gsub('_', '.', colnames(who.ht.vel)))
   setkey(who.ht.vel, sex, whoagegrp.ht)
   # keep track of column names in the who growth velocity data
-  who.fields = colnames(who.ht.vel)
-  who.fields = who.fields[!who.fields %in% c('sex', 'whoagegrp.ht')]
+  who.fields <- colnames(who.ht.vel)
+  who.fields <- who.fields[!who.fields %in% c('sex', 'whoagegrp.ht')]
 
   # 1.  General principles
   # a.	All steps are done separately for each parameter unless otherwise noted
@@ -584,7 +602,7 @@ adjustcarryforward <- function(subjid,
   # calculate z scores
   if (!quietly)
     cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
-  measurement.to.z = read.anthro(ref.data.path, cdc.only = T)
+  measurement.to.z <- read_anthro(ref.data.path, cdc.only = T)
   data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
 
   # calculate "standard deviation" scores
@@ -599,7 +617,7 @@ adjustcarryforward <- function(subjid,
   data.all[, index := 1:.N]
 
   # enumerate the different exclusion levels
-  exclude.levels = c(
+  exclude.levels <- c(
     'Missing',
     'No Change',
     'Include',
@@ -616,7 +634,7 @@ adjustcarryforward <- function(subjid,
   ordered = T)] # why is this ordered??
 
   # define field names needed by helper functions
-  ewma.fields = c('ewma.all', 'ewma.before', 'ewma.after')
+  ewma.fields <- c('ewma.all', 'ewma.before', 'ewma.after')
 
   # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time, we need to account for the fact that
   #     the mean SD-score for the population changes with age.
@@ -645,12 +663,12 @@ adjustcarryforward <- function(subjid,
       "Unit-Error-Possible",
       "Swapped-Measurements"
     )
-    sd.recenter = data.all[orig.exclude %in% keep.levels, sd.median(param, sex, agedays, sd.orig)]
+    sd.recenter <- data.all[orig.exclude %in% keep.levels, sd_median(param, sex, agedays, sd.orig)]
     # END EDIT
   }
   # add sd.recenter to data, and recenter
   setkey(data.all, param, sex, agedays)
-  data.all = sd.recenter[data.all]
+  data.all <- sd.recenter[data.all]
   setkey(data.all, subjid, param, agedays)
   data.all[, tbc.sd := sd.orig - sd.median]
 

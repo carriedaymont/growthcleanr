@@ -28,10 +28,13 @@ file:
 ```R
 > fwrite(cleaned_data, "cleaned.csv", row.names = F)
 ```
-Note that the column names should be as described for `cleaned_data` the Example 
+Note that the column names should be as described for `cleaned_data` the Example
 under Quickstart.
 
-The sweep script is executed from the command line on the cleaned data file:
+First navigate to the growthcleanr package directory in the command line. Then execute
+the sweep script is executed from the command line on the cleaned data file for as
+follows (with the assumption that cleaned.csv is in your current directory; otherwise,
+make sure to specify the path relative to your current directory):
 
 ```bash
 % Rscript exec/testadjustcf.R cleaned.csv
@@ -42,29 +45,32 @@ following parameters, where the min and max surround the default value:
 
 | parameter | default | min | max |
 | - | - | - | - |
-`minfactor` | 0.5 | 0 | 1
-`maxfactor` | 2 | 0 | 4
-`banddiff` | 3 | 0 | 6
-`banddiff_plus` | 5.5 | 0 | 11
-`min_ht.exp_under` | 2 | 0 | 4
-`min_ht.exp_over` | 0 | -1 | 1
-`max_ht.exp_under` | 0.33 | 0 | 0.66
-`max_ht.exp_over` | 1.5 | 0 | 3
+`minfactor` | 0.5 | 0 | 1 |
+`maxfactor` | 2 | 0 | 4 |
+`banddiff` | 3 | 0 | 6 |
+`banddiff_plus` | 5.5 | 0 | 11 |
+`min_ht.exp_under` | 2 | 0 | 4 |
+`min_ht.exp_over` | 0 | -1 | 1 |
+`max_ht.exp_under` | 0.33 | 0 | 0.66 |
+`max_ht.exp_over` | 1.5 | 0 | 3 |
 
-The determination of these values depends on the search type (specified with the 
+The determination of these values depends on the search type (specified with the
 option `--searchtype`:
-* `random` (default): Values will be generated randomly, with equal amounts of values 
+* `random` (default): Values will be generated randomly, with equal amounts of values
 on either side of the midpoint. The midpoint is always included.
-  * Note that if an even number is specified for `--gridlength`, one will be added to 
+  * Note that if an even number is specified for `--gridlength`, one will be added to
   include the midpoint in the run.
   * A random seed can be specified with `--seed` (default 7).
 * `line-grid`: Values will be evenly distributed along the range for each parameter.
 If the `--gridlength` specified is odd, this will include the midpoint.
 * `full-grid`: Values for each included parameter will evenly distributed along the
 range for each parameter and in a full combination between all parameters.
-  * Thus, the amount of runs done will be the `--gridlength`^(number of included 
+  * Thus, the amount of runs done will be the `--gridlength`^(number of included
 parameters).
-  * Default includes a full grid search among all parameters. To specify use of only specific parameters, use the `--param` option, which specifies a CSV of the following format:
+  * Default includes a full grid search among all parameters. To specify use of only
+  specific parameters, use the `--param` option, which specifies a CSV of the following
+  format:
+
   | parameter | include | value |
   | - | - | - |
   `minfactor` | T |  |
@@ -75,19 +81,19 @@ parameters).
   `min_ht.exp_over` | F |  |
   `max_ht.exp_under` | F | .5 |
   `max_ht.exp_over` | F |  |
-    * The first column specifies all the parameter names; the second specifies a
-    true or false value for whether or not the parameter should be included; the
-    third specifies a constant value to be used for not included parameters, left
-    empty if the value should be the default.
-    * In the above example, `minfactor` and `min_ht.exp_under` will be included, and
-    `maxfactor` and `max_ht_exp_under` will not be included, but will use 3 and .5
-    as their values.
+  * The first column specifies all the parameter names; the second specifies a
+  true or false value for whether or not the parameter should be included; the
+  third specifies a constant value to be used for not included parameters, left
+  empty if the value should be the default.
+  * In the above example, `minfactor` and `min_ht.exp_under` will be included, and
+  `maxfactor` and `max_ht_exp_under` will not be included, but will use 3 and .5
+  as their values.
   * Warning: this will take much longer!
 
 The default number of sweep steps is 9; this can be changed with the option
-`--gridlength`. 
+`--gridlength`.
 
-For example, for a 9-step sweep with the default search type, `random`, the parameters 
+For example, for a 9-step sweep with the default search type, `random`, the parameters
 passed to the function in each pass will be:
 
 ```R
@@ -119,7 +125,8 @@ run  minfactor  maxfactor  banddiff  banddiff_plus  min_ht.exp_under  min_ht.exp
 9    1          4          6         11             4                 1                0.66              3
 ```
 
-In a 3-step sweep with a `full-grid` search type, with the `--param` CSV specified as in the above example, the parameters passed to the function in each pass will be:
+In a 3-step sweep with a `full-grid` search type, with the `--param` CSV specified as
+in the above example, the parameters passed to the function in each pass will be:
 
 ```R
 run minfactor maxfactor banddiff banddiff_plus min_ht.exp_under min_ht.exp_over max_ht.exp_under max_ht.exp_over
@@ -134,9 +141,10 @@ run minfactor maxfactor banddiff banddiff_plus min_ht.exp_under min_ht.exp_over 
 9       1.0         3        3           5.5                4               0              0.5             1.5
 ```
 
-The output, in the `output/` directory will contain the sweep parameters, like
-the above, in a file called `params.csv`, and the output with adjustment results
-in a file called `all-adjusted.csv`.
+The output in the working directory will contain the sweep parameters, like the above,
+in a file called `test_adjustcarrforward_DATE_TIME_parameters.csv`, and the output with
+adjustment results in a file called `test_adjustcarrforward_DATE_TIME.csv`, where DATE
+and TIME are the system date and time.
 
 For example, a 5-step sweep with the `line-grid` search would be run with this command:
 
@@ -144,7 +152,7 @@ For example, a 5-step sweep with the `line-grid` search would be run with this c
 % Rscript exec/textadjustcf.R --gridlength 5 --searchtype line-grid cleaned.csv
 ```
 
-The parameter set for the sweep in file `output/params.csv` would be:
+The parameter set for the sweep in file `test_adjustcarrforward_DATE_TIME_parameters.csv` would be:
 
 ```R
 run  minfactor  maxfactor  banddiff  banddiff_plus  min_ht.exp_under  min_ht.exp_over  max_ht.exp_under  max_ht.exp_over
@@ -158,7 +166,7 @@ run  minfactor  maxfactor  banddiff  banddiff_plus  min_ht.exp_under  min_ht.exp
 Note that an odd-numbered length will include the default values in the middle run of the
 sweep (hence the examples w/5 and 9 step sweeps).
 
-And the first few result rows in `output/all-adjusted.csv` would be:
+And the first few result rows in `test_adjustcarrforward_DATE_TIME.csv` would be:
 
 ```R
 id     subjid    sex  agedays  param     measurement  clean_value                   run-1      run-2      run-3      run-4      run-5

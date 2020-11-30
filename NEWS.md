@@ -1,5 +1,26 @@
 # growthcleanr
 
+## [1.2.2] - 2020-09-29
+
+### Added
+
+- CITATION file, now `citation("growthcleanr")` works as expected
+
+### Changed
+
+- Standardized on arrow assignment
+- Moved functions previously within other functions to top level
+- `@import` now preferred over `library()` for library loading
+- Exported more functions
+- Improved carried forward adjustment driver script, now supports line-grid
+  (like original sweep), random, and grid-search search types, with
+  configuration
+- Added `fdir` option to `splitinput()` to specify split file directory
+- Added package minimum versions to DESCRIPTION
+- Fixed example code to reduce build warnings
+- Improved and corrected documentation
+- Re-compressed synthetic sample data (`syngrowth`) to improve compression
+
 ## [1.2.1] - 2020-08-14
 
 ### Added

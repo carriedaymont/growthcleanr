@@ -60,6 +60,8 @@ matching same ageday measurements for the other parameter. Options include "defa
 and "flag.both" (in case of two measurements of one type without matching values for the other parameter, flag both
 for exclusion if beyond threshold)}
 
+\item{height.tolerance.cm}{maximum decrease in height tolerated for sequential measurements}
+
 \item{error.load.mincount}{minimum count of exclusions on parameter before
 considering excluding all measurements. Defaults to 2.}
 
@@ -121,16 +123,26 @@ Possible values for each code are:
 Clean growth measurements
 }
 \examples{
-# Standard calculation Using Provided Age/Weight Data
-colnames(data_stats)<-c("id", "measure", "agedays", "sex", "value")
-clean_stats<-cleangrowth(data_stats$id, data_stats$measure, data_stats$agedays, data_stats$sex, data_stats$value)
+# Run calculation using a small subset of given data
+df_stats <- as.data.frame(syngrowth)
+df_stats <- df_stats[df_stats$subjid \%in\% unique(df_stats[, "subjid"])[1:5], ]
+
+clean_stats <-cleangrowth(subjid = df_stats$subjid,
+                         param = df_stats$param,
+                         agedays = df_stats$agedays,
+                         sex = df_stats$sex,
+                         measurement = df_stats$measurement)
 
 # Once processed you can filter data based on result value
-data_stats<-data_stats[,clean_result:=clean_stats]
-clean_data_stats<-data_stats[clean_result="Include"] # only include data marked as "Include"
+df_stats <- cbind(df_stats, "clean_result" = clean_stats)
+clean_df_stats <- df_stats[df_stats$clean_result == "Include",]
 
-# Parallel Processing
-# Run using 6 cores and batches
-clean_stats<-cleangrowth(data_stats$id, data_stats$measure, data_stats$agedays, data_stats$sex, data_stats$value, parallel = TRUE, num.batches = 6)
-
+# Parallel processing: run using 2 cores and batches
+clean_stats <- cleangrowth(subjid = df_stats$subjid,
+                           param = df_stats$param,
+                           agedays = df_stats$agedays,
+                           sex = df_stats$sex,
+                           measurement = df_stats$measurement,
+                           parallel = TRUE,
+                           num.batches = 2)
 }

@@ -1,3 +1,5 @@
+^renv$
+^renv\.lock$
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^packrat/
@@ -6,3 +8,5 @@
 ^output$
 .dockerignore
 Dockerfile
+^\.github$
+^\.lintr$

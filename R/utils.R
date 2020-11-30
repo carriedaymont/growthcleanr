@@ -9,20 +9,35 @@
 #' @param df data frame to split
 #' @param fname new name for each of the split files to start with
 #' @param fdir directory to put each of the split files (default working directory)
-#' @param min_row minimum number of rows for each split file (default 10000)
+#' @param min_nrow minimum number of rows for each split file (default 10000)
 #' @param keepcol the column name (default "subjid") to use to keep records with the same values together in the same single split file
 #'
-#' @return the count number refering to the last split file written
+#' @return the count number referring to the last split file written
 #'
 #' @export
+#' @examples
+#' \donttest{
+#' # Run on given data
+#' df <- as.data.frame(syngrowth)
+#'
+#' # Run with all defaults
+#' splitinput(df)
+#'
+#' # Specifying the name, directory and minimum row size
+#' splitinput(df, fname = "syngrowth", fdir = tempdir(), min_nrow = 5000)
+#'
+#' # Specifying a different subject ID column
+#' colnames(df)[colnames(df) == "subjid"] <- "sub_id"
+#' splitinput(df, keepcol = "sub_id")
+#' }
 splitinput <-
   function(df,
            fname = deparse(substitute(df)),
-           fdir = "",
+           fdir = ".",
            min_nrow = 10000,
            keepcol = 'subjid') {
     # first, check if the given directory exists
-    if (fdir != "" & is.character(fdir) & !dir.exists(fdir)){
+    if (fdir != "." & is.character(fdir) & !dir.exists(fdir)){
       stop("invalid directory")
     }
 
@@ -85,6 +100,18 @@ splitinput <-
 #' @return Returns a data table with recoded sex variables.
 #'
 #' @export
+#' @examples
+#' # Run on given data
+#' df <- as.data.frame(syngrowth)
+#'
+#' # Run with all defaults
+#' df_r <- recode_sex(df)
+#'
+#' # Specify different targets
+#' df_rt <- recode_sex(df, targetcol = "sexr", targetm = "Male", targetf = "Female")
+#'
+#' # Specify different inputs
+#' df_ri <- recode_sex(df_rt, sourcecol = "sexr", sourcem = "Male", sourcef = "Female")
 recode_sex <- function(input_data,
                        sourcecol = "sex",
                        sourcem = "0",
@@ -117,6 +144,7 @@ recode_sex <- function(input_data,
 #' @param agedays name of age (in days) descriptor column
 #' @param param name of parameter column to identify each type of measurement
 #' @param measurement name of measurement column containing the actual measurement data
+#' @param clean_value name of column of cleaned values from growthcleanr::cleangrowth()
 #' @param include_all Determines whether the function keeps all exclusion codes. If TRUE, all exclusion types are kept and the inclusion_types argument is ignored. Defaults to FALSE.
 #' @param inclusion_types Vector indicating which exclusion codes from the cleaning algorithm should be included in the data, given that include_all is FALSE. For all options, see growthcleanr::cleangrowth(). Defaults to c("Include").
 #'
@@ -125,6 +153,24 @@ recode_sex <- function(input_data,
 #' @export
 #' @rawNamespace import(tidyr, except = extract)
 #' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
+#' @examples
+#' # Run on a small subset of given data
+#' df <- as.data.frame(syngrowth)
+#' df <- df[df$subjid %in% unique(df[, "subjid"])[1:5], ]
+#' df <- cbind(df,
+#'             "clean_value" = cleangrowth(df$subjid,
+#'                                         df$param,
+#'                                         df$agedays,
+#'                                         df$sex,
+#'                                         df$measurement))
+#' # Convert to wide format
+#' long_df <- longwide(df)
+#'
+#' # Include all inclusion types
+#' long_df <- longwide(df, include_all = TRUE)
+#'
+#' # Specify all inclusion codes
+#' long_df <- longwide(df, inclusion_types = c("Include", "Exclude-Carried-Forward"))
 longwide <-
   function(long_df,
            id = "id",
@@ -174,7 +220,7 @@ longwide <-
   obs_df$agey <- round(obs_df$agedays / 365.25, 4)
 
   # calculate age in months
-  obs_df$agem = round((obs_df$agey * 12), 4)
+  obs_df$agem <- round((obs_df$agey * 12), 4)
 
   # recode sex to expected ext_bmiz() format
   obs_df <- recode_sex(

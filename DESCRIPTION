@@ -1,7 +1,7 @@
 Package: growthcleanr
 Type: Package
 Title: Growth Measurements Cleaner
-Version: 1.2.1
+Version: 1.2.2
 Authors@R: c(
     person("Daymont","Carrie",,"carriedaymont@gmail.com",c("aut","cre")),
     person("Grundmeier","Robert",,"grundmeier@email.chop.edu","aut"),
@@ -20,6 +20,8 @@ Imports:
     Hmisc (>= 4.4-0),
     labelled (>= 2.5.0),
     magrittr (>= 1.5)
+Depends:
+    R (>= 2.10)
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true

@@ -7,7 +7,7 @@
 splitinput(
   df,
   fname = deparse(substitute(df)),
-  fdir = "",
+  fdir = ".",
   min_nrow = 10000,
   keepcol = "subjid"
 )
@@ -19,12 +19,12 @@ splitinput(
 
 \item{fdir}{directory to put each of the split files (default working directory)}
 
-\item{keepcol}{the column name (default "subjid") to use to keep records with the same values together in the same single split file}
+\item{min_nrow}{minimum number of rows for each split file (default 10000)}
 
-\item{min_row}{minimum number of rows for each split file (default 10000)}
+\item{keepcol}{the column name (default "subjid") to use to keep records with the same values together in the same single split file}
 }
 \value{
-the count number refering to the last split file written
+the count number referring to the last split file written
 }
 \description{
 \code{splitinput} Splits input based on keepcol specified, yielding csv files each with at least the mininum
@@ -32,4 +32,20 @@ number of rows that are written and saved separately (except for the last split 
 smaller). Allows splitting input data while ensuring all records for each individual subject will stay together
 in one file. Pads split filenames with zeros out to five digits for consistency, assuming < 100,000 file count
 result.
+}
+\examples{
+\donttest{
+# Run on given data
+df <- as.data.frame(syngrowth)
+
+# Run with all defaults
+splitinput(df)
+
+# Specifying the name, directory and minimum row size
+splitinput(df, fname = "syngrowth", fdir = tempdir(), min_nrow = 5000)
+
+# Specifying a different subject ID column
+colnames(df)[colnames(df) == "subjid"] <- "sub_id"
+splitinput(df, keepcol = "sub_id")
+}
 }

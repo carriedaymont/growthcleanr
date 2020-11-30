@@ -32,6 +32,9 @@ vignettes/*.pdf
 *.utf8.md
 *.knit.md
 
+# renv environment files
+renv*
+
 # Shiny token, see https://shiny.rstudio.com/articles/shinyapps.html
 rsconnect/
 *.DS_Store
@@ -42,3 +45,6 @@ packrat/src/
 
 *.swp
 output
+.Rproj.user
+
+renv*
