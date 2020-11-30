@@ -313,9 +313,6 @@ check_cf_string <- function(
   eval_df, wh_exclude,
   ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels){
 
-  print("check_cf_str")
-  print(eval_df)
-
   # find the next include OR the row end
   next_incl <- which(
     eval_df$orig.exclude[(wh_exclude+1):nrow(eval_df)] == "Include"
@@ -746,9 +743,6 @@ adjustcarryforward <- function(subjid,
           # r.  If there is only one potential exclusion identified in step 15j for a subject and parameter,
           #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi  and exc_ht=16 if it met criteria iii, iv, vii, or viii
           # NOTE: these exclusions are assigned in the code above as 'Exclude-Min-Height-Change' and 'Exclude-Max-Height-Change'
-          print("outside")
-          print(opt)
-          print(eval_df)
 
           # count the amount of error codes we get
           all_exclude = !is.na(eval_df$temp.exclude)
@@ -853,6 +847,7 @@ adjustcarryforward <- function(subjid,
                 verdict <- res$verdict
                 cf_ind <- res$cf_ind
                 next_incl <- res$next_incl
+                first_incl <- res$first_incl
 
                 if (verdict == "Exclude"){
                   # mark all the CFs after for exclusion
@@ -860,9 +855,14 @@ adjustcarryforward <- function(subjid,
                   # also copy all the temp.excludes
                   eval_df$temp.exclude[(cf_ind-1):(next_incl-1)] <-
                     eval_df$temp.exclude[(cf_ind-1)]
+                } else {
+                  # if the verdict is include, we need to mark them all for
+                  # "exclusion" to remove -- otherwise we end up in a loop
+                  all_exclude[(first_incl+1):(next_incl-1)] <- T
+                  # also copy all the temp.excludes
+                  eval_df$temp.exclude[(first_incl+1):(next_incl-1)] <-
+                    "Include"
                 }
-                # if the verdict is include, don't need to do anything
-                # (assuming that the verdict will never result in all include)
               }
 
               # exclude all the carried forwards before the next include
@@ -890,6 +890,7 @@ adjustcarryforward <- function(subjid,
                 verdict <- res$verdict
                 cf_ind <- res$cf_ind
                 next_incl <- res$next_incl
+                first_incl <- res$first_incl
 
                 if (verdict == "Exclude"){
                   # mark all the CFs after for exclusion
@@ -897,9 +898,14 @@ adjustcarryforward <- function(subjid,
                   # also copy all the temp.excludes
                   eval_df$temp.exclude[(cf_ind-1):(next_incl-1)] <-
                     eval_df$temp.exclude[(cf_ind-1)]
+                } else {
+                  # if the verdict is include, we need to mark them all for
+                  # "exclusion" to remove -- otherwise we end up in a loop
+                  worst.row <- c((first_incl+1):(next_incl-1))
+                  # also copy all the temp.excludes
+                  eval_df$temp.exclude[(first_incl+1):(next_incl-1)] <-
+                    "Include"
                 }
-                # if the verdict is include, don't need to do anything
-                # (assuming that the verdict will never result in all include)
               }
 
               eval_df[worst.row, exclude := temp.exclude]
@@ -947,9 +953,14 @@ adjustcarryforward <- function(subjid,
                   # also copy all the temp.excludes
                   eval_df$temp.exclude[(first_incl+1):(cf_ind)] <-
                     "Include"
+                } else {
+                  # if the verdict is include, we need to mark them all for
+                  # "exclusion" to remove -- otherwise we end up in a loop
+                  all_exclude[(first_incl+1):(next_incl-1)] <- T
+                  # also copy all the temp.excludes
+                  eval_df$temp.exclude[(first_incl+1):(next_incl-1)] <-
+                    "Include"
                 }
-                # if the verdict is include, don't need to do anything
-                # (assuming that the verdict will never result in all include)
               }
 
               # exclude all the carried forwards before the next include
@@ -992,9 +1003,14 @@ adjustcarryforward <- function(subjid,
                   # also copy all the temp.excludes
                   eval_df$temp.exclude[(first_incl+1):(cf_ind)] <-
                     "Include"
+                } else {
+                  # if the verdict is include, we need to mark them all for
+                  # "exclusion" to remove -- otherwise we end up in a loop
+                  worst.row <- c((first_incl+1):(next_incl-1))
+                  # also copy all the temp.excludes
+                  eval_df$temp.exclude[(first_incl+1):(next_incl-1)] <-
+                    "Include"
                 }
-                # if the verdict is include, don't need to do anything
-                # (assuming that the verdict will never result in all include)
               }
 
               eval_df[worst.row, exclude := temp.exclude]
@@ -1041,9 +1057,15 @@ adjustcarryforward <- function(subjid,
 
   }
 
+  # formulating results and options
+  acf_df <- data.frame(n = data.all$n)
+  acf_df <- cbind(acf_df,
+                  data.all[, grepl("exclude_", colnames(data.all)), with = F])
+  colnames(acf_df)[-1] <- paste0("acf_option_", 0:3)
+
   # return results
   return(rbind(
-    data.frame(adjustcarryforward = data.all$exclude, n = data.all$n),
+    acf_df,
     data.frame(
       filter(data.orig,!n %in% data.all$n) %>% mutate(adjustcarryforward = "Not Considered")  %>% select(adjustcarryforward, n)
     )
