@@ -28,6 +28,7 @@ file:
 ```R
 > fwrite(cleaned_data, "cleaned.csv", row.names = F)
 ```
+
 Note that the column names should be as described for `cleaned_data` the Example
 under Quickstart.
 

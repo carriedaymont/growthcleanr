@@ -76,7 +76,7 @@ following packages:
 * `tidyr`
 * `magrittr`
 
-In addition, an R environment with `devtools` installed is also required. 
+In addition, an R environment with `devtools` installed is also required.
 Further installation details and notes can be found under
 [Installation](#installation) below.
 
@@ -210,7 +210,7 @@ In an up-to-date R environment such as RStudio, first install the dependencies:
 # Required packages for growthcleanr operation
 install.packages("devtools")
 # Optional additional packages referenced in this document
-install.packages("argparse")
+install.packages("argparser")
 install.packages("bit64")
 ```
 
@@ -694,8 +694,9 @@ pitfalls to avoid. The following lays out a rough approach:
 [1] "mydata.00000.csv" "mydata.00001.csv" "mydata.00002.csv" "mydata.00003.csv" "mydata.00004.csv" "mydata.00005.csv"
 ```
 
-* Write a standalone driver script to execute `growthcleanr` on each separate
-  file, then write out its results when complete. An example is below.
+* Use the standalone driver script `exec/gcdriver.R` to execute growthcleanr`
+  on each separate file, then write out its results when complete. An example
+  is below.
 * Invoke the job using a tool like
   [GNU Parallel](https://www.gnu.org/software/parallel/), which can be run on
   all major platforms. An example invocation is below as well.
@@ -703,44 +704,7 @@ pitfalls to avoid. The following lays out a rough approach:
   Then re-run the job on only the remaining input data.
 * When complete, re-combine the data into one file or as otherwise appropriate.
 
-A standalone driver script might look like the following (note that it uses the
-`argparse` library for processing options; this should make it easy to read, but
-requires additional installation steps from what is recommended above under
-[Installation](#installation)).
-
-```R
-library(argparse)
-library(data.table)
-library(growthcleanr)
-
-parser <- ArgumentParser(description='Run cleangrowth() from script')
-parser$add_argument('infile', metavar='INFILE', type="character", nargs=1,
-                    help='input file')
-parser$add_argument('outfile', metavar='OUTFILE', type='character', nargs=1,
-                    help='output file')
-parser$add_argument('--sdrecenter', type='character', nargs=1, default='',
-                    help='sd.recenter data file')
-parser$add_argument('--quietly', default=F, action='store_true',
-                    help='Disable verbose output')
-args <- parser$parse_args()
-
-if (args$sdrecenter != '' ) {
-  sdrecenter <- fread(args$sdrecenter)
-} else {
-  sdrecenter <- ''
-}
-
-df_in <- fread(args$infile)
-df_out <- df_in[, clean_value:=
-                cleangrowth(subjid, param, agedays, sex, measurement,
-                            sd.recenter=sdrecenter,
-                            quietly=args$quietly)
-           ]
-write.csv(df_out, args$outfile, row.names=FALSE)
-```
-
-A file like this could be saved as, for example, `gcdriver.R`, which can then
-be invoked on a single input file using `Rscript`:
+To invoke `gcdriver.R` on a single input file using `Rscript`:
 
 ```bash
 % Rscript gcdriver.R --quietly --sdrecenter sdmedians.csv mydata.csv mydata-cleaned.csv

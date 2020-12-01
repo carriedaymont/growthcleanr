@@ -8,7 +8,7 @@ COPY LICENSE /LICENSE
 COPY README.md /README.md
 
 RUN R -e "install.packages(c( \
-    'argparse', \
+    'argparser', \
     'bit64', \
     'data.table', \
     'doParallel', \
