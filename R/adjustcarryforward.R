@@ -1096,7 +1096,7 @@ adjustcarryforward <- function(subjid,
   acf_df <- data.frame(n = data.all$n)
   acf_df <- cbind(acf_df,
                   data.all[, exclude])
-  colnames(acf_df)[-1] <- "adjustcarryfoward"
+  colnames(acf_df)[-1] <- "adjustcarryforward"
 
   # return results
   return(rbind(
