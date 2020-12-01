@@ -12,7 +12,9 @@ na.as.false = function(v) {
 # function to calculate temporary exclusion for step 15 (a - q)
 calc_temp_exclusion_15 <- function(
   df,
-  ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels){
+  ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels,
+  ewma.exp, minfactor, maxfactor, banddiff, banddiff_plus,
+  min_ht.exp_under, min_ht.exp_over, max_ht.exp_under, max_ht.exp_over){
   # initialize fields
   df[, (ewma.fields) := as.double(NaN)]
   df[, `:=`(
@@ -311,7 +313,9 @@ calc_temp_exclusion_15 <- function(
 # function to check every carried forward in a string one by one
 check_cf_string <- function(
   eval_df, wh_exclude,
-  ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels){
+  ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels,
+  ewma.exp, minfactor, maxfactor, banddiff, banddiff_plus,
+  min_ht.exp_under, min_ht.exp_over, max_ht.exp_under, max_ht.exp_over){
 
   # find the next include OR the row end
   next_incl <- which(
@@ -342,7 +346,9 @@ check_cf_string <- function(
 
     eval_sub <- calc_temp_exclusion_15(
       copy(sub_df),
-      ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels)
+      ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels,
+      ewma.exp, minfactor, maxfactor, banddiff, banddiff_plus,
+      min_ht.exp_under, min_ht.exp_over, max_ht.exp_under, max_ht.exp_over)
 
     verdict <-
       if (is.na(eval_sub$temp.exclude[2])){
@@ -738,7 +744,9 @@ adjustcarryforward <- function(subjid,
           # do steps 15a - 15q (functionalized for ease)
           eval_df <- calc_temp_exclusion_15(
             copy(df),
-            ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels)
+            ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels,
+            ewma.exp, minfactor, maxfactor, banddiff, banddiff_plus,
+            min_ht.exp_under, min_ht.exp_over, max_ht.exp_under, max_ht.exp_over)
 
           # r.  If there is only one potential exclusion identified in step 15j for a subject and parameter,
           #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi  and exc_ht=16 if it met criteria iii, iv, vii, or viii
@@ -841,7 +849,9 @@ adjustcarryforward <- function(subjid,
                 # check all the carried forwards in a string
                 res <- check_cf_string(
                   copy(eval_df), wh_exclude,
-                  ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels
+                  ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels,
+                  ewma.exp, minfactor, maxfactor, banddiff, banddiff_plus,
+                  min_ht.exp_under, min_ht.exp_over, max_ht.exp_under, max_ht.exp_over
                   )
 
                 verdict <- res$verdict
@@ -884,7 +894,9 @@ adjustcarryforward <- function(subjid,
                 # check all the carried forwards in a string
                 res <- check_cf_string(
                   copy(eval_df), wh_exclude,
-                  ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels
+                  ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels,
+                  ewma.exp, minfactor, maxfactor, banddiff, banddiff_plus,
+                  min_ht.exp_under, min_ht.exp_over, max_ht.exp_under, max_ht.exp_over
                 )
 
                 verdict <- res$verdict
@@ -932,7 +944,9 @@ adjustcarryforward <- function(subjid,
                 # check all the carried forwards in a string
                 res <- check_cf_string(
                   copy(eval_df), wh_exclude,
-                  ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels
+                  ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels,
+                  ewma.exp, minfactor, maxfactor, banddiff, banddiff_plus,
+                  min_ht.exp_under, min_ht.exp_over, max_ht.exp_under, max_ht.exp_over
                 )
 
                 verdict <- res$verdict
@@ -982,7 +996,9 @@ adjustcarryforward <- function(subjid,
                 # check all the carried forwards in a string
                 res <- check_cf_string(
                   copy(eval_df), wh_exclude,
-                  ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels
+                  ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels,
+                  ewma.exp, minfactor, maxfactor, banddiff, banddiff_plus,
+                  min_ht.exp_under, min_ht.exp_over, max_ht.exp_under, max_ht.exp_over
                 )
 
                 verdict <- res$verdict
