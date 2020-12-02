@@ -90,7 +90,6 @@ exec_sweep <- function(grid_df, exclude_opt) {
         sex,
         measurement,
         orig.exclude,
-        n,
         exclude_opt = exclude_opt,
         quietly = quietly,
         minfactor = grid_df$minfactor[index],
