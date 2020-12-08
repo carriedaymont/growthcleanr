@@ -13,6 +13,7 @@ adjustcarryforward(
   sex,
   measurement,
   orig.exclude,
+  exclude_opt = 0,
   sd.recenter = NA,
   ewma.exp = -1.5,
   ref.data.path = "",
@@ -33,7 +34,8 @@ adjustcarryforward(
 \item{param}{Vector identifying each measurement, may be 'WEIGHTKG', 'HEIGHTCM', or 'LENGTHCM'
 'HEIGHTCM' vs. 'LENGTHCM' only affects z-score calculations between ages 24 to 35 months (730 to 1095 days).
 All linear measurements below 731 days of life (age 0-23 months) are interpreted as supine length, and
-all linear measurements above 1095 days of life (age 36+ months) are interpreted as standing height.}
+all linear measurements above 1095 days of life (age 36+ months) are interpreted as standing height.
+Note: at the moment, all LENGTHCM will be converted to HEIGHTCM. In the future, the algorithm will be updated to consider this difference.}
 
 \item{agedays}{Numeric vector containing the age in days at each measurement.}
 
@@ -44,6 +46,24 @@ all linear measurements above 1095 days of life (age 36+ months) are interpreted
 kilograms (kg), and linear measurements (height vs. length) in centimeters (cm).}
 
 \item{orig.exclude}{Vector of exclusion assessment results from cleangrowth()}
+
+\item{exclude_opt}{Number from 0 to 3 indicating which option to use to handle strings of carried-forwards:
+0. no change.
+\enumerate{
+\item when deciding to exclude values, if we have a string of carried forwards,
+drop the most deviant value, and all CFs in the same string, and move on as
+normal.
+\item when deciding to exclude values, if the most deviant in a
+string of carried forwards is flagged, check all the CFs in that
+string from 1:N. Exclude all after the first that is flagged for
+exclusion when comparing to the Include before and after. Do not
+remove things designated as include.
+\item when deciding to exclude values, if the most deviant in a
+string of carried forwards is flagged, check all the CFs in that
+string from 1:N. Exclude all after the first that is flagged for
+exclusion when comparing to the Include before and after. Make sure
+remove things designated as include.
+}}
 
 \item{sd.recenter}{Data frame or table with median SD-scores per day of life}
 

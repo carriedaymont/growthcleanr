@@ -35,7 +35,8 @@ cleangrowth(
 \item{param}{Vector identifying each measurement, may be 'WEIGHTKG', 'HEIGHTCM', or 'LENGTHCM'
 'HEIGHTCM' vs. 'LENGTHCM' only affects z-score calculations between ages 24 to 35 months (730 to 1095 days).
 All linear measurements below 731 days of life (age 0-23 months) are interpreted as supine length, and
-all linear measurements above 1095 days of life (age 36+ months) are interpreted as standing height.}
+all linear measurements above 1095 days of life (age 36+ months) are interpreted as standing height.
+Note: at the moment, all LENGTHCM will be converted to HEIGHTCM. In the future, the algorithm will be updated to consider this difference.}
 
 \item{agedays}{Numeric vector containing the age in days at each measurement.}
 

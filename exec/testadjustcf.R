@@ -70,7 +70,7 @@ make_grid_vect <- function(low,
 # - grid_df: data frame of parameters to sweep
 # outputs:
 # - combined input file and result of each run
-exec_sweep <- function(grid_df) {
+exec_sweep <- function(grid_df, exclude_opt) {
   for (index in 1:nrow(grid_df)) {
     if (!quietly) {
       cat(
@@ -90,7 +90,7 @@ exec_sweep <- function(grid_df) {
         sex,
         measurement,
         orig.exclude,
-        n,
+        exclude_opt = exclude_opt,
         quietly = quietly,
         minfactor = grid_df$minfactor[index],
         maxfactor = grid_df$maxfactor[index],
@@ -181,6 +181,13 @@ parser <- add_argument(parser, "--outfile",
   type = "character",
   help = "Output file name, default 'test_adjustcarrforward_DATE_TIME', where DATE is the current system date and time"
 )
+parser <- add_argument(
+  parser,
+  "--exclude_opt",
+  default = 0,
+  type = "integer",
+  help = "Type of exclusion method for carried forward strings, 0 to 3. See adjustcarryforward documentation for more information"
+)
 
 # Parse arguments for ease ----
 
@@ -192,6 +199,7 @@ grid.length <- argv$gridlength
 outfile <- argv$outfile
 quietly <- argv$quietly
 param_choice <- argv$param
+exclude_opt <- argv$exclude_opt
 
 if (searchtype == "random") {
   # if the line search isn't odd, add one so that it includes the midpoint
@@ -327,7 +335,7 @@ if (searchtype == "full-grid") {
 
 
 # Execute
-combo <- exec_sweep(grid_df)
+combo <- exec_sweep(grid_df, exclude_opt)
 
 # Write out results ----
 
