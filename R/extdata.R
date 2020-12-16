@@ -58,6 +58,22 @@ NULL
 #'
 NULL
 
+#' Tanner Growth Velocity Table with (2\eqn{\sigma})
+#'
+#' Part of default CDC-derived tables
+#'
+#' Contains velocities for growth pre-calculated by CDC, including those 2
+#' standard deviations away.
+#'
+#' @name tanner_ht_vel_2sd
+#'
+#' @section tanner_ht_vel.csv:
+#'
+#' Used in function `acf_answers()`
+#'
+#'
+NULL
+
 #' Weight Anthro Table
 #'
 #' Part of default CDC-derived tables
@@ -89,6 +105,22 @@ NULL
 #'
 NULL
 
+#' WHO Maximum Height Velocity for (2\eqn{\sigma})
+#'
+#' Part of default WHO-derived tables
+#'
+#' Contains two standard deviations for the World Health Organization values of
+#' maximum height velocities.
+#'
+#' @name who_ht_maxvel_2sd
+#'
+#' @section who_ht_maxvel_2sd.csv:
+#'
+#' Used in function `acf_answers()`
+#'
+#'
+NULL
+
 #' WHO Height Velocity for (3\eqn{\sigma})
 #'
 #' Part of default WHO-derived tables
@@ -101,6 +133,22 @@ NULL
 #' @section who_ht_vel_3sd.csv:
 #'
 #' Used in function `cleangrowth()`
+#'
+#'
+NULL
+
+#' WHO Height Velocity for (2\eqn{\sigma})
+#'
+#' Part of default WHO-derived tables
+#'
+#' Contains two standard deviations for the World Health Organization values of
+#' height velocities.
+#'
+#' @name who_ht_vel_2sd
+#'
+#' @section who_ht_vel_2sd.csv:
+#'
+#' Used in function `acf_answers()`
 #'
 #'
 NULL
