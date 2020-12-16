@@ -754,12 +754,24 @@ adjustcarryforward <- function(subjid,
     #subj.df[, `:=`(subjid = subjid, param='HEIGHTCM',index=1:.N)]
     subj.df[, index := 1:.N]
 
+    # keep the original subject dataframe, since we will always use the original
+    # includes to compare to
+    subj.df_orig <- copy(subj.df)
     num.height.excluded = 0
     while (T) {
       # use a closure to discard all the extra fields added to df with each iteration
       # "include" protects subsets (used in option 3)
       subj.df[!grepl("Exclude", exclude) & !grepl("Include", exclude),
               exclude := (function (df) {
+                # put together the dataframe with original includes for comparisons
+                # get all "includes"
+                subj.df_orig_incl <- copy(subj.df_orig[orig.exclude == "Include",])
+                # now get all the remaining and add them on
+                df <- rbind(subj.df_orig_incl,
+                            df[orig.exclude != "Include",])
+                # sort them by original index
+                df <- df[order(index),]
+
                 # do steps 15a - 15q (functionalized for ease)
                 eval_df <- calc_temp_exclusion_15(
                   copy(df),
@@ -770,6 +782,10 @@ adjustcarryforward <- function(subjid,
                 # r.  If there is only one potential exclusion identified in step 15j for a subject and parameter,
                 #     replace exc_ht=15 for that value if it met criteria i, ii, v, or vi  and exc_ht=16 if it met criteria iii, iv, vii, or viii
                 # NOTE: these exclusions are assigned in the code above as 'Exclude-Min-Height-Change' and 'Exclude-Max-Height-Change'
+
+                # remove includes from consideration of removal
+                eval_df[orig.exclude == "Include", temp.diff := NaN]
+                eval_df[orig.exclude == "Include", temp.exclude := NA]
 
                 # count the amount of error codes we get
                 all_exclude = !is.na(eval_df$temp.exclude)
