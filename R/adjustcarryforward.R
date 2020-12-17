@@ -367,7 +367,7 @@ check_cf_string <- function(
 }
 
 # function to calculate step 15 as in the original algorithm (no parameters)
-# eval type: definitely "exclude" or "keep"
+# eval type: definitely "exclude" or "include"
 calc_step_15_no_param <- function(
   df,
   eval_type = "exclude",
@@ -949,6 +949,9 @@ acf_answers <- function(subjid,
   data.all[is.na(tbc.sd), exclude := 'Missing']
 
   # start evaluation ----
+
+  if (!quietly)
+    cat(sprintf("[%s] Calculating definitely exclude/include...\n", Sys.time()))
 
   data.all[param == 'HEIGHTCM', acf_answer := (function(subj.df) {
     # assign some book keeping variables
