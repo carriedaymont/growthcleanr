@@ -188,6 +188,13 @@ parser <- add_argument(
   type = "integer",
   help = "Type of exclusion method for carried forward strings, 0 to 3. See adjustcarryforward documentation for more information"
 )
+parser <- add_argument(
+  parser,
+  "--add_answers",
+  default = TRUE,
+  type = "logical",
+  help = "TRUE or FALSE, indicating whether or not to add answers (definely include/exclude) for the given dataset. Defaults to TRUE"
+)
 
 # Parse arguments for ease ----
 
@@ -200,6 +207,7 @@ outfile <- argv$outfile
 quietly <- argv$quietly
 param_choice <- argv$param
 exclude_opt <- argv$exclude_opt
+add_answers <- argv$add_answers
 
 if (searchtype == "random") {
   # if the line search isn't odd, add one so that it includes the midpoint
@@ -239,6 +247,33 @@ sex <- with(dm_filt, sex)
 agedays <- with(dm_filt, agedays)
 measurement <- with(dm_filt, measurement)
 orig.exclude <- with(dm_filt, clean_value)
+
+# Find out answers ----
+
+if (add_answers){
+  if (!quietly) {
+    cat(
+      sprintf(
+        "[%s] Finding answers for cleaned dataset\n",
+        Sys.time()
+      )
+    )
+  }
+
+  acf_answer_df <- acf_answers(subjid,
+                               param,
+                               agedays,
+                               sex,
+                               measurement,
+                               orig.exclude,
+                               quietly = quietly)
+
+  dm_filt <- merge(as.data.frame(dm_filt),
+        acf_answer_df,
+        by = "n",
+        all = T
+  )
+}
 
 # Execute parameter sweep ----
 
