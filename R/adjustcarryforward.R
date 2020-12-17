@@ -694,8 +694,45 @@ calc_step_15_no_param <- function(
   return(df$temp.exclude)
 }
 
-# function to determine what should absolutely be reincluded or definitely excluded
-# for a given dataset
+#' Answers for adjustcarryforward
+#'
+#' Determines what should absolutely be reincluded or definitely excluded
+#' for a given dataset, already run through \code{cleangrowth}.
+#'
+#' @param subjid Vector of unique identifiers for each subject in the database.
+#' @param param Vector identifying each measurement, may be 'WEIGHTKG', 'HEIGHTCM', or 'LENGTHCM'
+#'   'HEIGHTCM' vs. 'LENGTHCM' only affects z-score calculations between ages 24 to 35 months (730 to 1095 days).
+#'   All linear measurements below 731 days of life (age 0-23 months) are interpreted as supine length, and
+#'   all linear measurements above 1095 days of life (age 36+ months) are interpreted as standing height.
+#'   Note: at the moment, all LENGTHCM will be converted to HEIGHTCM. In the future, the algorithm will be updated to consider this difference.
+#' @param agedays Numeric vector containing the age in days at each measurement.
+#' @param sex Vector identifying the gender of the subject, may be 'M', 'm', or 0 for males, vs. 'F',
+#'  'f' or 1 for females.
+#' @param measurement Numeric vector containing the actual measurement data.  Weight must be in
+#'   kilograms (kg), and linear measurements (height vs. length) in centimeters (cm).
+#' @param orig.exclude Vector of exclusion assessment results from cleangrowth()
+#' @param sd.recenter Data frame or table with median SD-scores per day of life
+#' @param ewma.exp Exponent to use for weighting measurements in the exponentially weighted moving
+#'  average calculations. Defaults to -1.5. This exponent should be negative in order to weight growth
+#'  measurements closer to the measurement being evaluated more strongly. Exponents that are further from
+#'  zero (e.g. -3) will increase the relative influence of measurements close in time to the measurement
+#'  being evaluated compared to using the default exponent.
+#' @param ref.data.path Path to reference data. If not supplied, the year 2000
+#' Centers for Disease Control (CDC) reference data will be used.
+#' @param quietly Determines if function messages are to be displayed and if log files (parallel only)
+#' are to be generated. Defaults to TRUE.
+#'
+#' @return A data frame, containing an index "n" of rows, corresponding to the
+#' original order of the input vectors, and "acf_answers", containing the answers
+#' on whether a height value should be kept or excluded (returns "Definitely
+#' Exclude", "Definitely Include", or "Unknown" for height values, NA for weight
+#' values).
+#'
+#' @export
+#' @rawNamespace import(plyr, except = c(failwith, id, summarize, count, desc, mutate, arrange, rename, is.discrete, summarise, summarize))
+#' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
+#' @import data.table
+# NOTE: no examples, since this is a temporary function
 acf_answers <- function(subjid,
                         param,
                         agedays,
