@@ -446,7 +446,7 @@ calc_step_15_no_param <- function(
     df[, ht.exp := ifelse(delta.agedays.next < 365.25, 0.33, 1.5)]
     df[, maxdiff.next.ht := 2 * max.ht.vel * (delta.agedays.next /
                                                 365.25) ^ ht.exp + 5.5]
-  } else { # we're evaluating one's we want to keep
+  } else { # we're evaluating ones we want to keep
     # 15f.	Calculate the following:
     #   i.	mindiff_ht=0.5*min_ht_vel*(d_agedays/365.25)^2-3 if d_agedays<365.25
     #   ii.	replace mindiff_ht=0.5*min_ht_vel-3 if d_agedays>365.25
@@ -565,8 +565,6 @@ calc_step_15_no_param <- function(
   #   3.	replace mindiff_`p'=0.5*who_mindiff_`p'-3 if mindiff_`p' is missing & who_mindiff_`p' is not missing
   #   4.	replace maxdiff_`p'=2*who_maxdiff_`p'+3 if maxdiff_`p is missing & who_maxdiff_`p' is not missing
 
-  # DO I CHANGE THIS??? -- ASSUMING YES
-
   if (eval_opt == "exclude"){
     # refactored logic slightly for efficiency
     df[!is.na(who.mindiff.next.ht) &
@@ -577,8 +575,10 @@ calc_step_15_no_param <- function(
          maxdiff.next.ht = 2.0 * who.maxdiff.next.ht + 3
        )]
   } else { # we're evaluating if we want to keep or not
+    # should only be used if age is less than 24 months
     # refactored logic slightly for efficiency
     df[!is.na(who.mindiff.next.ht) &
+         agedays < 24 * 30.4375 &
          (delta.agedays.next < 9 * 30.4375 |
             is.na(mindiff.next.ht)),
        `:=`(
@@ -731,7 +731,7 @@ acf_answers <- function(subjid,
 
   subjid.unique <- unique(data.all$subjid)
 
-  # TANNER DATA ----
+  # tanner/who 3 SD ----
 
   # load tanner height velocity data. sex variable is defined such that 0=male and 1=female
   # recode column names to match syntactic style ("." rather than "_" in variable names)
@@ -741,7 +741,6 @@ acf_answers <- function(subjid,
     paste(ref.data.path, "tanner_ht_vel.csv", sep =
             "")
   )
-
   tanner.ht.vel <- fread(tanner_ht_vel_path)
 
   setnames(tanner.ht.vel,
@@ -778,7 +777,57 @@ acf_answers <- function(subjid,
   who.fields <- colnames(who.ht.vel)
   who.fields <- who.fields[!who.fields %in% c('sex', 'whoagegrp.ht')]
 
-  # section ----
+  # tanner/who 2 SD ----
+
+  # load tanner height velocity data. sex variable is defined such that 0=male and 1=female
+  # recode column names to match syntactic style ("." rather than "_" in variable names)
+  tanner_ht_vel_2sd_path <- ifelse(
+    ref.data.path == "",
+    system.file("extdata/tanner_ht_vel_with_2sd.csv", package = "growthcleanr"),
+    paste(ref.data.path, "tanner_ht_vel_with_2sd.csv", sep =
+            "")
+  )
+  tanner.ht.vel.2sd <- fread(tanner_ht_vel_2sd_path)
+
+  setnames(tanner.ht.vel.2sd,
+           colnames(tanner.ht.vel.2sd),
+           gsub('_', '.', colnames(tanner.ht.vel.2sd)))
+  setkey(tanner.ht.vel.2sd, sex, tanner.months)
+  # keep track of column names in the tanner data
+  tanner.fields.2sd <- colnames(tanner.ht.vel.2sd)
+  tanner.fields.2sd <-
+    tanner.fields.2sd[!tanner.fields.2sd %in% c('sex', 'tanner.months')]
+
+  who_max_ht_vel_2sd_path <- ifelse(
+    ref.data.path == "",
+    system.file("extdata/who_ht_maxvel_2sd.csv", package = "growthcleanr"),
+    paste(ref.data.path, "who_ht_maxvel_2sd.csv", sep =
+            "")
+  )
+
+  who_ht_vel_2sd_path <- ifelse(
+    ref.data.path == "",
+    system.file("extdata/who_ht_vel_2sd.csv", package = "growthcleanr"),
+    paste(ref.data.path, "who_ht_vel_2sd.csv", sep =
+            "")
+  )
+  who.max.ht.vel.2sd <- fread(who_max_ht_vel_2sd_path)
+  who.ht.vel.2sd <- fread(who_ht_vel_2sd_path)
+  setkey(who.max.ht.vel.2sd, sex, whoagegrp_ht)
+  setkey(who.ht.vel.2sd, sex, whoagegrp_ht)
+  who.ht.vel.2sd <-
+    as.data.table(dplyr::full_join(who.ht.vel.2sd, who.max.ht.vel.2sd, by =
+                                     c('sex', 'whoagegrp_ht')))
+
+  setnames(who.ht.vel.2sd,
+           colnames(who.ht.vel.2sd),
+           gsub('_', '.', colnames(who.ht.vel.2sd)))
+  setkey(who.ht.vel.2sd, sex, whoagegrp.ht)
+  # keep track of column names in the who growth velocity data
+  who.fields.2sd <- colnames(who.ht.vel.2sd)
+  who.fields.2sd <- who.fields.2sd[!who.fields.2sd %in% c('sex', 'whoagegrp.ht')]
+
+  # getting zscores ----
 
   # recategorize linear parameters as 'HEIGHTCM'
   # NOTE: this will be changed in future to consider this difference
@@ -879,8 +928,6 @@ acf_answers <- function(subjid,
           ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels,
           ewma.exp, minfactor, maxfactor, banddiff, banddiff_plus,
           min_ht.exp_under, min_ht.exp_over, max_ht.exp_under, max_ht.exp_over)
-
-
 
         return(eval_df$exclude)
 
