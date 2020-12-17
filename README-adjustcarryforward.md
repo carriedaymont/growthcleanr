@@ -94,10 +94,15 @@ parameters).
 The default number of sweep steps is 9; this can be changed with the option
 `--gridlength`. 
 
-Further, for testing options of handling multiple carried forward
+For testing options of handling strings of multiple carried forward
 values, several options from 0 to 3 have been incorporated. 0 (no change) is the 
 default option, and can be changed `--exclude_opt`. More information on each 
 option can be found in the `adjustcarryforward()` documentation.
+
+In addition to multiple options for carried-forward strings, "answers" for a given
+dataset have been incorporated. When the `--add_answers` flag is set to `TRUE` 
+(`TRUE` by default), a column called `acf_answers` will have, for each height value, "Definitely Exclude", "Definitely Include", or "Unknown" (if it does not fall in
+either category). Weight values are set as `NA`.
 
 For example, for a 9-step sweep with the default search type, `random`, the parameters
 passed to the function in each pass will be:
