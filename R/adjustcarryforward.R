@@ -368,7 +368,6 @@ check_cf_string <- function(
 
 # function to calculate step 15 as in the original algorithm (no parameters)
 # eval type: definitely "exclude" or "keep"
-# STOP HERE: trying to figure out where to change things
 calc_step_15_no_param <- function(
   df,
   eval_type = "exclude",
@@ -431,7 +430,7 @@ calc_step_15_no_param <- function(
   setkey(df, sex, tanner.months)
   df <- tanner.ht.vel[df]
 
-  if (eval_opt == "exclude"){
+  if (eval_type == "exclude"){
     # 15f.	Calculate the following:
     #   i.	mindiff_ht=0.5*min_ht_vel*(d_agedays/365.25)^2-3 if d_agedays<365.25
     #   ii.	replace mindiff_ht=0.5*min_ht_vel-3 if d_agedays>365.25
@@ -565,7 +564,7 @@ calc_step_15_no_param <- function(
   #   3.	replace mindiff_`p'=0.5*who_mindiff_`p'-3 if mindiff_`p' is missing & who_mindiff_`p' is not missing
   #   4.	replace maxdiff_`p'=2*who_maxdiff_`p'+3 if maxdiff_`p is missing & who_maxdiff_`p' is not missing
 
-  if (eval_opt == "exclude"){
+  if (eval_type == "exclude"){
     # refactored logic slightly for efficiency
     df[!is.na(who.mindiff.next.ht) &
          (delta.agedays.next < 9 * 30.4375 |
@@ -821,7 +820,10 @@ acf_answers <- function(subjid,
 
   setnames(who.ht.vel.2sd,
            colnames(who.ht.vel.2sd),
-           gsub('_', '.', colnames(who.ht.vel.2sd)))
+           gsub(
+             ".2sd", "", # replace 2sd with nothing, for ease of use in calculations
+             gsub('_', '.', colnames(who.ht.vel.2sd))
+            ))
   setkey(who.ht.vel.2sd, sex, whoagegrp.ht)
   # keep track of column names in the who growth velocity data
   who.fields.2sd <- colnames(who.ht.vel.2sd)
@@ -911,34 +913,47 @@ acf_answers <- function(subjid,
 
   # start evaluation ----
 
-  data.all[param == 'HEIGHTCM', exclude := (function(subj.df) {
+  data.all[param == 'HEIGHTCM', acf_answer := (function(subj.df) {
     # assign some book keeping variables
     #subj.df[, `:=`(subjid = subjid, param='HEIGHTCM',index=1:.N)]
     subj.df[, index := 1:.N]
 
-    num.height.excluded = 0
     # use a closure to discard all the extra fields added to df with each iteration
-    # "include" protects subsets (used in option 3)
-    subj.df[
-      !grepl("Exclude", exclude) & !grepl("Include", exclude),
-      exclude := (function (df) {
+    subj.df[,
+      acf_answer := (function (df) {
+        # calculate definitely exclude
         # do steps 15a - 15q (functionalized for ease)
-        eval_df <- calc_temp_exclusion_15(
+        def_excl <- calc_step_15_no_param(
           copy(df),
+          eval_type = "exclude",
           ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels,
-          ewma.exp, minfactor, maxfactor, banddiff, banddiff_plus,
-          min_ht.exp_under, min_ht.exp_over, max_ht.exp_under, max_ht.exp_over)
+          ewma.exp)
 
-        return(eval_df$exclude)
+        def_incl <- calc_step_15_no_param(
+          copy(df),
+          eval_type = "include",
+          ewma.fields, tanner.ht.vel.2sd, who.ht.vel.2sd, exclude.levels,
+          ewma.exp)
+
+        # calculate which should definitely be included and excluded
+        verdict <- rep("Unknown", length(def_incl))
+        verdict[!is.na(def_excl)] <- "Definitely Exclude"
+        verdict[is.na(def_incl)] <- "Definitely Include"
+
+        return(verdict)
 
       })(copy(.SD))]
 
     setkey(subj.df, index)
-    return(subj.df$exclude)
+    return(subj.df$acf_answer)
   })(copy(.SD)), by = .(subjid), .SDcols = c('sex', 'agedays', 'v', 'tbc.sd', 'exclude', 'orig.exclude')]
 
+  # formulating results
+  acf_answer_df <- data.frame(n = data.all$n, acf_answer = data.all$acf_answer)
+  # sort for user ease
+  acf_answer_df <- acf_answer_df[order(acf_answer_df$n),]
 
-
+  return(acf_answer_df)
 }
 
 #' adjustcarryforward
