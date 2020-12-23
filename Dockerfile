@@ -16,5 +16,3 @@ RUN addgroup --gid 1202 gcuser && adduser --system --uid 1002 --ingroup gcuser g
 RUN chown -R gcuser:gcuser /app
 
 USER gcuser
-
-
