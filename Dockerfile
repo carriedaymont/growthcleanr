@@ -1,25 +1,22 @@
 FROM rocker/tidyverse:latest
 
-MAINTAINER dlchudnov@mitre.org
+LABEL maintainer="Daniel Chudnov <dlchudnov@mitre.org>"
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
 COPY LICENSE /LICENSE
 COPY README.md /README.md
 
-RUN R -e "install.packages(c( \
-    'argparser', \
-    'bit64', \
-    'data.table', \
-    'doParallel', \
-    'dplyr', \
-    'foreach', \
-    'Hmisc', \
-    'plyr' \
-    ))"
+RUN addgroup --gid 1202 gcuser && adduser --system --uid 1002 --ingroup gcuser gcuser
 
-RUN R -e "library(devtools); \
-    devtools::install_github('mitre/growthcleanr')"
+RUN mkdir /app/R_libs
+RUN echo "R_LIBS_USER=/app/R_libs" > /home/gcuser/.Renviron
+RUN echo ".libPaths(c('/app/R_libs', .libPaths()))" > /home/gcuser/.Rprofile
+
+RUN R -e "devtools::install_github('mitre/growthcleanr', dependencies = TRUE, ref = 'main', lib='/app/R_libs')"
 
 ADD exec/gcdriver.R /usr/local/bin/
-RUN chmod +x /usr/local/bin/gcdriver.R
+RUN chmod ugo+rx /usr/local/bin/gcdriver.R
+RUN chown -R gcuser:gcuser /app
+
+USER gcuser
