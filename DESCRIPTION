@@ -9,7 +9,7 @@ Authors@R: c(
     person("Campos","Diego",,"camposd@email.chop.edu","aut")
   )
 Maintainer: Robert Grundmeier <grundmeier@email.chop.edu>
-Description: Cleans growth data that may contain implausible data based on unit or data range
+Description: growthcleanr cleans growth data that may contain implausible data based on unit or data range.
 Imports:
     data.table (>= 1.13.0),
     tidyr (>= 1.1.0),

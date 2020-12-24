@@ -378,31 +378,31 @@ with `cleangrowth()` will likely take a few minutes to complete.
 > setkey(data, subjid, param, agedays)
 > cleaned_data <- data[, clean_value:=cleangrowth(subjid, param, agedays, sex, measurement)]
 > head(cleaned_data)
-     id subjid sex agedays    param measurement             clean_value
-1: 1510 775155   0     889 HEIGHTCM      84.900       Exclude-Duplicate
-2: 1511 775155   0     889 HEIGHTCM      89.060                 Include
-3: 1512 775155   0    1071 HEIGHTCM      92.500                 Include
-4: 1513 775155   0    1253 HEIGHTCM      96.200                 Include
-5: 1514 775155   0    1435 HEIGHTCM      96.200 Exclude-Carried-Forward
-6: 1515 775155   0    1435 HEIGHTCM      99.692                 Include
+     id subjid sex agedays    param measurement                 clean_value
+1: 1510 775155   0     889 HEIGHTCM      84.900 Exclude-Extraneous-Same-Day
+2: 1511 775155   0     889 HEIGHTCM      89.060                     Include
+3: 1512 775155   0    1071 HEIGHTCM      92.500                     Include
+4: 1513 775155   0    1253 HEIGHTCM      96.200                     Include
+5: 1514 775155   0    1435 HEIGHTCM      96.200     Exclude-Carried-Forward
+6: 1515 775155   0    1435 HEIGHTCM      99.692                     Include
 > cleaned_data %>% group_by(clean_value) %>% tally(sort=TRUE)
 # A tibble: 14 x 2
-   clean_value                   n
-   <ord>                     <int>
- 1 Include                   38875
- 2 Exclude-Duplicate         10546
- 3 Exclude-Carried-Forward    6694
- 4 Exclude-SD-Cutoff           168
- 5 Exclude-EWMA-8              135
- 6 Exclude-EWMA-Extreme         95
- 7 Exclude-EWMA-9               93
- 8 Exclude-Min-Height-Change    65
- 9 Swapped-Measurements         16
-10 Exclude-Too-Many-Errors       6
-11 Exclude-EWMA-11               5
-12 Exclude-EWMA-12               2
-13 Exclude-Pair-Delta-18         2
-14 Exclude-Max-Height-Change     1
+   clean_value                     n
+   <ord>                       <int>
+ 1 Include                     38875
+ 2 Exclude-Extraneous-Same-Day 10546
+ 3 Exclude-Carried-Forward      6694
+ 4 Exclude-SD-Cutoff             168
+ 5 Exclude-EWMA-8                135
+ 6 Exclude-EWMA-Extreme           95
+ 7 Exclude-EWMA-9                 93
+ 8 Exclude-Min-Height-Change      65
+ 9 Swapped-Measurements           16
+10 Exclude-Too-Many-Errors         6
+11 Exclude-EWMA-11                 5
+12 Exclude-EWMA-12                 2
+13 Exclude-Pair-Delta-18           2
+14 Exclude-Max-Height-Change       1
 ```
 
 If you are able to run these steps and see a similar result, you have the
@@ -596,7 +596,7 @@ the algorithm's step labels and labels used in comment text in `growthcleanr`.
 | - | - | - | - |
 | 2d | 0 | Include | - |
 | 2d | 1 | Missing | - |
-| 5b | 2 | Exclude-Temporary-Duplicate | - |
+| 5b | 2 | Exclude-Temporary-Extraneous-Same-Day | - |
 | 7d | - | Swapped-Measurement | - |
 | 8f | - | Unit-Error-High | - |
 | 8f | - | Unit-Error-Low | - |
@@ -605,7 +605,7 @@ the algorithm's step labels and labels used in comment text in `growthcleanr`.
 | 10c | 4 | Exclude-SD-Cutoff | 10d, 10e |
 | 11d | 5 | Exclude-EWMA-Extreme | 11e |
 | 11f.ii | 6 | Exclude-EWMA-Extreme-Pair | 11i (R only) |
-| 12d.i | 7 | Exclude-Duplicate | 12diii, 12ei, 12f |
+| 12d.i | 7 | Exclude-Extraneous-Same-Day | 12diii, 12ei, 12f |
 | 14f.i | 8 | Exclude-EWMA-8 | Set in 14h (in R) |
 | 14f.ii | 9 | Exclude-EWMA-9 | Set in 14h (in R) |
 | 14f.iii | 10 | Exclude-EWMA-10 | Set in 14h (in R) |
@@ -826,13 +826,13 @@ parameter type as `type`, specify each, with quotes:
 
 ```R
 > head(my_cleaned_data)
-     id subjid sex    aged     type measurement       clean_value
-1: 1510 775155   0     889 HEIGHTCM       84.90 Exclude-Duplicate
-2: 1511 775155   0     889 HEIGHTCM       89.06           Include
-3: 1518 775155   0     889 WEIGHTKG       13.10           Include
-4: 1512 775155   0    1071 HEIGHTCM       92.50           Include
-5: 1519 775155   0    1071 WEIGHTKG       14.70           Include
-6: 1513 775155   0    1253 HEIGHTCM       96.20           Include
+     id subjid sex    aged     type measurement                 clean_value
+1: 1510 775155   0     889 HEIGHTCM       84.90 Exclude-Extraneous-Same-Day
+2: 1511 775155   0     889 HEIGHTCM       89.06                     Include
+3: 1518 775155   0     889 WEIGHTKG       13.10                     Include
+4: 1512 775155   0    1071 HEIGHTCM       92.50                     Include
+5: 1519 775155   0    1071 WEIGHTKG       14.70                     Include
+6: 1513 775155   0    1253 HEIGHTCM       96.20                     Include
 > longwide(my_cleaned_data, agedays="aged", param="type")
 ```
 

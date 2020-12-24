@@ -340,7 +340,7 @@ test_that("longwide works as expected with custom values", {
   # run longwide on changed data with some exclusion types included
   inc_types <- c("Include",
                  "Exclude-Carried-Forward",
-                 "Exclude-Duplicate")
+                 "Exclude-Extraneous-Same-Day")
   wide_syn <- longwide(sub_syn,
                        clean_value = "cv",
                        inclusion_types = inc_types)
