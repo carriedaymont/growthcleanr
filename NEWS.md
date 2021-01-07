@@ -1,5 +1,19 @@
 # growthcleanr
 
+## [1.2.3] - 2021-01-07
+
+### Added
+
+- New exclusion handling option on experimental carry forward adjustment
+
+### Changed
+
+- Improved experimental carry forward adjustment handling of strings of
+  CF values, output handling, and documentation; renamed "Missing" values
+- Updated DESCRIPTION, imports, documentation to address testing issue (#12)
+- Switched to GitHub Actions for continuous integration / testing (thanks
+  @mcanouil)
+
 ## [1.2.2] - 2020-09-29
 
 ### Added
