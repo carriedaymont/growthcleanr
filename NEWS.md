@@ -11,7 +11,10 @@
 - Improved experimental carry forward adjustment handling of strings of
   CF values, output handling, and documentation; renamed "Missing" values
 - Updated DESCRIPTION, imports, documentation to address testing issue (#12)
+- Switched to R-native argparser library to support script options
 - Switched to GitHub Actions for continuous integration / testing (thanks
+  @mcanouil)
+- Improved Dockerfile to standardize user/path, simplify install (thanks
   @mcanouil)
 
 ## [1.2.2] - 2020-09-29
