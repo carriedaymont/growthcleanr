@@ -966,8 +966,8 @@ files may be obtained by visiting the tagged release version 1.2.3 at
 https://github.com/carriedaymont/growthcleanr/releases/tag/1.2.3, where the previous
 version of these files may be found:
 
-- `who_ht_maxvel_3sd.csv`
-- `who_ht_vel_3sd.csv`
+- `inst/extdata/who_ht_maxvel_3sd.csv`
+- `inst/extdata/who_ht_vel_3sd.csv`
 
 The tagged release available there, or these CSV files within it updated in a more
 recent version of this package, may be used to verify reproducibility.
