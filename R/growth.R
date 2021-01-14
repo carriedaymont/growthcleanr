@@ -1,10 +1,10 @@
-#' Helper function for cleanbatch to identify subset of observations that are either "included" or a "temporary duplicate"
+#' Helper function for cleanbatch to identify subset of observations that are either "included" or a "temporary extraneous"
 #'
 #' @keywords internal
 #' @noRd
 valid <- function(df,
-                  include.temporary.duplicates = F,
-                  include.duplicates = F,
+                  include.temporary.extraneous = F,
+                  include.extraneous = F,
                   include.carryforward = F) {
   exclude <- if (is.data.frame(df))
     df$exclude
@@ -13,9 +13,9 @@ valid <- function(df,
   return(
     exclude < 'Exclude'
     |
-      include.temporary.duplicates &
-      exclude == 'Exclude-Temporary-Duplicate'
-    | include.duplicates & exclude == 'Exclude-Duplicate'
+      include.temporary.extraneous &
+      exclude == 'Exclude-Temporary-Extraneous-Same-Day'
+    | include.extraneous & exclude == 'Exclude-Extraneous-Same-Day'
     |
       include.carryforward &
       exclude == 'Exclude-Carried-Forward'
@@ -31,63 +31,63 @@ na_as_false <- function(v) {
   v
 }
 
-#' Function for temporary duplicates (step 5):
-#' 5.  Temporary duplicates: I use duplicates to refer to more than more than one recorded value for a parameter on the same day,
+#' Function for temporary extraneous (step 5):
+#' 5.  Temporary extraneous: I use extraneous to refer to more than more than one recorded value for a parameter on the same day,
 #'     and we need to select which one to include in our analysis. The overall strategy will be to select a measurement using a simple
 #'     strategy that will be used temporarily, and select permanently in a later step after we have a somewhat cleaner dataset that
-#'     can help us identify the best duplicate.
-#' a.  For subjects/parameters with duplicates: Determine median_tbc*sd for both parameters: the median tbc*sd for each subject
-#'     and parameter including only non-duplicate values with exc_*==0. The median of the same parameter as the duplicate will
+#'     can help us identify the best extraneous.
+#' a.  For subjects/parameters with extraneous: Determine median_tbc*sd for both parameters: the median tbc*sd for each subject
+#'     and parameter including only non-extraneous values with exc_*==0. The median of the same parameter as the extraneous will
 #'     be referred to as median_tbc*sd, the median of the other parameter will be referred to as median_tbcOsd.
-#' b.	For each subject/parameter with duplicates and at least one value for the subject/parameter on a day with no duplicates,
-#'     select the value closest to the median_tbc*sd for temporary inclusion, and assign all other duplicates exc_*=2.
-#'  i.	For each subject/parameter with duplicates and no values for the subject/parameter on a day with no duplicates, select the
-#'     value closest to the median_tbcOsd for temporary inclusion, and assign all other duplicates exc_*=2.
-#'     If median_tbcOsd is missing because there are no values for the other parameter, randomly choose one duplicate value for
-#'     each subject/parameter/age to keep as exc_*=0 and replace exc_*=2 for all other duplicates for that subject/parameter/age.
+#' b.	For each subject/parameter with extraneous and at least one value for the subject/parameter on a day with no extraneous,
+#'     select the value closest to the median_tbc*sd for temporary inclusion, and assign all other extraneous exc_*=2.
+#'  i.	For each subject/parameter with extraneous and no values for the subject/parameter on a day with no extraneous, select the
+#'     value closest to the median_tbcOsd for temporary inclusion, and assign all other extraneous exc_*=2.
+#'     If median_tbcOsd is missing because there are no values for the other parameter, randomly choose one extraneous value for
+#'     each subject/parameter/age to keep as exc_*=0 and replace exc_*=2 for all other extraneous for that subject/parameter/age.
 #'
 #' @keywords internal
 #' @noRd
-temporary_duplicates <- function(df) {
+temporary_extraneous <- function(df) {
   # add subjid and param if needed (may be missing depending on where this is called from)
   if (is.null(df$subjid))
     df[, subjid := NA]
   if (is.null(df$param))
     df[, param := NA]
-  # only operate on valid rows (but include rows that may have previously been flagged as a "temporary duplicate")
-  valid.rows <- valid(df, include.temporary.duplicates = T)
+  # only operate on valid rows (but include rows that may have previously been flagged as a "temporary extraneous")
+  valid.rows <- valid(df, include.temporary.extraneous = T)
   # make a small copy of df with only the fields we need for efficiency
   df <- df[j = .(tbc.sd), keyby = .(subjid, param, agedays, index)]
   # initialize some useful fields
   df[, `:=`(
     median.sd = as.double(NA),
     delta.median.sd = as.double(NA),
-    duplicates.this.day = F,
-    duplicate = F
+    extraneous.this.day = F,
+    extraneous = F
   )]
-  # determine on which days there are duplicate measurements (more than 1 valid measurement on that age day)
-  df[valid.rows, duplicates.this.day := (.N > 1), by = .(subjid, param, agedays)]
-  # calculate median of measurements on days where there is no duplicate
+  # determine on which days there are extraneous measurements (more than 1 valid measurement on that age day)
+  df[valid.rows, extraneous.this.day := (.N > 1), by = .(subjid, param, agedays)]
+  # calculate median of measurements on days where there is no extraneous
   df[valid.rows &
-       !duplicates.this.day, median.sd := median(tbc.sd), by = .(subjid, param)]
-  # distribute median to other valid or potential duplicate rows for same parameter for that subject
+       !extraneous.this.day, median.sd := median(tbc.sd), by = .(subjid, param)]
+  # distribute median to other valid or potential extraneous rows for same parameter for that subject
   df[valid.rows, median.sd := sort(median.sd)[1], by = .(subjid, param)]
   # take care of subject/parameters with more than one day with a valid observation
   # determine the absolute difference between the measurements sd score and the median for that parameter for each child
   df[valid.rows &
-       duplicates.this.day, delta.median.sd := abs(tbc.sd - median.sd), by = .(subjid, param)]
-  # identify subjects that have duplicates on all days of observation for that parameter (i.e. delta.median.sd undefined)
+       extraneous.this.day, delta.median.sd := abs(tbc.sd - median.sd), by = .(subjid, param)]
+  # identify subjects that have duplicates/extraneous on all days of observation for that parameter (i.e. delta.median.sd undefined)
   subj.all.dups <- df[valid.rows &
-                        duplicates.this.day &
+                        extraneous.this.day &
                         is.na(delta.median.sd), unique(subjid)]
   df[valid.rows &
        subjid %in% subj.all.dups, delta.median.sd := (function(subj.df) {
          # iterate over parameters where delta.median.sd is not yet defined
          # pass 1: take median from other parameter(s)
          for (p in subj.df[is.na(delta.median.sd) &
-                           duplicates.this.day, unique(param)]) {
+                           extraneous.this.day, unique(param)]) {
            median.other.sd <- subj.df[param != p &
-                                        !duplicates.this.day, median(tbc.sd)]
+                                        !extraneous.this.day, median(tbc.sd)]
            subj.df[param == p, delta.median.sd := abs(tbc.sd - median.other.sd)]
          }
          return(subj.df$delta.median.sd)
@@ -95,15 +95,15 @@ temporary_duplicates <- function(df) {
   # Final pass: take median as zero (i.e. if no measurements from a different parameter)
   # NOTE -- this is not exactly the same as taking a random parameter
   df[valid.rows &
-       duplicates.this.day &
+       extraneous.this.day &
        is.na(delta.median.sd), delta.median.sd := abs(tbc.sd)]
-  # flag any duplicate value on the same day that is not the minimum distance from the median sd score
+  # flag any extraneous value on the same day that is not the minimum distance from the median sd score
   # NOTE: in the case of exact ducplicates, "which.min" will pick the first
   df[valid.rows &
-       duplicates.this.day, duplicate := seq_along(delta.median.sd) != which.min(delta.median.sd), by =
+       extraneous.this.day, extraneous := seq_along(delta.median.sd) != which.min(delta.median.sd), by =
        .(subjid, param, agedays)]
-  # return the duplicated valid rows (i.e. the ones that should be temporarily excluded)
-  return(df$duplicate & valid.rows)
+  # return the extraneous valid rows (i.e. the ones that should be temporarily excluded)
+  return(df$extraneous & valid.rows)
 }
 
 #' Function to identify switches (step 6):
@@ -198,13 +198,13 @@ cleanbatch <- function(data.df,
 
   if (!quietly)
     cat(sprintf(
-      "[%s] Preliminarily identify potential duplicates...\n",
+      "[%s] Preliminarily identify potential extraneous...\n",
       Sys.time()
     ))
-  data.df$exclude[temporary_duplicates(data.df)] <- 'Exclude-Temporary-Duplicate'
+  data.df$exclude[temporary_extraneous(data.df)] <- 'Exclude-Temporary-Extraneous-Same-Day'
 
-  # capture a list of subjects with possible duplicates for efficiency later
-  subj.dup <- data.df[exclude == 'Exclude-Temporary-Duplicate', unique(subjid)]
+  # capture a list of subjects with possible extraneous for efficiency later
+  subj.dup <- data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', unique(subjid)]
 
   # 7a.  For each day on which a subject had both a weight and a height recorded, calculate tbc*sd_sw: SD scores as if the weight had been recorded as the height
   #      and the height had been recorded as the weight, recentered using rcsd_*.  I intentionally did not allow values that were the first or last for a subject/parameter to be replaced as a switch.
@@ -398,7 +398,7 @@ cleanbatch <- function(data.df,
   #     is fairly small, and when this is the case the carried forward measurements provide little new information.
   # a.	Calculate d_prev_wt=wt-wtprev and d_prev_ht=ht-htprev. Use original measurements rather than transformed
   #     measurements (unit errors and switches).
-  # b.	Unlike most steps, do this step for all duplicate values (exc_*==2) in addition to included values (exc_*==0), comparing all values for one day to all
+  # b.	Unlike most steps, do this step for all extraneous values (exc_*==2) in addition to included values (exc_*==0), comparing all values for one day to all
   #     values from the prior day – if there are any values with a d_prev*==0, the value on the latter day should be excluded.
   # c.	Replace exc_*=3 for all values with d_prev*==0 & (exc_*==0 OR exc_*==2)
   if (!include.carryforward) {
@@ -412,13 +412,13 @@ cleanbatch <- function(data.df,
     data.df[, prev.v := as.double(NaN)]
     data.df[valid(data.df), prev.v := c(NA, v.orig[-.N]), by = .(subjid, param)]
 
-    # optimize "carry forward" for children without duplicates.
+    # optimize "carry forward" for children without extraneous.
     data.df[!(subjid %in% subj.dup) &
               v.orig == prev.v, exclude := 'Exclude-Carried-Forward']
 
-    # need to handle children with duplicate measurements on same day separately
+    # need to handle children with extraneous measurements on same day separately
     data.df[subjid %in% subj.dup &
-              valid(data.df, include.temporary.duplicates = T), exclude := (function(df) {
+              valid(data.df, include.temporary.extraneous = T), exclude := (function(df) {
                 setkey(df, agedays)
                 ages = unique(agedays)
                 # no point in looking for measurements carried forward if all measurements are from a single day of life
@@ -436,9 +436,9 @@ cleanbatch <- function(data.df,
               })(copy(.SD)), .SDcols = c('agedays', 'exclude', 'v.orig'), by = .(subjid, param)]
   }
 
-  # 9d.  Replace exc_*=0 if exc_*==2 & redo step 5 (temporary duplicates)
-  data.df[exclude == 'Exclude-Temporary-Duplicate', exclude := 'Include']
-  data.df[temporary_duplicates(data.df), exclude := 'Exclude-Temporary-Duplicate']
+  # 9d.  Replace exc_*=0 if exc_*==2 & redo step 5 (temporary extraneous)
+  data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
+  data.df[temporary_extraneous(data.df), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
 
   # 10.  Exclude extreme errors with SD cutoffs. For this, a cutoff of |SD|>25 is used. Because of differences in SD and z score, there are some very extreme values
   #      with a |z|>25 that are implausible with an |SD|<25, so both are used to exclude extreme errors. This works better than using a lower value for the limit
@@ -452,16 +452,16 @@ cleanbatch <- function(data.df,
       Sys.time()
     ))
   data.df[na_as_false(
-    valid(data.df, include.temporary.duplicates = T) & abs(tbc.sd) > sd.extreme
+    valid(data.df, include.temporary.extraneous = T) & abs(tbc.sd) > sd.extreme
     |
-      exclude %in% c('Include', 'Exclude-Temporary-Duplicate') &
+      exclude %in% c('Include', 'Exclude-Temporary-Extraneous-Same-Day') &
       abs(z.orig) > z.extreme
   ),
   exclude := 'Exclude-SD-Cutoff']
 
-  # 10d. Redo temporary duplicates as in step 5.
-  data.df[exclude == 'Exclude-Temporary-Duplicate', exclude := 'Include']
-  data.df[temporary_duplicates(data.df), exclude := 'Exclude-Temporary-Duplicate']
+  # 10d. Redo temporary extraneous as in step 5.
+  data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
+  data.df[temporary_extraneous(data.df), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
 
   # 11.  Exclude extreme errors with EWMA
   # a.	Erroneous measurements can distort the EWMA for measurements around them. Therefore, if the EWMA method identifies more than one value for a subject and
@@ -476,15 +476,15 @@ cleanbatch <- function(data.df,
     ))
   data.df <- data.df[, exclude := (function(df) {
     num.ewma.excluded <- 0
-    # optimization: determine whether this subject has any duplicates
-    has.duplicates <- subjid %in% subj.dup
+    # optimization: determine whether this subject has any extraneous
+    has.extraneous <- subjid %in% subj.dup
     while (T) {
       df[, (ewma.fields) := as.double(NaN)]
       df[valid(exclude), (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, T)]
 
       # note: at this point, only one ewma exists per param on a given day for a subject, so sort(ewma.all)[1] will returns the non-missing ewma.all
-      # restrict to children with possible duplicates for efficiency
-      if (has.duplicates) {
+      # restrict to children with possible extraneous for efficiency
+      if (has.extraneous) {
         df[, `:=`(
           ewma.all = sort(ewma.all)[1],
           ewma.before = sort(ewma.before)[1],
@@ -551,11 +551,11 @@ cleanbatch <- function(data.df,
         df[worst.row, exclude := 'Exclude-EWMA-Extreme-Pair']
       }
 
-      # 11h.  Recalculate temporary duplicates as in step 5
-      # optimize: only perform these steps if this subject is known to have duplicate measurements
-      if (has.duplicates) {
-        df[exclude == 'Exclude-Temporary-Duplicate', exclude := 'Include']
-        df[temporary_duplicates(df), exclude := 'Exclude-Temporary-Duplicate']
+      # 11h.  Recalculate temporary extraneous as in step 5
+      # optimize: only perform these steps if this subject is known to have extraneous measurements
+      if (has.extraneous) {
+        df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
+        df[temporary_extraneous(df), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
       }
 
       # 11i.  If there was at least one subject who had a potential exclusion identified in step 11c, repeat steps 11b-11g. If there were no subjects with potential
@@ -572,24 +572,24 @@ cleanbatch <- function(data.df,
 
 
 
-  # 12. Redo duplicates using EWMA. This will be the final time duplicates are done.
-  #     For some duplicates it is very difficult to tell which one is likely representative. If the duplicates are very similar to each
-  #     other, we will select one. If it is very difficult to tell which one is correct and the duplicates are not very similar, we will
-  #     exclude all duplicates for that subject/parameter on that day
-  # a.	Replace exc_*=0 for all temporarily excluded duplicates (exc_*==0)
+  # 12. Redo extraneous using EWMA. This will be the final time extraneous are done.
+  #     For some extraneous it is very difficult to tell which one is likely representative. If the extraneous are very similar to each
+  #     other, we will select one. If it is very difficult to tell which one is correct and the extraneous are not very similar, we will
+  #     exclude all extraneous for that subject/parameter on that day
+  # a.	Replace exc_*=0 for all temporarily excluded extraneous (exc_*==0)
   if (!quietly)
-    cat(sprintf("[%s] Exclude duplicates based on EWMA...\n", Sys.time()))
-  data.df[exclude == 'Exclude-Temporary-Duplicate', exclude := 'Include']
+    cat(sprintf("[%s] Exclude extraneous based on EWMA...\n", Sys.time()))
+  data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
 
-  # 12b. Select which duplicate to include in EWMA calculations using the same criteria as in step 5. However, do not include values
+  # 12b. Select which extraneous to include in EWMA calculations using the same criteria as in step 5. However, do not include values
   #      in these medians that were excluded in steps 9-11 (exc_*=3, 4, 5 or 6)
   #  i.  Determine median_tbc*sd and median_tbcOsd as in step 5.
-  # ii.	 For each subject/parameter with duplicates and at least one non-duplicate value, select the value closest to the
+  # ii.	 For each subject/parameter with extraneous and at least one non-extraneous value, select the value closest to the
   #      median_tbc*sd for inclusion in EWMA calculations.
 
-  # This is functionally the same as re-doing the "temporary duplicate" step before doing the EWMA
-  temp.dups <- temporary_duplicates(data.df)
-  data.df[temp.dups, exclude := 'Exclude-Temporary-Duplicate']
+  # This is functionally the same as re-doing the "temporary extraneous" step before doing the EWMA
+  temp.dups <- temporary_extraneous(data.df)
+  data.df[temp.dups, exclude := 'Exclude-Temporary-Extraneous-Same-Day']
 
   # prepare a list of valid rows and initialize variables for convenience
   valid.rows <- valid(data.df)
@@ -597,26 +597,26 @@ cleanbatch <- function(data.df,
     ewma.all = as.double(NaN),
     abssum2 = as.double(NaN),
     median.other.sd = as.double(NaN),
-    duplicate = F
+    extraneous = F
   )]
 
-  # 12c.	Calculate a EWMA step for all subjects/parameters with duplicates and at least one non-duplicate value with the
-  #       following modifications
-  #   i.	For calculating the EWMA, include only the duplicate selected in 12c
-  #  ii.	Calculate dewma_* for all values of duplicates
+  # 12c.	Calculate a EWMA step for all subjects/parameters with duplicates/extraneous and at
+  #       least one non-extraneous value with the following modifications
+  #   i.	For calculating the EWMA, include only the extraneous selected in 12c
+  #  ii.	Calculate dewma_* for all values of extraneous
   # iii.	You do not need to calculate EWMAbef or EWMAaft for this step
 
-  # determine proportion of days with duplication for each parameter ahead of time for efficiency
+  # determine proportion of days with extraneous/duplication for each parameter ahead of time for efficiency
   dup.ratio.df <- data.df[subjid %in% subj.dup &
                             (valid.rows |
                                temp.dups), list(dup = (.N > 1)), by = .(subjid, param, agedays)][j = list(dup.ratio =
                                                                                                             mean(dup)), keyby = .(subjid, param)]
-  # identify subject/parameters where there isduplication but at least one day with no duplicates for that parameter
+  # identify subject/parameters where there is duplication but at least one day with no extraneous for that parameter
   subj.param.not.all.dups <- dup.ratio.df[dup.ratio < 1.0, list(subjid, param)]
   # identify subject/parameters where there is duplication for all days for that parameter
   subj.param.all.dups <- dup.ratio.df[dup.ratio == 1, list(subjid, param)]
   subj.all.dups <- subj.param.all.dups[, unique(subjid)]
-  # perform ewma for subjects with duplicates
+  # perform ewma for subjects with extraneous
   data.df[subjid %in% subj.dup &
             valid.rows, ewma.all := ewma(agedays, tbc.sd, ewma.exp, ewma.adjacent =
                                            F), by = .(subjid, param)]
@@ -627,17 +627,17 @@ cleanbatch <- function(data.df,
   # NOTE: only children with more than one ageday with valid measurements will have a valid ewma from above
   data.df[, abssum2 := 2 * abs(tbc.sd - ewma.all) + abs(tbc.sd)]
 
-  # 12d.  For each subject/parameter/age with duplicates and at least one non-duplicate value:
+  # 12d.  For each subject/parameter/age with extraneous and at least one non-extraneous value:
   #   i.  Replace exc_*=7 for all values except the value that has the smallest abssum2_*.
-  data.df[J(subj.param.not.all.dups), duplicate := seq_along(abssum2) != which.min(abssum2), by =
+  data.df[J(subj.param.not.all.dups), extraneous := seq_along(abssum2) != which.min(abssum2), by =
             .(subjid, param, agedays)]
   data.df[temp.dups, exclude := 'Include']
   data.df[(valid.rows |
              temp.dups) &
-            duplicate, exclude := 'Exclude-Duplicate']
-  #  ii.  Determine dup_tot_* (# of days with duplicates for that subject/parameter) and nodup_tot_* (# of days with nonexlcuded
-  #       non-duplicates for that subject/parameter).
-  # iii.  If dup_tot_*/(dup_tot_*+nodup_tot_*) is greater than 1/2, replace exc_*=7 for all duplicates for that subject/parameter
+            extraneous, exclude := 'Exclude-Extraneous-Same-Day']
+  #  ii.  Determine dup_tot_* (# of days with extraneous for that subject/parameter) and nodup_tot_* (# of days with nonexlcuded
+  #       non-extraneous for that subject/parameter).
+  # iii.  If dup_tot_*/(dup_tot_*+nodup_tot_*) is greater than 1/2, replace exc_*=7 for all extraneous for that subject/parameter
   #       for each age where the  largest measurement minus the smallest measurement for that subject/parameter/age is larger than
   #       the maximum difference (ht 3cm; wt 0-9.999 kg 0.25kg; wt 10-29.9999 kg 0.5 kg; wt 30kg and higher 1 kg).
 
@@ -646,8 +646,8 @@ cleanbatch <- function(data.df,
               tbc.sd.max = as.double(NaN))]
     df[valid(
       exclude,
-      include.duplicates = T,
-      include.temporary.duplicates = T
+      include.extraneous = T,
+      include.temporary.extraneous = T
     ), `:=`(tbc.sd.min = min(tbc.sd),
             tbc.sd.max = max(tbc.sd))]
     df[tbc.sd.max - tbc.sd.min > ifelse(param == 'HEIGHTCM',
@@ -657,48 +657,48 @@ cleanbatch <- function(data.df,
                                           ifelse(tbc.sd.min < 10, 0.25, ifelse(tbc.sd.min < 30, 0.5, 1)),
                                           NA
                                         )),
-       exclude := 'Exclude-Duplicate']
+       exclude := 'Exclude-Extraneous-Same-Day']
     return(df$exclude)
   })(copy(.SD)), .SDcols = c('exclude', 'tbc.sd'), by = .(subjid, param, agedays)]
 
-  # 12e.	For each subject/parameter/age with duplicates and no nonduplicate values:
+  # 12e.	For each subject/parameter/age with extraneous and no nonextraneous values:
   #   i.	Replace exc_*=7 for all values except the value with the smallest |tbc*sd-median_tbcOsd|. If median_tbcOsd is missing because there are no values
-  #       for the other parameter, randomly choose one duplicate value for each subject/parameter/age to keep as exc_*=0 and replace exc_*=7 for all other
-  #       duplicates for that subject/parameter/age.
+  #       for the other parameter, randomly choose one extraneous value for each subject/parameter/age to keep as exc_*=0 and replace exc_*=7 for all other
+  #       extraneous for that subject/parameter/age.
   #  ii.  If the largest measurement minus the smallest measurement for that subject/parameter/age is larger than the maximum difference
-  #       (ht 3cm; wt 0-9.999 kg 0.25kg; wt 10-29.9999 kg 0.5 kg; wt 30kg and higher 1 kg)., replace exc_*=7 for all duplicates for that
+  #       (ht 3cm; wt 0-9.999 kg 0.25kg; wt 10-29.9999 kg 0.5 kg; wt 30kg and higher 1 kg)., replace exc_*=7 for all extraneous for that
   #       subject/parameter/age.
 
   # calculate median for other parameter (restrict to subjects with all duplication for at least one parameter)
   data.df[subjid %in% subj.all.dups, exclude := (function(subj.df) {
-    # flag days that have duplicates / potentially valid parameters
+    # flag days that have extraneous / potentially valid parameters
     subj.df[, `:=`(
-      duplicates.this.day = F,
-      duplicate = F,
+      extraneous.this.day = F,
+      extraneous = F,
       tbc.sd.min = as.double(NaN),
       tbc.sd.max = as.double(NaN)
     )]
     valid.rows = valid(
       subj.df,
-      include.duplicates = T,
-      include.temporary.duplicates = T
+      include.extraneous = T,
+      include.temporary.extraneous = T
     )
-    subj.df[valid.rows, duplicates.this.day := (.N > 1), by = .(param, agedays)]
+    subj.df[valid.rows, extraneous.this.day := (.N > 1), by = .(param, agedays)]
     for (p in subj.df[j = unique(param)]) {
       median.sd <- subj.df[param != p &
-                             !duplicates.this.day, median(tbc.sd)]
+                             !extraneous.this.day, median(tbc.sd)]
       subj.df[param == p, median.other.sd := median.sd]
     }
     # safety check -- assign median.other.sd==0 to ensure "which.min" functions correctly below
     subj.df[is.na(median.other.sd), median.other.sd := 0]
-    # identify rows as duplicate where |tbc*sd-median_tbcOsd| is not at the minimum value
-    subj.df[duplicates.this.day == T, duplicate := (seq_along(median.other.sd) != which.min(abs(tbc.sd - median.other.sd))), by =
+    # identify rows as extraneous where |tbc*sd-median_tbcOsd| is not at the minimum value
+    subj.df[extraneous.this.day == T, extraneous := (seq_along(median.other.sd) != which.min(abs(tbc.sd - median.other.sd))), by =
               .(param, agedays)]
-    subj.df[duplicates.this.day &
-              !duplicate, exclude := 'Include']
-    subj.df[duplicates.this.day &
-              duplicate, exclude := 'Exclude-Duplicate']
-    subj.df[duplicates.this.day == T, `:=`(tbc.sd.min = min(tbc.sd),
+    subj.df[extraneous.this.day &
+              !extraneous, exclude := 'Include']
+    subj.df[extraneous.this.day &
+              extraneous, exclude := 'Exclude-Extraneous-Same-Day']
+    subj.df[extraneous.this.day == T, `:=`(tbc.sd.min = min(tbc.sd),
                                            tbc.sd.max = max(tbc.sd)), by = .(param, agedays)]
     subj.df[tbc.sd.max - tbc.sd.min > ifelse(param == 'HEIGHTCM',
                                              3,
@@ -707,28 +707,28 @@ cleanbatch <- function(data.df,
                                                ifelse(tbc.sd.min < 10, 0.25, ifelse(tbc.sd.min < 30, 0.5, 1)),
                                                NA
                                              )),
-            exclude := 'Exclude-Duplicate']
+            exclude := 'Exclude-Extraneous-Same-Day']
 
-    # identify kids who had an SD or EWMA extreme excluded that was a duplicate and re-label as "Exclude-Duplicate"
-    subj.df[, duplicates.this.day := F]
-    # consider any non-missing measurement when determining presence of duplicates
-    subj.df[exclude != 'Missing', duplicates.this.day := (.N > 1), by =
+    # identify kids who had an SD or EWMA extreme excluded that was a extraneous and re-label as "Exclude-Extraneous-Same-Day"
+    subj.df[, extraneous.this.day := F]
+    # consider any non-missing measurement when determining presence of extraneous
+    subj.df[exclude != 'Missing', extraneous.this.day := (.N > 1), by =
               .(param, agedays)]
-    subj.df[duplicates.this.day &
+    subj.df[extraneous.this.day &
               exclude %in% c('Exclude-SD-Cutoff',
                              'Exclude-EWMA-Extreme',
-                             'Exclude-EWMA-Extreme-Pair'), exclude := 'Exclude-Duplicate']
+                             'Exclude-EWMA-Extreme-Pair'), exclude := 'Exclude-Extraneous-Same-Day']
 
     return(subj.df$exclude)
   })(copy(.SD)), .SDcols = c('param', 'agedays', 'exclude', 'tbc.sd'), by =
     .(subjid)]
 
-  # 12f.  For any values that were excluded with exc_*=4, 5, or 6 that are also duplicates, replace exc_*=7.
+  # 12f.  For any values that were excluded with exc_*=4, 5, or 6 that are also extraneous, replace exc_*=7.
   data.df[subjid %in% subj.dup, exclude := (function(subj.df) {
     if (.N > 1) {
       subj.df[exclude %in% c('Exclude-SD-Cutoff',
                              'Exclude-EWMA-Extreme',
-                             'Exclude-EWMA-Extreme-Pair'), exclude := 'Exclude-Duplicate']
+                             'Exclude-EWMA-Extreme-Pair'), exclude := 'Exclude-Extraneous-Same-Day']
     }
     return(subj.df$exclude)
   })(copy(.SD)), .SDcols = c('exclude'), by = .(subjid, param, agedays)]
@@ -1528,7 +1528,7 @@ cleanbatch <- function(data.df,
   # CD e-mail 2/10/15: It looks like there are two problems. One is carried forward measurements. The other is that I forgot to include an
   # important part of the rule in the English - tot_exc_* has to be >=2. I'm forwarding an updated English version.
   # Also, because your exclusions are handled a little differently I wanted to specify that unit errors and swaps are not included
-  # in tot_exc_* and are included in tot_inc_*, whereas carried forwards and duplicates are not included in either count.
+  # in tot_exc_* and are included in tot_inc_*, whereas carried forwards and extraneous are not included in either count.
   # NOTE: updated to include optional argument "include.carryforward=T" in the valid() function, and added the
   # constraints "exclude.count.this.parameter >= 2" and "exclude.count.other.parameter >= 2" in the code below
 
@@ -1544,7 +1544,7 @@ cleanbatch <- function(data.df,
     inc.exc <- subj.df[, j = list(exclude.count = sum(
       !valid(
         exclude,
-        include.duplicates = T,
+        include.extraneous = T,
         include.carryforward = T
       )
     ),
@@ -1638,7 +1638,7 @@ cleanbatch <- function(data.df,
 #'
 #' * 'Include', 'Unit-Error-High', 'Unit-Error-Low', 'Swapped-Measurements', 'Missing',
 #' *  'Exclude-Carried-Forward', 'Exclude-SD-Cutoff', 'Exclude-EWMA-Extreme', 'Exclude-EWMA-Extreme-Pair',
-#' *  'Exclude-Duplicate',
+#' *  'Exclude-Extraneous-Same-Day',
 #' *  'Exclude-EWMA-8', 'Exclude-EWMA-9', 'Exclude-EWMA-10', 'Exclude-EWMA-11', 'Exclude-EWMA-12', 'Exclude-EWMA-13', 'Exclude-EWMA-14',
 #' *  'Exclude-Min-Height-Change', 'Exclude-Max-Height-Change',
 #' *  'Exclude-Pair-Delta-17', 'Exclude-Pair-Delta-18', 'Exclude-Pair-Delta-19',
@@ -1714,7 +1714,7 @@ cleangrowth <- function(subjid,
       num.batches <- getDoParWorkers()
     }
     # variables needed for parallel workers
-    var_for_par <- c("temporary_duplicates", "valid", "swap_parameters",
+    var_for_par <- c("temporary_extraneous", "valid", "swap_parameters",
                      "na_as_false", "ewma", "read_anthro", "as_matrix_delta",
                      "sd_median")
 
@@ -1806,8 +1806,8 @@ cleangrowth <- function(subjid,
 
   # 2.  Data set-up
   # a.	I always code sex as 0=Male, 1=Female, so I recoded the variable sex that way and left a variable sexorigcode the way the data was sent to me (1=Female 2=Male)
-  # b.	Remove rows that are duplicates for subjid, param, and measurement from further analysis
-  #     NOTE: this step is not needed -- handled automatically by "temporary duplicate" step.
+  # b.	Remove rows that are extraneous for subjid, param, and measurement from further analysis
+  #     NOTE: this step is not needed -- handled automatically by "temporary extraneous" step.
   # c.  I generated separate variables for weight (wt) and height (ht), as well as exc_* and subjid_* variables. Set exc_*=0 if value is not missing
   #     and exc_*=1 if value is missing. In all future steps, exc_* should only be changed if it is 0. This helps to keep track of which step excluded a value.
   #     I also kept the measurement variable there and untouched because sometimes wt and ht got transformed to something else.
@@ -1851,12 +1851,12 @@ cleangrowth <- function(subjid,
     'Swapped-Measurements',
     'Exclude',
     'Missing',
-    'Exclude-Temporary-Duplicate',
+    'Exclude-Temporary-Extraneous-Same-Day',
     'Exclude-Carried-Forward',
     'Exclude-SD-Cutoff',
     'Exclude-EWMA-Extreme',
     'Exclude-EWMA-Extreme-Pair',
-    'Exclude-Duplicate',
+    'Exclude-Extraneous-Same-Day',
     'Exclude-EWMA-8',
     'Exclude-EWMA-9',
     'Exclude-EWMA-10',

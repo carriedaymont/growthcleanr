@@ -92,15 +92,15 @@ parameters).
   * Warning: this will take much longer!
 
 The default number of sweep steps is 9; this can be changed with the option
-`--gridlength`. 
+`--gridlength`.
 
 For testing options of handling strings of multiple carried forward
-values, several options from 0 to 3 have been incorporated. 0 (no change) is the 
-default option, and can be changed `--exclude_opt`. More information on each 
+values, several options from 0 to 3 have been incorporated. 0 (no change) is the
+default option, and can be changed `--exclude_opt`. More information on each
 option can be found in the `adjustcarryforward()` documentation.
 
 In addition to multiple options for carried-forward strings, "answers" for a given
-dataset have been incorporated. When the `--add_answers` flag is set to `TRUE` 
+dataset have been incorporated. When the `--add_answers` flag is set to `TRUE`
 (`TRUE` by default), a column called `acf_answers` will have, for each height value, "Definitely Exclude", "Definitely Include", or "Unknown" (if it does not fall in
 either category). Weight values are set as `NA`.
 
@@ -180,16 +180,16 @@ sweep (hence the examples w/5 and 9 step sweeps).
 And the first few result rows in `test_adjustcarrforward_DATE_TIME.csv` would be:
 
 ```R
-id     subjid    sex  agedays  param     measurement  clean_value                   run-1      run-2      run-3      run-4      run-5
-1510   775155    0    889      HEIGHTCM  84.9         Exclude-Duplicate          Missing    Missing    Missing    Missing    Missing
-1511   775155    0    889      HEIGHTCM  89.06        Include                    No Change  No Change  No Change  No Change  No Change
-1512   775155    0    1071     HEIGHTCM  92.5         Include                    No Change  No Change  No Change  No Change  No Change
-1513   775155    0    1253     HEIGHTCM  96.2         Include                    No Change  No Change  No Change  No Change  No Change
-1514   775155    0    1435     HEIGHTCM  96.2         Exclude-Carried-Forward    No Change  No Change  Include    Include    Include
-1515   775155    0    1435     HEIGHTCM  99.692       Include                    No Change  No Change  No Change  No Change  No Change
-1516   775155    0    1806     HEIGHTCM  106.1        Include                    No Change  No Change  No Change  No Change  No Change
-1517   775155    0    2177     HEIGHTCM  112.3        Include                    No Change  No Change  No Change  No Change  No Change
-1518   775155    0    889      WEIGHTKG  13.1         Include                    No Change  No Change  No Change  No Change  No Change
+id     subjid    sex  agedays  param     measurement  clean_value                     run-1      run-2      run-3      run-4      run-5
+1510   775155    0    889      HEIGHTCM  84.9         Exclude-Extraneous-Same-Day Missing    Missing    Missing    Missing    Missing
+1511   775155    0    889      HEIGHTCM  89.06        Include                     No Change  No Change  No Change  No Change  No Change
+1512   775155    0    1071     HEIGHTCM  92.5         Include                     No Change  No Change  No Change  No Change  No Change
+1513   775155    0    1253     HEIGHTCM  96.2         Include                     No Change  No Change  No Change  No Change  No Change
+1514   775155    0    1435     HEIGHTCM  96.2         Exclude-Carried-Forward     No Change  No Change  Include    Include    Include
+1515   775155    0    1435     HEIGHTCM  99.692       Include                     No Change  No Change  No Change  No Change  No Change
+1516   775155    0    1806     HEIGHTCM  106.1        Include                     No Change  No Change  No Change  No Change  No Change
+1517   775155    0    2177     HEIGHTCM  112.3        Include                     No Change  No Change  No Change  No Change  No Change
+1518   775155    0    889      WEIGHTKG  13.1         Include                     No Change  No Change  No Change  No Change  No Change
 ```
 
 The fifth row in the example above demonstrates the results of the experimental script;
