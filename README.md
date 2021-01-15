@@ -963,11 +963,16 @@ In release 1.2.4 in January 2021, an update was made to the WHO height velocity 
 files. Although these changes were very minor, it is possible that results on data
 cleaned after this change may vary from previous results. The prior version of these
 files may be obtained by visiting the tagged release version 1.2.3 at
-https://github.com/carriedaymont/growthcleanr/releases/tag/1.2.3, where the previous
-version of these files may be found:
+https://github.com/carriedaymont/growthcleanr/releases/tag/1.2.3.
+
+The changed files are:
 
 - `inst/extdata/who_ht_maxvel_3sd.csv`
 - `inst/extdata/who_ht_vel_3sd.csv`
 
-The tagged release available there, or these CSV files within it updated in a more
-recent version of this package, may be used to verify reproducibility.
+The released version of `growthcleanr` available at that link contains the older version
+of both files; that older version may be used to verify reproducibility.
+
+Alternatively, a more recent version of `growthcleanr` may be used with only the affected
+files replaced with their older versions available at the 1.2.3 tag link above. This
+must be done manually.
