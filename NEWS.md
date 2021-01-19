@@ -1,5 +1,11 @@
 # growthcleanr
 
+## [1.2.4] - 2021-01-14
+
+### Changed
+
+- Minor update to WHO HT velocity 3SD files (#24)
+
 ## [1.2.3] - 2021-01-07
 
 ### Added

@@ -45,18 +45,19 @@ packages is required, as is a growth measurement dataset prepared for use in
 
 The rest of this documentation includes:
 
-* [Quickstart](#quickstart) - a brief tour of using growthcleanr, including data
+- [Quickstart](#quickstart) - a brief tour of using growthcleanr, including data
   preparation
-* [Installation](#installation) - including required dependencies and
+- [Installation](#installation) - including required dependencies and
   OS-specific notes
-* [Usage](#usage) - examples of cleaning data, multiple options, example data
-* [Configuration options](#configuration) - changing growthcleanr operational
+- [Usage](#usage) - examples of cleaning data, multiple options, example data
+- [Configuration options](#configuration) - changing growthcleanr operational
   settings
-* [Understanding output](#output) - the exclusion types growthcleanr identifies
-* [Working with large datasets](#largedata) - notes and suggestions
-* [Computing BMI percentiles and Z-scores](#bmi) - additional functions for
+- [Understanding output](#output) - the exclusion types growthcleanr identifies
+- [Working with large datasets](#largedata) - notes and suggestions
+- [Computing BMI percentiles and Z-scores](#bmi) - additional functions for
   determining percentiles and Z-scores using the CDC method
-* [Related tools](#related) - additional software complementary to growthcleanr
+- [Related tools](#related) - additional software complementary to growthcleanr
+- [Changes](#changes) - notes about algorithm or package changes
 
 ## <a name="quickstart"></a>Quickstart
 
@@ -65,16 +66,16 @@ The rest of this documentation includes:
 The `growthcleanr` package must be installed, which will in turn install the
 following packages:
 
-* `data.table`
-* `foreach`
-* `doParallel`
-* `parallel`
-* `dplyr`
-* `Hmisc`
-* `labelled`
-* `plyr`
-* `tidyr`
-* `magrittr`
+- `data.table`
+- `foreach`
+- `doParallel`
+- `parallel`
+- `dplyr`
+- `Hmisc`
+- `labelled`
+- `plyr`
+- `tidyr`
+- `magrittr`
 
 In addition, an R environment with `devtools` installed is also required.
 Further installation details and notes can be found under
@@ -95,8 +96,8 @@ data vectors needed are:
    30.4375 days in one month; see also the additional
    [notes on calculating `agemos`](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm)
    from whole numbers of months
-3. `sex` - a numeric value of `0` (male) or `1` (female)
-4. `measurement` - numeric value of measurement in cm for height or kg for
+4. `sex` - a numeric value of `0` (male) or `1` (female)
+5. `measurement` - numeric value of measurement in cm for height or kg for
    weight
 
 **Note**: the dataset should be sorted by `subjid`, `param`, and `agedays`, as
@@ -106,21 +107,21 @@ demonstrated in the Example below.
 
 Starting with a dataset such as the following:
 
-| subjid | param | agedays | sex | measurement |
-| - | - | - | - | - |
-| 1 | HEIGHTCM | 2790 | 0 | 118.5 |
-| 1 | HEIGHTCM | 3677 | 0 | 148.22 |
-| 1 | WEIGHTKG | 2790 | 0 | 23.8 |
-| 1 | WEIGHTKG | 3677 | 0 | 38.41 |
-| 2 | HEIGHTCM | 2112 | 1 | 118.2 |
-| 2 | HEIGHTCM | 2410 | 1 | 123.9 |
-| 2 | HEIGHTCM | 2708 | 1 | 128.03 |
-| 2 | HEIGHTCM | 3029 | 1 | 135.3 |
-| 2 | WEIGHTKG | 2112 | 1 | 25.84 |
-| 2 | WEIGHTKG | 2410 | 1 | 28.61 |
-| 2 | WEIGHTKG | 2708 | 1 | 28.61 |
-| 2 | WEIGHTKG | 3029 | 1 | 34.5 |
-| ... | ... | ... | ... | ... |
+| subjid | param    | agedays | sex | measurement |
+| ------ | -------- | ------- | --- | ----------- |
+| 1      | HEIGHTCM | 2790    | 0   | 118.5       |
+| 1      | HEIGHTCM | 3677    | 0   | 148.22      |
+| 1      | WEIGHTKG | 2790    | 0   | 23.8        |
+| 1      | WEIGHTKG | 3677    | 0   | 38.41       |
+| 2      | HEIGHTCM | 2112    | 1   | 118.2       |
+| 2      | HEIGHTCM | 2410    | 1   | 123.9       |
+| 2      | HEIGHTCM | 2708    | 1   | 128.03      |
+| 2      | HEIGHTCM | 3029    | 1   | 135.3       |
+| 2      | WEIGHTKG | 2112    | 1   | 25.84       |
+| 2      | WEIGHTKG | 2410    | 1   | 28.61       |
+| 2      | WEIGHTKG | 2708    | 1   | 28.61       |
+| 2      | WEIGHTKG | 3029    | 1   | 34.5        |
+| ...    | ...      | ...     | ... | ...         |
 
 Note that in this Example, we see data from two subjects, sorted as described
 above, with two pairs of height/weight measurements for the first patient and
@@ -134,9 +135,9 @@ identify.
 The `cleangrowth()` function provided by `growthcleanr` will return a vector
 that specifies, for each measurement, whether to:
 
-* "`Include`" the measurement,
-* Conclude that the measurement is "`Missing`",
-* Or to "`Exclude`" the measurement (numerous variations of `Exclude` exist, as
+- "`Include`" the measurement,
+- Conclude that the measurement is "`Missing`",
+- Or to "`Exclude`" the measurement (numerous variations of `Exclude` exist, as
   specified below in Understanding output).
 
 For a data.frame object `source_data` containing growth data:
@@ -160,21 +161,21 @@ only_included_data <- cleaned_data[clean_value=='Include']
 If our Example dataset above were named `source_data`, examining `cleaned_data`
 would show:
 
-| subjid | param | agedays | sex | measurement | clean_value |
-| - | - | - | - | - | - |
-| 1 | HEIGHTCM | 2790 | 0 | 118.5 | Include |
-| 1 | HEIGHTCM | 3677 | 0 | 148.22 | Include |
-| 1 | WEIGHTKG | 2790 | 0 | 23.8 | Include |
-| 1 | WEIGHTKG | 3677 | 0 | 38.41 | Include |
-| 2 | HEIGHTCM | 2112 | 1 | 118.2 | Include |
-| 2 | HEIGHTCM | 2410 | 1 | 123.9 | Include |
-| 2 | HEIGHTCM | 2708 | 1 | 128.03 | Include |
-| 2 | HEIGHTCM | 3029 | 1 | 135.3 | Include |
-| 2 | WEIGHTKG | 2112 | 1 | 25.84 | Include |
-| 2 | WEIGHTKG | 2410 | 1 | 28.61 | Include |
-| 2 | WEIGHTKG | 2708 | 1 | 28.61 | Exclude-Carried-Forward |
-| 2 | WEIGHTKG | 3029 | 1 | 34.5 | Include |
-| ... | ... | ... | ... | ... | ... |
+| subjid | param    | agedays | sex | measurement | clean_value             |
+| ------ | -------- | ------- | --- | ----------- | ----------------------- |
+| 1      | HEIGHTCM | 2790    | 0   | 118.5       | Include                 |
+| 1      | HEIGHTCM | 3677    | 0   | 148.22      | Include                 |
+| 1      | WEIGHTKG | 2790    | 0   | 23.8        | Include                 |
+| 1      | WEIGHTKG | 3677    | 0   | 38.41       | Include                 |
+| 2      | HEIGHTCM | 2112    | 1   | 118.2       | Include                 |
+| 2      | HEIGHTCM | 2410    | 1   | 123.9       | Include                 |
+| 2      | HEIGHTCM | 2708    | 1   | 128.03      | Include                 |
+| 2      | HEIGHTCM | 3029    | 1   | 135.3       | Include                 |
+| 2      | WEIGHTKG | 2112    | 1   | 25.84       | Include                 |
+| 2      | WEIGHTKG | 2410    | 1   | 28.61       | Include                 |
+| 2      | WEIGHTKG | 2708    | 1   | 28.61       | Exclude-Carried-Forward |
+| 2      | WEIGHTKG | 3029    | 1   | 34.5        | Include                 |
+| ...    | ...      | ...     | ... | ...         | ...                     |
 
 In this sample output, we see that `growthcleanr` has indeed flagged the third
 weight measurement for `subjid 2` as an apparent carried forward value. The
@@ -424,17 +425,17 @@ cleaned_data <- data[, clean_value_both:=
                                    )]
 ```
 
-  * `lt3.exclude.mode = "flag.both"` will exclude both measurements for a
-    subject if they only have two unexcluded measurements of one parameter type
-    with at least one implausible value and no same age-day measurements of the
-    other parameter.
+- `lt3.exclude.mode = "flag.both"` will exclude both measurements for a
+  subject if they only have two unexcluded measurements of one parameter type
+  with at least one implausible value and no same age-day measurements of the
+  other parameter.
 
-  * `ref.data.path = "inst/extdata"` shouldn't be necessary if you have the
-    `growthcleanr` package installed, but if you are running it from its
-    source directly you may need to specify its full path.
+- `ref.data.path = "inst/extdata"` shouldn't be necessary if you have the
+  `growthcleanr` package installed, but if you are running it from its
+  source directly you may need to specify its full path.
 
-  * `quietly = F` enables verbose output, marking the progress of the algorithm
-    through its many processing steps. This can be very helpful while testing.
+- `quietly = F` enables verbose output, marking the progress of the algorithm
+  through its many processing steps. This can be very helpful while testing.
 
 This example shows built-in options for processing data in batches, which can
 speed the process while working with large data sets:
@@ -485,15 +486,15 @@ All of the following options may be set as additional parameters in the call to
 
 The following options change the behavior of the growthcleanr algorithm.
 
-* `recover.unit.error` - default `FALSE`; when `FALSE`, measurements identified
+- `recover.unit.error` - default `FALSE`; when `FALSE`, measurements identified
   as unit errors (e.g., apparent height values in inches instead of centimeters)
   will be flagged but not corrected, when `TRUE` these values will be corrected
   and included as valid measurements for cleaning.
 
-* `sd.extreme` - default `25`; a very extreme value check on modified
+- `sd.extreme` - default `25`; a very extreme value check on modified
   (recentered) Z-scores used as a first-pass elimination of clearly implausable
   values, often due to misplaced decimals.
-* `z.extreme` - default `25`; similar usage as `sd.extreme`, for absolute
+- `z.extreme` - default `25`; similar usage as `sd.extreme`, for absolute
   Z-scores.
 
 **NOTE**: many different steps in the `growthcleanr` algorithm use highly
@@ -506,39 +507,40 @@ configured to be lower values, measurements eliminated at the early step which
 checks against these extreme values will not be further considered using later
 techniques.
 
-* `include.carryforward` - default `FALSE`; if set to `TRUE`, `growthcleanr`
+- `include.carryforward` - default `FALSE`; if set to `TRUE`, `growthcleanr`
   will skip algorithm step 9, which identifies carried forward measurements, and
   will not flag these values for exclusion.
 
-* `ewma.exp` - default `-1.5`; the exponent used for weighting measurements when
+- `ewma.exp` - default `-1.5`; the exponent used for weighting measurements when
   calculating exponentially weighted moving average (EWMA). This exponent should
   be negative to weight growth measurements closer to the measurement being
   evaluated more strongly. Exponents that are further from zero (e.g., `-3`)
   will increase the relative influence of measurements close in time to the
   measurement being evaluated compared to using the default exponent.
 
-* `ref.data.path` - defaults to using CDC reference data from year 2000; supply
+- `ref.data.path` - defaults to using CDC reference data from year 2000; supply
   a file path to use alternate reference data. Note that when running from an
   installed `growthcleanr` package (e.g. having called `library(growthcleanr)`),
   this path does not need to be specified. Developers testing the source code
   directly from the source directory will need to specify this as well.
 
-* `error.load.mincount` - default `2`; minimum count of exclusions on parameter
+- `error.load.mincount` - default `2`; minimum count of exclusions on parameter
   for one subject before considering excluding all measurements.
 
-* `error.load.threshold` - default `0.5`; threshold to exceed for percentage
+- `error.load.threshold` - default `0.5`; threshold to exceed for percentage
   of excluded measurement count relative to count of included other measurement
   (e.g., if 3 of 5 WTs are excluded, and 5 corresponding HTs are included, this
   exceeds the 0.5 threshold and the other two WTs will be excluded).
 
-* `lt3.exclude.mode` - default `default`; determines type of exclusion procedure
+- `lt3.exclude.mode` - default `default`; determines type of exclusion procedure
   to use for 1 or 2 measurements of one type without matching same ageday
   measurements for the other parameter. Options include:
-  * `default` - standard growthcleanr approach
-  * `flag.both` - in case of two measurements with at least one beyond
+
+  - `default` - standard growthcleanr approach
+  - `flag.both` - in case of two measurements with at least one beyond
     thresholds, flag both instead of one (as in default)
 
-* `sd.recenter` - defaults to NA; data frame or table w/median SD-scores per day
+- `sd.recenter` - defaults to NA; data frame or table w/median SD-scores per day
   of life by gender and parameter. Columns must include param, sex, agedays, and
   sd.median (referred to elsewhere as "modified Z-score"). By default, median
   values will be calculated using growth data to be cleaned.
@@ -548,31 +550,31 @@ techniques.
 The following options change the execution of the program overall, with no
 effect on the algorithm itself.
 
-* `parallel` - default `FALSE`; set to `TRUE` to run `growthcleanr` in parallel.
+- `parallel` - default `FALSE`; set to `TRUE` to run `growthcleanr` in parallel.
   Running in parallel will split the input data into batches (while keeping all
   records for each subject together) and process each batch on a different
   processor/core to maximize throughput. Recommended for large datasets with more
   than 100K rows.
 
-* `num.batches` - specifies the number of batches to run in parallel; only
+- `num.batches` - specifies the number of batches to run in parallel; only
   applies if `parallel` is set to `TRUE`. Defaults to the number of workers
   returned by the `getDoParWorkers()` function in the `foreach` package. Note
   that processing in parallel may affect overall system performance.
 
-* `sdmedian.filename` - filename for optionally saving sd.median data calculated
+- `sdmedian.filename` - filename for optionally saving sd.median data calculated
   on the input dataset to as CSV. Defaults to `""`, for which this data will not
   be saved. Use for extracting medians for parallel processing scenarios other
   than the built-in parallel option. See notes on [large data sets](#largedata)
   for details.
 
-* `sdrecentered.filename` - filename to save re-centered data to as CSV.
+- `sdrecentered.filename` - filename to save re-centered data to as CSV.
   Defaults to "", for which this data will not be saved. Useful for
   post-processing and debugging.
 
-* `quietly` - default `TRUE`; when `TRUE`, displays function messages and will
+- `quietly` - default `TRUE`; when `TRUE`, displays function messages and will
   output log files when `parallel` is `TRUE`.
 
-* `log.path` - default `"."`; sets directory for batch log file output when
+- `log.path` - default `"."`; sets directory for batch log file output when
   processing with `parallel = TRUE`. A new directory will be created if necessary.
 
 ## <a name="output"></a>Understanding output
@@ -592,35 +594,35 @@ identifier also prescribed in the algorithm ("`algorithm exc id`"). The
 `growthcleanr`. The `notes` column at right identifies minor discrepancies between
 the algorithm's step labels and labels used in comment text in `growthcleanr`.
 
-| algorithm step | algorithm exc id | exclusion type | notes |
-| - | - | - | - |
-| 2d | 0 | Include | - |
-| 2d | 1 | Missing | - |
-| 5b | 2 | Exclude-Temporary-Extraneous-Same-Day | - |
-| 7d | - | Swapped-Measurement | - |
-| 8f | - | Unit-Error-High | - |
-| 8f | - | Unit-Error-Low | - |
-| 8f | - | Unit-Error-Possible | Not set in R code |
-| 9c | 3 | Exclude-Carried-Forward | - |
-| 10c | 4 | Exclude-SD-Cutoff | 10d, 10e |
-| 11d | 5 | Exclude-EWMA-Extreme | 11e |
-| 11f.ii | 6 | Exclude-EWMA-Extreme-Pair | 11i (R only) |
-| 12d.i | 7 | Exclude-Extraneous-Same-Day | 12diii, 12ei, 12f |
-| 14f.i | 8 | Exclude-EWMA-8 | Set in 14h (in R) |
-| 14f.ii | 9 | Exclude-EWMA-9 | Set in 14h (in R) |
-| 14f.iii | 10 | Exclude-EWMA-10 | Set in 14h (in R) |
-| 14f.iv | 11 | Exclude-EWMA-11 | Set in 14h (in R) |
-| 14f.v | 12 | Exclude-EWMA-12 | Set in 14h (in R) |
-| 14f.vi | 13 | Exclude-EWMA-13 | Set in 14h (in R) |
-| 14f.vii | 14 | Exclude-EWMA-14 | Set in 14h (in R) |
-| 15s | 15 | Exclude-Min-Height-Change | Set in 15q (in R), 15s, 15t |
-| 15s | 16 | Exclude-Max-Height-Change | Set in 15q (in R), 15s, 15t |
-| 16b | 17 | Exclude-Pair-Delta-17 | - |
-| 16b | 18 | Exclude-Pair-Delta-18 | - |
-|  -  |  - | Exclude-Pair-Delta-19 | Added `flag.both` mode |
-| 16d | 19 | Exclude-Single-Outlier | - |
-| 17a | 20 | Exclude-Too-Many-Errors | - |
-| 17a | 21 | Exclude-Too-Many-Errors-Other_Parameter | - |
+| algorithm step | algorithm exc id | exclusion type                          | notes                       |
+| -------------- | ---------------- | --------------------------------------- | --------------------------- |
+| 2d             | 0                | Include                                 | -                           |
+| 2d             | 1                | Missing                                 | -                           |
+| 5b             | 2                | Exclude-Temporary-Extraneous-Same-Day   | -                           |
+| 7d             | -                | Swapped-Measurement                     | -                           |
+| 8f             | -                | Unit-Error-High                         | -                           |
+| 8f             | -                | Unit-Error-Low                          | -                           |
+| 8f             | -                | Unit-Error-Possible                     | Not set in R code           |
+| 9c             | 3                | Exclude-Carried-Forward                 | -                           |
+| 10c            | 4                | Exclude-SD-Cutoff                       | 10d, 10e                    |
+| 11d            | 5                | Exclude-EWMA-Extreme                    | 11e                         |
+| 11f.ii         | 6                | Exclude-EWMA-Extreme-Pair               | 11i (R only)                |
+| 12d.i          | 7                | Exclude-Extraneous-Same-Day             | 12diii, 12ei, 12f           |
+| 14f.i          | 8                | Exclude-EWMA-8                          | Set in 14h (in R)           |
+| 14f.ii         | 9                | Exclude-EWMA-9                          | Set in 14h (in R)           |
+| 14f.iii        | 10               | Exclude-EWMA-10                         | Set in 14h (in R)           |
+| 14f.iv         | 11               | Exclude-EWMA-11                         | Set in 14h (in R)           |
+| 14f.v          | 12               | Exclude-EWMA-12                         | Set in 14h (in R)           |
+| 14f.vi         | 13               | Exclude-EWMA-13                         | Set in 14h (in R)           |
+| 14f.vii        | 14               | Exclude-EWMA-14                         | Set in 14h (in R)           |
+| 15s            | 15               | Exclude-Min-Height-Change               | Set in 15q (in R), 15s, 15t |
+| 15s            | 16               | Exclude-Max-Height-Change               | Set in 15q (in R), 15s, 15t |
+| 16b            | 17               | Exclude-Pair-Delta-17                   | -                           |
+| 16b            | 18               | Exclude-Pair-Delta-18                   | -                           |
+| -              | -                | Exclude-Pair-Delta-19                   | Added `flag.both` mode      |
+| 16d            | 19               | Exclude-Single-Outlier                  | -                           |
+| 17a            | 20               | Exclude-Too-Many-Errors                 | -                           |
+| 17a            | 21               | Exclude-Too-Many-Errors-Other_Parameter | -                           |
 
 A researcher wanting to compare two datasets -- for example, one including only
 measurements `growthcleanr` flags for inclusion, and a second which also
@@ -645,14 +647,14 @@ If you have under one million records, using `growthcleanr` may just
 necessitate planning to wait a little while the job processes. There are
 several strategies to improve performance you might consider:
 
- * The built-in `parallel` option should take advantage of multiple CPU cores
-   when your hardware allows.
- * Running `growthcleanr` on a machine with more CPU cores and more RAM can
-   improve this further.
- * Verify that supporting libraries like `data.table` are
-   [installed properly](#platform) for your machine
- * Anecdotally, Windows users have sometimes seen slower performance when
-   compared with similarly-appointed hardware running Linux or macOS.
+- The built-in `parallel` option should take advantage of multiple CPU cores
+  when your hardware allows.
+- Running `growthcleanr` on a machine with more CPU cores and more RAM can
+  improve this further.
+- Verify that supporting libraries like `data.table` are
+  [installed properly](#platform) for your machine
+- Anecdotally, Windows users have sometimes seen slower performance when
+  compared with similarly-appointed hardware running Linux or macOS.
 
 For very large datasets, on the order of millions of records or more, cleaning
 data can take several hours or more. When running this kind of job, the risk of
@@ -673,14 +675,14 @@ available RAM.
 Adopting this approach might require some custom code, and there are few
 pitfalls to avoid. The following lays out a rough approach:
 
-* Extract `sd.median` values for the entire dataset as a whole using the
+- Extract `sd.median` values for the entire dataset as a whole using the
   `sdmedian.filename` option. This is critical, as `growthcleanr` will generate
   these values itself for an input dataset if they are not provided. If a large
   dataset is split into 1,000 smaller files to be cleaned separately, each of
   those 1,000 `growthcleanr` jobs needs to use the same `sd.median` values to
   recenter or the results will be inconsistent. Pass this data in to
   `cleangrowth()` using the parameter `sd.recenter`.
-* Split the data into many small files, but keep each individual subject's
+- Split the data into many small files, but keep each individual subject's
   measurements together in one file. If, for example, a subject has 12
   measurements, all 12 should be in one and only one of the smaller files to
   maximize the longitudinal analysis of their values. The `splitinput()`
@@ -694,15 +696,15 @@ pitfalls to avoid. The following lays out a rough approach:
 [1] "mydata.00000.csv" "mydata.00001.csv" "mydata.00002.csv" "mydata.00003.csv" "mydata.00004.csv" "mydata.00005.csv"
 ```
 
-* Use the standalone driver script `exec/gcdriver.R` to execute growthcleanr`
+- Use the standalone driver script `exec/gcdriver.R` to execute growthcleanr`
   on each separate file, then write out its results when complete. An example
   is below.
-* Invoke the job using a tool like
+- Invoke the job using a tool like
   [GNU Parallel](https://www.gnu.org/software/parallel/), which can be run on
   all major platforms. An example invocation is below as well.
-* If a failure occurs, set aside both the completed inputs and their results.
+- If a failure occurs, set aside both the completed inputs and their results.
   Then re-run the job on only the remaining input data.
-* When complete, re-combine the data into one file or as otherwise appropriate.
+- When complete, re-combine the data into one file or as otherwise appropriate.
 
 To invoke `gcdriver.R` on a single input file using `Rscript`:
 
@@ -724,17 +726,17 @@ as resources are available. Each run of the job then saves the cleaned output
 with `-clean` appended to the input filename, and as each completes, the next
 file on the list will be started until all are complete. A few things to note:
 
-* The careful use of naming and wildcards when listing input files and naming
+- The careful use of naming and wildcards when listing input files and naming
   output files can save accidental re-running of data from output files
-* The `-j2` option specifies running two jobs at once; `-j0` would use as many
+- The `-j2` option specifies running two jobs at once; `-j0` would use as many
   CPU cores as a machine has available. This might need to vary to match
   specific hardware.
-* The `--eta` option will report on progress.
-* The `--quietly` option on the driver script will make it easier to monitor
+- The `--eta` option will report on progress.
+- The `--quietly` option on the driver script will make it easier to monitor
   progress with less verbose output coming from `growthcleanr`.
-* The `--sdrecenter` option on the driver script should be set to ensure each
+- The `--sdrecenter` option on the driver script should be set to ensure each
   individual file is recentered using the same set for the entire input.
-* If multiple cores are available, the job should proceed with speedup roughly
+- If multiple cores are available, the job should proceed with speedup roughly
   similar to what can be gained using the parallel batching feature built in to
   `growthcleanr`, with the main difference being the saving of intermediate
   output as each smaller file completes.
@@ -896,16 +898,16 @@ With data in wide format and with sex variables properly coded, `ext_bmiz()` can
 
 The output columns include:
 
-| variable | description |
-| - | - |
-| waz, wp	| LMS Weight-for-sex/age z-score and percentile |
-| haz, hp	| LMS Height-for-sex/age z-score and percentile |
-| bmiz, bmip | LMS BMI-for-sex/age z-score and percentile |
-| mod_waz, mod_haz, mod_bmi	| Modified z-scores for identifying outliers (see the information in the [CDC SAS growth charts program website](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm)) |
-| bmip95 | BMI expressed as a percentage of the 95th percentile.  A value ≥ 120 is widely used as the cut point for severe obesity. |
-| sigma |	Scale parameter of the half-normal distribution |
-| ext_bmip | Extended BMI percentile |
-| ext_bmiz | Extended BMI z-score |
+| variable                  | description                                                                                                                                                                       |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| waz, wp                   | LMS Weight-for-sex/age z-score and percentile                                                                                                                                     |
+| haz, hp                   | LMS Height-for-sex/age z-score and percentile                                                                                                                                     |
+| bmiz, bmip                | LMS BMI-for-sex/age z-score and percentile                                                                                                                                        |
+| mod_waz, mod_haz, mod_bmi | Modified z-scores for identifying outliers (see the information in the [CDC SAS growth charts program website](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm)) |
+| bmip95                    | BMI expressed as a percentage of the 95th percentile. A value ≥ 120 is widely used as the cut point for severe obesity.                                                           |
+| sigma                     | Scale parameter of the half-normal distribution                                                                                                                                   |
+| ext_bmip                  | Extended BMI percentile                                                                                                                                                           |
+| ext_bmiz                  | Extended BMI z-score                                                                                                                                                              |
 
 For convenience, these labels are available on the output of `ext_bmiz()`, e.g., when
 viewed in RStudio with `View(cleaned_data_bmi)`, or on the console:
@@ -952,3 +954,25 @@ above under [Computing BMI percentiles and Z-scores](#bmi).
 `growthcleanr` assesses data, packaged in a Jupyter notebook. It ships with the
 same `syngrowth` synthetic example dataset as `growthcleanr`, with results
 included.
+
+## <a name="changes"></a>Changes
+
+For a detailed history of released versions, see `NEWS.md`.
+
+In release 1.2.4 in January 2021, an update was made to the WHO height velocity 3sd
+files to correct a small number of errors:
+
+- `inst/extdata/who_ht_maxvel_3sd.csv`
+- `inst/extdata/who_ht_vel_3sd.csv`
+
+Although these changes were very minor, it is possible that results on data cleaned
+after this change may vary from previous results. The prior version of these files may
+be obtained by visiting the tagged release version 1.2.3 at
+https://github.com/carriedaymont/growthcleanr/releases/tag/1.2.3.
+
+The released version of `growthcleanr` available at that link contains the older
+version of both files; that older version may be used to verify reproducibility.
+
+Alternatively, a more recent version of `growthcleanr` may be used with only the
+affected files replaced with their older versions available at the 1.2.3 tag link
+above. This must be done manually.
