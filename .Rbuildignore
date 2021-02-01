@@ -8,5 +8,6 @@
 ^output$
 .dockerignore
 Dockerfile
+^README\.Rmd$
 ^\.github$
 ^\.lintr$
