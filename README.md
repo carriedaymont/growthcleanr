@@ -167,10 +167,10 @@ data <- as.data.table(source_data)
 setkey(data, subjid, param, agedays)
 
 # generate new exclusion flag field using function
-cleaned_data <- data[, clean_value:=cleangrowth(subjid, param, agedays, sex, measurement)]
+cleaned_data <- data[, clean_value := cleangrowth(subjid, param, agedays, sex, measurement)]
 
 # extract data limited only to values flagged for inclusion:
-only_included_data <- cleaned_data[clean_value=='Include']
+only_included_data <- cleaned_data[clean_value == "Include"]
 ```
 
 If our Example dataset above were named `source_data`, examining
@@ -240,8 +240,11 @@ You can install the `growthcleanr` package directly from GitHub using
 `devtools` in the R console with:
 
 ``` r
-devtools::install_github("carriedaymont/growthcleanr")
+devtools::install_github("carriedaymont/growthcleanr", ref="main")
 ```
+
+Note that `ref="main"` is required; the default branch is “main”, and
+must be referred to explicitly.
 
 ### Source-level install for developers
 
