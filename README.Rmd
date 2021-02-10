@@ -240,8 +240,11 @@ You can install the `growthcleanr` package directly from GitHub using `devtools`
 in the R console with:
 
 ```{r, eval = FALSE}
-devtools::install_github("carriedaymont/growthcleanr")
+devtools::install_github("carriedaymont/growthcleanr", ref="main")
 ```
+
+Note that `ref="main"` is required; the default branch is "main", and must be
+referred to explicitly.
 
 ### Source-level install for developers
 
