@@ -43,6 +43,19 @@ NULL
 #'
 NULL
 
+#' NHANES reference medians
+#'
+#' Contains reference median values for default recentering, derived from NHANES
+#'
+#' @name nhanes-reference-medians
+#'
+#' @section nhanes-reference-medians.csv:
+#'
+#' Used in function `cleangrowth()`
+#'
+#'
+NULL
+
 #' Tanner Growth Velocity Table
 #'
 #' Part of default CDC-derived tables
