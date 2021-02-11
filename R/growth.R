@@ -1606,8 +1606,11 @@ cleanbatch <- function(data.df,
 #' count that must be exceeded before excluding all measurements of either parameter. Defaults to 0.5.
 #' @param sd.recenter Data frame or table with median SD-scores per day of life
 #' by gender and parameter. Columns in the table must include param, sex,
-#' agedays, and sd.median.  If not supplied, the median values will be
-#' calculated using the growth data that is being cleaned. Defaults to NA.
+#' agedays, and sd.median. Defaults to NA; if a data table is not passed in, and this value
+#' is NA, and if there are at least 5,000 observations, the median values will be calculated
+#' using the growth data being cleaned. If there are fewer than 5,000 observations,
+#' the NHANES reference median set will be used. The NHANES medians can also be specified
+#' explicitly with sd.recenter="NHANES", and NHANES will be used independent of input size.
 #' @param sdmedian.filename Name of file to save sd.median data calculated on the input dataset to as CSV.
 #' Defaults to "", for which this data will not be saved. Use for extracting medians for parallel processing
 #' scenarios other than the built-in parallel option.
@@ -1902,24 +1905,62 @@ cleangrowth <- function(subjid,
     cat(sprintf("[%s] Re-centering data...\n", Sys.time()))
 
   # see function definition below for explanation of the re-centering process
-  # returns a data table indexed by param, sex, agedays
+  # returns a data table indexed by param, sex, agedays. can use NHANES reference
+  # data, derive from input, or use user-supplied data.
   if (!is.data.table(sd.recenter)) {
-    sd.recenter <- data.all[exclude < 'Exclude', sd_median(param, sex, agedays, sd.orig)]
-    if (sdmedian.filename != "") {
-      write.csv(sd.recenter, sdmedian.filename, row.names = F)
+    # Use NHANES medians if the string "nhanes" is specified instead of a data.table
+    # or if sd.recenter is unspecified and N < 5000.
+    if ((is.character(sd.recenter) & tolower(sd.recenter) == "nhanes") |
+      (data.all[, .N] < 5000)) {
+      nhanes_reference_medians_path <- ifelse(
+        ref.data.path == "",
+        system.file("extdata/nhanes-reference-medians.csv", package = "growthcleanr"),
+        paste(ref.data.path, "nhanes-reference-medians.csv", sep = "")
+      )
+      sd.recenter <- fread(nhanes_reference_medians_path)
       if (!quietly)
         cat(
           sprintf(
-            "[%s] Wrote re-centering medians to %s...\n",
-            Sys.time(),
-            sdmedian.filename
+            "[%s] Using NHANES reference medians...\n",
+            Sys.time()
           )
         )
+    } else {
+      # Derive medians from input data
+      sd.recenter <- data.all[exclude < 'Exclude', sd_median(param, sex, agedays, sd.orig)]
+      if (!quietly)
+        cat(
+          sprintf(
+            "[%s] Using re-centering medians derived from input...\n",
+            Sys.time()
+          )
+        )
+      if (sdmedian.filename != "") {
+        write.csv(sd.recenter, sdmedian.filename, row.names = F)
+        if (!quietly)
+          cat(
+            sprintf(
+              "[%s] Wrote re-centering medians to %s...\n",
+              Sys.time(),
+              sdmedian.filename
+          )
+        )
+      }
     }
   } else {
-    # ensure passed-in medians are sorted correctly
-    setkey(sd.recenter, param, sex, agedays)
+    # Use specified data
+    if (!quietly)
+      cat(
+        sprintf(
+          "[%s] Using specified re-centering medians...\n",
+          Sys.time()
+        )
+      )
   }
+
+  # ensure recentering medians are sorted correctly
+  setkey(sd.recenter, param, sex, agedays)
+
   # add sd.recenter to data, and recenter
   setkey(data.all, param, sex, agedays)
   data.all <- sd.recenter[data.all]
@@ -1936,6 +1977,19 @@ cleangrowth <- function(subjid,
           sdrecentered.filename
         )
       )
+  }
+
+  # notification: ensure awareness of small subsets in data
+  if (!quietly) {
+    year.counts <- data.all[, .N, floor(agedays / 365.25)]
+    if (year.counts[N < 100, .N] > 0) {
+      cat(
+        sprintf(
+          "[%s] Note: input data has at least one age-year with < 100 subjects...\n",
+          Sys.time()
+        )
+      )
+    }
   }
 
   # safety check: treat observations where tbc.sd cannot be calculated as missing

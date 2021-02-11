@@ -506,6 +506,7 @@ The following options change the behavior of the growthcleanr algorithm.
 - `sd.extreme` - default `25`; a very extreme value check on modified
   (recentered) Z-scores used as a first-pass elimination of clearly implausable
   values, often due to misplaced decimals.
+
 - `z.extreme` - default `25`; similar usage as `sd.extreme`, for absolute
   Z-scores.
 
@@ -552,10 +553,16 @@ techniques.
   - `flag.both` - in case of two measurements with at least one beyond
     thresholds, flag both instead of one (as in default)
 
-- `sd.recenter` - defaults to NA; data frame or table w/median SD-scores per day
-  of life by gender and parameter. Columns must include param, sex, agedays, and
-  sd.median (referred to elsewhere as "modified Z-score"). By default, median
-  values will be calculated using growth data to be cleaned.
+- `sd.recenter` - defaults to NA; data frame or table w/median SD-scores per day of
+  life by gender and parameter, or "NHANES" as a character vector. Columns must include
+  param, sex, agedays, and sd.median (referred to elsewhere as "modified Z-score"). If a
+  data set is passed in, those medians will be used for recentering. If NA, growthcleanr
+  will calculate median values using the growth data to be cleaned if there are at least
+  5,000 observations. If there are fewer than 5,000 observations, a reference set of
+  medians derived from NHANES will be used. The NHANES data may also be specified
+  explicitly by passing the character value "NHANES" to `sd.recenter`; this is
+  independent of the input size. A summary of how the data was derived from NHANES
+  is below under [NHANES reference data](#nhanes).
 
 ### Operational options
 
@@ -966,6 +973,12 @@ above under [Computing BMI percentiles and Z-scores](#bmi).
 `growthcleanr` assesses data, packaged in a Jupyter notebook. It ships with the
 same `syngrowth` synthetic example dataset as `growthcleanr`, with results
 included.
+
+## <a name="nhanes"></a>NHANES reference medians
+
+YOU ARE HERE.
+
+Cross-check description of `sd.recenter` above and param comment on `cleangrowth()`.
 
 ## <a name="changes"></a>Changes
 
