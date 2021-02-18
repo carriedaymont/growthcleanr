@@ -6,16 +6,25 @@ test_that("growthcleanr works as expected on synthetic data", {
   expect_equal(56703, data[, .N])
   setkey(data, subjid, param, agedays)
 
-  # Create two small samples; one small enough to trigger NHANES recentering,
+  # Create small samples; one small enough to trigger NHANES recentering,
   # one large enough not to.
-  d100_sample <- data[subjid %in% unique(data[, subjid])[1:100], ]
-  expect_equal(2215, d100_sample[, .N])
-  d300_sample <- data[subjid %in% unique(data[, subjid])[1:300], ]
-  expect_equal(6647, d300_sample[, .N])
+  #
+  # Note that we're creating distinct data tables to avoid accidentally
+  # reusing the same by reference.
+  d100 <- as.data.table(syngrowth)[subjid %in% unique(data[, subjid])[1:100], ]
+  expect_equal(2215, d100[, .N])
+  d300 <- as.data.table(syngrowth)[subjid %in% unique(data[, subjid])[1:300], ]
+  expect_equal(6647, d300[, .N])
 
-  # Clean both samples
+  # And for overriding NHANES/derive option
+  d100_derive <- as.data.table(syngrowth)[subjid %in% unique(data[, subjid])[1:100], ]
+  expect_equal(2215, d100_derive[, .N])
+  d300_nhanes <- as.data.table(syngrowth)[subjid %in% unique(data[, subjid])[1:300], ]
+  expect_equal(6647, d300_nhanes[, .N])
+
+  # Clean samples: cd100 w/o specifying sd.recenter should use NHANES
   cd100 <-
-    d100_sample[, clean_value := cleangrowth(
+    d100[, clean_value := cleangrowth(
       subjid,
       param,
       agedays,
@@ -23,13 +32,36 @@ test_that("growthcleanr works as expected on synthetic data", {
       measurement
     )]
 
+  # cd100 specifying "derive" should derive
+  cd100_derived <-
+    d100_derive[, clean_value := cleangrowth(
+      subjid,
+      param,
+      agedays,
+      sex,
+      measurement,
+      sd.recenter = "derive"
+    )]
+
+  # cd300 w/o specifying sd.recenter should derive
   cd300 <-
-    d300_sample[, clean_value := cleangrowth(
+    d300[, clean_value := cleangrowth(
       subjid,
       param,
       agedays,
       sex,
       measurement
+    )]
+
+  # cd300_nhanes specifying "nhanes" should use NHANES
+  cd300_nhanes <-
+    d300_nhanes[, clean_value := cleangrowth(
+      subjid,
+      param,
+      agedays,
+      sex,
+      measurement,
+      sd.recenter = "NHANES"
     )]
 
   # Spot check individual results
@@ -39,23 +71,35 @@ test_that("growthcleanr works as expected on synthetic data", {
 
   # Results for these records should not change w/sample size (NHANES vs. derived)
   expect_equal("Exclude-EWMA-8", clean_value(cd100, 9652))
+  expect_equal("Exclude-EWMA-8", clean_value(cd100_derived, 9652))
   expect_equal("Exclude-EWMA-8", clean_value(cd300, 9652))
+  expect_equal("Exclude-EWMA-8", clean_value(cd300_nhanes, 9652))
 
   expect_equal("Exclude-Min-Height-Change", clean_value(cd100, 31450))
+  expect_equal("Exclude-Min-Height-Change", clean_value(cd100_derived, 31450))
   expect_equal("Exclude-Min-Height-Change", clean_value(cd300, 31450))
+  expect_equal("Exclude-Min-Height-Change", clean_value(cd300_nhanes, 31450))
 
   expect_equal("Include", clean_value(cd100, 15102))
+  expect_equal("Include", clean_value(cd100_derived, 15102))
   expect_equal("Include", clean_value(cd300, 15102))
+  expect_equal("Include", clean_value(cd300_nhanes, 15102))
 
-  # Results for these records should change w/sample size (NHANES vs. derived)
+  # Results for these records can change w/NHANES vs. derived
   expect_equal("Include", clean_value(cd100, 862))
+  expect_equal("Include", clean_value(cd100_derived, 862))
   expect_equal("Exclude-EWMA-8", clean_value(cd300, 862))
+  expect_equal("Include", clean_value(cd300_nhanes, 862))
 
   expect_equal("Exclude-EWMA-8", clean_value(cd100, 3453))
+  expect_equal("Exclude-EWMA-Extreme", clean_value(cd100_derived, 3453))
   expect_equal("Exclude-EWMA-Extreme", clean_value(cd300, 3453))
+  expect_equal("Exclude-EWMA-8", clean_value(cd300_nhanes, 3453))
 
   expect_equal("Exclude-EWMA-9", clean_value(cd100, 38081))
+  expect_equal("Include", clean_value(cd100_derived, 38081))
   expect_equal("Include", clean_value(cd300, 38081))
+  expect_equal("Exclude-EWMA-9", clean_value(cd300_nhanes, 38081))
 
   # Check counts of exclusions by category
   catcount <- function (df, category) {
@@ -68,10 +112,22 @@ test_that("growthcleanr works as expected on synthetic data", {
   expect_equal(275, catcount(d100_exclusions, "Exclude-Carried-Forward"))
   expect_equal(1, catcount(d100_exclusions, "Exclude-EWMA-11"))
 
+  d100_derived_exclusions <-
+    cd100_derived %>% group_by(clean_value) %>% tally(sort = TRUE)
+  expect_equal(1505, catcount(d100_derived_exclusions, "Include"))
+  expect_equal(275, catcount(d100_derived_exclusions, "Exclude-Carried-Forward"))
+  expect_equal(1, catcount(d100_derived_exclusions, "Exclude-EWMA-11"))
+
   d300_exclusions <-
     cd300 %>% group_by(clean_value) %>% tally(sort = TRUE)
   expect_equal(4540, catcount(d300_exclusions, "Include"))
   expect_equal(809, catcount(d300_exclusions, "Exclude-Carried-Forward"))
   expect_equal(1, catcount(d300_exclusions, "Exclude-EWMA-11"))
+
+  d300_nhanes_exclusions <-
+    cd300_nhanes %>% group_by(clean_value) %>% tally(sort = TRUE)
+  expect_equal(4545, catcount(d300_nhanes_exclusions, "Include"))
+  expect_equal(809, catcount(d300_nhanes_exclusions, "Exclude-Carried-Forward"))
+  expect_equal(1, catcount(d300_nhanes_exclusions, "Exclude-EWMA-11"))
 
 })

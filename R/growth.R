@@ -1604,13 +1604,18 @@ cleanbatch <- function(data.df,
 #' considering excluding all measurements. Defaults to 2.
 #' @param error.load.threshold threshold of percentage of excluded measurement count to included measurement
 #' count that must be exceeded before excluding all measurements of either parameter. Defaults to 0.5.
-#' @param sd.recenter Data frame or table with median SD-scores per day of life
-#' by gender and parameter. Columns in the table must include param, sex,
-#' agedays, and sd.median. Defaults to NA; if a data table is not passed in, and this value
-#' is NA, and if there are at least 5,000 observations, the median values will be calculated
-#' using the growth data being cleaned. If there are fewer than 5,000 observations,
-#' the NHANES reference median set will be used. The NHANES medians can also be specified
-#' explicitly with sd.recenter="NHANES", and NHANES will be used independent of input size.
+#' @param sd.recenter specifies how to recenter medians. May be a data frame or
+#' table w/median SD-scores per day of life by gender and parameter, or "NHANES"
+#' or "derive" as a character vector. If a data set is passed in, columns must
+#' include param, sex, agedays, and sd.median (referred to elsewhere as "modified
+#' Z-score"), and those medians will be used for recentering. If NA, growthcleanr
+#' will calculate median values using the growth data to be cleaned if there are
+#' at least 5,000 observations. If there are fewer than 5,000 observations, a
+#' reference set of medians derived from NHANES will be used. The method may also
+#' be specified explicitly, by passing either the character value "NHANES" to
+#' 'sd.recenter', or "derive", for which medians will be derived from the input
+#' set; these will be applied independent of the input size. A summary of how
+#' the data was derived from NHANES is available in README.md. Defaults to NA.
 #' @param sdmedian.filename Name of file to save sd.median data calculated on the input dataset to as CSV.
 #' Defaults to "", for which this data will not be saved. Use for extracting medians for parallel processing
 #' scenarios other than the built-in parallel option.
@@ -1909,9 +1914,9 @@ cleangrowth <- function(subjid,
   # data, derive from input, or use user-supplied data.
   if (!is.data.table(sd.recenter)) {
     # Use NHANES medians if the string "nhanes" is specified instead of a data.table
-    # or if sd.recenter is unspecified and N < 5000.
+    # or if sd.recenter is not specified as "derive" and N < 5000.
     if ((is.character(sd.recenter) & tolower(sd.recenter) == "nhanes") |
-      (data.all[, .N] < 5000)) {
+      (!(is.character(sd.recenter) & tolower(sd.recenter) == "derive") & (data.all[, .N] < 5000))) {
       nhanes_reference_medians_path <- ifelse(
         ref.data.path == "",
         system.file("extdata/nhanes-reference-medians.csv", package = "growthcleanr"),

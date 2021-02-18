@@ -167,10 +167,10 @@ data <- as.data.table(source_data)
 setkey(data, subjid, param, agedays)
 
 # generate new exclusion flag field using function
-cleaned_data <- data[, clean_value:=cleangrowth(subjid, param, agedays, sex, measurement)]
+cleaned_data <- data[, clean_value := cleangrowth(subjid, param, agedays, sex, measurement)]
 
 # extract data limited only to values flagged for inclusion:
-only_included_data <- cleaned_data[clean_value=='Include']
+only_included_data <- cleaned_data[clean_value == "Include"]
 ```
 
 If our Example dataset above were named `source_data`, examining
@@ -578,11 +578,21 @@ later techniques.
     -   `flag.both` - in case of two measurements with at least one
         beyond thresholds, flag both instead of one (as in default)
 
--   `sd.recenter` - defaults to NA; data frame or table w/median
-    SD-scores per day of life by gender and parameter. Columns must
-    include param, sex, agedays, and sd.median (referred to elsewhere as
-    “modified Z-score”). By default, median values will be calculated
-    using growth data to be cleaned.
+-   `sd.recenter` - default `NA`; specifies how to recenter medians. May
+    be a data frame or table w/median SD-scores per day of life by
+    gender and parameter, or “`NHANES`” or “`derive`” as a character
+    vector. If a data set is passed in, columns must include param, sex,
+    agedays, and sd.median (referred to elsewhere as “modified
+    Z-score”), and those medians will be used for recentering. If `NA`,
+    growthcleanr will calculate median values using the growth data to
+    be cleaned if there are at least 5,000 observations. If there are
+    fewer than 5,000 observations, a reference set of medians derived
+    from NHANES will be used. The method may also be specified
+    explicitly, by passing either the character value “`NHANES`” to
+    `sd.recenter`, or “`derive`”, for which medians will be derived from
+    the input set; these will be applied independent of the input size.
+    A summary of how the data was derived from NHANES is below under
+    [NHANES reference data](#nhanes).
 
 ### Operational options
 
@@ -1028,9 +1038,71 @@ how `growthcleanr` assesses data, packaged in a Jupyter notebook. It
 ships with the same `syngrowth` synthetic example dataset as
 `growthcleanr`, with results included.
 
+## <a name="nhanes"></a>NHANES reference medians
+
+`growthcleanr` releases up to 1.2.4 offered two options for recentering
+medians, either the default of deriving medians from the input set, or
+supplying an externally-defined set of medians. These left out an option
+for researchers working with either small datasets or with data which
+might otherwise not be representative of the population, as deriving
+medians from the input set in those cases might be problematic. To
+provide a standard default reference to address these latter cases, a
+set of medians were derived from the [National Health and Nutrition
+Examination Survey](https://wwwn.cdc.gov/nchs/nhanes/Default.aspx)
+(NHANES). A summary of that process is below. As of release 1.2.5, the
+default behavior is:
+
+-   If `sd.recenter` is specified as a data set, use the data set
+-   If `sd.recenter` is specified as `nhanes`, use NHANES
+-   If `sd.recenter` is specified as `derive`, derive from input
+-   If `sd.recenter` is not specified or `NA`:
+    -   If the input set has at least 5,000 observations, derive medians
+        from input
+    -   If the input set is less than 5,000 observations, use NHANES
+
+With the verbose `cleangrowth()` option `quietly = FALSE`, the
+recentering medians approach used will be noted in the output. If the
+input set has fewer than 100 observations for any age-year, this will
+also be noted in the output.
+
+The NHANES reference medians are based primarily on data from NHANES
+2009-2010 through 2017-2018, including approximately 39,000
+heights/lengths and weights from children and adolescents between the
+ages of 0 months and &lt;240 months. Weight and height SD scores were
+based on the [CDC growth
+charts](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm).
+Based on the distributions of age-days in children at 0 months, an age
+adjustment was made based on the median number of days among these
+infants. This adjustment was made after consultation with the National
+Center for Health Statistics confirmed that a general assumption of ages
+occurring at the midpoint of the indicated integer month of age did not
+apply to children recorded as 0 months, and uses 0.75 months instead.
+Weights were supplemented with a random sample of birthweights from
+NCHS’s [Vital Statistics Natality Birth
+Data](https://www.nber.org/research/data/vital-statistics-natality-birth-data)
+for 2018. These had sample weights assigned so that the sum of the
+sample weights for the sample approximately equal the sum of the sample
+weights for each month for infants in NHANES, as NHANES is a multi-stage
+complex survey. The reference data was then smoothed using the
+`svysmooth()` function in the R
+[`survey`](https://cran.r-project.org/web/packages/survey/index.html)
+package to estimate the weight and height SD scores for each day up to
+7,305 days, with a bandwidth chosen to balance between over- and
+under-fitting, and interpolation between the estimates from this
+function was used to obtain an estimate for each day of age. Predictions
+from a regression model fit to smoothed height SDs between 23 and 365
+days (the youngest child in NHANES had an estimated age in days of 23)
+were used to extend smoothed height SD scores to children between 1 and
+22 days of age.
+
 ## <a name="changes"></a>Changes
 
 For a detailed history of released versions, see `NEWS.md`.
+
+In release 1.2.5 in February 2021, the default behavior of recentering
+medians changed as described in [NHANES reference medians](#nhanes). To
+confirm prior results based on derived medians, specify the
+`sd.recenter` option “derive”.
 
 In release 1.2.4 in January 2021, an update was made to the WHO height
 velocity 3sd files to correct a small number of errors:
