@@ -7,7 +7,7 @@
 - Updated behavior of `sd.recenter` option to include new NHANES reference
   medians and explicit specification with "NHANES" or "derive"
   (https://github.com/mitre/growthcleanr/issues/9)
-- Switched `README.md` to be generated from `README.Rmd` w/knits (thanks
+- Switched `README.md` to be generated from `README.Rmd` w/knitr (thanks
   @mcanouil) (#17)
 
 ### Added
