@@ -1,6 +1,6 @@
 # growthcleanr
 
-## [1.2.5] - 2021-02-19
+## [1.2.5] - 2021-02-26
 
 ### Changed
 
@@ -9,6 +9,7 @@
   (https://github.com/mitre/growthcleanr/issues/9)
 - Switched `README.md` to be generated from `README.Rmd` w/knitr (thanks
   @mcanouil) (#17)
+- Switched to use `file.path()` more consistently in `R/growth.R`
 
 ### Added
 
