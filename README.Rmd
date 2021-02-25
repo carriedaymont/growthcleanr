@@ -254,6 +254,9 @@ install.packages("remotes")
 remotes::install_github("carriedaymont/growthcleanr", ref="main")
 ```
 
+Note that `ref="main"` is required; the default branch is "main", and must be
+referred to explicitly.
+
 ### Source-level install for developers
 
 If you want to work with and potentially change the `growthcleanr` code itself,
