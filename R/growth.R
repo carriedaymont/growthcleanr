@@ -1606,16 +1606,22 @@ cleanbatch <- function(data.df,
 #' count that must be exceeded before excluding all measurements of either parameter. Defaults to 0.5.
 #' @param sd.recenter specifies how to recenter medians. May be a data frame or
 #' table w/median SD-scores per day of life by gender and parameter, or "NHANES"
-#' or "derive" as a character vector. If a data set is passed in, columns must
-#' include param, sex, agedays, and sd.median (referred to elsewhere as "modified
-#' Z-score"), and those medians will be used for recentering. If NA, growthcleanr
-#' will calculate median values using the growth data to be cleaned if there are
-#' at least 5,000 observations. If there are fewer than 5,000 observations, a
-#' reference set of medians derived from NHANES will be used. The method may also
-#' be specified explicitly, by passing either the character value "NHANES" to
-#' 'sd.recenter', or "derive", for which medians will be derived from the input
-#' set; these will be applied independent of the input size. A summary of how
-#' the data was derived from NHANES is available in README.md. Defaults to NA.
+#' or "derive" as a character vector.
+#' \itemize{
+#'   \item If `sd.recenter` is specified as a data set, use the data set
+#'   \item If `sd.recenter` is specified as "`nhanes`", use NHANES reference medians
+#'   \item If `sd.recenter` is specified as "`derive`", derive from input
+#'   \item If `sd.recenter` is not specified or `NA`:
+#'     \itemize{
+#'       \item If the input set has at least 5,000 observations, derive medians from input
+#'       \item If the input set has fewer than 5,000 observations, use NHANES
+#'     }
+#' }
+#'
+#' If specifying a data set, columns must include param, sex, agedays, and sd.median
+#' (referred to elsewhere as "modified Z-score"), and those medians will be used
+#' for recentering. A summary of how the NHANES reference medians were derived is
+#' available in README.md. Defaults to NA.
 #' @param sdmedian.filename Name of file to save sd.median data calculated on the input dataset to as CSV.
 #' Defaults to "", for which this data will not be saved. Use for extracting medians for parallel processing
 #' scenarios other than the built-in parallel option.
@@ -1747,9 +1753,8 @@ cleangrowth <- function(subjid,
   # recode column names to match syntactic style ("." rather than "_" in variable names)
   tanner_ht_vel_path <- ifelse(
     ref.data.path == "",
-    system.file("extdata/tanner_ht_vel.csv", package = "growthcleanr"),
-    paste(ref.data.path, "tanner_ht_vel.csv", sep =
-            "")
+    system.file(file.path("extdata", "tanner_ht_vel.csv"), package = "growthcleanr"),
+    file.path(ref.data.path, "tanner_ht_vel.csv")
   )
 
   tanner.ht.vel <- fread(tanner_ht_vel_path)
@@ -1764,16 +1769,14 @@ cleangrowth <- function(subjid,
 
   who_max_ht_vel_path <- ifelse(
     ref.data.path == "",
-    system.file("extdata/who_ht_maxvel_3sd.csv", package = "growthcleanr"),
-    paste(ref.data.path, "who_ht_maxvel_3sd.csv", sep =
-            "")
+    system.file(file.path("extdata", "who_ht_maxvel_3sd.csv"), package = "growthcleanr"),
+    file.path(ref.data.path, "who_ht_maxvel_3sd.csv")
   )
 
   who_ht_vel_3sd_path <- ifelse(
     ref.data.path == "",
-    system.file("extdata/who_ht_vel_3sd.csv", package = "growthcleanr"),
-    paste(ref.data.path, "who_ht_vel_3sd.csv", sep =
-            "")
+    system.file(file.path("extdata", "who_ht_vel_3sd.csv"), package = "growthcleanr"),
+    file.path(ref.data.path, "who_ht_vel_3sd.csv")
   )
   who.max.ht.vel <- fread(who_max_ht_vel_path)
   who.ht.vel <- fread(who_ht_vel_3sd_path)
@@ -1919,8 +1922,8 @@ cleangrowth <- function(subjid,
       (!(is.character(sd.recenter) & tolower(sd.recenter) == "derive") & (data.all[, .N] < 5000))) {
       nhanes_reference_medians_path <- ifelse(
         ref.data.path == "",
-        system.file("extdata/nhanes-reference-medians.csv", package = "growthcleanr"),
-        paste(ref.data.path, "nhanes-reference-medians.csv", sep = "")
+        system.file(file.path("extdata", "nhanes-reference-medians.csv"), package = "growthcleanr"),
+        file.path(ref.data.path, "nhanes-reference-medians.csv")
       )
       sd.recenter <- fread(nhanes_reference_medians_path)
       if (!quietly)
@@ -2084,22 +2087,22 @@ read_anthro <- function(path = "", cdc.only = F) {
   # set correct path based on input reference table path (if any)
   weianthro_path <- ifelse(
     path == "",
-    system.file(file.path("extdata","weianthro.txt"), package = "growthcleanr"),
+    system.file(file.path("extdata", "weianthro.txt"), package = "growthcleanr"),
     file.path(path, "weianthro.txt")
   )
   lenanthro_path <- ifelse(
     path == "",
-    system.file(file.path("extdata","lenanthro.txt"), package = "growthcleanr"),
+    system.file(file.path("extdata", "lenanthro.txt"), package = "growthcleanr"),
     file.path(path, "lenanthro.txt")
   )
   bmianthro_path <- ifelse(
     path == "",
-    system.file(file.path("extdata","bmianthro.txt"), package = "growthcleanr"),
+    system.file(file.path("extdata", "bmianthro.txt"), package = "growthcleanr"),
     file.path(path, "bmianthro.txt")
   )
   growth_cdc_ext_path <- ifelse(
     path == "",
-    system.file(file.path("extdata","growthfile_cdc_ext.csv"), package = "growthcleanr"),
+    system.file(file.path("extdata", "growthfile_cdc_ext.csv"), package = "growthcleanr"),
     file.path(path, "growthfile_cdc_ext.csv")
   )
 

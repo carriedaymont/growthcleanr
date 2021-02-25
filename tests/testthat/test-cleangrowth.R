@@ -130,4 +130,11 @@ test_that("growthcleanr works as expected on synthetic data", {
   expect_equal(809, catcount(d300_nhanes_exclusions, "Exclude-Carried-Forward"))
   expect_equal(1, catcount(d300_nhanes_exclusions, "Exclude-EWMA-11"))
 
+  # Verify that the 100-subject set which defaulted to NHANES and the same 100
+  # subjects from the 300-subject set which specified NHANES had the same results
+  cd300_nhanes_100 <- cd300_nhanes[subjid %in% unique(data[, subjid])[1:100], ]
+  nhanes_combined <- merge(cd100, cd300_nhanes_100,
+                           by=c("id", "subjid", "sex", "agedays", "param", "measurement"),
+                           suffixes=c(".c100", ".c300n100"))
+  expect_equal(0, nhanes_combined[clean_value.c100 != clean_value.c300n100, .N])
 })

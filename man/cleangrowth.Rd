@@ -71,16 +71,22 @@ count that must be exceeded before excluding all measurements of either paramete
 
 \item{sd.recenter}{specifies how to recenter medians. May be a data frame or
 table w/median SD-scores per day of life by gender and parameter, or "NHANES"
-or "derive" as a character vector. If a data set is passed in, columns must
-include param, sex, agedays, and sd.median (referred to elsewhere as "modified
-Z-score"), and those medians will be used for recentering. If NA, growthcleanr
-will calculate median values using the growth data to be cleaned if there are
-at least 5,000 observations. If there are fewer than 5,000 observations, a
-reference set of medians derived from NHANES will be used. The method may also
-be specified explicitly, by passing either the character value "NHANES" to
-'sd.recenter', or "derive", for which medians will be derived from the input
-set; these will be applied independent of the input size. A summary of how
-the data was derived from NHANES is available in README.md. Defaults to NA.}
+or "derive" as a character vector.
+\itemize{
+\item If \code{sd.recenter} is specified as a data set, use the data set
+\item If \code{sd.recenter} is specified as "\code{nhanes}", use NHANES reference medians
+\item If \code{sd.recenter} is specified as "\code{derive}", derive from input
+\item If \code{sd.recenter} is not specified or \code{NA}:
+\itemize{
+\item If the input set has at least 5,000 observations, derive medians from input
+\item If the input set has fewer than 5,000 observations, use NHANES
+}
+}
+
+If specifying a data set, columns must include param, sex, agedays, and sd.median
+(referred to elsewhere as "modified Z-score"), and those medians will be used
+for recentering. A summary of how the NHANES reference medians were derived is
+available in README.md. Defaults to NA.}
 
 \item{sdmedian.filename}{Name of file to save sd.median data calculated on the input dataset to as CSV.
 Defaults to "", for which this data will not be saved. Use for extracting medians for parallel processing
