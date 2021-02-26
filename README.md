@@ -538,7 +538,7 @@ The following options change the behavior of the growthcleanr algorithm.
 
 -   `sd.extreme` - default `25`; a very extreme value check on modified
     (recentered) Z-scores used as a first-pass elimination of clearly
-    implausable values, often due to misplaced decimals.
+    implausible values, often due to misplaced decimals.
 
 -   `z.extreme` - default `25`; similar usage as `sd.extreme`, for
     absolute Z-scores.
@@ -609,9 +609,11 @@ later techniques.
 
     If specifying a data set, columns must include param, sex, agedays,
     and sd.median (referred to elsewhere as “modified Z-score”), and
-    those medians will be used for centering. A summary of how the
-    NHANES reference medians were derived is below under [NHANES
-    reference data](#nhanes).
+    those medians will be used for centering. This data set must include
+    a row for every ageday present in the dataset to be cleaned; the
+    NHANES reference medians include a row for every ageday in the range
+    (731-7305 days). A summary of how the NHANES reference medians were
+    derived is below under [NHANES reference data](#nhanes).
 
 ### Operational options
 
@@ -1090,23 +1092,27 @@ The NHANES reference medians are based primarily on data from NHANES
 2009-2010 through 2017-2018, including approximately 39,000
 heights/lengths and weights from children and adolescents between the
 ages of 0 months and &lt;240 months. Weight and height SD scores were
-based on the [CDC growth
-charts](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm).
-Based on the distributions of age-days in children at 0 months, an age
-adjustment was made based on the median number of days among these
-infants. This adjustment was made after consultation with the National
-Center for Health Statistics confirmed that a general assumption of ages
-occurring at the midpoint of the indicated integer month of age did not
-apply to children recorded as 0 months, and uses 0.75 months instead.
+calculated from the [L, M, and S
+parameters](https://www.cdc.gov/growthcharts/percentile_data_files.htm)
+for the [CDC growth
+charts](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm)
+were used as the reference to calculate weight and height SD scores for
+the NHANES 2009-2010 through 2017-2018 samples. Based on the
+distributions of age-days in children at 0 months, an age adjustment was
+made based on the median number of days among these infants. This
+adjustment was made after consultation with the National Center for
+Health Statistics confirmed that a general assumption of ages occurring
+at the midpoint of the indicated integer month of age did not apply to
+children recorded as 0 months, and uses 0.75 months instead.
 
 Weights were supplemented with a random sample of birthweights from
 NCHS’s [Vital Statistics Natality Birth
 Data](https://www.nber.org/research/data/vital-statistics-natality-birth-data)
 for 2018. These had sample weights assigned so that the sum of the
-sample weights for the sample approximately equal the sum of the sample
-weights for each month for infants in NHANES, as NHANES is a multi-stage
-complex survey. The reference data was then smoothed using the
-`svysmooth()` function in the R
+sample weights for the sample equalled the sum of the sample weights for
+each month for infants in NHANES, as NHANES is a multi-stage complex
+survey. The reference data was then smoothed using the `svysmooth()`
+function in the R
 [`survey`](https://cran.r-project.org/web/packages/survey/index.html)
 package to estimate the weight and height SD scores for each day up to
 7,305 days, with a bandwidth chosen to balance between over- and
