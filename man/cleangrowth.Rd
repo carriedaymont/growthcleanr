@@ -69,10 +69,24 @@ considering excluding all measurements. Defaults to 2.}
 \item{error.load.threshold}{threshold of percentage of excluded measurement count to included measurement
 count that must be exceeded before excluding all measurements of either parameter. Defaults to 0.5.}
 
-\item{sd.recenter}{Data frame or table with median SD-scores per day of life
-by gender and parameter. Columns in the table must include param, sex,
-agedays, and sd.median.  If not supplied, the median values will be
-calculated using the growth data that is being cleaned. Defaults to NA.}
+\item{sd.recenter}{specifies how to recenter medians. May be a data frame or
+table w/median SD-scores per day of life by gender and parameter, or "NHANES"
+or "derive" as a character vector.
+\itemize{
+\item If \code{sd.recenter} is specified as a data set, use the data set
+\item If \code{sd.recenter} is specified as "\code{nhanes}", use NHANES reference medians
+\item If \code{sd.recenter} is specified as "\code{derive}", derive from input
+\item If \code{sd.recenter} is not specified or \code{NA}:
+\itemize{
+\item If the input set has at least 5,000 observations, derive medians from input
+\item If the input set has fewer than 5,000 observations, use NHANES
+}
+}
+
+If specifying a data set, columns must include param, sex, agedays, and sd.median
+(referred to elsewhere as "modified Z-score"), and those medians will be used
+for recentering. A summary of how the NHANES reference medians were derived is
+available in README.md. Defaults to NA.}
 
 \item{sdmedian.filename}{Name of file to save sd.median data calculated on the input dataset to as CSV.
 Defaults to "", for which this data will not be saved. Use for extracting medians for parallel processing

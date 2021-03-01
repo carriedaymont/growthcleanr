@@ -1,5 +1,21 @@
 # growthcleanr
 
+## [1.2.5] - 2021-02-26
+
+### Changed
+
+- Updated behavior of `sd.recenter` option to include new NHANES reference
+  medians and explicit specification with "NHANES" or "derive"
+  (https://github.com/mitre/growthcleanr/issues/9)
+- Switched `README.md` to be generated from `README.Rmd` w/knitr (thanks
+  @mcanouil) (#17)
+- Switched to use `file.path()` more consistently in `R/growth.R`
+
+### Added
+
+- Added `inst/extdata/nhanes-reference-medians.csv`, reference medians for
+  recentering derived from NHANES (described in README)
+
 ## [1.2.4] - 2021-01-14
 
 ### Changed

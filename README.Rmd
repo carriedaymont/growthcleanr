@@ -246,6 +246,17 @@ devtools::install_github("carriedaymont/growthcleanr", ref="main")
 Note that `ref="main"` is required; the default branch is "main", and must be
 referred to explicitly.
 
+If you are unable to install `devtools`, a similar function is available in the
+`remotes` package:
+
+```{r, eval = FALSE}
+install.packages("remotes")
+remotes::install_github("carriedaymont/growthcleanr", ref="main")
+```
+
+Note that `ref="main"` is required; the default branch is "main", and must be
+referred to explicitly.
+
 ### Source-level install for developers
 
 If you want to work with and potentially change the `growthcleanr` code itself,
@@ -507,8 +518,9 @@ The following options change the behavior of the growthcleanr algorithm.
   and included as valid measurements for cleaning.
 
 - `sd.extreme` - default `25`; a very extreme value check on modified
-  (recentered) Z-scores used as a first-pass elimination of clearly implausable
+  (recentered) Z-scores used as a first-pass elimination of clearly implausible
   values, often due to misplaced decimals.
+
 - `z.extreme` - default `25`; similar usage as `sd.extreme`, for absolute
   Z-scores.
 
@@ -555,10 +567,23 @@ techniques.
   - `flag.both` - in case of two measurements with at least one beyond
     thresholds, flag both instead of one (as in default)
 
-- `sd.recenter` - defaults to NA; data frame or table w/median SD-scores per day
-  of life by gender and parameter. Columns must include param, sex, agedays, and
-  sd.median (referred to elsewhere as "modified Z-score"). By default, median
-  values will be calculated using growth data to be cleaned.
+- `sd.recenter` - default `NA`; specifies how to recenter medians. May be a data frame
+  or table w/median SD-scores per day of life by gender and parameter, or "`nhanes`"
+  or "`derive`" as a character vector.
+
+  - If `sd.recenter` is specified as a data set, use the data set
+  - If `sd.recenter` is specified as "`nhanes`", use NHANES reference medians
+  - If `sd.recenter` is specified as "`derive`", derive from input
+  - If `sd.recenter` is not specified or `NA`:
+    - If the input set has at least 5,000 observations, derive medians from input
+    - If the input set has fewer than 5,000 observations, use NHANES
+
+  If specifying a data set, columns must include param, sex, agedays, and sd.median
+  (referred to elsewhere as "modified Z-score"), and those medians will be used for
+  centering. This data set must include a row for every ageday present in the dataset
+  to be cleaned; the NHANES reference medians include a row for every ageday in the
+  range (731-7305 days). A summary of how the NHANES reference medians were derived is
+  below under [NHANES reference data](#nhanes).
 
 ### Operational options
 
@@ -959,20 +984,77 @@ for `cleangrowth()`.
 
 ## <a name="related"></a>Related tools
 
-The CDC provides a
-[SAS Program for the 2000 CDC Growth Charts](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm)
-which can also be used to identify biologically implausible values using a different
-approach, as also implemented for `growthcleanr` in the function `ext_bmiz()`, described
-above under [Computing BMI percentiles and Z-scores](#bmi).
+The CDC provides a [SAS Program for the 2000 CDC Growth
+Charts](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm) which can
+also be used to identify biologically implausible values using a different approach, as
+also implemented for `growthcleanr` in the function `ext_bmiz()`, described above under
+[Computing BMI percentiles and Z-scores](#bmi).
 
 [GrowthViz](https://github.com/mitre/GrowthViz) provides insights into how
-`growthcleanr` assesses data, packaged in a Jupyter notebook. It ships with the
-same `syngrowth` synthetic example dataset as `growthcleanr`, with results
-included.
+`growthcleanr` assesses data, packaged in a Jupyter notebook. It ships with the same
+`syngrowth` synthetic example dataset as `growthcleanr`, with results included.
+
+## <a name="nhanes"></a>NHANES reference medians
+
+`growthcleanr` [releases](https://github.com/carriedaymont/growthcleanr/releases) up to
+1.2.4 offered two options for recentering medians, either the default of deriving
+medians from the input set, or supplying an externally-defined set of medians. These
+left out an option for researchers working with either small datasets or with data
+which might otherwise not be representative of the population, as deriving medians from
+the input set in those cases might be problematic. To provide a standard default
+reference to address these latter cases, a set of medians were derived from the
+[National Health and Nutrition Examination
+Survey](https://wwwn.cdc.gov/nchs/nhanes/Default.aspx) (NHANES). A summary of that
+process is below. As of release 1.2.5, the default behavior is:
+
+- If `sd.recenter` is specified as a data set, use the data set
+- If `sd.recenter` is specified as `nhanes`, use NHANES
+- If `sd.recenter` is specified as `derive`, derive from input
+- If `sd.recenter` is not specified or `NA`:
+  - If the input set has at least 5,000 observations, derive medians from input
+  - If the input set has fewer than 5,000 observations, use NHANES
+
+With the verbose `cleangrowth()` option `quietly = FALSE`, the recentering medians
+approach used will be noted in the output. If the input set has fewer than 100
+observations for any age-year, this will also be noted in the output.
+
+The NHANES reference medians are based primarily on data from NHANES 2009-2010 through
+2017-2018, including approximately 39,000 heights/lengths and weights from children and
+adolescents between the ages of 0 months and <240 months. Weight and height SD scores
+were calculated from the [L, M, and S
+parameters](https://www.cdc.gov/growthcharts/percentile_data_files.htm) for the [CDC
+growth charts](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm) were
+used as the reference to calculate weight and height SD scores for the NHANES 2009-2010
+through 2017-2018 samples. Based on the distributions of age-days in children at 0
+months, an age adjustment was made based on the median number of days among these
+infants. This adjustment was made after consultation with the National Center for
+Health Statistics confirmed that a general assumption of ages occurring at the midpoint
+of the indicated integer month of age did not apply to children recorded as 0 months,
+and uses 0.75 months instead.
+
+Weights were supplemented with a random sample of birthweights from NCHS's [Vital
+Statistics Natality Birth
+Data](https://www.nber.org/research/data/vital-statistics-natality-birth-data) for 2018. These had sample weights assigned so that the sum of the sample weights for the
+sample equalled the sum of the sample weights for each month for infants in NHANES, as
+NHANES is a multi-stage complex survey. The reference data was then smoothed using the
+`svysmooth()` function in the R
+[`survey`](https://cran.r-project.org/web/packages/survey/index.html) package to
+estimate the weight and height SD scores for each day up to 7,305 days, with a
+bandwidth chosen to balance between over- and under-fitting, and interpolation between
+the estimates from this function was used to obtain an estimate for each day of age.
+Predictions from a regression model fit to smoothed height SDs between 23 and 365 days
+(the youngest child in NHANES had an estimated age in days of 23) were used to extend
+smoothed height SD scores to children between 1 and 22 days of age.
 
 ## <a name="changes"></a>Changes
 
-For a detailed history of released versions, see `NEWS.md`.
+For a detailed history of released versions, see `NEWS.md`. Tagged releases, starting
+with 1.2.3 in January 2021, are listed [at
+GitHub](https://github.com/carriedaymont/growthcleanr/releases).
+
+In release 1.2.5 in February 2021, the default behavior of recentering medians
+changed as described in [NHANES reference medians](#nhanes). To confirm prior
+results based on derived medians, specify the `sd.recenter` option "derive".
 
 In release 1.2.4 in January 2021, an update was made to the WHO height velocity 3sd
 files to correct a small number of errors:
