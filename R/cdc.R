@@ -105,11 +105,11 @@ set_cols_first <- function(DT, cols, intersection = TRUE)
 #' df <- as.data.frame(syngrowth)
 #' df <- df[df$subjid %in% unique(df[, "subjid"])[1:5], ]
 #' df <- cbind(df,
-#'             "clean_value" = cleangrowth(df$subjid,
-#'                                         df$param,
-#'                                         df$agedays,
-#'                                         df$sex,
-#'                                         df$measurement))
+#'             "gcr_result" = cleangrowth(df$subjid,
+#'                                        df$param,
+#'                                        df$agedays,
+#'                                        df$sex,
+#'                                        df$measurement))
 #' df <- longwide(df) # convert to wide format for ext_bmiz
 #'
 #' # Calling the function with default column names

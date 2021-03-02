@@ -246,7 +246,7 @@ param <- with(dm_filt, param)
 sex <- with(dm_filt, sex)
 agedays <- with(dm_filt, agedays)
 measurement <- with(dm_filt, measurement)
-orig.exclude <- with(dm_filt, clean_value)
+orig.exclude <- with(dm_filt, gcr_result)
 
 # Find out answers ----
 

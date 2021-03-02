@@ -166,16 +166,16 @@ data <- as.data.table(source_data)
 setkey(data, subjid, param, agedays)
 
 # generate new exclusion flag field using function
-cleaned_data <- data[, clean_value := cleangrowth(subjid, param, agedays, sex, measurement)]
+cleaned_data <- data[, gcr_result := cleangrowth(subjid, param, agedays, sex, measurement)]
 
 # extract data limited only to values flagged for inclusion:
-only_included_data <- cleaned_data[clean_value == "Include"]
+only_included_data <- cleaned_data[gcr_result == "Include"]
 ```
 
 If our Example dataset above were named `source_data`, examining
 `cleaned_data` would show:
 
-| subjid | param    | agedays | sex | measurement | clean\_value            |
+| subjid | param    | agedays | sex | measurement | gcr\_result             |
 |--------|----------|---------|-----|-------------|-------------------------|
 | 1      | HEIGHTCM | 2790    | 0   | 118.5       | Include                 |
 | 1      | HEIGHTCM | 3677    | 0   | 148.22      | Include                 |
@@ -413,18 +413,18 @@ data with `cleangrowth()` will likely take a few minutes to complete.
 library(dplyr)
 data <- as.data.table(syngrowth)
 setkey(data, subjid, param, agedays)
-cleaned_data <- data[, clean_value := cleangrowth(subjid, param, agedays, sex, measurement)]
+cleaned_data <- data[, gcr_result := cleangrowth(subjid, param, agedays, sex, measurement)]
 head(cleaned_data)
-     id subjid sex agedays    param measurement                 clean_value
+     id subjid sex agedays    param measurement                  gcr_result
 1: 1510 775155   0     889 HEIGHTCM      84.900 Exclude-Extraneous-Same-Day
 2: 1511 775155   0     889 HEIGHTCM      89.060                     Include
 3: 1512 775155   0    1071 HEIGHTCM      92.500                     Include
 4: 1513 775155   0    1253 HEIGHTCM      96.200                     Include
 5: 1514 775155   0    1435 HEIGHTCM      96.200     Exclude-Carried-Forward
 6: 1515 775155   0    1435 HEIGHTCM      99.692                     Include
-cleaned_data %>% group_by(clean_value) %>% tally(sort=TRUE)
+cleaned_data %>% group_by(gcr_result) %>% tally(sort=TRUE)
 # A tibble: 14 x 2
-   clean_value                     n
+   gcr_result                      n
    <ord>                       <int>
  1 Include                     38875
  2 Exclude-Extraneous-Same-Day 10546
@@ -455,7 +455,7 @@ This example shows three configuration options in use:
 
 ``` r
 cleaned_data <- data[,
-  clean_value_both := cleangrowth(
+  gcr_result_both := cleangrowth(
     subjid, param, agedays, sex, measurement,
     lt3.exclude.mode = "flag.both",
     ref.data.path = "inst/extdata/",
@@ -482,7 +482,7 @@ which can speed the process while working with large data sets:
 
 ``` r
 cleaned_data <- data[,
-  clean_value_both := cleangrowth(
+  gcr_result_both := cleangrowth(
     subjid, param, agedays, sex, measurement,
     parallel = TRUE,
     num.batches = 4,
@@ -884,7 +884,7 @@ before:
 
 ``` r
 names(cleaned_data)
-[1] "id"          "subjid"      "sex"         "agedays"     "param"       "measurement" "clean_value"
+[1] "id"          "subjid"      "sex"         "agedays"     "param"       "measurement" "gcr_result"
 ```
 
 The wide dataset `cleaned_data_wide` will include rows with aligned
@@ -920,7 +920,7 @@ each, with quotes:
 
 ``` r
 head(my_cleaned_data)
-     id subjid sex    aged     type measurement                 clean_value
+     id subjid sex    aged     type measurement                  gcr_result
 1: 1510 775155   0     889 HEIGHTCM       84.90 Exclude-Extraneous-Same-Day
 2: 1511 775155   0     889 HEIGHTCM       89.06                     Include
 3: 1518 775155   0     889 WEIGHTKG       13.10                     Include

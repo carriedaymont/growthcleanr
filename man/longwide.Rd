@@ -12,13 +12,13 @@ longwide(
   agedays = "agedays",
   param = "param",
   measurement = "measurement",
-  clean_value = "clean_value",
+  gcr_result = "gcr_result",
   include_all = FALSE,
   inclusion_types = c("Include")
 )
 }
 \arguments{
-\item{long_df}{A data frame to be transformed. Expects columns: id, subjid, sex, agedays, param, measurement, and clean_value.}
+\item{long_df}{A data frame to be transformed. Expects columns: id, subjid, sex, agedays, param, measurement, and gcr_result.}
 
 \item{id}{name of observation ID column}
 
@@ -32,7 +32,7 @@ longwide(
 
 \item{measurement}{name of measurement column containing the actual measurement data}
 
-\item{clean_value}{name of column of cleaned values from growthcleanr::cleangrowth()}
+\item{gcr_result}{name of column of results from growthcleanr::cleangrowth()}
 
 \item{include_all}{Determines whether the function keeps all exclusion codes. If TRUE, all exclusion types are kept and the inclusion_types argument is ignored. Defaults to FALSE.}
 
@@ -49,11 +49,11 @@ Returns a data frame transformed from long to wide. Includes only values flagged
 df <- as.data.frame(syngrowth)
 df <- df[df$subjid \%in\% unique(df[, "subjid"])[1:5], ]
 df <- cbind(df,
-            "clean_value" = cleangrowth(df$subjid,
-                                        df$param,
-                                        df$agedays,
-                                        df$sex,
-                                        df$measurement))
+            "gcr_result" = cleangrowth(df$subjid,
+                                       df$param,
+                                       df$agedays,
+                                       df$sex,
+                                       df$measurement))
 # Convert to wide format
 long_df <- longwide(df)
 
