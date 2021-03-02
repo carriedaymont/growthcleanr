@@ -85,7 +85,6 @@ the following packages:
 -   `doParallel`
 -   `parallel`
 -   `dplyr`
--   `Hmisc`
 -   `labelled`
 -   `plyr`
 -   `tidyr`

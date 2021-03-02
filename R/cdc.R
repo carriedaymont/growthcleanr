@@ -98,7 +98,6 @@ set_cols_first <- function(DT, cols, intersection = TRUE)
 #' @export
 #' @import data.table
 #' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
-#' @import Hmisc
 #' @import magrittr
 #' @import labelled
 #' @examples
@@ -151,7 +150,7 @@ ext_bmiz <- function(data,
   data <- data[between(age, 24, 240) & !(is.na(wt) & is.na(ht)),
                .(seq_, sex, age, wt, ht, bmi)]
 
-  v1 <- Cs(seq_, id, sex, age, wt, ht, bmi)
+  v1 <- c("seq_", "id", "sex", "age", "wt", "ht", "bmi")
 
   dref_path <- ifelse(
     ref.data.path == "",
@@ -193,10 +192,10 @@ ext_bmiz <- function(data,
 
   dref <- rbindlist(list(dref, d20))
   adj_bmi_met <-
-    dref[agemos == 240, .(sex, mbmi, sbmi)] %>% setnames(., Cs(sex, mref, sref))
+    dref[agemos == 240, .(sex, mbmi, sbmi)] %>% setnames(., c("sex", "mref", "sref"))
 
   dref <- dref[adj_bmi_met, on = 'sex']
-  v <- Cs(sex, age, wl, wm, ws, bl, bm, bs, hl, hm, hs, mref, sref)
+  v <- c("sex", "age", "wl", "wm", "ws", "bl", "bm", "bs", "hl", "hm", "hs", "mref", "sref")
   setnames(dref, v)
 
   # interpolate reference data to match each agemos in input data
@@ -215,13 +214,13 @@ ext_bmiz <- function(data,
   setkey(dref, sex, age)
   dt <- dref[data]
 
-  dt[, Cs(waz, mwaz) := z_score(dt$wt, dt$wl, dt$wm, dt$ws)]
-  dt[, Cs(haz, mhaz) := z_score(dt$ht, dt$hl, dt$hm, dt$hs)]
-  dt[, Cs(bz, mbz) := z_score(dt$bmi, dt$bl, dt$bm, dt$bs)]
+  dt[, c("waz", "mwaz") := z_score(dt$wt, dt$wl, dt$wm, dt$ws)]
+  dt[, c("haz", "mhaz") := z_score(dt$ht, dt$hl, dt$hm, dt$hs)]
+  dt[, c("bz", "mbz") := z_score(dt$bmi, dt$bl, dt$bm, dt$bs)]
 
   setDT(dt)
-  setnames(dt, Cs(bl, bm, bs), Cs(l, m, s))
-  dt[, Cs(wl, wm, ws, hl, hm, hs) := NULL]
+  setnames(dt, c("bl", "bm", "bs"), c("l", "m", "s"))
+  dt[, c("wl", "wm", "ws", "hl", "hm", "hs") := NULL]
 
   dt <- mutate(
     dt,
@@ -260,48 +259,48 @@ ext_bmiz <- function(data,
   dt[bp > 99 &
        is.infinite(ebz), ebz := 8.21] # highest poss value is 8.20945
 
-  x <- Cs(agey, mref, sref, sex, wt, ht, bmi)
+  x <- c("agey", "mref", "sref", "sex", "wt", "ht", "bmi")
   dt[, (x) := NULL]
   setnames(
     dt,
-    Cs(adist1, aperc1, bp, bz, mbz, mwaz, mhaz, ebp, ebz, l, m, s),
-    Cs(
-      adj_dist1,
-      adj_perc1,
-      bmip,
-      bmiz,
-      mod_bmiz,
-      mod_waz,
-      mod_haz,
-      ext_bmip,
-      ext_bmiz,
-      bmi_l,
-      bmi_m,
-      bmi_s
+    c("adist1", "aperc1", "bp", "bz", "mbz", "mwaz", "mhaz", "ebp", "ebz", "l", "m", "s"),
+    c(
+      "adj_dist1",
+      "adj_perc1",
+      "bmip",
+      "bmiz",
+      "mod_bmiz",
+      "mod_waz",
+      "mod_haz",
+      "ext_bmip",
+      "ext_bmiz",
+      "bmi_l",
+      "bmi_m",
+      "bmi_s"
     )
   )
 
   # Note: removing distance from median metrics; can restore
 
-  v <- Cs(
-    seq_,
-    bmiz,
-    bmip,
-    waz,
-    wp,
-    haz,
-    hp,
-    p95,
-    p97,
-    bmip95,
-    mod_bmiz,
-    mod_waz,
-    mod_haz,
-    sigma,
-    ext_bmip,
-    ext_bmiz,
-    sev_obese,
-    obese
+  v <- c(
+    "seq_",
+    "bmiz",
+    "bmip",
+    "waz",
+    "wp",
+    "haz",
+    "hp",
+    "p95",
+    "p97",
+    "bmip95",
+    "mod_bmiz",
+    "mod_waz",
+    "mod_haz",
+    "sigma",
+    "ext_bmip",
+    "ext_bmiz",
+    "sev_obese",
+    "obese"
   )
   dt <- dt[, ..v]
 
@@ -309,7 +308,7 @@ ext_bmiz <- function(data,
   setkey(dorig, seq_)
   dtot <- dt[dorig]
   set_cols_first(dtot, names(dorig))
-  dtot[, Cs(seq_) := NULL]
+  dtot[, c("seq_") := NULL]
 
   # Add labels for convenience
   dtot <- dtot %>% labelled::set_variable_labels(
