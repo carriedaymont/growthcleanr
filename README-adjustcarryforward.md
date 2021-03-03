@@ -44,52 +44,55 @@ make sure to specify the path relative to your current directory):
 By default, the script will generate a range of values with nine steps for the
 following parameters, where the min and max surround the default value:
 
-| parameter | default | min | max |
-| - | - | - | - |
-`minfactor` | 0.5 | 0 | 1 |
-`maxfactor` | 2 | 0 | 4 |
-`banddiff` | 3 | 0 | 6 |
-`banddiff_plus` | 5.5 | 0 | 11 |
-`min_ht.exp_under` | 2 | 0 | 4 |
-`min_ht.exp_over` | 0 | -1 | 1 |
-`max_ht.exp_under` | 0.33 | 0 | 0.66 |
-`max_ht.exp_over` | 1.5 | 0 | 3 |
+| parameter          | default | min | max  |
+| ------------------ | ------- | --- | ---- |
+| `minfactor`        | 0.5     | 0   | 1    |
+| `maxfactor`        | 2       | 0   | 4    |
+| `banddiff`         | 3       | 0   | 6    |
+| `banddiff_plus`    | 5.5     | 0   | 11   |
+| `min_ht.exp_under` | 2       | 0   | 4    |
+| `min_ht.exp_over`  | 0       | -1  | 1    |
+| `max_ht.exp_under` | 0.33    | 0   | 0.66 |
+| `max_ht.exp_over`  | 1.5     | 0   | 3    |
 
 The determination of these values depends on the search type (specified with the
 option `--searchtype`:
-* `random` (default): Values will be generated randomly, with equal amounts of values
-on either side of the midpoint. The midpoint is always included.
-  * Note that if an even number is specified for `--gridlength`, one will be added to
-  include the midpoint in the run.
-  * A random seed can be specified with `--seed` (default 7).
-* `line-grid`: Values will be evenly distributed along the range for each parameter.
-If the `--gridlength` specified is odd, this will include the midpoint.
-* `full-grid`: Values for each included parameter will evenly distributed along the
-range for each parameter and in a full combination between all parameters.
-  * Thus, the amount of runs done will be the `--gridlength`^(number of included
-parameters).
-  * Default includes a full grid search among all parameters. To specify use of only
-  specific parameters, use the `--param` option, which specifies a CSV of the following
-  format:
 
-  | parameter | include | value |
-  | - | - | - |
-  `minfactor` | T |  |
-  `maxfactor` | F | 3 |
-  `banddiff` | F |  |
-  `banddiff_plus` | F |  |
-  `min_ht.exp_under` | T |  |
-  `min_ht.exp_over` | F |  |
-  `max_ht.exp_under` | F | .5 |
-  `max_ht.exp_over` | F |  |
-  * The first column specifies all the parameter names; the second specifies a
-  true or false value for whether or not the parameter should be included; the
-  third specifies a constant value to be used for not included parameters, left
-  empty if the value should be the default.
-  * In the above example, `minfactor` and `min_ht.exp_under` will be included, and
-  `maxfactor` and `max_ht_exp_under` will not be included, but will use 3 and .5
-  as their values.
-  * Warning: this will take much longer!
+- `random` (default): Values will be generated randomly, with equal amounts of values
+  on either side of the midpoint. The midpoint is always included.
+  - Note that if an even number is specified for `--gridlength`, one will be added to
+    include the midpoint in the run.
+  - A random seed can be specified with `--seed` (default 7).
+- `line-grid`: Values will be evenly distributed along the range for each parameter.
+  If the `--gridlength` specified is odd, this will include the midpoint.
+- `full-grid`: Values for each included parameter will evenly distributed along the
+  range for each parameter and in a full combination between all parameters.
+
+  - Thus, the amount of runs done will be the `--gridlength`^(number of included
+    parameters).
+  - Default includes a full grid search among all parameters. To specify use of only
+    specific parameters, use the `--param` option, which specifies a CSV of the following
+    format:
+
+  | parameter          | include | value |
+  | ------------------ | ------- | ----- |
+  | `minfactor`        | T       |       |
+  | `maxfactor`        | F       | 3     |
+  | `banddiff`         | F       |       |
+  | `banddiff_plus`    | F       |       |
+  | `min_ht.exp_under` | T       |       |
+  | `min_ht.exp_over`  | F       |       |
+  | `max_ht.exp_under` | F       | .5    |
+  | `max_ht.exp_over`  | F       |       |
+
+  - The first column specifies all the parameter names; the second specifies a
+    true or false value for whether or not the parameter should be included; the
+    third specifies a constant value to be used for not included parameters, left
+    empty if the value should be the default.
+  - In the above example, `minfactor` and `min_ht.exp_under` will be included, and
+    `maxfactor` and `max_ht_exp_under` will not be included, but will use 3 and .5
+    as their values.
+  - Warning: this will take much longer!
 
 The default number of sweep steps is 9; this can be changed with the option
 `--gridlength`.
@@ -180,7 +183,7 @@ sweep (hence the examples w/5 and 9 step sweeps).
 And the first few result rows in `test_adjustcarrforward_DATE_TIME.csv` would be:
 
 ```R
-id     subjid    sex  agedays  param     measurement  clean_value                     run-1      run-2      run-3      run-4      run-5
+id     subjid    sex  agedays  param     measurement  gcr_result                      run-1      run-2      run-3      run-4      run-5
 1510   775155    0    889      HEIGHTCM  84.9         Exclude-Extraneous-Same-Day Missing    Missing    Missing    Missing    Missing
 1511   775155    0    889      HEIGHTCM  89.06        Include                     No Change  No Change  No Change  No Change  No Change
 1512   775155    0    1071     HEIGHTCM  92.5         Include                     No Change  No Change  No Change  No Change  No Change
@@ -198,7 +201,7 @@ adjusted for reinclusion. To demonstrate the range, the following is an extract 
 measurements only marked as carried forward exclusions by `cleangrowth()`:
 
 ```R
-id     subjid     sex  agedays  param     measurement  clean_value                  run-1      run-2      run-3      run-4      run-5
+id     subjid     sex  agedays  param     measurement  gcr_result                   run-1      run-2      run-3      run-4      run-5
 1514   775155     0    1435     HEIGHTCM  96.2         Exclude-Carried-Forward  No Change  No Change  Include    Include    Include
 1521   775155     0    1435     WEIGHTKG  15.3         Exclude-Carried-Forward  No Change  No Change  No Change  No Change  No Change
 7952   1340377    1    1806     HEIGHTCM  107.1        Exclude-Carried-Forward  No Change  Include    Include    Include    Include

@@ -137,14 +137,14 @@ recode_sex <- function(input_data,
 #'
 #' \code{longwide} transforms data from long to wide format. Ideal for transforming output from growthcleanr::cleangrowth() into a format suitable for growthcleanr::ext_bmiz().
 #'
-#' @param long_df A data frame to be transformed. Expects columns: id, subjid, sex, agedays, param, measurement, and clean_value.
+#' @param long_df A data frame to be transformed. Expects columns: id, subjid, sex, agedays, param, measurement, and gcr_result.
 #' @param id name of observation ID column
 #' @param subjid name of subject ID column
 #' @param sex name of sex descriptor column
 #' @param agedays name of age (in days) descriptor column
 #' @param param name of parameter column to identify each type of measurement
 #' @param measurement name of measurement column containing the actual measurement data
-#' @param clean_value name of column of cleaned values from growthcleanr::cleangrowth()
+#' @param gcr_result name of column of results from growthcleanr::cleangrowth()
 #' @param include_all Determines whether the function keeps all exclusion codes. If TRUE, all exclusion types are kept and the inclusion_types argument is ignored. Defaults to FALSE.
 #' @param inclusion_types Vector indicating which exclusion codes from the cleaning algorithm should be included in the data, given that include_all is FALSE. For all options, see growthcleanr::cleangrowth(). Defaults to c("Include").
 #'
@@ -158,11 +158,11 @@ recode_sex <- function(input_data,
 #' df <- as.data.frame(syngrowth)
 #' df <- df[df$subjid %in% unique(df[, "subjid"])[1:5], ]
 #' df <- cbind(df,
-#'             "clean_value" = cleangrowth(df$subjid,
-#'                                         df$param,
-#'                                         df$agedays,
-#'                                         df$sex,
-#'                                         df$measurement))
+#'             "gcr_result" = cleangrowth(df$subjid,
+#'                                        df$param,
+#'                                        df$agedays,
+#'                                        df$sex,
+#'                                        df$measurement))
 #' # Convert to wide format
 #' long_df <- longwide(df)
 #'
@@ -179,13 +179,13 @@ longwide <-
            agedays = "agedays",
            param = "param",
            measurement = "measurement",
-           clean_value = "clean_value",
+           gcr_result = "gcr_result",
            include_all = FALSE,
            inclusion_types = c("Include")) {
   # selects each column with specified / default variable name
   long_df %>%
     select(id, subjid, sex, agedays,
-           param, measurement, clean_value) -> obs_df
+           param, measurement, gcr_result) -> obs_df
 
   # if all columns could be found,
   # 7 columns will be present in the correct order. Thus, rename
@@ -196,7 +196,7 @@ longwide <-
                        "agedays",
                        "param",
                        "measurement",
-                       "clean_value")
+                       "gcr_result")
   } else{
     # catch error if any variables were not found
     stop("not all needed columns were present")
@@ -206,7 +206,7 @@ longwide <-
   if (include_all == TRUE) {
     obs_df <- obs_df
   } else if (include_all == FALSE) {
-    obs_df <- obs_df[obs_df$clean_value %in% inclusion_types,]
+    obs_df <- obs_df[obs_df$gcr_result %in% inclusion_types,]
   } else{
     stop(paste0("include_all is not a logical of length 1. It is a ",
                 typeof(include_all), " of length ", length(include_all)))

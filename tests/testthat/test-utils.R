@@ -202,7 +202,7 @@ test_that("longwide works as expected with default values", {
     syngrowth[syngrowth$subjid %in% unique(syngrowth$subjid)[1:100], ]
   sub_syn <- cbind(
     sub_syn,
-    "clean_value" = cleangrowth(
+    "gcr_result" = cleangrowth(
       subjid = sub_syn$subjid,
       param = sub_syn$param,
       agedays = sub_syn$agedays,
@@ -225,7 +225,7 @@ test_that("longwide works as expected with default values", {
 
   # check that all subjects' measurements with at least two occurrences appear
   all_obs <- sapply(unique(sub_syn$subjid), function(i) {
-    sub_group <- sub_syn[sub_syn$clean_value == "Include" &
+    sub_group <- sub_syn[sub_syn$gcr_result == "Include" &
                            sub_syn$agedays >= 730, ]
     sum(table(sub_group$agedays[sub_group$subjid == i]) >= 2)
   })
@@ -235,7 +235,7 @@ test_that("longwide works as expected with default values", {
 
   # check that it includes specified inclusion types
   expect(
-    all(sub_syn$clean_value[sub_syn$id %in% obs_ids] == "Include"),
+    all(sub_syn$gcr_result[sub_syn$id %in% obs_ids] == "Include"),
     "longwide() includes inclusion values that were not specified"
   )
 
@@ -317,7 +317,7 @@ test_that("longwide works as expected with custom values", {
 
   # run longwide on changed data with all exclusion types included
   wide_syn <- longwide(sub_syn,
-                       clean_value = "cv",
+                       gcr_result = "cv",
                        include_all = T)
 
   # check that it has the correct amount of columns
@@ -342,7 +342,7 @@ test_that("longwide works as expected with custom values", {
                  "Exclude-Carried-Forward",
                  "Exclude-Extraneous-Same-Day")
   wide_syn <- longwide(sub_syn,
-                       clean_value = "cv",
+                       gcr_result = "cv",
                        inclusion_types = inc_types)
 
   # check that it has the correct amount of columns
@@ -354,7 +354,7 @@ test_that("longwide works as expected with custom values", {
 
   # check that all subjects' measurements with at least two occurrences appear
   all_obs <- sapply(unique(sub_syn$subjid), function(i) {
-    sub_group <- sub_syn[sub_syn$clean_value %in% inc_types &
+    sub_group <- sub_syn[sub_syn$gcr_result %in% inc_types &
                            sub_syn$agedays >= 730, ]
     sum(table(sub_group$agedays[sub_group$subjid == i]) >= 2)
   })
@@ -365,7 +365,7 @@ test_that("longwide works as expected with custom values", {
   # check that it includes specified inclusion types
   obs_ids <- c(wide_syn$wt_id, wide_syn$ht_id)
   expect(
-    all(sub_syn$clean_value[sub_syn$id %in% obs_ids] == inc_types),
+    all(sub_syn$gcr_result[sub_syn$id %in% obs_ids] == inc_types),
     "longwide() includes inclusion values that were not specified"
   )
 
@@ -378,7 +378,7 @@ test_that("longwide throws errors correctly", {
     syngrowth[syngrowth$subjid %in% unique(syngrowth$subjid)[1:5], ]
   sub_syn <- cbind(
     sub_syn,
-    "clean_value" = cleangrowth(
+    "gcr_result" = cleangrowth(
       subjid = sub_syn$subjid,
       param = sub_syn$param,
       agedays = sub_syn$agedays,
