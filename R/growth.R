@@ -854,10 +854,13 @@ cleanbatch <- function(data.df,
              dnext.sd.plus < -1 & dnext.sd.minus < -1,
            temp.exclude := 'Exclude-EWMA-8']
 
-        # 14h.ii.	Replace temp_exc_*=9 if the value is the first of 3 or more measurements for a subject/parameter AND d_agedays_next<365.25
-        #       AND one of the following sets of criteria are met
-        #     1.	dewma_*>2 & dewma_*_aft>1 & d_nextsd_*>1 & d_nextsd_plus_*>1 & d_nextsd_minus_*>1
-        #     2.	dewma_*<-2 & dewma_*_aft<-1 & d_nextsd_*<-1 & d_nextsd_plus_*<-1 & d_nextsd_minus_*<-1
+        # 14h.ii.	Replace temp_exc_*=9 (mark for potential exclusion) if the value is the first of 3 or more measurements for a subject/parameter 
+        #      AND d_agedays_next< 365.25 AND one of the following sets of criteria are met
+        # 
+        #     1.	dewma_*>2 & dewma_*_aft>1 & d_nextsd_*>1 & d_nextsd_plus_*>1 & d_nextsd_minus_*>1 & agedays>=30
+        #     2.	dewma_*<-2 & dewma_*_aft<-1 & d_nextsd_*<-1 & d_nextsd_plus_*<-1 & d_nextsd_minus_*<-1 & agedays>=30
+        #     3.  dewma_*>2.5 & dewma_*_aft>1 & d_nextsd_*>1 & d_nextsd_plus_*>1 & d_nextsd_minus_*>1 & agedays<30
+        #     4.  dewma_*<-4 & dewma_*_aft<-1 & d_nextsd_*<-1 & d_nextsd_plus_*<-1 & d_nextsd_minus_*<-1 & agedays<30
 
         # take advantage of other variables we have calculated to infer that a row is the first of three or more valid measurements for a paramete
         df$first.of.three.or.more <- F
@@ -873,12 +876,22 @@ cleanbatch <- function(data.df,
                dewma.all > 2 &
                  dewma.after > 1 &
                  dnext.sd > 1 &
-                 dnext.sd.plus > 1 & dnext.sd.minus > 1
+                 dnext.sd.plus > 1 & dnext.sd.minus > 1 & agedays >= 30
                |
                  dewma.all < -2 &
                  dewma.after < -1 &
                  dnext.sd < -1 &
-                 dnext.sd.plus < -1 & dnext.sd.minus < -1
+                 dnext.sd.plus < -1 & dnext.sd.minus < -1 & agedays >= 30
+               |
+                 dewma.all > 2.5 &
+                 dewma.after > 1 &
+                 dnext.sd > 1 &
+                 dnext.sd.plus > 1 & dnext.sd.minus > 1 & agedays < 30
+               |
+                 dewma.all < -4 &
+                 dewma.after < -1 &
+                 dnext.sd < -1 &
+                 dnext.sd.plus < -1 & dnext.sd.minus < -1 & agedays < 30
              ),
            temp.exclude := 'Exclude-EWMA-9']
 
