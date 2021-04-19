@@ -39,7 +39,11 @@ print(argv)
 logfile <- sprintf("output/log/log-%s.txt", argv$infile)
 
 if (argv$sdrecenter != "") {
-  sdrecenter <- fread(argv$sdrecenter)
+  if (argv$sdrecenter == "nhanes") {
+    sdrecenter = "nhanes"
+  } else {
+    sdrecenter <- fread(argv$sdrecenter)
+  }
 } else {
   sdrecenter <- ""
 }
