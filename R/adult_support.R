@@ -190,7 +190,7 @@ remove_biv_high <- function(subj_df, type, biv_df, include = F){
 #' Function to identify repeated values in WEIGHT values
 #' adds two colummns to w_subj_df:
 #'   is_first_rv: is it the first repeated value?
-#'   is_rv: is it a repeated value?
+#'   is_rv: is it a repeated value that is not a first rv
 #' @keywords internal
 #' @noRd
 identify_rv <- function(w_subj_df){
@@ -279,7 +279,7 @@ temp_sde <- function(subj_df, ptype = "height"){
 #' function to identify hundred exclusions
 #' inc_df: subj_df with temp extraneous/first rv removed
 #' dewma: delta ewma, for metric
-#' meas_col: meas_imp or meas_m
+#' meas_col: meas_im or meas_m
 #' hundreds: 100/200/300, etc.
 #' ptype: param type, "weight" or "height"
 #' mtype: m or imp (metric or imperial)
@@ -298,8 +298,11 @@ rem_hundreds <- function(inc_df, dewma, meas_col, hundreds, ptype = "weight"){
   } else {
     2
   }
+  # TODO: FIX THIS -- NOT WEIGHT
+  # these are metric limits
   llim <- (hundreds / if (grepl("_m", meas_col)){ 1 } else { 2.2046226}) - modifier
   ulim <- (hundreds / if (grepl("_m", meas_col)){ 1 } else { 2.2046226}) + modifier
+  # these are imperial limits
   llim_imp <- if (ptype == "height" | grepl("_m", meas_col)){
     llim
   } else {
@@ -330,6 +333,7 @@ rem_hundreds <- function(inc_df, dewma, meas_col, hundreds, ptype = "weight"){
     exc_down | exc_up
   }
   # end criteria depends on the number of distinct values
+  # TODO: FIX THE WEIGHT TO BE METRIC
   criteria <-
     if ((ptype == "height" & length(unique(inc_df$meas_m)) > 2) &
         (ptype == "weight" & length(inc_df$meas_m) > 2)){
@@ -601,6 +605,7 @@ ht_3d_growth_compare <- function(mean_ht, min_age, glist,
     # check based on growth
     htcompare <- ifelse(ageyears2 > 25, 25, ageyears2)
 
+    # TODO: HT COMPARE AT TOP?
     # using short circuiting
     hta <-
       if ((ageyears2 - ageyears1) < 1){
@@ -611,6 +616,7 @@ ht_3d_growth_compare <- function(mean_ht, min_age, glist,
         ht_allow(12, ageyears1, htcompare)
       }
 
+    # TODO: ADD: AGEYEARS1 < 25
     origexc <- origexc |
       (mh2 - mh1) < 0 |
       (mh2 - mh1) > hta
@@ -685,6 +691,8 @@ remove_ewma_wt <- function(subj_df, ewma_cutoff_low = 60,
       subj_df <- subj_df[subj_df$id != rem_ids[length(rem_ids)],]
       # update iteration
       iter <- iter + 1
+
+      # TODO: NEED A CERTAIN AMOUNT TO DO THIS -- CHANGE -> F
     }
   }
 

@@ -1,6 +1,8 @@
 # Main adult growthcleanr function
 # internal supporting functions for adults can be found in: adult_support.R
 
+# TODO: ADD A DATAFRAME FOR STEPS
+
 #' function to clean height and weight data for adults
 #' inputs:
 #' df: data.table with 7 columns:
@@ -132,7 +134,7 @@ cleanadult <- function(df, weight_cap = Inf){
     # only do this if there are at least two values
     if (nrow(inc_df) > 1){
 
-      criteria <- rem_unit_errors(inc_df, ptype = "weight")
+      criteria <- rem_unit_errors(inc_df, ptype = "height")
 
       # update and remove
       h_subj_keep[as.character(inc_df$id)][criteria] <- step
@@ -157,7 +159,7 @@ cleanadult <- function(df, weight_cap = Inf){
       criteria <- rem_transpositions(inc_df, ptype = "height")
 
       # update and remove
-      h_subj_keep[as.character(inc_df$id)][criteria] <- "step"
+      h_subj_keep[as.character(inc_df$id)][criteria] <- step
 
       # don't get rid of extraneous just yet
       h_subj_df <- h_subj_df[h_subj_df$id %in% inc_df$id[!criteria] |
@@ -309,7 +311,7 @@ cleanadult <- function(df, weight_cap = Inf){
     # 5w. when weight goes up/down by 100/200 kg/100-300 lbs -- is it valid?
     step <- "Exclude-Hundreds"
 
-    # we only want to consider subjects without temp extraneous
+    # we only want to consider subjects without temp extraneous and rvs
     inc_df <- copy(w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,])
 
     # only do this if there are at least two values
@@ -359,7 +361,7 @@ cleanadult <- function(df, weight_cap = Inf){
     # 6w. if a record recorded as metric should be imperial for interior values
     step <- "Exclude-Unit-Errors"
 
-    # we only want to consider subjects without temp extraneous
+    # we only want to consider subjects without temp extraneous and rvs
     inc_df <- copy(w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,])
 
     # only do this if there are at least two values
@@ -441,7 +443,7 @@ cleanadult <- function(df, weight_cap = Inf){
       # remove ones that don't match
       comb_df <- comb_df[!(is.na(comb_df$id.h) | (is.na(comb_df$id.w))),]
 
-      # you need at least two values for this -- can't evaluate next/previous for
+      # you need at least three values for this -- can't evaluate next/previous for
       # first and last values
       if (nrow(comb_df) >= 3){
         # identify safe swaps
@@ -512,17 +514,11 @@ cleanadult <- function(df, weight_cap = Inf){
         swap_wt_close <-
           (abs(comb_df$dewma.all.swap_w) <= 2 |
              abs(comb_df$swap_prev_w) <= 2 |
-             abs(comb_df$swap_next_w) <= 2) #|
-        # (abs(comb_df$dewma.all.swap_im_w) <= 2 |
-        #    abs(comb_df$swap_im_prev_w) <= 2 |
-        #    abs(comb_df$swap_im_next_w) <= 2)
+             abs(comb_df$swap_next_w) <= 2)
         swap_ht_close <-
           (abs(comb_df$dewma.all.swap_h) <= 2.54 |
              abs(comb_df$swap_prev_h) <= 2.54 |
-             abs(comb_df$swap_next_h) <= 2.54) #|
-        # (abs(comb_df$dewma.all.swap_im_h) <= 2.54 |
-        #    abs(comb_df$swap_im_prev_h) <= 2.54 |
-        #    abs(comb_df$swap_im_next_h) <= 2.54)
+             abs(comb_df$swap_next_h) <= 2.54)
 
         exc_swap <- wt_far & ht_far & swap_wt_close & swap_ht_close
         # replace noswaps
@@ -561,7 +557,7 @@ cleanadult <- function(df, weight_cap = Inf){
       }
     }
 
-    # finish height steps (steps 9-11) ----
+    # height steps (steps 9-11) ----
     # 9h, H same day extraneous ----
     # 9h. reevaluate same day extraneous for exclusion
     # step specified inside
@@ -668,9 +664,10 @@ cleanadult <- function(df, weight_cap = Inf){
 
       # if criteria didn't catch it, we now compare with medians
       if (!all(criteria) & any(h_subj_df$extraneous)){
-        med <- median(h_subj_df$measurement[
+        med <- median(h_subj_df$meas_m[
           !h_subj_df$age_days %in% dup_days
         ])
+        # TODO: CHECK THIS
         h_subj_df$absdiff <- NA
         h_subj_df$absdiff[h_subj_df$age_days %in% dup_days] <-
           abs(med - h_subj_df$diff[h_subj_df$age_days %in% dup_days])
@@ -694,6 +691,7 @@ cleanadult <- function(df, weight_cap = Inf){
             n_ind <- nrow(h_subj_df)
           }
 
+          # TODO: CHECK ABSDIFF??
           compare <-
             abs(mm[curr_ind] - mm[p_ind]) < 2.541 &
             abs(mm[curr_ind] - mm[n_ind]) < 2.541 &
@@ -777,10 +775,6 @@ cleanadult <- function(df, weight_cap = Inf){
           pairhtgain <- T
         }
 
-        # generate keep ratios for height 1 and 2
-        keepht1 <- sum(ht_1_log) >= (sum(ht_2_log)*(4/3))
-        keepht2 <- sum(ht_2_log) >= (sum(ht_1_log)*(4/3))
-
         # potential reallow: falls are <= 3 (+2) in or <= 5 (+2) for ageyears > 50
         pairhtloss <-
           (ht_1 > ht_2) &
@@ -793,6 +787,10 @@ cleanadult <- function(df, weight_cap = Inf){
         if (exc_pairs){
           criteria <- rep(T, nrow(h_subj_df))
         }
+
+        # generate keep ratios for height 1 and 2
+        keepht1 <- sum(ht_1_log) >= (sum(ht_2_log)*(4/3))
+        keepht2 <- sum(ht_2_log) >= (sum(ht_1_log)*(4/3))
 
         # reallow if the ratios are satisfied
         if (keepht1){
@@ -888,8 +886,9 @@ cleanadult <- function(df, weight_cap = Inf){
             suppressWarnings(min(ga))
           })
 
-          # check g2 v g1 -- true indicates reinclude all
-          g2_g1_incl_check <-
+          # check g2 v g1 -- true indicates use the original exclusions
+          # TODO: CHECK
+          g2_g1_check <-
             if (!is.na(mean_ht[2])){
               (mean_ht[2] - mean_ht[1]) < 0 &
                 ((min_age[2] < 50 &
@@ -927,13 +926,13 @@ cleanadult <- function(df, weight_cap = Inf){
 
           # if g2 g1 check passess, reinclude all
           # TODO: CHECK IF SHOULD BE ANY OR ALL
-          if (any(g2_g1_incl_check)){
-            criteria <- rep(F, nrow(h_subj_df))
-          }
+          # if (any(g2_g1_incl_check)){
+          #   criteria <- rep(F, nrow(h_subj_df))
+          # }
 
           # if all are false, reinclude all?
           # TODO: CHECK THIS
-          if (all(!c(g3_g2_check, g3_g1_check))){
+          if (all(!c(g3_g2_check, g3_g1_check, g2_g1_check))){
             criteria <- rep(F, nrow(h_subj_df))
           }
         }
@@ -986,6 +985,8 @@ cleanadult <- function(df, weight_cap = Inf){
     h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
 
     h_subj_df <- h_subj_df[!criteria,]
+
+    # TODO: MEAN HTS -- STEP 11H
 
     # finish weight steps (steps 9-12) ----
 
@@ -1164,9 +1165,7 @@ cleanadult <- function(df, weight_cap = Inf){
         # keep the first one that satisfies this criteria
         rem_ids <- c()
         for (dd in dup_days){
-          # TODO: DOES COMPARE ALWAYS IMPLY LESS 5?
           compare <- abs(dewma$dewma.all[w_subj_df$age_days == dd]) <= 2.001
-          # TODO: CHECK IF THIS IS ONLY FOR THE SPECIFIC DAY AND SUBJECT
           less_5 <- abs(dewma$dewma.all[w_subj_df$age_days == dd]) < 5
 
           comp_id <-
@@ -1186,6 +1185,9 @@ cleanadult <- function(df, weight_cap = Inf){
       w_subj_keep[as.character(w_subj_df$id)][criteria] <- step
 
       w_subj_df <- w_subj_df[!criteria,]
+
+      # TODO: ADD RVS FOR ERVERY TIME YOU CALCULATE TEMP SDE
+      # TODO: ADD RVS HERE
     }
 
     # 11w, W distinct/moderate EWMA ----
@@ -1247,7 +1249,7 @@ cleanadult <- function(df, weight_cap = Inf){
       # TODO: ASK WHAT THIS MEANS
       # set a limit for wts to be percent of other wts, focused on lower wts
       perc_limit <- .7
-      if (any(w_subj_df$meas_m > 45)){
+      if (all(w_subj_df$meas_m > 45)){
         perc_limit <- .4
       }
 
@@ -1270,10 +1272,8 @@ cleanadult <- function(df, weight_cap = Inf){
       while (change){
         # TODO: ASK WHAT THIS MEANS -- VECTOR?
         # set a limit for wts to be percent of other wts, focused on lower wts
-        perc_limit <- .7
-        if (any(w_subj_df$meas_m > 45)){
-          perc_limit <- .4
-        }
+        perc_limit <- rep(.7, nrow(w_subj_df))
+        perc_limit[w_subj_df$meas_m > 45] <- .4
 
         # figure out time difference between points
         ageyears_bef <- c(Inf, diff(inc_df$age_years))
@@ -1299,6 +1299,7 @@ cleanadult <- function(df, weight_cap = Inf){
         }), NA)
         # extrapolation -- prior weights
         lepolate_p <- binerr_lepolate_p <- c(rep(NA,2))
+        # TODO: CHECK IF AT LEAST 3
         for (x in 3:nrow(inc_df)){
           slope <- (inc_df$meas_m[x-1] - inc_df$meas_m[x-2])/
             (inc_df$age_days[x-1] - inc_df$age_days[x-2])
@@ -1382,8 +1383,8 @@ cleanadult <- function(df, weight_cap = Inf){
         exc_mod_ewma[is.na(exc_mod_ewma)] <- F
 
         # identify binerr criteria -- edge ones are marked as true
-        binerr_lepolate_n[is.na(binerr_lepolate_n)] <- T
-        binerr_lepolate_p[is.na(binerr_lepolate_p)] <- T
+        binerr_lepolate_n[is.na(binerr_lepolate_n)] <- F
+        binerr_lepolate_p[is.na(binerr_lepolate_p)] <- F
         binerr_interpol[is.na(binerr_interpol)] <- F
         exc_binerr <- !binerr_lepolate_p & !binerr_lepolate_n & !binerr_interpol
         # alternate binerr crtieria -- if difference with adjacent within wta and
@@ -1446,8 +1447,37 @@ cleanadult <- function(df, weight_cap = Inf){
 
     w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids),]
 
-    # 12, distinct 1 ----
-    # 12.  determine if single values in height/weight fall within BMI criteria
+    # no need to do rvs -- no need in the future
+
+    # 12w, W weight cap influence ----
+    # 12w. Check, if a weight cap is specified, if there are any remaining after
+    # the preceding steps -- they may have some influence on remaining data.
+    step <- "Exclude-Possibly-Impacted-By-Weight-Cap"
+
+    if (weight_cap < Inf & nrow(w_subj_df) > 0){
+      # weight cap is evaluated with +/ .1 (for precision)
+      wc_low <- round(weight_cap, 1) - .1
+      wc_high <- round(weight_cap, 1) + .1
+      is_wc <- check_between(inc_df$meas_m, wc_low, wc_high)
+
+      # if there are any weight caps left, we need to propagate out
+      if (any(is_wc)){
+        # if there are any left, we need to mark everything for exclusion
+        criteria <- w_subj_keep == "Include"
+
+        # remove based on above criteria
+        rem_ids <- names(w_subj_keep)[criteria]
+
+        # update and remove
+        w_subj_keep[rem_ids] <- step
+
+        # remove everything from weight, we don't use it anymore
+        w_subj_df <- w_subj_df[c(),]
+      }
+    }
+
+    # 13, distinct 1 ----
+    # 13.  determine if single values in height/weight fall within BMI criteria
     step <- "Exclude-Distinct-Single"
 
     # only do this if there's 1 distinct in either height or weight
@@ -1472,6 +1502,7 @@ cleanadult <- function(df, weight_cap = Inf){
         # calculate bmi
         comb_df$bmi <- comb_df$meas_m.w/((comb_df$meas_m.h/100)^2)
 
+        # TODO: DATAFRAME OF THESE 8 PARAMETERS
         # check if it's in a more common range, then have wider limits
         h_exc_btw <-
           check_between(comb_df$bmi, 16, 60) &
@@ -1516,28 +1547,37 @@ cleanadult <- function(df, weight_cap = Inf){
       }
       # no bmis available -- no matches
       if (nrow(comb_df) == 0){
-        exc_ht <-
-          !check_between(h_subj_df$meas_m, 139, 206) &
-          length(unique(h_subj_df$meas_m)) == 1
-        exc_wt <-
-          !check_between(w_subj_df$meas_m, 40, 225) &
-          length(unique(w_subj_df$meas_m)) == 1
+        if (nrow(h_subj_df) > 0){
+          exc_ht <-
+            !check_between(h_subj_df$meas_m, 139, 206) &
+            length(unique(h_subj_df$meas_m)) == 1
 
-        # remove based on above criteria
-        rem_ids_ht <- h_subj_df$id[exc_ht]
-        rem_ids_wt <- w_subj_df$id[exc_wt]
+          # remove based on above criteria
+          rem_ids_ht <- h_subj_df$id[exc_ht]
 
-        # update and remove
-        h_subj_keep[rem_ids_ht] <- step
-        w_subj_keep[rem_ids_wt] <- step
+          # update and remove
+          h_subj_keep[rem_ids_ht] <- step
 
-        h_subj_df <- h_subj_df[!h_subj_df$id %in% rem_ids_ht,]
-        w_subj_df <- w_subj_df[!w_subj_df$id %in% rem_ids_wt,]
+          h_subj_df <- h_subj_df[!h_subj_df$id %in% rem_ids_ht,]
+        }
+
+        if (nrow(w_subj_df) > 0){
+          exc_wt <-
+            !check_between(w_subj_df$meas_m, 40, 225) &
+            length(unique(w_subj_df$meas_m)) == 1
+
+          # update and remove
+          rem_ids_wt <- w_subj_df$id[exc_wt]
+
+          w_subj_keep[rem_ids_wt] <- step
+
+          w_subj_df <- w_subj_df[!w_subj_df$id %in% rem_ids_wt,]
+        }
       }
     }
 
-    # 13h, H error load ----
-    # 13h. compute error load -- whether there are too many errors and all
+    # 14h, H error load ----
+    # 14h. compute error load -- whether there are too many errors and all
     # should be excluded
     step <- "Exclude-Error-Load"
 
@@ -1548,10 +1588,10 @@ cleanadult <- function(df, weight_cap = Inf){
       # compute include -- without sde
       num_inc <- sum(!grepl("Same-Day", h_subj_keep) & h_subj_keep == "Include")
 
-      # if there are greater than 33.33% errors for a subject, fill everything
+      # if there are greater than 40% errors for a subject, fill everything
       # with errors
-      if (num_err/num_inc > 1/3){
-        criteria <- h_subj_keep != "Include"
+      if (num_err/num_inc > .4){
+        criteria <- h_subj_keep == "Include"
 
         # remove based on above criteria
         rem_ids <- names(h_subj_keep)[criteria]
@@ -1563,8 +1603,8 @@ cleanadult <- function(df, weight_cap = Inf){
       }
     }
 
-    # 13w, W error load ----
-    # 13w. compute error load -- whether there are too many errors and all
+    # 14w, W error load ----
+    # 14w. compute error load -- whether there are too many errors and all
     # should be excluded
     step <- "Exclude-Error-Load"
 
@@ -1575,10 +1615,10 @@ cleanadult <- function(df, weight_cap = Inf){
       # compute include -- without sde
       num_inc <- sum(!grepl("Same-Day", w_subj_keep) & w_subj_keep == "Include")
 
-      # if there are greater than 33.33% errors for a subject, fill everything
+      # if there are greater than 40% errors for a subject, fill everything
       # with errors
-      if (num_err/num_inc > 1/3){
-        criteria <- w_subj_keep != "Include"
+      if (num_err/num_inc > .4){
+        criteria <- w_subj_keep == "Include"
 
         # remove based on above criteria
         rem_ids <- names(w_subj_keep)[criteria]

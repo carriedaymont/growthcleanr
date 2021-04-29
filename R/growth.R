@@ -564,6 +564,7 @@ cleangrowth <- function(subjid,
     exclude = c(as.character(ret.df$exclude), res$result),
     mean_sde = c(rep(NA, nrow(ret.df)), res$mean_sde)
   )
+  # TODO: LEVELS FACTOR
   # it's not an ordered factor... how important is that?
   full_out[, exclude := factor(exclude, levels = unique(exclude))]
   full_out <- full_out[order(line),]
