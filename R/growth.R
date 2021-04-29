@@ -854,9 +854,9 @@ cleanbatch <- function(data.df,
              dnext.sd.plus < -1 & dnext.sd.minus < -1,
            temp.exclude := 'Exclude-EWMA-8']
 
-        # 14h.ii.	Replace temp_exc_*=9 (mark for potential exclusion) if the value is the first of 3 or more measurements for a subject/parameter 
+        # 14h.ii.	Replace temp_exc_*=9 (mark for potential exclusion) if the value is the first of 3 or more measurements for a subject/parameter
         #      AND d_agedays_next< 365.25 AND one of the following sets of criteria are met
-        # 
+        #
         #     1.	dewma_*>2 & dewma_*_aft>1 & d_nextsd_*>1 & d_nextsd_plus_*>1 & d_nextsd_minus_*>1 & agedays>=30
         #     2.	dewma_*<-2 & dewma_*_aft<-1 & d_nextsd_*<-1 & d_nextsd_plus_*<-1 & d_nextsd_minus_*<-1 & agedays>=30
         #     3.  dewma_*>2.5 & dewma_*_aft>1 & d_nextsd_*>1 & d_nextsd_plus_*>1 & d_nextsd_minus_*>1 & agedays<30
@@ -1722,9 +1722,13 @@ cleangrowth <- function(subjid,
                         log.path = ".",
                         parallel = F,
                         num.batches = NA,
-                        quietly = T) {
+                        quietly = T,
+                        adult_cutpoint = 20,
+                        weight_cap = Inf) {
+  # preprocessing ----
+
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
-  data.all <- data.table(
+  data.all.ages <- data.table(
     line = seq_along(measurement),
     subjid = as.factor(subjid),
     param,
@@ -1734,6 +1738,32 @@ cleangrowth <- function(subjid,
       sex %in% c(0, 'm', 'M'), 0, ifelse(sex %in% c(1, 'f', 'F'), 1, NA)
     ))
   )
+
+  # quality checks
+  if (!is.numeric(adult_cutpoint)){
+    stop("adult_cutpoint not numeric. Please enter a number between 18 and 20.")
+  }
+  if (!is.numeric(weight_cap)){
+    stop("weight_cap not numeric. Please enter a positive number.")
+  }
+
+  # rate limit cutpoint -- min 18, max 20
+  cutpoint_update <-
+    if (adult_cutpoint < 18){
+      18
+    } else if (adult_cutpoint > 20){
+      20
+    } else {
+      adult_cutpoint
+    }
+
+  # split by cutpoint
+  # for ease, data.all will refer to pediatric data; data.adult will refer to
+  # adult data -- copy to make sure they're separate
+  data.all <- copy(data.all.ages[agedays < adult_cutpoint*365.25,])
+  data.adult <- copy(data.all.ages[agedays >= adult_cutpoint*365.25,])
+
+  # TODO: ADD PARALLEL FOR ADULTS
 
   # if parallel processing is desired, load additional modules
   if (parallel) {
@@ -1761,6 +1791,12 @@ cleangrowth <- function(subjid,
     key = 'subjid'
   )
   data.all <- batches.all[data.all]
+
+  # pediatric: height velocity calculations and preprocessing ----
+
+  if (!quietly){
+    cat(sprintf("[%s] Begin processing pediatric data...\n", Sys.time()))
+  }
 
   # load tanner height velocity data. sex variable is defined such that 0=male and 1=female
   # recode column names to match syntactic style ("." rather than "_" in variable names)
@@ -2016,6 +2052,8 @@ cleangrowth <- function(subjid,
   # safety check: treat observations where tbc.sd cannot be calculated as missing
   data.all[is.na(tbc.sd), exclude := 'Missing']
 
+  # pediatric: cleanbatch (most of steps) ----
+
   # NOTE: the rest of cleangrowth's steps are done through cleanbatch().
 
   # optionally process batches in parallel
@@ -2075,9 +2113,45 @@ cleangrowth <- function(subjid,
     stopCluster(cl)
   }
   if (!quietly)
-    cat(sprintf("[%s] Done!\n", Sys.time()))
+    cat(sprintf("[%s] Done with pediatric data!\n", Sys.time()))
 
-  return(ret.df$exclude[order(ret.df$line)])
+  # adult: send to cleanadult to do most of the work ----
+
+  if (!quietly){
+    cat(sprintf("[%s] Begin processing adult data...\n", Sys.time()))
+  }
+
+  # no need to do this if there's no data
+  if (nrow(data.adult) > 0){
+    # add age in years
+    data.adult[, age_years := agedays/365.25]
+    # rename for ease of use
+    data.adult[, measurement := v]
+    data.adult[, id := line]
+
+    # do the cleaning
+    res <- cleanadult(copy(data.adult), weight_cap = weight_cap)
+  } else {
+    res <- data.table()
+  }
+
+  if (!quietly)
+    cat(sprintf("[%s] Done with adult data!\n", Sys.time()))
+
+  # join with pediatric data
+  full_out <- data.table(
+    line = c(ret.df$line, res$line),
+    exclude = c(as.character(ret.df$exclude), res$result),
+    mean_sde = c(rep(NA, nrow(ret.df)), res$mean_sde)
+  )
+  # it's not an ordered factor... how important is that?
+  full_out[, exclude := factor(exclude, levels = unique(exclude))]
+  full_out <- full_out[order(line),]
+  # remove column added for keeping track
+  full_out[, line := NULL]
+
+  # TODO: RETURNING EXCLUDE, NEED TO RETURN MEAN_sDE
+  return(full_out$exclude)
 
 }
 
