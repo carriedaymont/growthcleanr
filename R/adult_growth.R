@@ -29,8 +29,8 @@ cleanadult <- function(df, weight_cap = Inf){
   # begin implementation ----
 
   # preallocate final designation
+  df[, id := as.character(id)]
   df[, result := "Include"]
-  df[, mean_sde := NA]
   # rownames(df) <- df$id # NO ROWNAMES IN DATA.TABLE
   # go through each subject
   for (i in unique(df$subjid)){
@@ -1051,7 +1051,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # don't do this if there aren't any non extraneous for the subject
     if (nrow(w_subj_df) > 0 & any(w_subj_df$extraneous)){
-      step <- "10w, W same day identical"
+      step <- "Exclude-Same-Day-Identical"
 
       # identify duplicate days
       dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
@@ -1060,7 +1060,7 @@ cleanadult <- function(df, weight_cap = Inf){
       ide_ids <- c() # where we keep the identical ones
       for (dd in dup_days){
         # count amount of unique values
-        s_df <- w_subj_df[w_subj_df$age_days == dd,]
+        s_df <- copy(w_subj_df[w_subj_df$age_days == dd,])
         ide_tab <- table(s_df$meas_m)
         if (any(ide_tab > 1)){
           # for each identical, keep only the first one, by id
@@ -1076,10 +1076,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
       # we're going to update h_subj_df before moving on to the rest of this
       # subject
-      w_subj_keep[as.character(w_subj_df$id)][criteria] <-
-        "Implausible"
-      w_subj_reason[as.character(w_subj_df$id)][criteria] <-
-        paste0("Implausible, Step ",step)
+      w_subj_keep[as.character(w_subj_df$id)][criteria] <- step
 
       w_subj_df <- w_subj_df[!criteria,]
 
@@ -1090,14 +1087,14 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
       }
 
-      step <- "10w, W same day extraneous"
+      step <- "Exclude-Same-Day-Extraneous"
       # now the rest!
 
       # check if heights on duplicate days are trivially the same, keep both,
       # use mean for all of those
       rem_ids <- c()
       for (dd in dup_days){
-        s_df <- w_subj_df[w_subj_df$age_days == dd,]
+        s_df <- copy(w_subj_df[w_subj_df$age_days == dd,])
         sde_range <- max(s_df$meas_m) - min(s_df$meas_m)
         if (sde_range < 1.001){ # 1 pound
           w_subj_df$mean_sde[w_subj_df$age_days == dd] <-
@@ -1116,10 +1113,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
       # we're going to update w_subj_df before moving on to the rest of this
       # subject
-      w_subj_keep[as.character(w_subj_df$id)][criteria] <-
-        "Implausible"
-      w_subj_reason[as.character(w_subj_df$id)][criteria] <-
-        paste0("Implausible, Step ",step)
+      w_subj_keep[as.character(w_subj_df$id)][criteria] <- step
       # also update mean sde
       w_subj_mean_sde[as.character(w_subj_df$id)] <- w_subj_df$mean_sde
 
@@ -1155,7 +1149,7 @@ cleanadult <- function(df, weight_cap = Inf){
         }
 
       # if criteria didn't catch it, we now compare with medians
-      if (!all(criteria)){
+      if (!all(criteria) & any(w_subj_df$extraneous)){
         # calculate ewma
         # calculate ewma (using metric)
         ewma_res <- ewma_dn(w_subj_df$age_days, w_subj_df$meas_m,
@@ -1187,10 +1181,7 @@ cleanadult <- function(df, weight_cap = Inf){
         criteria <- w_subj_df$id %in% rem_ids
       }
 
-      w_subj_keep[as.character(w_subj_df$id)][criteria] <-
-        "Implausible"
-      w_subj_reason[as.character(w_subj_df$id)][criteria] <-
-        paste0("Implausible, Step ",step)
+      w_subj_keep[as.character(w_subj_df$id)][criteria] <- step
 
       w_subj_df <- w_subj_df[!criteria,]
     }
@@ -1221,7 +1212,7 @@ cleanadult <- function(df, weight_cap = Inf){
       # 11wa, W distinct ordered pairs ----
       # 11wa. Check pairs (2 distinct ordered values), where all first values are
       # of ages less than second values
-      step <- "11wa, W distinct ordered pairs"
+      step <- "Exclude-Distinct-Ordered-Pairs"
 
       # get first and last weight -- already ordered by age
       # all first are before all last, so these will be the two distinct values
@@ -1266,9 +1257,9 @@ cleanadult <- function(df, weight_cap = Inf){
       # 11wb, W moderate EWMA ----
       # 11wb. Check all other types, using a more moderate EWMA cutoff and other
       # criteria
-      step <- "11wb, W moderate EWMA"
+      step <- "Exclude-Moderate-EWMA"
 
-      inc_df <- w_subj_df
+      inc_df <- copy(w_subj_df)
 
       # exclude the most extreme, then recalculate again and again
       rem_ids <- c()
@@ -1392,7 +1383,7 @@ cleanadult <- function(df, weight_cap = Inf){
         binerr_lepolate_n[is.na(binerr_lepolate_n)] <- T
         binerr_lepolate_p[is.na(binerr_lepolate_p)] <- T
         binerr_interpol[is.na(binerr_interpol)] <- F
-        exc_binerr <- binerr_lepolate_p & binerr_lepolate_n & !binerr_interpol
+        exc_binerr <- !binerr_lepolate_p & !binerr_lepolate_n & !binerr_interpol
         # alternate binerr crtieria -- if difference with adjacent within wta and
         # difference in agedays <= 14
         alt_exc_binerr <-
@@ -1427,7 +1418,7 @@ cleanadult <- function(df, weight_cap = Inf){
           to_rem <- which.max(ewmaratio[criteria_new])
 
           # keep the ids that failed and remove
-          rem_ids[length(rem_ids)+1] <- inc_df[criteria_new,][to_rem, "id"]
+          rem_ids[length(rem_ids)+1] <- unlist(inc_df[criteria_new,][to_rem, "id"])
           inc_df <- inc_df[inc_df$id != rem_ids[length(rem_ids)],]
 
           # check if this is viable -- you need at least three points, otherwise
@@ -1449,27 +1440,30 @@ cleanadult <- function(df, weight_cap = Inf){
     impl_ids <- as.character(w_subj_df$id)[criteria]
 
     # update and remove
-    w_subj_keep[c(impl_ids)] <- "Implausible"
-    w_subj_reason[impl_ids] <- paste0("Implausible, Step ",step)
+    w_subj_keep[c(impl_ids)] <- step
 
     w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids),]
 
     # 12, distinct 1 ----
     # 12.  determine if single values in height/weight fall within BMI criteria
-    step <- "12, distinct 1"
+    step <- "Exclude-Distinct-Single"
 
     # only do this if there's 1 distinct in either height or weight
     if (length(unique(h_subj_df$meas_m)) == 1 |
         length(unique(w_subj_df$meas_m)) == 1){
       # match and create BMIs
 
-      # possible removal of height/weights by bmi
-      # h = height, w = weight
-      comb_df <- comb_df_orig <-
-        merge(h_subj_df, w_subj_df, by = "age_days", all = T,
-              suffixes = c(".h", ".w"))
-      # remove ones that don't match
-      comb_df <- comb_df[!(is.na(comb_df$id.h) | (is.na(comb_df$id.w))),]
+      if (nrow(h_subj_df) > 0 & nrow(w_subj_df) > 0){
+        # possible removal of height/weights by bmi
+        # h = height, w = weight
+        comb_df <- comb_df_orig <-
+          merge(h_subj_df, w_subj_df, by = "age_days", all = T,
+                suffixes = c(".h", ".w"))
+        # remove ones that don't match
+        comb_df <- comb_df[!(is.na(comb_df$id.h) | (is.na(comb_df$id.w))),]
+      } else {
+        comb_df <- data.table()
+      }
 
       # must be matches
       if (nrow(comb_df) > 0){
@@ -1500,23 +1494,24 @@ cleanadult <- function(df, weight_cap = Inf){
         rem_ids_wt <- comb_df$id.w[w_exc_btw | rep(w_bmi_out, nrow(comb_df))]
 
         # update and remove
-        h_subj_keep[rem_ids_ht] <- "Implausible"
-        h_subj_reason[rem_ids_ht] <- paste0("Implausible, Step ",step)
-        w_subj_keep[rem_ids_wt] <- "Implausible"
-        w_subj_reason[rem_ids_wt] <- paste0("Implausible, Step ",step)
+        h_subj_keep[rem_ids_ht] <- step
+        w_subj_keep[rem_ids_wt] <- step
 
         h_subj_df <- h_subj_df[!h_subj_df$id %in% rem_ids_ht,]
         w_subj_df <- w_subj_df[!w_subj_df$id %in% rem_ids_wt,]
       }
 
       # combine again, then check if still 1D
-      # h = height, w = weight
-      comb_df <- comb_df_orig <-
-        merge(h_subj_df, w_subj_df, by = "age_days", all = T,
-              suffixes = c(".h", ".w"))
-      # remove ones that don't match
-      comb_df <- comb_df[!(is.na(comb_df$id.h) | (is.na(comb_df$id.w))),]
-
+      if (nrow(h_subj_df) > 0 & nrow(w_subj_df) > 0){
+        # h = height, w = weight
+        comb_df <- comb_df_orig <-
+          merge(h_subj_df, w_subj_df, by = "age_days", all = T,
+                suffixes = c(".h", ".w"))
+        # remove ones that don't match
+        comb_df <- comb_df[!(is.na(comb_df$id.h) | (is.na(comb_df$id.w))),]
+      } else {
+        comb_df <- data.table()
+      }
       # no bmis available -- no matches
       if (nrow(comb_df) == 0){
         exc_ht <-
@@ -1531,10 +1526,8 @@ cleanadult <- function(df, weight_cap = Inf){
         rem_ids_wt <- w_subj_df$id[exc_wt]
 
         # update and remove
-        h_subj_keep[rem_ids_ht] <- "Implausible"
-        h_subj_reason[rem_ids_ht] <- paste0("Implausible, Step ",step)
-        w_subj_keep[rem_ids_wt] <- "Implausible"
-        w_subj_reason[rem_ids_wt] <- paste0("Implausible, Step ",step)
+        h_subj_keep[rem_ids_ht] <- step
+        w_subj_keep[rem_ids_wt] <- step
 
         h_subj_df <- h_subj_df[!h_subj_df$id %in% rem_ids_ht,]
         w_subj_df <- w_subj_df[!w_subj_df$id %in% rem_ids_wt,]
@@ -1544,26 +1537,25 @@ cleanadult <- function(df, weight_cap = Inf){
     # 13h, H error load ----
     # 13h. compute error load -- whether there are too many errors and all
     # should be excluded
-    step <- "13h, H error load"
+    step <- "Exclude-Error-Load"
 
     # no need to do this if everything is already excluded
     if (nrow(h_subj_df) > 0){
       # compute errors -- without sde
-      num_err <- sum(!grepl("same day", h_subj_reason) & h_subj_reason != "")
+      num_err <- sum(!grepl("Same-Day", h_subj_keep) & h_subj_keep != "Include")
       # compute include -- without sde
-      num_inc <- sum(!grepl("same day", h_subj_reason) & h_subj_reason == "")
+      num_inc <- sum(!grepl("Same-Day", h_subj_keep) & h_subj_keep == "Include")
 
       # if there are greater than 33.33% errors for a subject, fill everything
       # with errors
       if (num_err/num_inc > 1/3){
-        criteria <- h_subj_reason == ""
+        criteria <- h_subj_keep != "Include"
 
         # remove based on above criteria
-        rem_ids <- names(h_subj_reason)[criteria]
+        rem_ids <- names(h_subj_keep)[criteria]
 
         # update and remove
-        h_subj_keep[rem_ids] <- "Implausible"
-        h_subj_reason[rem_ids] <- paste0("Implausible, Step ",step)
+        h_subj_keep[rem_ids] <- step
 
         # no need to update h, since we're done
       }
@@ -1572,28 +1564,27 @@ cleanadult <- function(df, weight_cap = Inf){
     # 13w, W error load ----
     # 13w. compute error load -- whether there are too many errors and all
     # should be excluded
-    step <- "13w, W error load"
+    step <- "Exclude-Error-Load"
 
     # no need to do this if everything is already excluded
     if (nrow(w_subj_df) > 0){
       # compute errors -- without sde
-      num_err <- sum(!grepl("same day", w_subj_reason) & w_subj_reason != "")
+      num_err <- sum(!grepl("Same-Day", w_subj_keep) & w_subj_keep != "Include")
       # compute include -- without sde
-      num_inc <- sum(!grepl("same day", w_subj_reason) & w_subj_reason == "")
+      num_inc <- sum(!grepl("Same-Day", w_subj_keep) & w_subj_keep == "Include")
 
       # if there are greater than 33.33% errors for a subject, fill everything
       # with errors
       if (num_err/num_inc > 1/3){
-        criteria <- w_subj_reason == ""
+        criteria <- w_subj_keep != "Include"
 
         # remove based on above criteria
-        rem_ids <- names(w_subj_reason)[criteria]
+        rem_ids <- names(w_subj_keep)[criteria]
 
         # update and remove
-        w_subj_keep[rem_ids] <- "Implausible"
-        w_subj_reason[rem_ids] <- paste0("Implausible, Step ",step)
+        w_subj_keep[rem_ids] <- step
 
-        # no need to update h, since we're done
+        # no need to update w, since we're done
       }
     }
 
@@ -1601,14 +1592,26 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # add results to full dataframe
     if (nrow(h_df) > 0){
-      df[names(h_subj_keep), "result"] <- h_subj_keep
-      df[names(h_subj_reason), "reason"] <- h_subj_reason
-      df[names(h_subj_mean_sde), "mean_sde"] <- h_subj_mean_sde
+      # create a data.table for easy joining
+      h_out <- data.table(
+        id = names(h_subj_keep),
+        keep = h_subj_keep,
+        mean_sde = h_subj_mean_sde
+      )
+
+      df[h_out, result := i.keep, on = .(id)]
+      df[h_out, mean_sde := i.mean_sde, on = .(id)]
     }
     if (nrow(w_df) > 0){
-      df[names(w_subj_keep), "result"] <- w_subj_keep
-      df[names(w_subj_reason), "reason"] <- w_subj_reason
-      df[names(w_subj_mean_sde), "mean_sde"] <- w_subj_mean_sde
+      # create a data.table for easy joining
+      w_out <- data.table(
+        id = names(w_subj_keep),
+        keep = w_subj_keep,
+        mean_sde = w_subj_mean_sde
+      )
+
+      df[w_out, result := i.keep, on = .(id)]
+      df[w_out, mean_sde := i.mean_sde, on = .(id)]
     }
 
     # complete ----
