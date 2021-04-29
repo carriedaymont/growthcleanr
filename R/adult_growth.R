@@ -174,12 +174,11 @@ cleanadult <- function(df, weight_cap = Inf){
     w_df <- w_df[order(age_years, id),]
 
     w_subj_keep <- rep("Include", nrow(w_df))
-    w_subj_reason <- rep("", nrow(w_df))
     w_subj_mean_sde <- rep(NA, nrow(w_df))
-    names(w_subj_keep) <- names(w_subj_reason) <- names(w_subj_mean_sde) <-
+    names(w_subj_keep) <- names(w_subj_mean_sde) <-
       w_df$id
 
-    w_subj_df <- w_df
+    w_subj_df <- copy(w_df)
 
     if (nrow(w_df) > 0){
       # add metric (m) and imperial (im) measurements
@@ -191,35 +190,34 @@ cleanadult <- function(df, weight_cap = Inf){
       w_subj_df$meas_im[w_subj_df$param == "WEIGHTKG"] <-
         w_subj_df$measurement[w_subj_df$param == "WEIGHTKG"]*2.2046226
 
-      # convert age years to days
-      w_subj_df$age_days <- w_subj_df$age_years*365.25
+      # convert age years to days -- already exists
+      w_subj_df$age_days <- w_subj_df$agedays
     }
 
     # if there are no valid heights, skip
     if (nrow(w_subj_df) > 0){
       # 1w, W BIV ----
       # 1w. remove biologically impossible weight records
-      step <- "1w, W BIV"
+      step <- "Exclude-BIV"
 
       # overwrite measurement with metric (bivs are in metric)
       w_subj_df$measurement <- w_subj_df$meas_m
 
       criteria <- remove_biv(w_subj_df, "weight", biv_df)
-      w_subj_keep[criteria] <- "Implausible"
-      w_subj_reason[criteria] <- paste0("Implausible, Step ",step)
+      w_subj_keep[criteria] <- step
 
       w_subj_df <- w_subj_df[!criteria,]
     }
 
     # 2w, W repeated values ----
     # 2w. Identify repeated values (RV) -- values that are the same over different days
-    step <- "2w, W repeated values"
+    step <- "repeated values" # no exclusions here
 
     w_subj_df <- identify_rv(w_subj_df)
 
     # 3w, W temp extraneous ----
     # 3w. Calculate temporary extraneous for exclusion in intermediate steps
-    step <- "3w, W temp extraneous"
+    step <- "temp extraneous" # no exclusions here
 
     if (nrow(w_subj_df) > 0){
       # overwrite measurement with metric (step done in metric)
@@ -232,7 +230,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
       # redo RVs just if any first RVs became extraneous
       if (any(w_subj_df$extraneous & w_subj_df$is_first_rv)){
-        inc_df <- w_subj_df[!w_subj_df$extraneous,]
+        inc_df <- copy(w_subj_df[!w_subj_df$extraneous,])
         inc_df <- identify_rv(inc_df)
 
         # reassign new rvs to weight df -- ordered the same way
@@ -244,10 +242,10 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 4w, W weight cap ----
     # 4w. excluding specified "weight caps" if a user specifies
-    step <- "4w, W weight cap"
+    step <- "Exclude-Weight-Cap"
 
     # we only want to consider subjects without temp extraneous
-    inc_df <- w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,]
+    inc_df <- copy(w_subj_df[!w_subj_df$extraneous,])
 
     # only do this if there are at least two values, and if there's a weight cap
     # to evaluate
@@ -294,11 +292,10 @@ cleanadult <- function(df, weight_cap = Inf){
       impl_ids <- as.character(inc_df$id)[criteria]
 
       # update and remove
-      w_subj_keep[c(impl_ids)] <- "Implausible"
-      w_subj_reason[impl_ids] <- paste0("Implausible, Step ",step)
+      w_subj_keep[c(impl_ids)] <- step
 
       # don't get rid of extraneous just yet
-      w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids),]
+      w_subj_df <- w_subj_df[!w_subj_df$id %in% impl_ids,]
 
       # reevaluate first RV
       w_subj_df <- identify_rv(w_subj_df)
@@ -308,10 +305,10 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 5w, W hundreds ----
     # 5w. when weight goes up/down by 100/200 kg/100-300 lbs -- is it valid?
-    step <- "5w, W hundreds"
+    step <- "Exclude-Hundreds"
 
     # we only want to consider subjects without temp extraneous
-    inc_df <- w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,]
+    inc_df <- copy(w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,])
 
     # only do this if there are at least two values
     if (nrow(inc_df) > 1){
@@ -346,10 +343,8 @@ cleanadult <- function(df, weight_cap = Inf){
       )
 
       # update and remove
-      w_subj_keep[c(impl_ids, rv_impl_ids)] <- "Implausible"
-      w_subj_reason[impl_ids] <- paste0("Implausible, Step ",step)
-      # RVs get slightly different reasons
-      w_subj_reason[rv_impl_ids] <- paste0("Implausible, Step ",step, ", RV")
+      w_subj_keep[impl_ids] <- step
+      w_subj_keep[rv_impl_ids] <- paste0(step, "-RV")
 
       # don't get rid of extraneous just yet
       w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids),]
@@ -360,10 +355,10 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 6w, W unit errors ----
     # 6w. if a record recorded as metric should be imperial for interior values
-    step <- "6w, W unit errors"
+    step <- "Exclude-Unit-Errors"
 
     # we only want to consider subjects without temp extraneous
-    inc_df <- w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,]
+    inc_df <- copy(w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,])
 
     # only do this if there are at least two values
     if (nrow(inc_df) > 1){
@@ -379,10 +374,8 @@ cleanadult <- function(df, weight_cap = Inf){
       )
 
       # update and remove
-      w_subj_keep[c(impl_ids, rv_impl_ids)] <- "Implausible"
-      w_subj_reason[impl_ids] <- paste0("Implausible, Step ",step)
-      # RVs get slightly different reasons
-      w_subj_reason[rv_impl_ids] <- paste0("Implausible, Step ",step, ", RV")
+      w_subj_keep[impl_ids] <- step
+      w_subj_keep[rv_impl_ids] <- paste0(step, "-RV")
 
       # don't get rid of extraneous just yet
       w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids),]
@@ -393,10 +386,10 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 7w, W transpositions ----
     # 7w. if a record should have swapped the 10s and 1s digits
-    step <- "7w, W transpositions"
+    step <- "Exclude-Transpositions"
 
     # we only want to consider subjects without temp extraneous
-    inc_df <- w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,]
+    inc_df <- copy(w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,])
 
     # only do this if there are at least two values
     if (nrow(inc_df) > 1 & length(inc_df$meas_m) > 2){
@@ -412,10 +405,8 @@ cleanadult <- function(df, weight_cap = Inf){
       )
 
       # update and remove
-      w_subj_keep[c(impl_ids, rv_impl_ids)] <- "Implausible"
-      w_subj_reason[impl_ids] <- paste0("Implausible, Step ",step)
-      # RVs get slightly different reasons
-      w_subj_reason[rv_impl_ids] <- paste0("Implausible, Step ",step, ", RV")
+      w_subj_keep[impl_ids] <- step
+      w_subj_keep[rv_impl_ids] <- paste0(step, "-RV")
 
       # don't get rid of extraneous just yet
       w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids),]
