@@ -274,6 +274,25 @@ temp_sde <- function(subj_df, ptype = "height"){
   return(subj_df)
 }
 
+# function to redo repeated values after you've done a temporary same day extraneous
+# w_subj_df: weight subject data.table
+#' @keywords internal
+#' @noRd
+redo_identify_rv <- function(w_subj_df){
+  # redo RVs just if any first RVs became extraneous
+  if (any(w_subj_df$extraneous & w_subj_df$is_first_rv)){
+    inc_df <- copy(w_subj_df[!w_subj_df$extraneous,])
+    inc_df <- identify_rv(inc_df)
+
+    # reassign new rvs to weight df -- ordered the same way
+    w_subj_df$is_first_rv <- w_subj_df$is_rv <- F
+    w_subj_df$is_rv[w_subj_df$id %in% inc_df$id] <- inc_df$is_rv
+    w_subj_df$is_first_rv[w_subj_df$id %in% inc_df$id] <- inc_df$is_first_rv
+  }
+
+  return(w_subj_df)
+}
+
 # step 5, hundreds ----
 
 #' function to identify hundred exclusions
@@ -298,42 +317,46 @@ rem_hundreds <- function(inc_df, dewma, meas_col, hundreds, ptype = "weight"){
   } else {
     2
   }
-  # TODO: FIX THIS -- NOT WEIGHT
+  # conversion for imperial for weight (none for height)
+  div_modifier <- if (grepl("_m", meas_col) | ptype == "height"){
+    1
+  } else {
+    2.2046226
+  }
   # these are metric limits
-  llim <- (hundreds / if (grepl("_m", meas_col)){ 1 } else { 2.2046226}) - modifier
-  ulim <- (hundreds / if (grepl("_m", meas_col)){ 1 } else { 2.2046226}) + modifier
+  llimit <- (hundreds / div_modifier) - modifier
+  ulimit <- (hundreds / div_modifier) + modifier
   # these are imperial limits
-  llim_imp <- if (ptype == "height" | grepl("_m", meas_col)){
-    llim
+  llimit_imp <- if (ptype == "height" | grepl("_m", meas_col)){
+    llimit
   } else {
     hundreds - 2*2.2046226
   }
-  ulim_imp <- if (ptype == "height" | grepl("_m", meas_col)){
-    ulim
+  ulimit_imp <- if (ptype == "height" | grepl("_m", meas_col)){
+    ulimit
   } else {
     hundreds + 2*2.2046226
   }
 
   # identify hundred exclusions -- only hundred down
   exc_up <-
-    (check_between(dewma$dewma.all, llim, ulim)) &
-    (check_between(dewma$dewma.before, llim, ulim)) &
-    (check_between(dewma$dewma.after, llim, ulim)) &
-    (check_between(inc_df$diff_prev, llim_imp, ulim_imp) |
-       check_between(inc_df$diff_next, llim_imp, ulim_imp))
+    (check_between(dewma$dewma.all, llimit, ulimit)) &
+    (check_between(dewma$dewma.before, llimit, ulimit)) &
+    (check_between(dewma$dewma.after, llimit, ulimit)) &
+    (check_between(inc_df$diff_prev, llimit_imp, ulimit_imp) |
+       check_between(inc_df$diff_next, llimit_imp, ulimit_imp))
   exc_down <-
-    (check_between(dewma$dewma.all, -ulim, -llim)) &
-    (check_between(dewma$dewma.before, -ulim, -llim)) &
-    (check_between(dewma$dewma.after, -ulim, -llim)) &
-    (check_between(inc_df$diff_prev, -ulim_imp, -llim_imp) |
-       check_between(inc_df$diff_next, -ulim_imp, -llim_imp))
+    (check_between(dewma$dewma.all, -ulimit, -llimit)) &
+    (check_between(dewma$dewma.before, -ulimit, -llimit)) &
+    (check_between(dewma$dewma.after, -ulimit, -llimit)) &
+    (check_between(inc_df$diff_prev, -ulimit_imp, -llimit_imp) |
+       check_between(inc_df$diff_next, -ulimit_imp, -llimit_imp))
   exc_hundred <- if (ptype == "height"){
     exc_down
   } else {
     exc_down | exc_up
   }
   # end criteria depends on the number of distinct values
-  # TODO: FIX THE WEIGHT TO BE METRIC
   criteria <-
     if ((ptype == "height" & length(unique(inc_df$meas_m)) > 2) &
         (ptype == "weight" & length(inc_df$meas_m) > 2)){
@@ -341,9 +364,9 @@ rem_hundreds <- function(inc_df, dewma, meas_col, hundreds, ptype = "weight"){
     } else {
       exc_hundred &
         if (ptype == "height"){
-          inc_df[, ..meas_col] < 100
+          inc_df$meas_m < 100
         } else {
-          inc_df[, ..meas_col] < 40 | inc_df[, ..meas_col] > 182
+          inc_df$meas_m < 40 | inc_df$meas_m > 182
         }
     }
   criteria[is.na(criteria)] <- F
@@ -605,21 +628,20 @@ ht_3d_growth_compare <- function(mean_ht, min_age, glist,
     # check based on growth
     htcompare <- ifelse(ageyears2 > 25, 25, ageyears2)
 
-    # TODO: HT COMPARE AT TOP?
     # using short circuiting
     hta <-
-      if ((ageyears2 - ageyears1) < 1){
+      if ((htcompare - ageyears1) < 1){
         ht_allow(20, ageyears1, htcompare)
-      } else if ((ageyears2 - ageyears1) <= 3){
+      } else if ((htcompare - ageyears1) <= 3){
         ht_allow(15, ageyears1, htcompare)
-      } else if ((ageyears2 - ageyears1) > 3){
+      } else if ((htcompare - ageyears1) > 3){
         ht_allow(12, ageyears1, htcompare)
       }
 
-    # TODO: ADD: AGEYEARS1 < 25
     origexc <- origexc |
-      (mh2 - mh1) < 0 |
-      (mh2 - mh1) > hta
+      (((mh2 - mh1) < 0 |
+      (mh2 - mh1) > hta) &
+        ageyears1 < 25)
   }
 
   return(origexc)
@@ -692,7 +714,11 @@ remove_ewma_wt <- function(subj_df, ewma_cutoff_low = 60,
       # update iteration
       iter <- iter + 1
 
-      # TODO: NEED A CERTAIN AMOUNT TO DO THIS -- CHANGE -> F
+      # check if this is viable -- you need at least three points, otherwise
+      # we're done
+      if (nrow(subj_df) < 3){
+        change <- F
+      }
     }
   }
 

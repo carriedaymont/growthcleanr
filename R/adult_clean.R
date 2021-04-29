@@ -233,15 +233,7 @@ cleanadult <- function(df, weight_cap = Inf){
       w_subj_df <- temp_sde(w_subj_df, ptype = "weight")
 
       # redo RVs just if any first RVs became extraneous
-      if (any(w_subj_df$extraneous & w_subj_df$is_first_rv)){
-        inc_df <- copy(w_subj_df[!w_subj_df$extraneous,])
-        inc_df <- identify_rv(inc_df)
-
-        # reassign new rvs to weight df -- ordered the same way
-        w_subj_df$is_first_rv <- w_subj_df$is_rv <- F
-        w_subj_df$is_rv[w_subj_df$id %in% inc_df$id] <- inc_df$is_rv
-        w_subj_df$is_first_rv[w_subj_df$id %in% inc_df$id] <- inc_df$is_first_rv
-      }
+      w_subj_df <- redo_identify_rv(w_subj_df)
     }
 
     # 4w, W weight cap ----
@@ -305,6 +297,8 @@ cleanadult <- function(df, weight_cap = Inf){
       w_subj_df <- identify_rv(w_subj_df)
       # reevaluate temp same day
       w_subj_df <- temp_sde(w_subj_df, ptype = "weight")
+      # redo RVs just if any first RVs became extraneous
+      w_subj_df <- redo_identify_rv(w_subj_df)
     }
 
     # 5w, W hundreds ----
@@ -355,6 +349,8 @@ cleanadult <- function(df, weight_cap = Inf){
 
       # reevaluate temp same day
       w_subj_df <- temp_sde(w_subj_df, ptype = "weight")
+      # redo RVs just if any first RVs became extraneous
+      w_subj_df <- redo_identify_rv(w_subj_df)
     }
 
     # 6w, W unit errors ----
@@ -386,6 +382,8 @@ cleanadult <- function(df, weight_cap = Inf){
 
       # reevaluate temp same day
       w_subj_df <- temp_sde(w_subj_df, ptype = "weight")
+      # redo RVs just if any first RVs became extraneous
+      w_subj_df <- redo_identify_rv(w_subj_df)
     }
 
     # 7w, W transpositions ----
@@ -417,6 +415,8 @@ cleanadult <- function(df, weight_cap = Inf){
 
       # reevaluate temp same day
       w_subj_df <- temp_sde(w_subj_df, ptype = "weight")
+      # redo RVs just if any first RVs became extraneous
+      w_subj_df <- redo_identify_rv(w_subj_df)
     }
 
     # do step 8: swaps (both height and weight) ----
@@ -553,6 +553,8 @@ cleanadult <- function(df, weight_cap = Inf){
         if (any(criteria)){
           h_subj_df <- temp_sde(h_subj_df)
           w_subj_df <- temp_sde(w_subj_df, ptype = "weight")
+          # redo RVs just if any first RVs became extraneous
+          w_subj_df <- redo_identify_rv(w_subj_df)
         }
       }
     }
@@ -603,7 +605,6 @@ cleanadult <- function(df, weight_cap = Inf){
       step <- "Exclude-Same-Day-Extraneous"
       # now the rest!
 
-      # TODO: CHECK THIS
       # check if heights on duplicate days are trivially the same, keep both,
       # use mean for all of those
       rem_ids <- c()
@@ -667,14 +668,12 @@ cleanadult <- function(df, weight_cap = Inf){
         med <- median(h_subj_df$meas_m[
           !h_subj_df$age_days %in% dup_days
         ])
-        # TODO: CHECK THIS
         h_subj_df$absdiff <- NA
         h_subj_df$absdiff[h_subj_df$age_days %in% dup_days] <-
-          abs(med - h_subj_df$diff[h_subj_df$age_days %in% dup_days])
+          abs(med - h_subj_df$meas_m[h_subj_df$age_days %in% dup_days])
 
         # go through each duplicate day and figure out criteria
         # keep the first one that satisfies this criteria
-        # TODO: CHECK THIS
         mm <- h_subj_df$meas_m # shorthand
         rem_ids <- c()
         for (dd in dup_days){
@@ -691,11 +690,11 @@ cleanadult <- function(df, weight_cap = Inf){
             n_ind <- nrow(h_subj_df)
           }
 
-          # TODO: CHECK ABSDIFF??
+          # are before, after, median close enough? 1 inch
           compare <-
             abs(mm[curr_ind] - mm[p_ind]) < 2.541 &
             abs(mm[curr_ind] - mm[n_ind]) < 2.541 &
-            h_subj_df$diff[h_subj_df$age_days == dd] < 2.541
+            h_subj_df$absdiff[h_subj_df$age_days == dd] < 2.541
 
           comp_id <-
             if (sum(compare) == 1){
@@ -924,14 +923,7 @@ cleanadult <- function(df, weight_cap = Inf){
               F
             }
 
-          # if g2 g1 check passess, reinclude all
-          # TODO: CHECK IF SHOULD BE ANY OR ALL
-          # if (any(g2_g1_incl_check)){
-          #   criteria <- rep(F, nrow(h_subj_df))
-          # }
-
           # if all are false, reinclude all?
-          # TODO: CHECK THIS
           if (all(!c(g3_g2_check, g3_g1_check, g2_g1_check))){
             criteria <- rep(F, nrow(h_subj_df))
           }
@@ -1186,8 +1178,8 @@ cleanadult <- function(df, weight_cap = Inf){
 
       w_subj_df <- w_subj_df[!criteria,]
 
-      # TODO: ADD RVS FOR ERVERY TIME YOU CALCULATE TEMP SDE
-      # TODO: ADD RVS HERE
+      # redo RVs just if any first RVs became extraneous
+      w_subj_df <- identify_rv(w_subj_df)
     }
 
     # 11w, W distinct/moderate EWMA ----
@@ -1246,7 +1238,6 @@ cleanadult <- function(df, weight_cap = Inf){
           wt_first/wt_last
         }
 
-      # TODO: ASK WHAT THIS MEANS
       # set a limit for wts to be percent of other wts, focused on lower wts
       perc_limit <- .7
       if (all(w_subj_df$meas_m > 45)){
@@ -1270,7 +1261,6 @@ cleanadult <- function(df, weight_cap = Inf){
       change <- T
       iter <- 1
       while (change){
-        # TODO: ASK WHAT THIS MEANS -- VECTOR?
         # set a limit for wts to be percent of other wts, focused on lower wts
         perc_limit <- rep(.7, nrow(w_subj_df))
         perc_limit[w_subj_df$meas_m > 45] <- .4
@@ -1300,43 +1290,47 @@ cleanadult <- function(df, weight_cap = Inf){
         # extrapolation -- prior weights
         lepolate_p <- binerr_lepolate_p <- c(rep(NA,2))
         # TODO: CHECK IF AT LEAST 3
-        for (x in 3:nrow(inc_df)){
-          slope <- (inc_df$meas_m[x-1] - inc_df$meas_m[x-2])/
-            (inc_df$age_days[x-1] - inc_df$age_days[x-2])
-          lepolate_p <- c(lepolate_p, round_pt(
-            inc_df$meas_m[x-1] +
-              slope*(inc_df$meas_m[x]-inc_df$meas_m[x-1]),
-            .2
-          ))
+        if (nrow(inc_df) > 3){
+          for (x in 3:nrow(inc_df)){
+            slope <- (inc_df$meas_m[x-1] - inc_df$meas_m[x-2])/
+              (inc_df$age_days[x-1] - inc_df$age_days[x-2])
+            lepolate_p <- c(lepolate_p, round_pt(
+              inc_df$meas_m[x-1] +
+                slope*(inc_df$meas_m[x]-inc_df$meas_m[x-1]),
+              .2
+            ))
 
-          # is current value between extrapolated and 2 previous
-          binerr_lepolate_p <- c(
-            binerr_lepolate_p,
-            check_between(inc_df$meas_m[x],
-                          inc_df$meas_m[x - 2] - 5, lepolate_p[x] + 5) |
+            # is current value between extrapolated and 2 previous
+            binerr_lepolate_p <- c(
+              binerr_lepolate_p,
               check_between(inc_df$meas_m[x],
-                            lepolate_p[x] - 5, inc_df$meas_m[x - 2] + 5)
-          )
+                            inc_df$meas_m[x - 2] - 5, lepolate_p[x] + 5) |
+                check_between(inc_df$meas_m[x],
+                              lepolate_p[x] - 5, inc_df$meas_m[x - 2] + 5)
+            )
+          }
         }
         # extrapolation -- next weights
         lepolate_n <- binerr_lepolate_n <- c()
-        for (x in 1:(nrow(inc_df)-2)){
-          slope <- (inc_df$meas_m[x+1] - inc_df$meas_m[x+2])/
-            (inc_df$age_days[x+1] - inc_df$age_days[x+2])
-          lepolate_n <- c(lepolate_n, round_pt(
-            inc_df$meas_m[x+1] +
-              slope*(inc_df$meas_m[x+1]-inc_df$meas_m[x]),
-            .2
-          ))
+        if (nrow(inc_df) > 3){
+          for (x in 1:(nrow(inc_df)-2)){
+            slope <- (inc_df$meas_m[x+1] - inc_df$meas_m[x+2])/
+              (inc_df$age_days[x+1] - inc_df$age_days[x+2])
+            lepolate_n <- c(lepolate_n, round_pt(
+              inc_df$meas_m[x+1] +
+                slope*(inc_df$meas_m[x+1]-inc_df$meas_m[x]),
+              .2
+            ))
 
-          # is current value between extrapolated and 2 next
-          binerr_lepolate_n <- c(
-            binerr_lepolate_n,
-            check_between(inc_df$meas_m[x],
-                          inc_df$meas_m[x + 2] - 5, lepolate_n[x] + 5) |
+            # is current value between extrapolated and 2 next
+            binerr_lepolate_n <- c(
+              binerr_lepolate_n,
               check_between(inc_df$meas_m[x],
-                            lepolate_n[x] - 5, inc_df$meas_m[x + 2] + 5)
-          )
+                            inc_df$meas_m[x + 2] - 5, lepolate_n[x] + 5) |
+                check_between(inc_df$meas_m[x],
+                              lepolate_n[x] - 5, inc_df$meas_m[x + 2] + 5)
+            )
+          }
         }
         lepolate_n <- c(lepolate_n, rep(NA,2))
         binerr_lepolate_n <- c(binerr_lepolate_n, rep(NA,2))
