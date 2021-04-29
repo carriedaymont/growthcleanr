@@ -4,8 +4,10 @@
 
 # convenience functions ----
 
-# convenience function -- see if numeric vector falls between two numbers
-# returns boolean vector
+#' convenience function -- see if numeric vector falls between two numbers
+#' returns boolean vector
+#' @keywords internal
+#' @noRd
 check_between <- function(vect, num_low, num_high, incl = T){
   return(
     if (incl){
@@ -16,19 +18,25 @@ check_between <- function(vect, num_low, num_high, incl = T){
   )
 }
 
-# convenience function -- round to the nearest .x
+#' convenience function -- round to the nearest .x
+#' @keywords internal
+#' @noRd
 round_pt <- function(val, pt){
   return(round(val/pt)*pt)
 }
 
-# convenience function to get remainders for floats (a/b)
+#' convenience function to get remainders for floats (a/b)
+#' @keywords internal
+#' @noRd
 get_float_rem <- function(a, b){
   return(abs(round(a/b) - (a/b)))
 }
 
 # EWMA functions ----
 
-# daymont implementation
+#' function to calculate as delta matrix for adults
+#' @keywords internal
+#' @noRd
 as.matrix.delta_dn <- function(agedays) {
   n <- length(agedays)
   delta <- abs(matrix(rep(agedays, n), n, byrow = T) - agedays)
@@ -55,6 +63,8 @@ as.matrix.delta_dn <- function(agedays) {
 #'   and the immediate prior observation.
 #' * The third variable (ewma.after) contains the EWMA for each observation excluding both the actual observation
 #'   and the subsequent observation.
+#' @keywords internal
+#' @noRd
 ewma_dn <- function(agedays, z, ewma.exp = 5, ewma.adjacent = T) {
   # 6.  EWMA calculation description: Most of the next steps will involve calculating the exponentially weighted moving average for each subject and parameter. I will
   #     describe how to calculate EWMASDs, and will describe how it needs to be varied in subsequent steps.
@@ -116,14 +126,16 @@ ewma_dn <- function(agedays, z, ewma.exp = 5, ewma.adjacent = T) {
 
 # step 1w, W BIV ----
 
-# function to remove BIVs, based on cutoffs for the given method
-# inputs:
-#   subj_df: data frame with measurements of a given type
-#   type: height, weight, or bmi
-#   biv_df: data frame with BIV cutoffs for the given type
-#   include: default F, whether or not to include the endpoints
-# outputs:
-#   logical, true if the given record should be removed due to being a BIV
+#' function to remove BIVs, based on cutoffs for the given method
+#' inputs:
+#'   subj_df: data frame with measurements of a given type
+#'   type: height, weight, or bmi
+#'   biv_df: data frame with BIV cutoffs for the given type
+#'   include: default F, whether or not to include the endpoints
+#' outputs:
+#'   logical, true if the given record should be removed due to being a BIV
+#' @keywords internal
+#' @noRd
 remove_biv <- function(subj_df, type, biv_df, include = F){
   too_low <- remove_biv_low(subj_df, type, biv_df, include)
   too_high <- remove_biv_high(subj_df, type, biv_df, include)
@@ -131,15 +143,17 @@ remove_biv <- function(subj_df, type, biv_df, include = F){
   return(too_low | too_high)
 }
 
-# function to remove only the low end of BIVs, based on cutoffs for the given
-# method (for intermediate processing only)
-# inputs:
-#   subj_df: data frame with measurements of a given type
-#   type: height, weight, or bmi
-#   biv_df: data frame with BIV cutoffs for the given type
-#   include: default F, whether or not to include the endpoints
-# outputs:
-#   logical, true if the given record should be removed due to being a BIV
+#' function to remove only the low end of BIVs, based on cutoffs for the given
+#' method (for intermediate processing only)
+#' inputs:
+#'   subj_df: data frame with measurements of a given type
+#'   type: height, weight, or bmi
+#'   biv_df: data frame with BIV cutoffs for the given type
+#'   include: default F, whether or not to include the endpoints
+#' outputs:
+#'   logical, true if the given record should be removed due to being a BIV
+#' @keywords internal
+#' @noRd
 remove_biv_low <- function(subj_df, type, biv_df, include = F){
   if (!include){
     too_low <- subj_df$measurement < biv_df[type, "low"]
@@ -150,15 +164,17 @@ remove_biv_low <- function(subj_df, type, biv_df, include = F){
   return(too_low)
 }
 
-# function to remove only the high end of BIVs, based on cutoffs for the given
-# method (for intermediate processing only)
-# inputs:
-#   subj_df: data frame with measurements of a given type
-#   type: height, weight, or bmi
-#   biv_df: data frame with BIV cutoffs for the given type
-#   include: default F, whether or not to include the endpoints
-# outputs:
-#   logical, true if the given record should be removed due to being a BIV
+#' function to remove only the high end of BIVs, based on cutoffs for the given
+#' method (for intermediate processing only)
+#' inputs:
+#'   subj_df: data frame with measurements of a given type
+#'   type: height, weight, or bmi
+#'   biv_df: data frame with BIV cutoffs for the given type
+#'   include: default F, whether or not to include the endpoints
+#' outputs:
+#'   logical, true if the given record should be removed due to being a BIV
+#' @keywords internal
+#' @noRd
 remove_biv_high <- function(subj_df, type, biv_df, include = F){
   if (!include){
     too_high <- subj_df$measurement > biv_df[type, "high"]
@@ -168,12 +184,15 @@ remove_biv_high <- function(subj_df, type, biv_df, include = F){
 
   return(too_high)
 }
+
 # step 2w, W repeated values ----
 
-# Function to identify repeated values in WEIGHT values
-# adds two colummns to w_subj_df:
-#   is_first_rv: is it the first repeated value?
-#   is_rv: is it a repeated value?
+#' Function to identify repeated values in WEIGHT values
+#' adds two colummns to w_subj_df:
+#'   is_first_rv: is it the first repeated value?
+#'   is_rv: is it a repeated value?
+#' @keywords internal
+#' @noRd
 identify_rv <- function(w_subj_df){
   if (nrow(w_subj_df) > 0){
     # follows a similar process to temp sde (step 3)
@@ -201,10 +220,12 @@ identify_rv <- function(w_subj_df){
 
 # step 3, temp extraneous ----
 
-# Function to identify temporary same days extraneous
-# adds a column to subj_df : "extraneous" designating whether or not the row is
-# temporarily extraneous (not to be considered in the future)
-# ptype: height or weight, weight excludes repeated values
+#' Function to identify temporary same days extraneous
+#' adds a column to subj_df : "extraneous" designating whether or not the row is
+#' temporarily extraneous (not to be considered in the future)
+#' ptype: height or weight, weight excludes repeated values
+#' @keywords internal
+#' @noRd
 temp_sde <- function(subj_df, ptype = "height"){
   # identify which of these have duplicate days
   tab_days <- table(subj_df$age_days)
@@ -255,14 +276,16 @@ temp_sde <- function(subj_df, ptype = "height"){
 
 # step 5, hundreds ----
 
-# function to identify hundred exclusions
-# inc_df: subj_df with temp extraneous/first rv removed
-# dewma: delta ewma, for metric
-# meas_col: meas_imp or meas_m
-# hundreds: 100/200/300, etc.
-# ptype: param type, "weight" or "height"
-# mtype: m or imp (metric or imperial)
-# returns criteria (true if implausible)
+#' function to identify hundred exclusions
+#' inc_df: subj_df with temp extraneous/first rv removed
+#' dewma: delta ewma, for metric
+#' meas_col: meas_imp or meas_m
+#' hundreds: 100/200/300, etc.
+#' ptype: param type, "weight" or "height"
+#' mtype: m or imp (metric or imperial)
+#' returns criteria (true if implausible)
+#' @keywords internal
+#' @noRd
 rem_hundreds <- function(inc_df, dewma, meas_col, hundreds, ptype = "weight"){
   # calculate difference between values -- ENDS ARE PROTECTED ON EITHER SIDE
   inc_df$diff_prev <- c(NA, diff(inc_df[,..meas_col]))
@@ -324,13 +347,14 @@ rem_hundreds <- function(inc_df, dewma, meas_col, hundreds, ptype = "weight"){
   return(criteria)
 }
 
-
 # step 6, unit errors ----
 
-# function to remove unit errors
-# inc_df: subj_df with temp extraneous/first rv removed
-# ptype: height or weight
-# returns criteria (true if implausible)
+#' function to remove unit errors
+#' inc_df: subj_df with temp extraneous/first rv removed
+#' ptype: height or weight
+#' returns criteria (true if implausible)
+#' @keywords internal
+#' @noRd
 rem_unit_errors <- function(inc_df, ptype = "height"){
   # add "unit error": metric encoded as imperial
   inc_df$ue <- inc_df$meas_m * (if (ptype == "height"){ 2.54 } else {1/2.2046226})
@@ -386,6 +410,8 @@ rem_unit_errors <- function(inc_df, ptype = "height"){
 
 # get ones/tens places of a given number
 # returns vector of desired digits
+#' @keywords internal
+#' @noRd
 get_num_places <- function(num, place){
   place_map <- c(
     "ones" = 1,
@@ -404,8 +430,10 @@ get_num_places <- function(num, place){
   return(res)
 }
 
-# function to switch the ones and tens place digit of a number
-# returns vector of switched numbers
+#' function to switch the ones and tens place digit of a number
+#' returns vector of switched numbers
+#' @keywords internal
+#' @noRd
 switch_tens_ones <- function(num){
   # gets 10s and ones digits
   tens <- get_num_places(num, "tens")
@@ -434,10 +462,12 @@ switch_tens_ones <- function(num){
   return(as.numeric(paste0(left_num, ones, tens, right_num)))
 }
 
-# function to calculate transpositions
-# inc_df: subj_df with temp extraneous/first rv removed
-# ptype: height or weight
-# returns criteria (true if implausible)
+#' function to calculate transpositions
+#' inc_df: subj_df with temp extraneous/first rv removed
+#' ptype: height or weight
+#' returns criteria (true if implausible)
+#' @keywords internal
+#' @noRd
 rem_transpositions <- function(inc_df, ptype = "height"){
   # calculate ewma (using metric)
   ewma_res <- ewma_dn(inc_df$age_days, inc_df$meas_m)
@@ -497,14 +527,18 @@ rem_transpositions <- function(inc_df, ptype = "height"){
 
 # step 10 hab, H distinct values ----
 
-# function to calculate height growth allowance
+#' function to calculate height growth allowance
+#' @keywords internal
+#' @noRd
 ht_allow <- function(velocity, ageyears1, ageyears2){
   return(
     velocity*(log(ageyears2 - 16.9)) - (velocity*log(ageyears1 - 16.9))
   )
 }
 
-# function to generate height growth/loss groups
+#' function to generate height growth/loss groups
+#' @keywords internal
+#' @noRd
 ht_change_groups <- function(h_subj_df, cutoff){
   # already ordered by age
   glist <- galist <- list()
@@ -542,9 +576,11 @@ ht_change_groups <- function(h_subj_df, cutoff){
   ))
 }
 
-# function to compare growth for 3D height groups
-# compare: before or first
-# returns whether or not to use original exclusions
+#' function to compare growth for 3D height groups
+#' compare: before or first
+#' returns whether or not to use original exclusions
+#' @keywords internal
+#' @noRd
 ht_3d_growth_compare <- function(mean_ht, min_age, glist,
                                  compare = "before"){
   # preallocating on whether or not we want to go by original exclusion
@@ -585,14 +621,16 @@ ht_3d_growth_compare <- function(mean_ht, min_age, glist,
 
 # Step 9w, W extreme EWMA ----
 
-# Function to remove data based on exponentially-weighted moving average
-# (Daymont, et al.) for WEIGHT. Cutoff defaults adjusted for adults.
-# inputs:
-# subj_df: subject data frame, which has age in days and z-score
-# ewma_cutoff: EWMA past which considered invalid (center value). left and right
-#   are .5 less.
-# outputs:
-#  logical indicating whether to exclude a record
+#' Function to remove data based on exponentially-weighted moving average
+#' (Daymont, et al.) for WEIGHT. Cutoff defaults adjusted for adults.
+#' inputs:
+#' subj_df: subject data frame, which has age in days and z-score
+#' ewma_cutoff: EWMA past which considered invalid (center value). left and right
+#'   are .5 less.
+#' outputs:
+#'  logical indicating whether to exclude a record
+#' @keywords internal
+#' @noRd
 remove_ewma_wt <- function(subj_df, ewma_cutoff_low = 60,
                            ewma_cutoff_high = 100){
   orig_subj_df <- subj_df

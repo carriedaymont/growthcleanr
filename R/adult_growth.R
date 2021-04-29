@@ -1,20 +1,22 @@
 # Main adult growthcleanr function
 # internal supporting functions for adults can be found in: adult_support.R
 
-# function to clean height and weight data for adults
-# inputs:
-# df: data.table with 7 columns:
-#   id: row id, must be unique
-#   subjid: subject id
-#   sex: sex of subject
-#   age_years: age, in years
-#   param: HEIGHTCM or WEIGHTKG
-#   measurement: height or weight measurement
-# outputs:
-#   df, with additional columns:
-#     result, which specifies whether the height measurement should be included,
-#       or is implausible (designated with an error code).
-#     mean_sde, mean of similar same day extraneous values
+#' function to clean height and weight data for adults
+#' inputs:
+#' df: data.table with 7 columns:
+#'   id: row id, must be unique
+#'   subjid: subject id
+#'   sex: sex of subject
+#'   age_years: age, in years
+#'   param: HEIGHTCM or WEIGHTKG
+#'   measurement: height or weight measurement
+#' outputs:
+#'   df, with additional columns:
+#'     result, which specifies whether the height measurement should be included,
+#'       or is implausible (designated with an error code).
+#'     mean_sde, mean of similar same day extraneous values
+#' @keywords internal
+#' @noRd
 cleanadult <- function(df, weight_cap = Inf){
   # method specific constants ----
   # this includes specified cutoffs, etc.

@@ -1658,6 +1658,12 @@ cleanbatch <- function(data.df,
 #' returned by the getDoParWorkers function in the foreach package.
 #' @param quietly Determines if function messages are to be displayed and if log files (parallel only) are to be generated.
 #' Defaults to TRUE
+#' @param adult_cutpoint Number between 18 and 20, describing ages when the
+#'  pediatric algorithm should not be applied (< adult_cutpoint), and the adult
+#'   algorithm should apply (>= adult_cutpoint). Numbers outside this range will be
+#'   changed to the closest number within the range. Defaults to 20.
+#' @param weight_cap Positive number, describing a weight cap within the adult
+#'  dataset. If there is no weight cap, set to Inf. Defaults to Inf.
 #'
 #' @return Vector of exclusion codes for each of the input measurements.
 #'
