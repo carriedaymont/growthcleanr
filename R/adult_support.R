@@ -265,8 +265,8 @@ temp_sde <- function(subj_df, ptype = "height"){
 # returns criteria (true if implausible)
 rem_hundreds <- function(inc_df, dewma, meas_col, hundreds, ptype = "weight"){
   # calculate difference between values -- ENDS ARE PROTECTED ON EITHER SIDE
-  inc_df$diff_prev <- c(NA, diff(inc_df[,meas_col]))
-  inc_df$diff_next <- c(diff(inc_df[,meas_col]), NA)
+  inc_df$diff_prev <- c(NA, diff(inc_df[,..meas_col]))
+  inc_df$diff_next <- c(diff(inc_df[,..meas_col]), NA)
 
   # state upper and lower limits (hundreds +/- 2)
   # modifier for height vs weight
@@ -314,9 +314,9 @@ rem_hundreds <- function(inc_df, dewma, meas_col, hundreds, ptype = "weight"){
     } else {
       exc_hundred &
         if (ptype == "height"){
-          inc_df[, meas_col] < 100
+          inc_df[, ..meas_col] < 100
         } else {
-          inc_df[, meas_col] < 40 | inc_df[, meas_col] > 182
+          inc_df[, ..meas_col] < 40 | inc_df[, ..meas_col] > 182
         }
     }
   criteria[is.na(criteria)] <- F
@@ -446,15 +446,21 @@ rem_transpositions <- function(inc_df, ptype = "height"){
 
   criteria <- rep(F, nrow(inc_df))
   for (mtype in c("m", "im")){
-    inc_df$transpo <- switch_tens_ones(inc_df[, paste0("meas_", mtype)])
+    inc_df$transpo <- switch_tens_ones(
+      unlist(inc_df[, paste0("meas_", mtype), with = F])
+      )
     # if imperial, we want to convert to metric
     if (mtype == "im"){
       inc_df$transpo <- inc_df$transpo *
         (if (ptype == "height"){ 2.54 } else {1/2.2046226})
     }
 
-    inc_df$ones <- get_num_places(inc_df[, paste0("meas_", mtype)], "ones")
-    inc_df$tens <- get_num_places(inc_df[, paste0("meas_", mtype)], "tens")
+    inc_df$ones <- get_num_places(
+      unlist(inc_df[, paste0("meas_", mtype), with = F]), "ones"
+    )
+    inc_df$tens <- get_num_places(
+      unlist(inc_df[, paste0("meas_", mtype), with = F]), "tens"
+    )
     absdewma_transpo <- abs(inc_df$transpo - ewma_res)
     colnames(absdewma_transpo) <- paste0("d",colnames(ewma_res))
 
