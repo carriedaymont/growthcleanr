@@ -643,7 +643,7 @@ remove_ewma_wt <- function(subj_df, ewma_cutoff_low = 60,
       to_rem <- which.max(abs(dewma$dewma.all)[criteria_new])
 
       # keep the ids that failed and remove
-      rem_ids[length(rem_ids)+1] <- subj_df[criteria_new,][to_rem, "id"]
+      rem_ids[length(rem_ids)+1] <- unlist(subj_df[criteria_new,][to_rem, "id"])
       subj_df <- subj_df[subj_df$id != rem_ids[length(rem_ids)],]
       # update iteration
       iter <- iter + 1

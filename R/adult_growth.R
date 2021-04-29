@@ -417,12 +417,12 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # do step 8: swaps (both height and weight) ----
     # 8. checking whether heights and weights should have been swapped
-    step <- "8, swaps"
+    step <- "Exclude-Swaps"
 
     if (nrow(h_subj_df) > 0 & nrow(w_subj_df) > 0){
       # we only want to consider subjects without temp extraneous
-      h_inc_df <- h_subj_df[!h_subj_df$extraneous,]
-      w_inc_df <- w_subj_df[!w_subj_df$extraneous,]
+      h_inc_df <- copy(h_subj_df[!h_subj_df$extraneous,])
+      w_inc_df <- copy(w_subj_df[!w_subj_df$extraneous,])
 
       # calculate ewma
       h_ewma_res <- ewma_dn(h_inc_df$age_days, h_inc_df$meas_m)
@@ -462,26 +462,30 @@ cleanadult <- function(df, weight_cap = Inf){
         for (typ in c("h", "w")){
           # create "swaps"
           comb_df[,paste0("swap_",typ)] <-
-            comb_df[, paste0("meas_m.", opposite_map[typ])]
+            comb_df[, paste0("meas_m.", opposite_map[typ]), with = F]
 
           # calculate difference between values -- DOING ABS HERE
           comb_df[,paste0("swap_prev_",typ)] <-
-            c(NA, abs(comb_df[, paste0("swap_",typ)][2:nrow(comb_df)] -
-                        comb_df[, paste0("meas_m.",typ)][1:(nrow(comb_df)-1)]))
+            c(NA, abs(unlist(
+              comb_df[, paste0("swap_",typ), with = F][2:nrow(comb_df)] -
+                comb_df[, paste0("meas_m.",typ), with = F][1:(nrow(comb_df)-1)]
+            )))
           comb_df[,paste0("swap_next_",typ)] <-
-            c(abs(comb_df[, paste0("swap_",typ)][1:(nrow(comb_df)-1)] -
-                    comb_df[, paste0("meas_m.",typ)][2:nrow(comb_df)]), NA)
+            c(abs(unlist(
+              comb_df[, paste0("swap_",typ), with = F][1:(nrow(comb_df)-1)] -
+                comb_df[, paste0("meas_m.",typ), with = F][2:nrow(comb_df)]
+              )), NA)
 
           # create dewmas
           for (dtyp in c("all", "before", "after")){
             comb_df[,paste0("dewma.",dtyp,".", typ)] <-
-              comb_df[, paste0("meas_m.",typ)] -
-              comb_df[,paste0("ewma.",dtyp,".", typ)]
+              comb_df[, paste0("meas_m.",typ), with = F] -
+              comb_df[,paste0("ewma.",dtyp,".", typ), with = F]
 
             # dewma for swaps
             comb_df[,paste0("dewma.",dtyp,".swap_", typ)] <-
-              comb_df[, paste0("swap_",typ)] -
-              comb_df[,paste0("ewma.",dtyp,".", typ)]
+              comb_df[, paste0("swap_",typ), with = F] -
+              comb_df[,paste0("ewma.",dtyp,".", typ), with = F]
           }
         }
 
@@ -533,19 +537,14 @@ cleanadult <- function(df, weight_cap = Inf){
         )
 
         # update and remove -- weight
-        w_subj_keep[c(impl_ids, rv_impl_ids)] <- "Implausible"
-        w_subj_reason[impl_ids] <- paste0("Implausible, Step ",step)
-        # RVs get slightly different reasons
-        w_subj_reason[rv_impl_ids] <- paste0("Implausible, Step ",step, ", RV")
+        w_subj_keep[impl_ids] <- step
+        w_subj_keep[rv_impl_ids] <- paste0(step, "-RV")
 
-        # don't get rid of extraneous just yet
+        # don't get rid of extraneous just yet -- shouldn't be in
         w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids),]
 
-
         # update and remove -- height
-        h_subj_keep[as.character(comb_df$id.h)][criteria] <- "Implausible"
-        h_subj_reason[as.character(comb_df$id.h)][criteria] <-
-          paste0("Implausible, Step ",step)
+        h_subj_keep[as.character(comb_df$id.h)][criteria] <- step
 
         # don't get rid of extraneous just yet
         h_subj_df <- h_subj_df[h_subj_df$id %in% comb_df$id.h[!criteria] |
@@ -560,7 +559,6 @@ cleanadult <- function(df, weight_cap = Inf){
       }
     }
 
-
     # finish height steps (steps 9-11) ----
     # 9h, H same day extraneous ----
     # 9h. reevaluate same day extraneous for exclusion
@@ -568,7 +566,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # don't do this if there aren't any non extraneous for the subject
     if (nrow(h_subj_df) > 0 & any(h_subj_df$extraneous)){
-      step <- "9h, H same day identical"
+      step <- "Exclude-Same-Day-Identical"
 
       # identify duplicate days
       dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
@@ -577,7 +575,7 @@ cleanadult <- function(df, weight_cap = Inf){
       ide_ids <- c() # where we keep the identical ones
       for (dd in dup_days){
         # count amount of unique values
-        s_df <- h_subj_df[h_subj_df$age_days == dd,]
+        s_df <- copy(h_subj_df[h_subj_df$age_days == dd,])
         ide_tab <- table(s_df$meas_m)
         if (any(ide_tab > 1)){
           # for each identical, keep only the first one, by id
@@ -593,10 +591,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
       # we're going to update h_subj_df before moving on to the rest of this
       # subject
-      h_subj_keep[as.character(h_subj_df$id)][criteria] <-
-        "Implausible"
-      h_subj_reason[as.character(h_subj_df$id)][criteria] <-
-        paste0("Implausible, Step ",step)
+      h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
 
       h_subj_df <- h_subj_df[!criteria,]
 
@@ -607,7 +602,7 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
       }
 
-      step <- "9h, H same day extraneous"
+      step <- "Exclude-Same-Day-Extraneous"
       # now the rest!
 
       # TODO: CHECK THIS
@@ -615,7 +610,7 @@ cleanadult <- function(df, weight_cap = Inf){
       # use mean for all of those
       rem_ids <- c()
       for (dd in dup_days){
-        s_df <- h_subj_df[h_subj_df$age_days == dd,]
+        s_df <- copy(h_subj_df[h_subj_df$age_days == dd,])
         sde_range <- max(s_df$meas_m) - min(s_df$meas_m)
         if (sde_range < 2.541){ # 1 inch
           h_subj_df$mean_sde[h_subj_df$age_days == dd] <-
@@ -634,10 +629,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
       # we're going to update h_subj_df before moving on to the rest of this
       # subject
-      h_subj_keep[as.character(h_subj_df$id)][criteria] <-
-        "Implausible"
-      h_subj_reason[as.character(h_subj_df$id)][criteria] <-
-        paste0("Implausible, Step ",step)
+      h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
       # also update mean sde
       h_subj_mean_sde[as.character(h_subj_df$id)] <- h_subj_df$mean_sde
 
@@ -673,10 +665,11 @@ cleanadult <- function(df, weight_cap = Inf){
         }
 
       # if criteria didn't catch it, we now compare with medians
-      if (!all(criteria)){
+      if (!all(criteria) & any(h_subj_df$extraneous)){
         med <- median(h_subj_df$measurement[
           !h_subj_df$age_days %in% dup_days
         ])
+        h_subj_df$absdiff <- NA
         h_subj_df$absdiff[h_subj_df$age_days %in% dup_days] <-
           abs(med - h_subj_df$diff[h_subj_df$age_days %in% dup_days])
 
@@ -718,10 +711,7 @@ cleanadult <- function(df, weight_cap = Inf){
         criteria <- h_subj_df$id %in% rem_ids
       }
 
-      h_subj_keep[as.character(h_subj_df$id)][criteria] <-
-        "Implausible"
-      h_subj_reason[as.character(h_subj_df$id)][criteria] <-
-        paste0("Implausible, Step ",step)
+      h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
 
       h_subj_df <- h_subj_df[!criteria,]
     }
@@ -739,7 +729,7 @@ cleanadult <- function(df, weight_cap = Inf){
     # go through each type of exclusion
     if (num_distinct == 2){
       # 10ha, H distinct pairs ----
-      step <- "10ha, H distinct pairs"
+      step <- "Exclude-Distinct-Pairs"
 
       # identify "height 1 and 2" and their corresponding ages
       ht_1 <- unique(h_subj_df$meas_m[order(h_subj_df$age_days)])[1]
@@ -813,7 +803,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     } else if (num_distinct >= 3){
       # 10ha, H distinct 3 or more ----
-      step <- "10hb, H distinct 3 or more"
+      step <- "Exclude-Distinct-3-Or-More"
 
       h_subj_df <- h_subj_df[order(h_subj_df$age_years),]
       # create w2 (w/in 2) and o2  (outside 2) groups
@@ -858,7 +848,7 @@ cleanadult <- function(df, weight_cap = Inf){
         } else {
           best_w2 <- consider_w2[best_scores]
         }
-      } else if (sum(okratio == 1)){
+      } else if (sum(okratio) == 1){
         best_w2 <- unique(h_subj_df$meas_m)[okratio]
       } else {
         best_w2 <- "none"
@@ -922,7 +912,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
           # check g3 v g1 -- true indicates use the original exclusions
           g3_g1_check <-
-            if (!is.na(mean_ht[3])){
+            if (!is.na(mean_ht[2]) & !is.na(mean_ht[3])){
               (min_age[3] < 50 &
                  (mean_ht[3] - mean_ht[1]) < ((-6 * 2.54) +.001)) |
                 (min_age[2] < 50 & min_age[3] >= 50 &
@@ -991,9 +981,7 @@ cleanadult <- function(df, weight_cap = Inf){
     }
 
     # update and remove
-    h_subj_keep[as.character(h_subj_df$id)][criteria] <- "Implausible"
-    h_subj_reason[as.character(h_subj_df$id)][criteria] <-
-      paste0("Implausible, Step ", step)
+    h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
 
     h_subj_df <- h_subj_df[!criteria,]
 
@@ -1001,11 +989,11 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 9w, W extreme EWMA ----
     # 9w. mark extreme values using EWMA method
-    step <- "9w, W extreme EWMA"
+    step <- "Exclude-Extreme-EWMA"
 
     # first, remove ewma without temp extraneous and repeated values
     # we only want to consider subjects without temp extraneous
-    inc_df_first <- w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,]
+    inc_df_first <- copy(w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,])
     # only do this if there are at least two values
     criteria_first <-
       if (nrow(inc_df_first) > 1){
@@ -1015,8 +1003,9 @@ cleanadult <- function(df, weight_cap = Inf){
       }
 
     # then, remove ewma just without temp extraneous
-    inc_df_rv <- w_subj_df[!w_subj_df$extraneous &
-                             !w_subj_df$id %in% inc_df_first$id[criteria_first],]
+    inc_df_rv <- copy(w_subj_df[
+      !w_subj_df$extraneous & !w_subj_df$id %in% inc_df_first$id[criteria_first],
+      ])
     # only do this if there are at least two UNIQUE values
     criteria_rv <-
       if (length(unique(inc_df_rv)) > 1){
@@ -1041,10 +1030,8 @@ cleanadult <- function(df, weight_cap = Inf){
     )
 
     # update and remove
-    w_subj_keep[c(impl_ids, rv_impl_ids)] <- "Implausible"
-    w_subj_reason[impl_ids] <- paste0("Implausible, Step ",step)
-    # RVs get slightly different reasons
-    w_subj_reason[rv_impl_ids] <- paste0("Implausible, Step ",step, ", RV")
+    w_subj_keep[impl_ids] <- step
+    w_subj_keep[rv_impl_ids] <- paste0(step, "-RV")
 
     # don't get rid of extraneous just yet
     w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids),]
