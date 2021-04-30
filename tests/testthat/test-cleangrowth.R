@@ -2,6 +2,11 @@ test_that("growthcleanr works as expected on synthetic data", {
 
   # Run cleangrowth() on syngrowth data
   data <- as.data.table(syngrowth)
+  # subset to pediatric data
+  data_orig <- data <-
+    copy(data[suppressWarnings(!is.na(as.numeric(data$subjid))),])
+  data[, subjid := as.numeric(subjid)]
+
   # syngrowth hasn't changed in length
   expect_equal(56703, data[, .N])
   setkey(data, subjid, param, agedays)
@@ -11,15 +16,15 @@ test_that("growthcleanr works as expected on synthetic data", {
   #
   # Note that we're creating distinct data tables to avoid accidentally
   # reusing the same by reference.
-  d100 <- as.data.table(syngrowth)[subjid %in% unique(data[, subjid])[1:100], ]
+  d100 <- as.data.table(data_orig)[subjid %in% unique(data[, subjid])[1:100], ]
   expect_equal(2215, d100[, .N])
-  d300 <- as.data.table(syngrowth)[subjid %in% unique(data[, subjid])[1:300], ]
+  d300 <- as.data.table(data_orig)[subjid %in% unique(data[, subjid])[1:300], ]
   expect_equal(6647, d300[, .N])
 
   # And for overriding NHANES/derive option
-  d100_derive <- as.data.table(syngrowth)[subjid %in% unique(data[, subjid])[1:100], ]
+  d100_derive <- as.data.table(data_orig)[subjid %in% unique(data[, subjid])[1:100], ]
   expect_equal(2215, d100_derive[, .N])
-  d300_nhanes <- as.data.table(syngrowth)[subjid %in% unique(data[, subjid])[1:300], ]
+  d300_nhanes <- as.data.table(data_orig)[subjid %in% unique(data[, subjid])[1:300], ]
   expect_equal(6647, d300_nhanes[, .N])
 
   # Clean samples: cd100 w/o specifying sd.recenter should use NHANES

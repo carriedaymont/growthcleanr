@@ -26,17 +26,22 @@ cleangrowth(
   log.path = ".",
   parallel = F,
   num.batches = NA,
-  quietly = T
+  quietly = T,
+  adult_cutpoint = 20,
+  weight_cap = Inf,
+  adult_columns_filename = ""
 )
 }
 \arguments{
 \item{subjid}{Vector of unique identifiers for each subject in the database.}
 
-\item{param}{Vector identifying each measurement, may be 'WEIGHTKG', 'HEIGHTCM', or 'LENGTHCM'
-'HEIGHTCM' vs. 'LENGTHCM' only affects z-score calculations between ages 24 to 35 months (730 to 1095 days).
+\item{param}{Vector identifying each measurement, may be 'WEIGHTKG', 'WEIGHTLBS', 'HEIGHTCM', 'HEIGHTIN', or 'LENGTHCM'
+'HEIGHTCM'/'HEIGHTIN' vs. 'LENGTHCM' only affects z-score calculations between ages 24 to 35 months (730 to 1095 days).
 All linear measurements below 731 days of life (age 0-23 months) are interpreted as supine length, and
 all linear measurements above 1095 days of life (age 36+ months) are interpreted as standing height.
-Note: at the moment, all LENGTHCM will be converted to HEIGHTCM. In the future, the algorithm will be updated to consider this difference.}
+Note: at the moment, all LENGTHCM will be converted to HEIGHTCM. In the future, the algorithm will be updated to consider this difference.
+Additionally, imperial 'HEIGHTIN' and 'WEIGHTLBS' measurements are converted to
+metric during algorithm calculations.}
 
 \item{agedays}{Numeric vector containing the age in days at each measurement.}
 
@@ -119,6 +124,19 @@ returned by the getDoParWorkers function in the foreach package.}
 
 \item{quietly}{Determines if function messages are to be displayed and if log files (parallel only) are to be generated.
 Defaults to TRUE}
+
+\item{adult_cutpoint}{Number between 18 and 20, describing ages when the
+pediatric algorithm should not be applied (< adult_cutpoint), and the adult
+algorithm should apply (>= adult_cutpoint). Numbers outside this range will be
+changed to the closest number within the range. Defaults to 20.}
+
+\item{weight_cap}{Positive number, describing a weight cap (rounded to the
+nearest .1, +/- .1) within the adult dataset. If there is no weight cap, set
+to Inf. Defaults to Inf.}
+
+\item{adult_columns_filename}{Name of file to save original adult data, with additional output columns to
+as CSV. Defaults to "", for which this data will not be saved. Useful
+for post-analysis. For more information on this output, please see README.}
 }
 \value{
 Vector of exclusion codes for each of the input measurements.
