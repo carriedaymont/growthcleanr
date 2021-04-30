@@ -198,10 +198,11 @@ cleanadult <- function(df, weight_cap = Inf){
       w_subj_df$age_days <- w_subj_df$agedays
     }
 
+    # 1w, W BIV ----
+    # 1w. remove biologically impossible weight records
+
     # if there are no valid heights, skip
     if (nrow(w_subj_df) > 0){
-      # 1w, W BIV ----
-      # 1w. remove biologically impossible weight records
       step <- "Exclude-BIV"
 
       # overwrite measurement with metric (bivs are in metric)
@@ -240,6 +241,7 @@ cleanadult <- function(df, weight_cap = Inf){
     # 4w. excluding specified "weight caps" if a user specifies
     step <- "Exclude-Weight-Cap"
 
+    # TODO: NO WEIGHTS
     # we only want to consider subjects without temp extraneous
     inc_df <- copy(w_subj_df[!w_subj_df$extraneous,])
 
@@ -725,6 +727,13 @@ cleanadult <- function(df, weight_cap = Inf){
     # preallocate criteria
     criteria <- rep(F, nrow(h_subj_df))
 
+    # preallocate values used for mean ht later
+    # pairs
+    pairhtloss <- pairhtgain <- F
+    # 3d gain/loss
+    glist_loss <- glist_gain <- list()
+    origexc <- g3_g2_check <- g3_g1_check <- g2_g1_check <- T
+
     # go through each type of exclusion
     if (num_distinct == 2){
       # 10ha, H distinct pairs ----
@@ -869,9 +878,9 @@ cleanadult <- function(df, weight_cap = Inf){
         # g3: first height outside g2 + 2 inches
         # ^ if any heights out, we want to go with what we had originally
 
-        gtotal <- ht_change_groups(h_subj_df, 3)
-        glist <- gtotal$meas # groups with measurements
-        galist <- gtotal$age # groups with ages, in years
+        gtotal_loss <- ht_change_groups(h_subj_df, 3)
+        glist <- glist_loss <- gtotal_loss$meas # groups with measurements
+        galist <- gtotal_loss$age # groups with ages, in years
 
         # if there are any outside these groups, we don't attempt to fix
         # we need all of them to be in some group
@@ -940,9 +949,9 @@ cleanadult <- function(df, weight_cap = Inf){
         # g2: first height outside g1 + 2 inches ....
         # ^ if any heights out, we want to go with what we had originally
 
-        gtotal <- ht_change_groups(h_subj_df, 6)
-        glist <- gtotal$meas # groups with measurements
-        galist <- gtotal$age # groups with ages
+        gtotal_gain <- ht_change_groups(h_subj_df, 6)
+        glist <- glist_gain <- gtotal_gain$meas # groups with measurements
+        galist <- gtotal_gain$age # groups with ages
 
         # if there are any outside these groups, we don't attempt to fix
         # we need all of them to be in some group
@@ -978,7 +987,61 @@ cleanadult <- function(df, weight_cap = Inf){
 
     h_subj_df <- h_subj_df[!criteria,]
 
-    # TODO: MEAN HTS -- STEP 11H
+    # 11h, H mean height ----
+    # 11h. If there are any heights left, generate a stable height to be used
+    # for analysis and output.
+
+    # if there are any heights left
+    if (nrow(h_subj_df) > 0){
+      # we're relying on variables created above
+      # if pairhtloss/gain are true, we're dealing with pairs
+      meanht <-
+        if (pairhtloss | pairhtgain){
+          h_subj_df$meas_orig
+        } else if (length(glist_loss) > 0 &
+                   all(!c(g3_g2_check, g3_g1_check, g2_g1_check))){
+          # has loss -- everything was reincluded
+          # we were in a 3d scenario -- we repeat mean for every one in the group
+          unlist(lapply(1:length(glist_loss), function(x){
+            if (x == 1){
+              rep(mean(h_subj_df$meas_orig[1:length(glist_loss[[x]])]),
+                  length(glist_loss[[x]] ))
+            } else {
+              rep(mean(
+                h_subj_df$meas_orig[
+                  (length(glist_loss[[x-1]])+1):
+                    (length(glist_loss[[x-1]])+length(glist_loss[[x]]))]),
+                length(glist_loss[[x]]
+                ))
+            }
+          }))
+        } else if (length(glist_gain) > 0 &
+                   !origexc){
+          # has gain -- everything was reincluded
+          # we were in a 3d scenario -- we repeat mean for every one in the group
+          unlist(lapply(1:length(glist_gain), function(x){
+            if (x == 1){
+              rep(mean(h_subj_df$meas_orig[1:length(glist_gain[[x]])]),
+                  length(glist_gain[[x]] ))
+            } else {
+              rep(mean(
+                h_subj_df$meas_orig[
+                  (length(glist_gain[[x-1]])+1):
+                    (length(glist_gain[[x-1]])+length(glist_gain[[x]]))]),
+                length(glist_gain[[x]]
+                ))
+            }
+          }))
+        } else {
+          # it's just the mean of the remaining heights
+          rep(mean(h_subj_df$meas_orig), nrow(h_subj_df))
+        }
+      # give mean height id names to correspond them back later
+      names(meanht) <- h_subj_df$id
+    } else {
+      # mean height is empty
+      meanht <- c()
+    }
 
     # finish weight steps (steps 9-12) ----
 

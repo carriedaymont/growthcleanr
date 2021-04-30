@@ -5,11 +5,13 @@
 #' Clean growth measurements
 #'
 #' @param subjid Vector of unique identifiers for each subject in the database.
-#' @param param Vector identifying each measurement, may be 'WEIGHTKG', 'HEIGHTCM', or 'LENGTHCM'
-#'   'HEIGHTCM' vs. 'LENGTHCM' only affects z-score calculations between ages 24 to 35 months (730 to 1095 days).
+#' @param param Vector identifying each measurement, may be 'WEIGHTKG', 'WEIGHTLBS', 'HEIGHTCM', 'HEIGHTIN', or 'LENGTHCM'
+#'   'HEIGHTCM'/'HEIGHTIN' vs. 'LENGTHCM' only affects z-score calculations between ages 24 to 35 months (730 to 1095 days).
 #'   All linear measurements below 731 days of life (age 0-23 months) are interpreted as supine length, and
 #'   all linear measurements above 1095 days of life (age 36+ months) are interpreted as standing height.
 #'   Note: at the moment, all LENGTHCM will be converted to HEIGHTCM. In the future, the algorithm will be updated to consider this difference.
+#'   Additionally, imperial 'HEIGHTIN' and 'WEIGHTLBS' measurements are converted to
+#'   metric during algorithm calculations.
 #' @param agedays Numeric vector containing the age in days at each measurement.
 #' @param sex Vector identifying the gender of the subject, may be 'M', 'm', or 0 for males, vs. 'F', 'f' or 1 for females.
 #' @param measurement Numeric vector containing the actual measurement data.  Weight must be in
@@ -163,7 +165,7 @@ cleangrowth <- function(subjid,
   if (!is.numeric(adult_cutpoint)){
     stop("adult_cutpoint not numeric. Please enter a number between 18 and 20.")
   }
-  if (!is.numeric(weight_cap)){
+  if (!is.numeric(weight_cap) | weight_cap < 0){
     stop("weight_cap not numeric. Please enter a positive number.")
   }
 
@@ -184,6 +186,12 @@ cleangrowth <- function(subjid,
   data.adult <- copy(data.all.ages[agedays >= adult_cutpoint*365.25,])
 
   # TODO: ADD PARALLEL FOR ADULTS
+
+  # for pediatric data, convert in and lbs to cm and kg (adult is done within algo)
+  data.all[param == "HEIGHTIN", v := v*2.54]
+  data.all[param == "HEIGHTIN", param := "HEIGHTCM"]
+  data.all[param == "WEIGHTLBS", v := v/2.2046226]
+  data.all[param == "WEIGHTLBS", param := "WEIGHTKG"]
 
   # if parallel processing is desired, load additional modules
   if (parallel) {

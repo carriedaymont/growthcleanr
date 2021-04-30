@@ -280,7 +280,7 @@ temp_sde <- function(subj_df, ptype = "height"){
 #' @noRd
 redo_identify_rv <- function(w_subj_df){
   # redo RVs just if any first RVs became extraneous
-  if (any(w_subj_df$extraneous & w_subj_df$is_first_rv)){
+  if (nrow(w_subj_df) > 0 & any(w_subj_df$extraneous & w_subj_df$is_first_rv)){
     inc_df <- copy(w_subj_df[!w_subj_df$extraneous,])
     inc_df <- identify_rv(inc_df)
 
