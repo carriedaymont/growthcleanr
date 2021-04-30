@@ -646,8 +646,8 @@ cleangrowth <- function(subjid,
     exclude = c(as.character(ret.df$exclude), res$result),
     mean_sde = c(rep(NA, nrow(ret.df)), res$mean_sde)
   )
-  full_out[, exclude := factor(exclude, levels = c(exclude.levels,
-                                                   unique(exclude)))]
+  full_out[, exclude := factor(exclude, levels = unique(c(exclude.levels,
+                                                   unique(exclude))))]
   full_out <- full_out[order(line),]
   # remove column added for keeping track
   full_out[, line := NULL]
