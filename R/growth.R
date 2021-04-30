@@ -192,6 +192,8 @@ cleangrowth <- function(subjid,
 
   # TODO: ADD PARALLEL FOR ADULTS
 
+  # pediatric: height velocity calculations and preprocessing ----
+
   # for pediatric data, convert in and lbs to cm and kg (adult is done within algo)
   data.all[param == "HEIGHTIN", v := v*2.54]
   data.all[param == "HEIGHTIN", param := "HEIGHTCM"]
@@ -224,8 +226,6 @@ cleangrowth <- function(subjid,
     key = 'subjid'
   )
   data.all <- batches.all[data.all]
-
-  # pediatric: height velocity calculations and preprocessing ----
 
   if (!quietly){
     cat(sprintf("[%s] Begin processing pediatric data...\n", Sys.time()))
@@ -556,14 +556,70 @@ cleangrowth <- function(subjid,
 
   # no need to do this if there's no data
   if (nrow(data.adult) > 0){
+    # TODO: MAKE THIS BETTER -- FUNCTION OR SOMETHING
+    # TODO: BATCH LOGS??
+    # if parallel processing is desired, load additional modules
+    if (parallel) {
+      if (is.na(num.batches)) {
+        num.batches <- getDoParWorkers()
+      }
+      # variables needed for parallel workers
+      var_for_par <- c(
+        "cleanadult", "check_between", "round_pt", "get_float_rem",
+        "as.matrix.delta_dn", "ewma_dn", "remove_biv", "remove_biv_high",
+        "remove_biv_low", "identify_rv", "temp_sde", "redo_identify_rv",
+        "rem_hundreds", "rem_unit_errors", "get_num_places", "switch_tens_ones",
+        "rem_transpositions", "ht_allow", "ht_change_groups",
+        "ht_3d_growth_compare", "remove_ewma_wt"
+      )
+
+      cl <- makeCluster(num.batches)
+      clusterExport(cl = cl, varlist = var_for_par, envir = environment())
+      registerDoParallel(cl)
+    } else {
+      if (is.na(num.batches))
+        num.batches <- 1
+    }
+
+    subjid.unique <- data.adult[j = unique(subjid)]
+    batches.adult <- data.table(
+      subjid = subjid.unique,
+      batch = sample(num.batches, length(subjid.unique), replace = T)
+    )
+    # this is not the most efficient way to do this
+    data.adult[, batch := 1]
+    if (num.batches > 1){
+      for (b in 1:num.batches){
+        data.adult[subjid %in% batches.adult[batch == b, subjid], batch := b]
+      }
+    }
     # add age in years
     data.adult[, age_years := agedays/365.25]
     # rename for ease of use
     data.adult[, measurement := v]
     data.adult[, id := line]
 
-    # do the cleaning
-    res <- cleanadult(copy(data.adult), weight_cap = weight_cap)
+    if (!quietly)
+      cat(sprintf(
+        "[%s] Cleaning growth data in %d batch(es)...\n",
+        Sys.time(),
+        num.batches
+      ))
+    if (num.batches == 1) {
+      # do the cleaning
+      res <- cleanadult(copy(data.adult), weight_cap = weight_cap)
+    } else {
+      res <- ddply(
+        data.adult,
+        .(batch),
+        cleanadult,
+        .parallel = parallel,
+        .paropts = list(.packages = "data.table"),
+        weight_cap = weight_cap
+      )
+      stopCluster(cl)
+    }
+
   } else {
     res <- data.table()
   }

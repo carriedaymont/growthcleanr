@@ -32,6 +32,11 @@ cleanadult <- function(df, weight_cap = Inf){
 
   # begin implementation ----
 
+  # parallel coerces to a dataframe
+  if (!is.data.table(df)){
+    df <- as.data.table(df)
+  }
+
   # preallocate final designation
   df[, id := as.character(id)]
   df[, result := "Include"]
