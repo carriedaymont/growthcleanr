@@ -252,7 +252,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 4w, W weight cap ----
     # 4w. excluding specified "weight caps" if a user specifies
-    step <- "Exclude-Weight-Cap"
+    # step specified in function
 
     inc_df <- if (nrow(w_subj_df) > 0){
       # we only want to consider subjects without temp extraneous
@@ -304,6 +304,12 @@ cleanadult <- function(df, weight_cap = Inf){
 
       # implausible ids from the step
       impl_ids <- as.character(inc_df$id)[criteria]
+
+      step <- if (all(is_wc)){
+        "Exclude-Weight-Cap-Identical"
+      } else {
+        "Exclude-Weight-Cap"
+      }
 
       # update and remove
       w_subj_keep[c(impl_ids)] <- step
@@ -1715,6 +1721,19 @@ cleanadult <- function(df, weight_cap = Inf){
         # no need to update w, since we're done
       }
     }
+
+    # additional column additions and cleanup ----
+
+    # first, let's deal with the weight cap
+    # preallocate the all exc weight cap variable (for additional output)
+    if (nrow(w_df) > 0){
+      all_exc_weight_cap <- rep(F, length(w_subj_keep))
+      names(all_exc_weight_cap) <- names(w_subj_keep)
+    } else {
+      all_exc_weight_cap <- c()
+    }
+    all_exc_weight_cap[names(w_subj_keep)[grepl("Weight-Cap", w_subj_keep)]] <-
+      T
 
     # add to output ----
 
