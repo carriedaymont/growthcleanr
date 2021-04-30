@@ -100,8 +100,12 @@ cleanadult <- function(df, weight_cap = Inf){
     # 5h. when height goes down by 100 cm -- is it valid?
     step <- "Exclude-Hundreds"
 
-    # we only want to consider subjects without temp extraneous
-    inc_df <- copy(h_subj_df[!h_subj_df$extraneous,])
+    inc_df <- if (nrow(h_subj_df) > 0){
+      # we only want to consider subjects without temp extraneous
+      copy(h_subj_df[!h_subj_df$extraneous,])
+    } else {
+      h_subj_df
+    }
 
     # only do this if there are at least two values
     if (nrow(inc_df) > 1){
@@ -128,8 +132,12 @@ cleanadult <- function(df, weight_cap = Inf){
     # 6h. checking whether or not height should be a different type of value
     step <- "Exclude-Unit-Errors"
 
-    # we only want to consider subjects without temp extraneous
-    inc_df <- copy(h_subj_df[!h_subj_df$extraneous,])
+    inc_df <- if (nrow(h_subj_df) > 0){
+      # we only want to consider subjects without temp extraneous
+      copy(h_subj_df[!h_subj_df$extraneous,])
+    } else {
+      h_subj_df
+    }
 
     # only do this if there are at least two values
     if (nrow(inc_df) > 1){
@@ -151,8 +159,13 @@ cleanadult <- function(df, weight_cap = Inf){
     # 7h. checking whether or not 10s and 1s digit should be switched
     step <- "Exclude-Transpositions"
 
-    # we only want to consider subjects without temp extraneous
-    inc_df <- copy(h_subj_df[!h_subj_df$extraneous,])
+    inc_df <- if (nrow(h_subj_df) > 0){
+      # we only want to consider subjects without temp extraneous
+      copy(h_subj_df[!h_subj_df$extraneous,])
+    } else {
+      h_subj_df
+    }
+
     # only do this if there are at least two unique values
     if (nrow(inc_df) > 1 & length(unique(inc_df$meas_m)) > 2){
 
@@ -241,9 +254,12 @@ cleanadult <- function(df, weight_cap = Inf){
     # 4w. excluding specified "weight caps" if a user specifies
     step <- "Exclude-Weight-Cap"
 
-    # TODO: NO WEIGHTS
-    # we only want to consider subjects without temp extraneous
-    inc_df <- copy(w_subj_df[!w_subj_df$extraneous,])
+    inc_df <- if (nrow(w_subj_df) > 0){
+      # we only want to consider subjects without temp extraneous
+      copy(w_subj_df[!w_subj_df$extraneous,])
+    } else {
+      w_subj_df
+    }
 
     # only do this if there are at least two values, and if there's a weight cap
     # to evaluate
@@ -307,8 +323,12 @@ cleanadult <- function(df, weight_cap = Inf){
     # 5w. when weight goes up/down by 100/200 kg/100-300 lbs -- is it valid?
     step <- "Exclude-Hundreds"
 
-    # we only want to consider subjects without temp extraneous and rvs
-    inc_df <- copy(w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,])
+    inc_df <- if (nrow(w_subj_df) > 0){
+      # we only want to consider subjects without temp extraneous and rvs
+      copy(w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,])
+    } else {
+      w_subj_df
+    }
 
     # only do this if there are at least two values
     if (nrow(inc_df) > 1){
@@ -359,8 +379,12 @@ cleanadult <- function(df, weight_cap = Inf){
     # 6w. if a record recorded as metric should be imperial for interior values
     step <- "Exclude-Unit-Errors"
 
-    # we only want to consider subjects without temp extraneous and rvs
-    inc_df <- copy(w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,])
+    inc_df <- if (nrow(w_subj_df) > 0){
+      # we only want to consider subjects without temp extraneous and rvs
+      copy(w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,])
+    } else {
+      w_subj_df
+    }
 
     # only do this if there are at least two values
     if (nrow(inc_df) > 1){
@@ -392,8 +416,12 @@ cleanadult <- function(df, weight_cap = Inf){
     # 7w. if a record should have swapped the 10s and 1s digits
     step <- "Exclude-Transpositions"
 
-    # we only want to consider subjects without temp extraneous
-    inc_df <- copy(w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,])
+    inc_df <- if (nrow(w_subj_df) > 0){
+      # we only want to consider subjects without temp extraneous and rvs
+      copy(w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,])
+    } else {
+      w_subj_df
+    }
 
     # only do this if there are at least two values
     if (nrow(inc_df) > 1 & length(inc_df$meas_m) > 2){
@@ -1049,57 +1077,59 @@ cleanadult <- function(df, weight_cap = Inf){
     # 9w. mark extreme values using EWMA method
     step <- "Exclude-Extreme-EWMA"
 
-    # first, remove ewma without temp extraneous and repeated values
-    # we only want to consider subjects without temp extraneous
-    inc_df_first <- copy(w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,])
-    # only do this if there are at least two values
-    criteria_first <-
-      if (nrow(inc_df_first) > 1){
-        remove_ewma_wt(inc_df_first)
-      } else {
-        rep(F, nrow(inc_df_first))
-      }
+    if (nrow(w_subj_df) > 0){
+      # first, remove ewma without temp extraneous and repeated values
+      # we only want to consider subjects without temp extraneous
+      inc_df_first <- copy(w_subj_df[!w_subj_df$extraneous & !w_subj_df$is_rv,])
+      # only do this if there are at least two values
+      criteria_first <-
+        if (nrow(inc_df_first) > 1){
+          remove_ewma_wt(inc_df_first)
+        } else {
+          rep(F, nrow(inc_df_first))
+        }
 
-    # then, remove ewma just without temp extraneous
-    inc_df_rv <- copy(w_subj_df[
-      !w_subj_df$extraneous & !w_subj_df$id %in% inc_df_first$id[criteria_first],
+      # then, remove ewma just without temp extraneous
+      inc_df_rv <- copy(w_subj_df[
+        !w_subj_df$extraneous & !w_subj_df$id %in% inc_df_first$id[criteria_first],
       ])
-    # only do this if there are at least two UNIQUE values
-    criteria_rv <-
-      if (length(unique(inc_df_rv)) > 1){
-        remove_ewma_wt(inc_df_rv)
-      } else {
-        rep(F, nrow(inc_df_rv))
+      # only do this if there are at least two UNIQUE values
+      criteria_rv <-
+        if (length(unique(inc_df_rv)) > 1){
+          remove_ewma_wt(inc_df_rv)
+        } else {
+          rep(F, nrow(inc_df_rv))
+        }
+
+      # implausible ids from the step
+      impl_ids <- c(
+        as.character(inc_df_first$id)[criteria_first],
+        as.character(inc_df_rv$id)[criteria_rv]
+      )
+      # if it's a repeated value, we want to get rid of it as well
+      rv_impl_ids <- as.character(
+        w_subj_df$id[w_subj_df$meas_m %in%
+                       inc_df_first$meas_m[criteria_first &
+                                             inc_df_first$is_first_rv]],
+        w_subj_df$id[w_subj_df$meas_m %in%
+                       inc_df_rv$meas_m[criteria_rv &
+                                          inc_df_rv$is_first_rv]]
+      )
+
+      # update and remove
+      w_subj_keep[impl_ids] <- step
+      w_subj_keep[rv_impl_ids] <- paste0(step, "-RV")
+
+      # don't get rid of extraneous just yet
+      w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids),]
+
+      # don't need to do this if we don't find anything to remove
+      if (length(c(impl_ids, rv_impl_ids)) > 0){
+        # reevaluate first rvs
+        w_subj_df <- identify_rv(w_subj_df)
+
+        # don't need to reevaluate temp same day -- next step we get rid of them
       }
-
-    # implausible ids from the step
-    impl_ids <- c(
-      as.character(inc_df_first$id)[criteria_first],
-      as.character(inc_df_rv$id)[criteria_rv]
-    )
-    # if it's a repeated value, we want to get rid of it as well
-    rv_impl_ids <- as.character(
-      w_subj_df$id[w_subj_df$meas_m %in%
-                     inc_df_first$meas_m[criteria_first &
-                                           inc_df_first$is_first_rv]],
-      w_subj_df$id[w_subj_df$meas_m %in%
-                     inc_df_rv$meas_m[criteria_rv &
-                                        inc_df_rv$is_first_rv]]
-    )
-
-    # update and remove
-    w_subj_keep[impl_ids] <- step
-    w_subj_keep[rv_impl_ids] <- paste0(step, "-RV")
-
-    # don't get rid of extraneous just yet
-    w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids),]
-
-    # don't need to do this if we don't find anything to remove
-    if (length(c(impl_ids, rv_impl_ids)) > 0){
-      # reevaluate first rvs
-      w_subj_df <- identify_rv(w_subj_df)
-
-      # don't need to reevaluate temp same day -- next step we get rid of them
     }
 
     # 10w, W same day extraneous ----
@@ -1352,7 +1382,6 @@ cleanadult <- function(df, weight_cap = Inf){
         }), NA)
         # extrapolation -- prior weights
         lepolate_p <- binerr_lepolate_p <- c(rep(NA,2))
-        # TODO: CHECK IF AT LEAST 3
         if (nrow(inc_df) > 3){
           for (x in 3:nrow(inc_df)){
             slope <- (inc_df$meas_m[x-1] - inc_df$meas_m[x-2])/
