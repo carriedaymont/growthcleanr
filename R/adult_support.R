@@ -571,7 +571,7 @@ ht_change_groups <- function(h_subj_df, cutoff){
   glist <- galist <- list()
   # keep track of some current group variables
   cg <-  1 # current group
-  glist[[cg]] <- h_subj_df$meas_m[1]
+  glist[[cg]] <- setNames(h_subj_df$meas_m[1], h_subj_df$id[1])
   galist[[cg]] <- h_subj_df$age_years[1]
   for (m in 2:nrow(h_subj_df)){
     cm <- h_subj_df$meas_m[m] # current measurement
@@ -580,13 +580,15 @@ ht_change_groups <- function(h_subj_df, cutoff){
     crng <- max(c(glist[[cg]], cm)) - min(c(glist[[cg]], cm))
 
     # if the range is below 2 inches with the added value, add and move on
+    # we're also going to set the names on the measurements as ids for ease later
     if (crng < (5.08 + .001)){
-      glist[[cg]] <- c(glist[[cg]], cm)
+      glist[[cg]] <- setNames(c(glist[[cg]], cm),
+                              c(names(glist[[cg]]), h_subj_df$id[m]))
       galist[[cg]] <- c(galist[[cg]], h_subj_df$age_years[m])
     } else {
       # otherwise, we add a new group for the current measurement
       cg <- cg + 1
-      glist[[cg]] <- cm
+      glist[[cg]] <- setNames(cm, h_subj_df$id[m])
       galist[[cg]] <- h_subj_df$age_years[m]
     }
 

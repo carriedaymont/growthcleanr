@@ -78,8 +78,12 @@
 #'  pediatric algorithm should not be applied (< adult_cutpoint), and the adult
 #'   algorithm should apply (>= adult_cutpoint). Numbers outside this range will be
 #'   changed to the closest number within the range. Defaults to 20.
-#' @param weight_cap Positive number, describing a weight cap within the adult
-#'  dataset. If there is no weight cap, set to Inf. Defaults to Inf.
+#' @param weight_cap Positive number, describing a weight cap (rounded to the
+#' nearest .1, +/- .1) within the adult dataset. If there is no weight cap, set
+#'  to Inf. Defaults to Inf.
+#' @param adult_columns_filename Name of file to save original adult data, with additional output columns to
+#' as CSV. Defaults to "", for which this data will not be saved. Useful
+#' for post-analysis. For more information on this output, please see README.
 #'
 #' @return Vector of exclusion codes for each of the input measurements.
 #'
@@ -146,7 +150,8 @@ cleangrowth <- function(subjid,
                         num.batches = NA,
                         quietly = T,
                         adult_cutpoint = 20,
-                        weight_cap = Inf) {
+                        weight_cap = Inf,
+                        adult_columns_filename = "") {
   # preprocessing ----
 
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
@@ -563,6 +568,19 @@ cleangrowth <- function(subjid,
     res <- data.table()
   }
 
+  if (adult_columns_filename != "") {
+    write.csv(res, adult_columns_filename, row.names = F, na = "")
+    if (!quietly){
+      cat(
+        sprintf(
+          "[%s] Wrote adult data with additional columns to to %s...\n",
+          Sys.time(),
+          adult_columns_filename
+        )
+      )
+    }
+  }
+
   if (!quietly)
     cat(sprintf("[%s] Done with adult data!\n", Sys.time()))
 
@@ -579,7 +597,6 @@ cleangrowth <- function(subjid,
   # remove column added for keeping track
   full_out[, line := NULL]
 
-  # TODO: RETURNING EXCLUDE, NEED TO RETURN MEAN_sDE
   return(full_out$exclude)
 
 }

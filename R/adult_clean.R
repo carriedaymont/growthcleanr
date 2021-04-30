@@ -35,6 +35,12 @@ cleanadult <- function(df, weight_cap = Inf){
   # preallocate final designation
   df[, id := as.character(id)]
   df[, result := "Include"]
+  df[, orig_sde := as.numeric(NA)]
+  df[, mean_sde := as.numeric(NA)]
+  df[, mean_ht := as.numeric(NA)]
+  df[, loss_groups := as.numeric(NA)]
+  df[, gain_groups := as.numeric(NA)]
+  df[, all_exc_weight_cap := F]
   # rownames(df) <- df$id # NO ROWNAMES IN DATA.TABLE
   # go through each subject
   for (i in unique(df$subjid)){
@@ -300,6 +306,7 @@ cleanadult <- function(df, weight_cap = Inf){
              (wt_prev < -50 & wt_next < -50))
 
         criteria <- exc_wc
+        criteria[is.na(criteria)] <- F
       }
 
       # implausible ids from the step
@@ -1016,6 +1023,31 @@ cleanadult <- function(df, weight_cap = Inf){
 
     }
 
+    # we're going to do some processing to get the growth groups and loss groups
+    # for eventual output
+    loss_groups <- gain_groups <- rep(NA, length(h_subj_keep))
+    names(loss_groups) <- names(gain_groups) <- names(h_subj_keep)
+
+    hold_groups <-
+      if (length(glist_loss) > 0){
+        unlist(lapply(1:length(glist_loss), function(x){
+          setNames(rep(x, length(glist_loss[[x]])), names(glist_loss[[x]]))
+        }))
+      } else {
+        loss_groups
+      }
+    loss_groups[names(hold_groups)] <- hold_groups
+
+    hold_groups <-
+      if (length(glist_gain) > 0){
+        unlist(lapply(1:length(glist_gain), function(x){
+          setNames(rep(x, length(glist_gain[[x]])), names(glist_gain[[x]]))
+        }))
+      } else {
+        c()
+      }
+    gain_groups[names(hold_groups)] <- hold_groups
+
     # update and remove
     h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
 
@@ -1026,55 +1058,36 @@ cleanadult <- function(df, weight_cap = Inf){
     # for analysis and output.
 
     # if there are any heights left
+    meanht <- setNames(rep(NA, length(h_subj_keep)), names(h_subj_keep))
     if (nrow(h_subj_df) > 0){
       # we're relying on variables created above
       # if pairhtloss/gain are true, we're dealing with pairs
-      meanht <-
+      hold_meanht <-
         if (pairhtloss | pairhtgain){
           h_subj_df$meas_orig
         } else if (length(glist_loss) > 0 &
                    all(!c(g3_g2_check, g3_g1_check, g2_g1_check))){
           # has loss -- everything was reincluded
           # we were in a 3d scenario -- we repeat mean for every one in the group
-          unlist(lapply(1:length(glist_loss), function(x){
-            if (x == 1){
-              rep(mean(h_subj_df$meas_orig[1:length(glist_loss[[x]])]),
-                  length(glist_loss[[x]] ))
-            } else {
-              rep(mean(
-                h_subj_df$meas_orig[
-                  (length(glist_loss[[x-1]])+1):
-                    (length(glist_loss[[x-1]])+length(glist_loss[[x]]))]),
-                length(glist_loss[[x]]
-                ))
-            }
+          unlist(lapply(glist_loss, function(x){
+              rep(mean(h_subj_df$meas_orig[h_subj_df$id %in% names(x)]),
+                  length(x))
           }))
         } else if (length(glist_gain) > 0 &
                    !origexc){
           # has gain -- everything was reincluded
           # we were in a 3d scenario -- we repeat mean for every one in the group
-          unlist(lapply(1:length(glist_gain), function(x){
-            if (x == 1){
-              rep(mean(h_subj_df$meas_orig[1:length(glist_gain[[x]])]),
-                  length(glist_gain[[x]] ))
-            } else {
-              rep(mean(
-                h_subj_df$meas_orig[
-                  (length(glist_gain[[x-1]])+1):
-                    (length(glist_gain[[x-1]])+length(glist_gain[[x]]))]),
-                length(glist_gain[[x]]
-                ))
-            }
+          unlist(lapply(glist_gain, function(x){
+            rep(mean(h_subj_df$meas_orig[h_subj_df$id %in% names(x)]),
+                length(x))
           }))
         } else {
           # it's just the mean of the remaining heights
           rep(mean(h_subj_df$meas_orig), nrow(h_subj_df))
         }
       # give mean height id names to correspond them back later
-      names(meanht) <- h_subj_df$id
-    } else {
-      # mean height is empty
-      meanht <- c()
+      names(hold_meanht) <- h_subj_df$id
+      meanht[names(hold_meanht)] <- hold_meanht
     }
 
     # finish weight steps (steps 9-12) ----
@@ -1361,8 +1374,8 @@ cleanadult <- function(df, weight_cap = Inf){
       iter <- 1
       while (change){
         # set a limit for wts to be percent of other wts, focused on lower wts
-        perc_limit <- rep(.7, nrow(w_subj_df))
-        perc_limit[w_subj_df$meas_m > 45] <- .4
+        perc_limit <- rep(.7, nrow(inc_df))
+        perc_limit[inc_df$meas_m > 45] <- .4
 
         # figure out time difference between points
         ageyears_bef <- c(Inf, diff(inc_df$age_years))
@@ -1388,7 +1401,7 @@ cleanadult <- function(df, weight_cap = Inf){
         }), NA)
         # extrapolation -- prior weights
         lepolate_p <- binerr_lepolate_p <- c(rep(NA,2))
-        if (nrow(inc_df) > 3){
+        if (nrow(inc_df) >= 3){
           for (x in 3:nrow(inc_df)){
             slope <- (inc_df$meas_m[x-1] - inc_df$meas_m[x-2])/
               (inc_df$age_days[x-1] - inc_df$age_days[x-2])
@@ -1410,7 +1423,7 @@ cleanadult <- function(df, weight_cap = Inf){
         }
         # extrapolation -- next weights
         lepolate_n <- binerr_lepolate_n <- c()
-        if (nrow(inc_df) > 3){
+        if (nrow(inc_df) >= 3){
           for (x in 1:(nrow(inc_df)-2)){
             slope <- (inc_df$meas_m[x+1] - inc_df$meas_m[x+2])/
               (inc_df$age_days[x+1] - inc_df$age_days[x+2])
@@ -1531,14 +1544,15 @@ cleanadult <- function(df, weight_cap = Inf){
       criteria[w_subj_df$id %in% rem_ids] <- T
     }
 
-    # implausible ids from the step
-    impl_ids <- as.character(w_subj_df$id)[criteria]
+    if (nrow(w_subj_df) > 0){
+      # implausible ids from the step
+      impl_ids <- as.character(w_subj_df$id)[criteria]
 
-    # update and remove
-    w_subj_keep[c(impl_ids)] <- step
+      # update and remove
+      w_subj_keep[c(impl_ids)] <- step
 
-    w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids),]
-
+      w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids),]
+    }
     # no need to do rvs -- no need in the future
 
     # 12w, W weight cap influence ----
@@ -1722,16 +1736,12 @@ cleanadult <- function(df, weight_cap = Inf){
       }
     }
 
-    # additional column additions and cleanup ----
+    # additional columns ----
 
     # first, let's deal with the weight cap
     # preallocate the all exc weight cap variable (for additional output)
-    if (nrow(w_df) > 0){
-      all_exc_weight_cap <- rep(F, length(w_subj_keep))
-      names(all_exc_weight_cap) <- names(w_subj_keep)
-    } else {
-      all_exc_weight_cap <- c()
-    }
+    all_exc_weight_cap <- rep(F, length(w_subj_keep))
+    names(all_exc_weight_cap) <- names(w_subj_keep)
     all_exc_weight_cap[names(w_subj_keep)[grepl("Weight-Cap", w_subj_keep)]] <-
       T
 
@@ -1743,22 +1753,34 @@ cleanadult <- function(df, weight_cap = Inf){
       h_out <- data.table(
         id = names(h_subj_keep),
         keep = h_subj_keep,
-        mean_sde = h_subj_mean_sde
+        orig_sde = h_df$measurement,
+        mean_sde = h_subj_mean_sde,
+        mean_ht = meanht,
+        loss_groups = loss_groups,
+        gain_groups = gain_groups
       )
 
       df[h_out, result := i.keep, on = .(id)]
+      df[h_out, orig_sde := i.orig_sde, on = .(id)]
       df[h_out, mean_sde := i.mean_sde, on = .(id)]
+      df[h_out, mean_ht := i.mean_ht, on = .(id)]
+      df[h_out, loss_groups := i.loss_groups, on = .(id)]
+      df[h_out, gain_groups := i.gain_groups, on = .(id)]
     }
     if (nrow(w_df) > 0){
       # create a data.table for easy joining
       w_out <- data.table(
         id = names(w_subj_keep),
         keep = w_subj_keep,
-        mean_sde = w_subj_mean_sde
+        orig_sde = w_df$measurement,
+        mean_sde = w_subj_mean_sde,
+        all_exc_weight_cap = all_exc_weight_cap
       )
 
       df[w_out, result := i.keep, on = .(id)]
+      df[w_out, orig_sde := i.orig_sde, on = .(id)]
       df[w_out, mean_sde := i.mean_sde, on = .(id)]
+      df[w_out, all_exc_weight_cap := i.all_exc_weight_cap, on = .(id)]
     }
 
     # complete ----
