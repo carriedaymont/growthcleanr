@@ -628,7 +628,9 @@ cleanadult <- function(df, weight_cap = Inf){
         if (any(ide_tab > 1)){
           # for each identical, keep only the first one, by id
           # (ordered initially)
-          ide_ids <- c(ide_ids, s_df$id[duplicated(
+          ide_ids <- c(ide_ids, s_df$id[
+            as.character(s_df$meas_m) %in% names(ide_tab[ide_tab > 1])
+            ][duplicated(
             s_df$meas_m[
               as.character(s_df$meas_m) %in% names(ide_tab[ide_tab > 1])
             ]
@@ -659,13 +661,14 @@ cleanadult <- function(df, weight_cap = Inf){
       for (dd in dup_days){
         s_df <- copy(h_subj_df[h_subj_df$age_days == dd,])
         sde_range <- max(s_df$meas_m) - min(s_df$meas_m)
-        if (sde_range < 2.541){ # 1 inch
+        if (sde_range < 2.541){ # 1 inch +eps
+          # update imperial
+          h_subj_df$meas_im[h_subj_df$age_days == dd] <-
+            mean(s_df$meas_m)/2.54
+
           h_subj_df$mean_sde[h_subj_df$age_days == dd] <-
             h_subj_df$meas_m[h_subj_df$age_days == dd] <-
             mean(s_df$meas_m)
-          # update imperial
-          h_subj_df$meas_im[h_subj_df$age_days == dd] <-
-            round(mean(s_df$meas_m)/2.54, 2)
 
           # remove all except the first by id
           rem_ids <- c(rem_ids, h_subj_df$id[h_subj_df$age_days == dd][
@@ -1177,7 +1180,9 @@ cleanadult <- function(df, weight_cap = Inf){
         if (any(ide_tab > 1)){
           # for each identical, keep only the first one, by id
           # (ordered initially)
-          ide_ids <- c(ide_ids, s_df$id[duplicated(
+          ide_ids <- c(ide_ids, s_df$id[
+            as.character(s_df$meas_m) %in% names(ide_tab[ide_tab > 1])
+          ][duplicated(
             s_df$meas_m[
               as.character(s_df$meas_m) %in% names(ide_tab[ide_tab > 1])
             ]
@@ -1209,12 +1214,13 @@ cleanadult <- function(df, weight_cap = Inf){
         s_df <- copy(w_subj_df[w_subj_df$age_days == dd,])
         sde_range <- max(s_df$meas_m) - min(s_df$meas_m)
         if (sde_range < 1.001){ # 1 pound
+          # update imperial
+          w_subj_df$meas_im[w_subj_df$age_days == dd] <-
+            mean(s_df$meas_m)*2.2046226
+
           w_subj_df$mean_sde[w_subj_df$age_days == dd] <-
             w_subj_df$meas_m[w_subj_df$age_days == dd] <-
             mean(s_df$meas_m)
-          # update imperial
-          w_subj_df$meas_im[w_subj_df$age_days == dd] <-
-            round(mean(s_df$meas_m)*2.2046226, 1)
 
           # remove all except the first by id
           rem_ids <- c(rem_ids, w_subj_df$id[w_subj_df$age_days == dd][
