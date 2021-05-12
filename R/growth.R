@@ -192,149 +192,7 @@ cleangrowth <- function(subjid,
 
   # TODO: ADD PARALLEL FOR ADULTS
 
-  # pediatric: height velocity calculations and preprocessing ----
-
-  # for pediatric data, convert in and lbs to cm and kg (adult is done within algo)
-  data.all[param == "HEIGHTIN", v := v*2.54]
-  data.all[param == "HEIGHTIN", param := "HEIGHTCM"]
-  data.all[param == "WEIGHTLBS", v := v/2.2046226]
-  data.all[param == "WEIGHTLBS", param := "WEIGHTKG"]
-
-  # if parallel processing is desired, load additional modules
-  if (parallel) {
-    if (is.na(num.batches)) {
-      num.batches <- getDoParWorkers()
-    }
-    # variables needed for parallel workers
-    var_for_par <- c("temporary_extraneous", "valid", "swap_parameters",
-                     "na_as_false", "ewma", "read_anthro", "as_matrix_delta",
-                     "sd_median")
-
-    cl <- makeCluster(num.batches)
-    clusterExport(cl = cl, varlist = var_for_par, envir = environment())
-    registerDoParallel(cl)
-  } else {
-    if (is.na(num.batches))
-      num.batches <- 1
-  }
-
-  setkey(data.all, subjid)
-  subjid.unique <- data.all[j = unique(subjid)]
-  batches.all <- data.table(
-    subjid = subjid.unique,
-    batch = sample(num.batches, length(subjid.unique), replace = T),
-    key = 'subjid'
-  )
-  data.all <- batches.all[data.all]
-
-  if (!quietly){
-    cat(sprintf("[%s] Begin processing pediatric data...\n", Sys.time()))
-  }
-
-  # load tanner height velocity data. sex variable is defined such that 0=male and 1=female
-  # recode column names to match syntactic style ("." rather than "_" in variable names)
-  tanner_ht_vel_path <- ifelse(
-    ref.data.path == "",
-    system.file(file.path("extdata", "tanner_ht_vel.csv"), package = "growthcleanr"),
-    file.path(ref.data.path, "tanner_ht_vel.csv")
-  )
-
-  tanner.ht.vel <- fread(tanner_ht_vel_path)
-
-  setnames(tanner.ht.vel,
-           colnames(tanner.ht.vel),
-           gsub('_', '.', colnames(tanner.ht.vel)))
-  setkey(tanner.ht.vel, sex, tanner.months)
-  # keep track of column names in the tanner data
-  tanner.fields <- colnames(tanner.ht.vel)
-  tanner.fields <- tanner.fields[!tanner.fields %in% c('sex', 'tanner.months')]
-
-  who_max_ht_vel_path <- ifelse(
-    ref.data.path == "",
-    system.file(file.path("extdata", "who_ht_maxvel_3sd.csv"), package = "growthcleanr"),
-    file.path(ref.data.path, "who_ht_maxvel_3sd.csv")
-  )
-
-  who_ht_vel_3sd_path <- ifelse(
-    ref.data.path == "",
-    system.file(file.path("extdata", "who_ht_vel_3sd.csv"), package = "growthcleanr"),
-    file.path(ref.data.path, "who_ht_vel_3sd.csv")
-  )
-  who.max.ht.vel <- fread(who_max_ht_vel_path)
-  who.ht.vel <- fread(who_ht_vel_3sd_path)
-  setkey(who.max.ht.vel, sex, whoagegrp_ht)
-  setkey(who.ht.vel, sex, whoagegrp_ht)
-  who.ht.vel <- as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel, by =
-                                                c('sex', 'whoagegrp_ht')))
-
-  setnames(who.ht.vel, colnames(who.ht.vel), gsub('_', '.', colnames(who.ht.vel)))
-  setkey(who.ht.vel, sex, whoagegrp.ht)
-  # keep track of column names in the who growth velocity data
-  who.fields <- colnames(who.ht.vel)
-  who.fields <- who.fields[!who.fields %in% c('sex', 'whoagegrp.ht')]
-
-  # 1.  General principles
-  # a.	All steps are done separately for each parameter unless otherwise noted
-  # b.	All steps are done sorted by subject, parameter, and age (in days) for nonexcluded and nonmissing values only unless otherwise noted. This is very important.
-  #     Sorting needs to be redone with each step to account for excluded and transformed  values.
-  # c.	The next value refers to the value with the next highest age for the same parameter and the same subject, and the previous value refers to the value with the
-  #     next lowest age for the same parameter and the same subject.
-  # d.	You will need to set up a method for keeping track of whether a value is missing or excluded (and in what step). I use variables called exc_* that are =0
-  #     if a value is to be included, =1 if missing, and =2 or higher if it is to be excluded, with each number indicating a different step. I also set up
-  #     parameter-specific subjid_* variables that are = to subjid for included values and are blank if the value is missing or should be excluded. These subjid_*
-  #     variables need to be updated with each step.
-  # e.  All steps assume that data are sorted by subjid_*, parameter, and age (in days) for nonexcluded and nonmissing values only
-  #     unless otherwise noted. Sorting needs to be redone after any transformations or exclusions to account for excluded and
-  #     transformed values.
-  # f.  The next value refers to the nonexcluded nonmissing value with the next highest age for the same parameter and the same
-  #     subject, and the previous value refers to the nonexcluded nonmissing value with the next lowest age for the same parameter
-  #     and the same subject.
-  # g.  exc_* should only be replaced with a  higher value if exc_*==0 at the time of replacement, unless otherwise specified.
-
-
-  # NOTE: in the R code below exclusion is documented as a series of factor levels, where all levels occuring before 'Exclude' in the sequence are considered
-  # to be valid measurements.  We use the built in sorting of the data.table object and subsets rather than re-sorting at each step
-  # to ensure that only valid measurements are used at the beginning of each step.
-  # Also, unlike the Stata code, the measurement parameter (weight vs. height) is recorded as a factor in the data frame, rather than as a variable name
-
-  # 2.  Data set-up
-  # a.	I always code sex as 0=Male, 1=Female, so I recoded the variable sex that way and left a variable sexorigcode the way the data was sent to me (1=Female 2=Male)
-  # b.	Remove rows that are extraneous for subjid, param, and measurement from further analysis
-  #     NOTE: this step is not needed -- handled automatically by "temporary extraneous" step.
-  # c.  I generated separate variables for weight (wt) and height (ht), as well as exc_* and subjid_* variables. Set exc_*=0 if value is not missing
-  #     and exc_*=1 if value is missing. In all future steps, exc_* should only be changed if it is 0. This helps to keep track of which step excluded a value.
-  #     I also kept the measurement variable there and untouched because sometimes wt and ht got transformed to something else.
-  # d.	I made tables based on CDC growth curve parameters that include data for each day that I will send separately. The LMS parameters for each day are
-  #     cubically interpolated from the values by month available on the CDC website. Create wt and ht z-scores for each value of each parameter (Z: WtZ and HtZ).
-  # e.	There are variables in the table labelled cdc_*_csd_pos and cdc_*_csd_neg. For each age and sex, these correspond to ½ of the absolute value of the
-  #     median and the value with a z-score of +2 (csd_pos) and -2 (csd_neg). These can be created to generate a score similar to the z-score but with an
-  #     important difference. The z-scores created using the LMS method account for skewness in the distribution of the parameters (particularly weight), which
-  #     can lead to small changes in z-score with large changes in weight in subjects with very high weight, and relatively large changes in z-score for smaller
-  #     changes in weight in subjects with low weights.  The score we will create can be called an SD-score (SDorig: WtSDorig and HtSDorig that is calculated by
-  #     dividing the difference between the value and the median by the SD score (use csd_pos if the value is above the median, csd_neg if the value is below the
-  #     median). These SD-scores, rather than z-scores, now form the basis for the algorithm.
-
-  # recategorize linear parameters as 'HEIGHTCM'
-  # NOTE: this will be changed in future to consider this difference
-  data.all[param == 'LENGTHCM', param := 'HEIGHTCM']
-
-  # calculate z scores
-  if (!quietly)
-    cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
-  measurement.to.z <- read_anthro(ref.data.path, cdc.only = T)
-  data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
-
-  # calculate "standard deviation" scores
-  if (!quietly)
-    cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
-  data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, T)]
-
-  # sort by subjid, param, agedays
-  setkey(data.all, subjid, param, agedays)
-
-  # add a new convenience index for bookkeeping
-  data.all[, index := 1:.N]
-
+  # constants for pediatric
   # enumerate the different exclusion levels
   exclude.levels <- c(
     'Include',
@@ -367,186 +225,340 @@ cleangrowth <- function(subjid,
     'Exclude-Too-Many-Errors-Other-Parameter'
   )
 
-  # Mark missing values for exclusion
-  data.all[, exclude := factor(with(data.all, ifelse(
-    is.na(v) |
-      agedays < 0, 'Missing', 'Include'
-  )),
-  levels = exclude.levels,
-  ordered = T)]
+  # if there's no pediatric data, no need to go through this rigamarole
+  if (nrow(data.all) > 0){
 
-  # define field names needed by helper functions
-  ewma.fields <- c('ewma.all', 'ewma.before', 'ewma.after')
+    # pediatric: height velocity calculations and preprocessing ----
 
-  # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time, we need to account for the fact that
-  #     the mean SD-score for the population changes with age.
-  # a.	Determine the median cdc*sd for each parameter by year of age (with sexes combined): median*sd.
-  # b.	The median*sd should be considered to apply to midyear-age, defined as the age in days with the same value as the integer
-  #     portion of (365.25*year + 365.25/2).
-  # c.	Linearly interpolate median*sd for each parameter between each midyear-age, naming the interpolated values rc*sd.
-  # d.	For ages below the first midyear-age, let rc*sd equal the median*sd for the earliest year.
-  #     For ages above the last midyear_age, let rc*sd equal the median*sd for the last year.
-  # e.	Subtract rcsd_* from SDorig to create the recentered SD-score.  This recentered SD-score, labeled tbc*sd
-  #     (stands for "to be cleaned") will be used for most of the rest of the analyses.
-  # f.	In future steps I will sometimes refer to measprev and measnext which refer to the previous or next wt or ht measurement
-  #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject, parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
+    # for pediatric data, convert in and lbs to cm and kg (adult is done within algo)
+    data.all[param == "HEIGHTIN", v := v*2.54]
+    data.all[param == "HEIGHTIN", param := "HEIGHTCM"]
+    data.all[param == "WEIGHTLBS", v := v/2.2046226]
+    data.all[param == "WEIGHTLBS", param := "WEIGHTKG"]
 
-  if (!quietly)
-    cat(sprintf("[%s] Re-centering data...\n", Sys.time()))
+    # if parallel processing is desired, load additional modules
+    if (parallel) {
+      if (is.na(num.batches)) {
+        num.batches <- getDoParWorkers()
+      }
+      # variables needed for parallel workers
+      var_for_par <- c("temporary_extraneous", "valid", "swap_parameters",
+                       "na_as_false", "ewma", "read_anthro", "as_matrix_delta",
+                       "sd_median")
 
-  # see function definition below for explanation of the re-centering process
-  # returns a data table indexed by param, sex, agedays. can use NHANES reference
-  # data, derive from input, or use user-supplied data.
-  if (!is.data.table(sd.recenter)) {
-    # Use NHANES medians if the string "nhanes" is specified instead of a data.table
-    # or if sd.recenter is not specified as "derive" and N < 5000.
-    if ((is.character(sd.recenter) & tolower(sd.recenter) == "nhanes") |
-      (!(is.character(sd.recenter) & tolower(sd.recenter) == "derive") & (data.all[, .N] < 5000))) {
-      nhanes_reference_medians_path <- ifelse(
-        ref.data.path == "",
-        system.file(file.path("extdata", "nhanes-reference-medians.csv"), package = "growthcleanr"),
-        file.path(ref.data.path, "nhanes-reference-medians.csv")
-      )
-      sd.recenter <- fread(nhanes_reference_medians_path)
-      if (!quietly)
-        cat(
-          sprintf(
-            "[%s] Using NHANES reference medians...\n",
-            Sys.time()
-          )
-        )
+      cl <- makeCluster(num.batches)
+      clusterExport(cl = cl, varlist = var_for_par, envir = environment())
+      registerDoParallel(cl)
     } else {
-      # Derive medians from input data
-      sd.recenter <- data.all[exclude < 'Exclude', sd_median(param, sex, agedays, sd.orig)]
-      if (!quietly)
-        cat(
-          sprintf(
-            "[%s] Using re-centering medians derived from input...\n",
-            Sys.time()
-          )
+      if (is.na(num.batches))
+        num.batches <- 1
+    }
+
+    setkey(data.all, subjid)
+    subjid.unique <- data.all[j = unique(subjid)]
+    batches.all <- data.table(
+      subjid = subjid.unique,
+      batch = sample(num.batches, length(subjid.unique), replace = T),
+      key = 'subjid'
+    )
+    data.all <- batches.all[data.all]
+
+    if (!quietly){
+      cat(sprintf("[%s] Begin processing pediatric data...\n", Sys.time()))
+    }
+
+    # load tanner height velocity data. sex variable is defined such that 0=male and 1=female
+    # recode column names to match syntactic style ("." rather than "_" in variable names)
+    tanner_ht_vel_path <- ifelse(
+      ref.data.path == "",
+      system.file(file.path("extdata", "tanner_ht_vel.csv"), package = "growthcleanr"),
+      file.path(ref.data.path, "tanner_ht_vel.csv")
+    )
+
+    tanner.ht.vel <- fread(tanner_ht_vel_path)
+
+    setnames(tanner.ht.vel,
+             colnames(tanner.ht.vel),
+             gsub('_', '.', colnames(tanner.ht.vel)))
+    setkey(tanner.ht.vel, sex, tanner.months)
+    # keep track of column names in the tanner data
+    tanner.fields <- colnames(tanner.ht.vel)
+    tanner.fields <- tanner.fields[!tanner.fields %in% c('sex', 'tanner.months')]
+
+    who_max_ht_vel_path <- ifelse(
+      ref.data.path == "",
+      system.file(file.path("extdata", "who_ht_maxvel_3sd.csv"), package = "growthcleanr"),
+      file.path(ref.data.path, "who_ht_maxvel_3sd.csv")
+    )
+
+    who_ht_vel_3sd_path <- ifelse(
+      ref.data.path == "",
+      system.file(file.path("extdata", "who_ht_vel_3sd.csv"), package = "growthcleanr"),
+      file.path(ref.data.path, "who_ht_vel_3sd.csv")
+    )
+    who.max.ht.vel <- fread(who_max_ht_vel_path)
+    who.ht.vel <- fread(who_ht_vel_3sd_path)
+    setkey(who.max.ht.vel, sex, whoagegrp_ht)
+    setkey(who.ht.vel, sex, whoagegrp_ht)
+    who.ht.vel <- as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel, by =
+                                                   c('sex', 'whoagegrp_ht')))
+
+    setnames(who.ht.vel, colnames(who.ht.vel), gsub('_', '.', colnames(who.ht.vel)))
+    setkey(who.ht.vel, sex, whoagegrp.ht)
+    # keep track of column names in the who growth velocity data
+    who.fields <- colnames(who.ht.vel)
+    who.fields <- who.fields[!who.fields %in% c('sex', 'whoagegrp.ht')]
+
+    # 1.  General principles
+    # a.	All steps are done separately for each parameter unless otherwise noted
+    # b.	All steps are done sorted by subject, parameter, and age (in days) for nonexcluded and nonmissing values only unless otherwise noted. This is very important.
+    #     Sorting needs to be redone with each step to account for excluded and transformed  values.
+    # c.	The next value refers to the value with the next highest age for the same parameter and the same subject, and the previous value refers to the value with the
+    #     next lowest age for the same parameter and the same subject.
+    # d.	You will need to set up a method for keeping track of whether a value is missing or excluded (and in what step). I use variables called exc_* that are =0
+    #     if a value is to be included, =1 if missing, and =2 or higher if it is to be excluded, with each number indicating a different step. I also set up
+    #     parameter-specific subjid_* variables that are = to subjid for included values and are blank if the value is missing or should be excluded. These subjid_*
+    #     variables need to be updated with each step.
+    # e.  All steps assume that data are sorted by subjid_*, parameter, and age (in days) for nonexcluded and nonmissing values only
+    #     unless otherwise noted. Sorting needs to be redone after any transformations or exclusions to account for excluded and
+    #     transformed values.
+    # f.  The next value refers to the nonexcluded nonmissing value with the next highest age for the same parameter and the same
+    #     subject, and the previous value refers to the nonexcluded nonmissing value with the next lowest age for the same parameter
+    #     and the same subject.
+    # g.  exc_* should only be replaced with a  higher value if exc_*==0 at the time of replacement, unless otherwise specified.
+
+
+    # NOTE: in the R code below exclusion is documented as a series of factor levels, where all levels occuring before 'Exclude' in the sequence are considered
+    # to be valid measurements.  We use the built in sorting of the data.table object and subsets rather than re-sorting at each step
+    # to ensure that only valid measurements are used at the beginning of each step.
+    # Also, unlike the Stata code, the measurement parameter (weight vs. height) is recorded as a factor in the data frame, rather than as a variable name
+
+    # 2.  Data set-up
+    # a.	I always code sex as 0=Male, 1=Female, so I recoded the variable sex that way and left a variable sexorigcode the way the data was sent to me (1=Female 2=Male)
+    # b.	Remove rows that are extraneous for subjid, param, and measurement from further analysis
+    #     NOTE: this step is not needed -- handled automatically by "temporary extraneous" step.
+    # c.  I generated separate variables for weight (wt) and height (ht), as well as exc_* and subjid_* variables. Set exc_*=0 if value is not missing
+    #     and exc_*=1 if value is missing. In all future steps, exc_* should only be changed if it is 0. This helps to keep track of which step excluded a value.
+    #     I also kept the measurement variable there and untouched because sometimes wt and ht got transformed to something else.
+    # d.	I made tables based on CDC growth curve parameters that include data for each day that I will send separately. The LMS parameters for each day are
+    #     cubically interpolated from the values by month available on the CDC website. Create wt and ht z-scores for each value of each parameter (Z: WtZ and HtZ).
+    # e.	There are variables in the table labelled cdc_*_csd_pos and cdc_*_csd_neg. For each age and sex, these correspond to ½ of the absolute value of the
+    #     median and the value with a z-score of +2 (csd_pos) and -2 (csd_neg). These can be created to generate a score similar to the z-score but with an
+    #     important difference. The z-scores created using the LMS method account for skewness in the distribution of the parameters (particularly weight), which
+    #     can lead to small changes in z-score with large changes in weight in subjects with very high weight, and relatively large changes in z-score for smaller
+    #     changes in weight in subjects with low weights.  The score we will create can be called an SD-score (SDorig: WtSDorig and HtSDorig that is calculated by
+    #     dividing the difference between the value and the median by the SD score (use csd_pos if the value is above the median, csd_neg if the value is below the
+    #     median). These SD-scores, rather than z-scores, now form the basis for the algorithm.
+
+    # recategorize linear parameters as 'HEIGHTCM'
+    # NOTE: this will be changed in future to consider this difference
+    data.all[param == 'LENGTHCM', param := 'HEIGHTCM']
+
+    # calculate z scores
+    if (!quietly)
+      cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
+    measurement.to.z <- read_anthro(ref.data.path, cdc.only = T)
+    data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
+
+    # calculate "standard deviation" scores
+    if (!quietly)
+      cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
+    data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, T)]
+
+    # sort by subjid, param, agedays
+    setkey(data.all, subjid, param, agedays)
+
+    # add a new convenience index for bookkeeping
+    data.all[, index := 1:.N]
+
+    # Mark missing values for exclusion
+    data.all[, exclude := factor(with(data.all, ifelse(
+      is.na(v) |
+        agedays < 0, 'Missing', 'Include'
+    )),
+    levels = exclude.levels,
+    ordered = T)]
+
+    # define field names needed by helper functions
+    ewma.fields <- c('ewma.all', 'ewma.before', 'ewma.after')
+
+    # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time, we need to account for the fact that
+    #     the mean SD-score for the population changes with age.
+    # a.	Determine the median cdc*sd for each parameter by year of age (with sexes combined): median*sd.
+    # b.	The median*sd should be considered to apply to midyear-age, defined as the age in days with the same value as the integer
+    #     portion of (365.25*year + 365.25/2).
+    # c.	Linearly interpolate median*sd for each parameter between each midyear-age, naming the interpolated values rc*sd.
+    # d.	For ages below the first midyear-age, let rc*sd equal the median*sd for the earliest year.
+    #     For ages above the last midyear_age, let rc*sd equal the median*sd for the last year.
+    # e.	Subtract rcsd_* from SDorig to create the recentered SD-score.  This recentered SD-score, labeled tbc*sd
+    #     (stands for "to be cleaned") will be used for most of the rest of the analyses.
+    # f.	In future steps I will sometimes refer to measprev and measnext which refer to the previous or next wt or ht measurement
+    #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject, parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
+
+    if (!quietly)
+      cat(sprintf("[%s] Re-centering data...\n", Sys.time()))
+
+    # see function definition below for explanation of the re-centering process
+    # returns a data table indexed by param, sex, agedays. can use NHANES reference
+    # data, derive from input, or use user-supplied data.
+    if (!is.data.table(sd.recenter)) {
+      # Use NHANES medians if the string "nhanes" is specified instead of a data.table
+      # or if sd.recenter is not specified as "derive" and N < 5000.
+      if ((is.character(sd.recenter) & tolower(sd.recenter) == "nhanes") |
+          (!(is.character(sd.recenter) & tolower(sd.recenter) == "derive") & (data.all[, .N] < 5000))) {
+        nhanes_reference_medians_path <- ifelse(
+          ref.data.path == "",
+          system.file(file.path("extdata", "nhanes-reference-medians.csv"), package = "growthcleanr"),
+          file.path(ref.data.path, "nhanes-reference-medians.csv")
         )
-      if (sdmedian.filename != "") {
-        write.csv(sd.recenter, sdmedian.filename, row.names = F)
+        sd.recenter <- fread(nhanes_reference_medians_path)
         if (!quietly)
           cat(
             sprintf(
-              "[%s] Wrote re-centering medians to %s...\n",
-              Sys.time(),
-              sdmedian.filename
+              "[%s] Using NHANES reference medians...\n",
+              Sys.time()
+            )
+          )
+      } else {
+        # Derive medians from input data
+        sd.recenter <- data.all[exclude < 'Exclude', sd_median(param, sex, agedays, sd.orig)]
+        if (!quietly)
+          cat(
+            sprintf(
+              "[%s] Using re-centering medians derived from input...\n",
+              Sys.time()
+            )
+          )
+        if (sdmedian.filename != "") {
+          write.csv(sd.recenter, sdmedian.filename, row.names = F)
+          if (!quietly)
+            cat(
+              sprintf(
+                "[%s] Wrote re-centering medians to %s...\n",
+                Sys.time(),
+                sdmedian.filename
+              )
+            )
+        }
+      }
+    } else {
+      # Use specified data
+      if (!quietly)
+        cat(
+          sprintf(
+            "[%s] Using specified re-centering medians...\n",
+            Sys.time()
+          )
+        )
+    }
+
+    # ensure recentering medians are sorted correctly
+    setkey(sd.recenter, param, sex, agedays)
+
+    # add sd.recenter to data, and recenter
+    setkey(data.all, param, sex, agedays)
+    data.all <- sd.recenter[data.all]
+    setkey(data.all, subjid, param, agedays)
+    data.all[, tbc.sd := sd.orig - sd.median]
+
+    if (sdrecentered.filename != "") {
+      write.csv(data.all, sdrecentered.filename, row.names = F)
+      if (!quietly)
+        cat(
+          sprintf(
+            "[%s] Wrote re-centered data to %s...\n",
+            Sys.time(),
+            sdrecentered.filename
+          )
+        )
+    }
+
+    # notification: ensure awareness of small subsets in data
+    if (!quietly) {
+      year.counts <- data.all[, .N, floor(agedays / 365.25)]
+      if (year.counts[N < 100, .N] > 0) {
+        cat(
+          sprintf(
+            "[%s] Note: input data has at least one age-year with < 100 subjects...\n",
+            Sys.time()
           )
         )
       }
     }
-  } else {
-    # Use specified data
+
+    # safety check: treat observations where tbc.sd cannot be calculated as missing
+    data.all[is.na(tbc.sd), exclude := 'Missing']
+
+    # pediatric: cleanbatch (most of steps) ----
+
+    # NOTE: the rest of cleangrowth's steps are done through cleanbatch().
+
+    # optionally process batches in parallel
     if (!quietly)
-      cat(
-        sprintf(
-          "[%s] Using specified re-centering medians...\n",
-          Sys.time()
-        )
+      cat(sprintf(
+        "[%s] Cleaning growth data in %d batch(es)...\n",
+        Sys.time(),
+        num.batches
+      ))
+    if (num.batches == 1) {
+      ret.df <- cleanbatch(data.all,
+                           log.path = log.path,
+                           quietly = quietly,
+                           parallel = parallel,
+                           measurement.to.z = measurement.to.z,
+                           ewma.fields = ewma.fields,
+                           ewma.exp = ewma.exp,
+                           recover.unit.error = recover.unit.error,
+                           include.carryforward = include.carryforward,
+                           sd.extreme = sd.extreme,
+                           z.extreme = z.extreme,
+                           exclude.levels = exclude.levels,
+                           tanner.ht.vel = tanner.ht.vel,
+                           who.ht.vel = who.ht.vel,
+                           lt3.exclude.mode = lt3.exclude.mode,
+                           error.load.threshold = error.load.threshold,
+                           error.load.mincount = error.load.mincount)
+    } else {
+      # create log directory if necessary
+      if (!quietly)
+        cat(sprintf("[%s] Writing batch logs to '%s'...\n", Sys.time(), log.path))
+      ifelse(!dir.exists(log.path), dir.create(log.path), FALSE)
+
+      ret.df <- ddply(
+        data.all,
+        .(batch),
+        cleanbatch,
+        .parallel = parallel,
+        .paropts = list(.packages = "data.table"),
+        log.path = log.path,
+        quietly = quietly,
+        parallel = parallel,
+        measurement.to.z = measurement.to.z,
+        ewma.fields = ewma.fields,
+        ewma.exp = ewma.exp,
+        recover.unit.error = recover.unit.error,
+        include.carryforward = include.carryforward,
+        sd.extreme = sd.extreme,
+        z.extreme = z.extreme,
+        exclude.levels = exclude.levels,
+        tanner.ht.vel = tanner.ht.vel,
+        who.ht.vel = who.ht.vel,
+        lt3.exclude.mode = lt3.exclude.mode,
+        error.load.threshold = error.load.threshold,
+        error.load.mincount = error.load.mincount
       )
-  }
-
-  # ensure recentering medians are sorted correctly
-  setkey(sd.recenter, param, sex, agedays)
-
-  # add sd.recenter to data, and recenter
-  setkey(data.all, param, sex, agedays)
-  data.all <- sd.recenter[data.all]
-  setkey(data.all, subjid, param, agedays)
-  data.all[, tbc.sd := sd.orig - sd.median]
-
-  if (sdrecentered.filename != "") {
-    write.csv(data.all, sdrecentered.filename, row.names = F)
-    if (!quietly)
-      cat(
-        sprintf(
-          "[%s] Wrote re-centered data to %s...\n",
-          Sys.time(),
-          sdrecentered.filename
-        )
-      )
-  }
-
-  # notification: ensure awareness of small subsets in data
-  if (!quietly) {
-    year.counts <- data.all[, .N, floor(agedays / 365.25)]
-    if (year.counts[N < 100, .N] > 0) {
-      cat(
-        sprintf(
-          "[%s] Note: input data has at least one age-year with < 100 subjects...\n",
-          Sys.time()
-        )
-      )
+      stopCluster(cl)
     }
-  }
 
-  # safety check: treat observations where tbc.sd cannot be calculated as missing
-  data.all[is.na(tbc.sd), exclude := 'Missing']
 
-  # pediatric: cleanbatch (most of steps) ----
-
-  # NOTE: the rest of cleangrowth's steps are done through cleanbatch().
-
-  # optionally process batches in parallel
-  if (!quietly)
-    cat(sprintf(
-      "[%s] Cleaning growth data in %d batch(es)...\n",
-      Sys.time(),
-      num.batches
-    ))
-  if (num.batches == 1) {
-    ret.df <- cleanbatch(data.all,
-                         log.path = log.path,
-                         quietly = quietly,
-                         parallel = parallel,
-                         measurement.to.z = measurement.to.z,
-                         ewma.fields = ewma.fields,
-                         ewma.exp = ewma.exp,
-                         recover.unit.error = recover.unit.error,
-                         include.carryforward = include.carryforward,
-                         sd.extreme = sd.extreme,
-                         z.extreme = z.extreme,
-                         exclude.levels = exclude.levels,
-                         tanner.ht.vel = tanner.ht.vel,
-                         who.ht.vel = who.ht.vel,
-                         lt3.exclude.mode = lt3.exclude.mode,
-                         error.load.threshold = error.load.threshold,
-                         error.load.mincount = error.load.mincount)
-  } else {
-    # create log directory if necessary
     if (!quietly)
-      cat(sprintf("[%s] Writing batch logs to '%s'...\n", Sys.time(), log.path))
-    ifelse(!dir.exists(log.path), dir.create(log.path), FALSE)
+      cat(sprintf("[%s] Done with pediatric data!\n", Sys.time()))
+  } else {
+    ret.df <- data.table()
 
-    ret.df <- ddply(
-      data.all,
-      .(batch),
-      cleanbatch,
-      .parallel = parallel,
-      .paropts = list(.packages = "data.table"),
-      log.path = log.path,
-      quietly = quietly,
-      parallel = parallel,
-      measurement.to.z = measurement.to.z,
-      ewma.fields = ewma.fields,
-      ewma.exp = ewma.exp,
-      recover.unit.error = recover.unit.error,
-      include.carryforward = include.carryforward,
-      sd.extreme = sd.extreme,
-      z.extreme = z.extreme,
-      exclude.levels = exclude.levels,
-      tanner.ht.vel = tanner.ht.vel,
-      who.ht.vel = who.ht.vel,
-      lt3.exclude.mode = lt3.exclude.mode,
-      error.load.threshold = error.load.threshold,
-      error.load.mincount = error.load.mincount
-    )
-    stopCluster(cl)
+    if (!quietly)
+      cat(sprintf("[%s] No pediatric data. Moving to adult data...\n", Sys.time()))
   }
-  if (!quietly)
-    cat(sprintf("[%s] Done with pediatric data!\n", Sys.time()))
 
   # adult: send to cleanadult to do most of the work ----
 
@@ -620,25 +632,30 @@ cleangrowth <- function(subjid,
       stopCluster(cl)
     }
 
+
+    if (adult_columns_filename != "") {
+      write.csv(res, adult_columns_filename, row.names = F, na = "")
+      if (!quietly){
+        cat(
+          sprintf(
+            "[%s] Wrote adult data with additional columns to to %s...\n",
+            Sys.time(),
+            adult_columns_filename
+          )
+        )
+      }
+    }
+
+    if (!quietly)
+      cat(sprintf("[%s] Done with adult data!\n", Sys.time()))
   } else {
     res <- data.table()
-  }
 
-  if (adult_columns_filename != "") {
-    write.csv(res, adult_columns_filename, row.names = F, na = "")
     if (!quietly){
-      cat(
-        sprintf(
-          "[%s] Wrote adult data with additional columns to to %s...\n",
-          Sys.time(),
-          adult_columns_filename
-        )
-      )
+      cat(sprintf("[%s] No adult data. Moving to postprocessing...\n", Sys.time()))
     }
   }
 
-  if (!quietly)
-    cat(sprintf("[%s] Done with adult data!\n", Sys.time()))
 
   # join with pediatric data
   full_out <- data.table(
