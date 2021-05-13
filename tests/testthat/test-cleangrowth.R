@@ -143,3 +143,35 @@ test_that("growthcleanr works as expected on synthetic data", {
                            suffixes=c(".c100", ".c300n100"))
   expect_equal(0, nhanes_combined[gcr_result.c100 != gcr_result.c300n100, .N])
 })
+
+test_that("growthcleanr works without either adult or pediatric data", {
+  # creating small only adult and only pediatric data
+  # using default cutpoint -- 20
+  only_peds <- syngrowth[syngrowth$agedays < 20*365.25,][1:50,]
+  only_adult <- syngrowth[syngrowth$agedays >= 20*365.25,][1:50,]
+
+  # testing cleangrowth works without adult data
+  peds_res <- cleangrowth(
+    only_peds$subjid,
+    only_peds$param,
+    only_peds$agedays,
+    only_peds$sex,
+    only_peds$measurement,
+    quietly = T
+  )
+
+  expect_equal(length(peds_res), nrow(only_peds))
+
+  # testing cleangrowth works without pediatric data
+  adult_res <- cleangrowth(
+    only_adult$subjid,
+    only_adult$param,
+    only_adult$agedays,
+    only_adult$sex,
+    only_adult$measurement,
+    quietly = T
+  )
+
+  expect_equal(length(adult_res), nrow(only_adult))
+
+})
