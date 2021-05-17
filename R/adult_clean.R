@@ -1407,12 +1407,17 @@ cleanadult <- function(df, weight_cap = Inf){
 
         # 'polation (inter/extra-polation)
         # "interpolation" - between prior and next with error of 5 on either end
-        binerr_interpol <- c(NA, sapply(2:(nrow(inc_df)-1), function(x){
-          check_between(inc_df$meas_m[x],
-                        inc_df$meas_m[x-1]-5, inc_df$meas_m[x+1]+5) |
-            check_between(inc_df$meas_m[x],
-                          inc_df$meas_m[x+1]-5, inc_df$meas_m[x-1]+5)
-        }), NA)
+        binerr_interpol <-
+          if (nrow(inc_df) >= 3){
+            c(NA, sapply(2:(nrow(inc_df)-1), function(x){
+              check_between(inc_df$meas_m[x],
+                            inc_df$meas_m[x-1]-5, inc_df$meas_m[x+1]+5) |
+                check_between(inc_df$meas_m[x],
+                              inc_df$meas_m[x+1]-5, inc_df$meas_m[x-1]+5)
+            }), NA)
+          } else {
+            c(NA, NA)
+          }
         # extrapolation -- prior weights
         lepolate_p <- binerr_lepolate_p <- c(rep(NA,2))
         if (nrow(inc_df) >= 3){
@@ -1498,8 +1503,9 @@ cleanadult <- function(df, weight_cap = Inf){
                 dewma$dewma.before > (.75*wta)) |
              (dewma$dewma.all < -1*wta &
                 dewma$dewma.before < (-1*.75*wta)))
-        exc_mod_ewma <- exc_mod_ewma | alt_ewma_exc
         exc_mod_ewma[is.na(exc_mod_ewma)] <- F
+        alt_ewma_exc[is.na(alt_ewma_exc)] <- F
+        exc_mod_ewma <- exc_mod_ewma | alt_ewma_exc
 
         # identify binerr criteria -- edge ones are marked as true
         binerr_lepolate_n[is.na(binerr_lepolate_n)] <- F
@@ -1524,6 +1530,7 @@ cleanadult <- function(df, weight_cap = Inf){
         exc_perc <- percewma$ewma.all < perc_limit &
           percewma$ewma.before < perc_limit &
           percewma$ewma.after < perc_limit
+        exc_perc[is.na(exc_perc)] <- F
 
         criteria_new <- (exc_mod_ewma & exc_binerr) | exc_perc
 
