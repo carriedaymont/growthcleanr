@@ -899,6 +899,9 @@ cleanadult <- function(df, weight_cap = Inf){
             mean(abs(mean(w2_groups[[as.character(x)]]) -
                        o2_groups[[as.character(x)]]))
           })
+          # if NA, means that there is nothing in the o2 groups and it is
+          # indeed the best
+          mean_abs_dist[is.na(mean_abs_dist)] <- Inf
 
           # this will choose the first if there's a tiebreaker
           best_w2 <- consider_w2[best_scores][which.max(mean_abs_dist)]
