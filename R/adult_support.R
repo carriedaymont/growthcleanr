@@ -513,12 +513,19 @@ rem_transpositions <- function(inc_df, ptype = "height"){
         (if (ptype == "height"){ 2.54 } else {2.2046226})
     }
 
+    # inc_df$ones <- get_num_places(
+    #   unlist(inc_df[, paste0("meas_", mtype), with = F]), "ones"
+    # )
+    # inc_df$tens <- get_num_places(
+    #   unlist(inc_df[, paste0("meas_", mtype), with = F]), "tens"
+    # )
     inc_df$ones <- get_num_places(
-      unlist(inc_df[, paste0("meas_", mtype), with = F]), "ones"
+      unlist(inc_df[, "transpo", with = F]), "tens"
     )
     inc_df$tens <- get_num_places(
-      unlist(inc_df[, paste0("meas_", mtype), with = F]), "tens"
+      unlist(inc_df[, "transpo", with = F]), "ones"
     )
+
     absdewma_transpo <- abs(inc_df$transpo - ewma_res)
     colnames(absdewma_transpo) <- paste0("d",colnames(ewma_res))
 
