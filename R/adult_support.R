@@ -307,8 +307,8 @@ redo_identify_rv <- function(w_subj_df){
 #' @noRd
 rem_hundreds <- function(inc_df, dewma, meas_col, hundreds, ptype = "weight"){
   # calculate difference between values -- ENDS ARE PROTECTED ON EITHER SIDE
-  inc_df$diff_prev <- c(NA, diff(inc_df[,..meas_col]))
-  inc_df$diff_next <- c(diff(inc_df[,..meas_col]), NA)
+  inc_df$diff_prev <- c(NA, diff(unlist(inc_df[,..meas_col])))
+  inc_df$diff_next <- c(diff(unlist(inc_df[,..meas_col])), NA)
 
   # state upper and lower limits (hundreds +/- 2)
   # modifier for height vs weight
@@ -324,8 +324,8 @@ rem_hundreds <- function(inc_df, dewma, meas_col, hundreds, ptype = "weight"){
     2.2046226
   }
   # these are metric limits
-  llimit <- (hundreds / div_modifier) - modifier
-  ulimit <- (hundreds / div_modifier) + modifier
+  llimit <- (hundreds * div_modifier) - modifier
+  ulimit <- (hundreds * div_modifier) + modifier
   # these are imperial limits
   llimit_imp <- if (ptype == "height" | grepl("_m", meas_col)){
     llimit
