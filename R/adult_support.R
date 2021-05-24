@@ -384,7 +384,7 @@ rem_hundreds <- function(inc_df, dewma, meas_col, hundreds, ptype = "weight"){
 #' @noRd
 rem_unit_errors <- function(inc_df, ptype = "height"){
   # add "unit error": metric encoded as imperial
-  inc_df$ue <- inc_df$meas_m * (if (ptype == "height"){ 2.54 } else {1/2.2046226})
+  inc_df$ue <- inc_df$meas_m * (if (ptype == "height"){ 2.54 } else {2.2046226})
 
   # calculate ewma (using metric)
   ewma_res <- ewma_dn(inc_df$age_days, inc_df$meas_m)
@@ -504,12 +504,13 @@ rem_transpositions <- function(inc_df, ptype = "height"){
   criteria <- rep(F, nrow(inc_df))
   for (mtype in c("m", "im")){
     inc_df$transpo <- switch_tens_ones(
-      unlist(inc_df[, paste0("meas_", mtype), with = F])
+      unlist(inc_df[, paste0("meas_", "m"), with = F])
       )
+
     # if imperial, we want to convert to metric
     if (mtype == "im"){
       inc_df$transpo <- inc_df$transpo *
-        (if (ptype == "height"){ 2.54 } else {1/2.2046226})
+        (if (ptype == "height"){ 2.54 } else {2.2046226})
     }
 
     inc_df$ones <- get_num_places(
