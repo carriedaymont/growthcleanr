@@ -587,14 +587,16 @@ cleanadult <- function(df, weight_cap = Inf){
         w_subj_keep[rv_impl_ids] <- paste0(step, "-RV")
 
         # don't get rid of extraneous just yet -- shouldn't be in
-        w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids),]
+        w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids) |
+                                 !w_subj_df$id %in% comb_df$id.w,]
 
         # update and remove -- height
         h_subj_keep[as.character(comb_df$id.h)][criteria] <- step
 
         # don't get rid of extraneous just yet
         h_subj_df <- h_subj_df[h_subj_df$id %in% comb_df$id.h[!criteria] |
-                                 h_subj_df$extraneous,]
+                                 h_subj_df$extraneous |
+                                 !h_subj_df$id %in% comb_df$id.h,]
 
         # reevaluate temp same day -- don't need to reevaluate if nothing has
         # changed
