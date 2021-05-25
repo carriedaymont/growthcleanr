@@ -1264,15 +1264,16 @@ cleanadult <- function(df, weight_cap = Inf){
       }
 
       # if dup ratio is too high, or any adjacent same days, we exclude all
+      # same day extraneous
       criteria <-
         if ((dup_ratio > .25) | adjacent){
-          rep(T, nrow(w_subj_df))
+          !is.na(w_subj_df$diff)
         } else {
           rep(F, nrow(w_subj_df))
         }
 
       # if criteria didn't catch it, we now compare with medians
-      if (!all(criteria) & any(w_subj_df$extraneous)){
+      if (!any(criteria) & any(w_subj_df$extraneous)){
         # calculate ewma
         # calculate ewma (using metric)
         ewma_res <- ewma_dn(w_subj_df$age_days, w_subj_df$meas_m,
