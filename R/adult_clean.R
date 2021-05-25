@@ -709,15 +709,16 @@ cleanadult <- function(df, weight_cap = Inf){
       }
 
       # if dup ratio is too high, or any adjacent same days, we exclude all
+      # same day extraneous
       criteria <-
         if ((dup_ratio > .25) | adjacent){
-          rep(T, nrow(h_subj_df))
+          !is.na(h_subj_df$diff)
         } else {
           rep(F, nrow(h_subj_df))
         }
 
       # if criteria didn't catch it, we now compare with medians
-      if (!all(criteria) & any(h_subj_df$extraneous)){
+      if (!any(criteria) & any(h_subj_df$extraneous)){
         med <- median(h_subj_df$meas_m[
           !h_subj_df$age_days %in% dup_days
         ])
