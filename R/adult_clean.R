@@ -1648,14 +1648,18 @@ cleanadult <- function(df, weight_cap = Inf){
         # within the limits AND it's 1D, we exclude
         h_bmi_out <-
           all(!check_between(comb_df$bmi, 16, 60)) &
+          !check_between(comb_df$meas_m.h, 139, 206) &
           length(unique(h_subj_df$meas_m)) == 1
         w_bmi_out <-
           all(!check_between(comb_df$bmi, 16, 60)) &
+          !check_between(comb_df$meas_m.w, 40, 225) &
           length(unique(w_subj_df$meas_m)) == 1
 
+        # if any are true for the above or below, remove all for that parameter
+
         # remove based on above criteria
-        rem_ids_ht <- comb_df$id.h[h_exc_btw | rep(h_bmi_out, nrow(comb_df))]
-        rem_ids_wt <- comb_df$id.w[w_exc_btw | rep(w_bmi_out, nrow(comb_df))]
+        rem_ids_ht <- h_subj_df$id[any(h_exc_btw | h_bmi_out)]
+        rem_ids_wt <- w_subj_df$id[any(w_exc_btw | w_bmi_out)]
 
         # update and remove
         h_subj_keep[rem_ids_ht] <- step
@@ -1663,21 +1667,8 @@ cleanadult <- function(df, weight_cap = Inf){
 
         h_subj_df <- h_subj_df[!h_subj_df$id %in% rem_ids_ht,]
         w_subj_df <- w_subj_df[!w_subj_df$id %in% rem_ids_wt,]
-      }
-
-      # combine again, then check if still 1D
-      if (nrow(h_subj_df) > 0 & nrow(w_subj_df) > 0){
-        # h = height, w = weight
-        comb_df <- comb_df_orig <-
-          merge(h_subj_df, w_subj_df, by = "age_days", all = T,
-                suffixes = c(".h", ".w"))
-        # remove ones that don't match
-        comb_df <- comb_df[!(is.na(comb_df$id.h) | (is.na(comb_df$id.w))),]
       } else {
-        comb_df <- data.table()
-      }
-      # no bmis available -- no matches
-      if (nrow(comb_df) == 0){
+        # no bmis available
         if (nrow(h_subj_df) > 0){
           exc_ht <-
             !check_between(h_subj_df$meas_m, 139, 206) &
