@@ -279,7 +279,7 @@ longwide <-
 #' \code{simple_bmi} Computes BMI using standard formula. Assumes input compatible with
 #' output from longwide().
 #'
-#' @param wide_df A data frame containing heights and weights in wide format (e.g., after
+#' @param wide_df A data frame containing heights and weights in wide format, e.g., after
 #' transformation with longwide()
 #' @param wtcol name of observation height value column, default 'wt'
 #' @param htcol name of subject weight value column, default 'ht'
