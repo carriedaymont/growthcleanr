@@ -803,7 +803,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
       # check if pairs outside two inch range
       # imperial will also be unique
-      exc_2d <- abs(ht_1_imp - ht_2_imp) > 2
+      exc_2d <- round(abs(ht_1_imp - ht_2_imp), 2) > 2
 
       # only if outside the range
       if (exc_2d){
