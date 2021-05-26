@@ -237,7 +237,6 @@ temp_sde <- function(subj_df, ptype = "height"){
       if (sum(!as.character(subj_df$age_days) %in% dup_days) > 0){
         # get the median without duplicate days
         median(subj_df$measurement[
-          !as.character(subj_df$age_days) %in% dup_days &
             if (ptype == "weight"){
               !subj_df$is_rv
             } else {
