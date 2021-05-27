@@ -7,13 +7,15 @@ library(growthcleanr)
 
 parser <- arg_parser("CLI driver for growthcleanr")
 
-parser <- add_argument(parser,
+parser <- add_argument(
+  parser,
   "infile",
   type = "character",
   nargs = 1,
   help = "input file"
 )
-parser <- add_argument(parser,
+parser <- add_argument(
+  parser,
   "outfile",
   type = "character",
   nargs = 1,
@@ -27,7 +29,23 @@ parser <- add_argument(
   default = "",
   help = "sd.recenter data file"
 )
-parser <- add_argument(parser,
+parser <- add_argument(
+  parser,
+  "--weightcap",
+  type = "numeric",
+  default = Inf,
+  help = "weight cap"
+)
+parser <- add_argument(
+  parser,
+  "--numbatches",
+  type = "numeric",
+  nargs = 1,
+  default = 1,
+  help = "Number of batches"
+)
+parser <- add_argument(
+  parser,
   "--quietly",
   flag = TRUE,
   help = "Disable verbose output"
@@ -36,7 +54,7 @@ parser <- add_argument(parser,
 argv <- parse_args(parser)
 print(argv)
 
-logfile <- sprintf("output/log/log-%s.txt", argv$infile)
+log.path <- sprintf("output/log/%s/%s", Sys.Date(), basename(argv$infile))
 
 if (argv$sdrecenter != "") {
   if (argv$sdrecenter == "nhanes") {
@@ -48,6 +66,9 @@ if (argv$sdrecenter != "") {
   sdrecenter <- ""
 }
 
+parallel <- argv$numbatches > 1
+num.batches <- argv$numbatches
+
 df_in <- fread(argv$infile)
 df_out <- df_in[, exclude :=
   cleangrowth(
@@ -57,7 +78,10 @@ df_out <- df_in[, exclude :=
     sex,
     measurement,
     sd.recenter = sdrecenter,
-    log.path = logfile,
+    weight_cap = argv$weightcap,
+    log.path = log.path,
+    num.batches = num.batches,
+    parallel = parallel,
     quietly = argv$quietly
   )]
 fwrite(df_out, argv$outfile, row.names = FALSE)

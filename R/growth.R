@@ -67,7 +67,7 @@
 #' @param ref.data.path Path to reference data. If not supplied, the year 2000
 #' Centers for Disease Control (CDC) reference data will be used.
 #' @param log.path Path to log file output when running in parallel (non-quiet mode). Default is ".". A new
-#' directory will be created if necessary.
+#' directory will be created if necessary. Set to NA to disable log files.
 #' @param parallel Determines if function runs in parallel.  Defaults to FALSE.
 #' @param num.batches Specify the number of batches to run in parallel. Only
 #' applies if parallel is set to TRUE. Defaults to the number of workers
@@ -520,9 +520,10 @@ cleangrowth <- function(subjid,
                            error.load.mincount = error.load.mincount)
     } else {
       # create log directory if necessary
-      if (!quietly)
+      if (!is.na(log.path)) {
         cat(sprintf("[%s] Writing batch logs to '%s'...\n", Sys.time(), log.path))
-      ifelse(!dir.exists(log.path), dir.create(log.path), FALSE)
+        ifelse(!dir.exists(log.path), dir.create(log.path, recursive = TRUE), FALSE)
+      }
 
       ret.df <- ddply(
         data.all,
