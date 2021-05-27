@@ -65,7 +65,7 @@ as.matrix.delta_dn <- function(agedays) {
 #'   and the subsequent observation.
 #' @keywords internal
 #' @noRd
-ewma_dn <- function(agedays, z, ewma.exp = 5, ewma.adjacent = T) {
+ewma_dn <- function(agedays, z, ewma.exp = -5, ewma.adjacent = T) {
   # 6.  EWMA calculation description: Most of the next steps will involve calculating the exponentially weighted moving average for each subject and parameter. I will
   #     describe how to calculate EWMASDs, and will describe how it needs to be varied in subsequent steps.
   # a.	The overall goal of the EWMASD calculation is to identify the difference between the SD-score and what we might predict that DS-score should be, in order to
@@ -512,19 +512,11 @@ rem_transpositions <- function(inc_df, ptype = "height"){
         (if (ptype == "height"){ 2.54 } else {2.2046226})
     }
 
-    # TODO: CHECK THING
-
-    # inc_df$ones <- get_num_places(
-    #   unlist(inc_df[, paste0("meas_", mtype), with = F]), "ones"
-    # )
-    # inc_df$tens <- get_num_places(
-    #   unlist(inc_df[, paste0("meas_", mtype), with = F]), "tens"
-    # )
     inc_df$ones <- get_num_places(
-      unlist(inc_df[, "transpo", with = F]), "tens"
+      unlist(inc_df[, paste0("meas_", mtype), with = F]), "ones"
     )
     inc_df$tens <- get_num_places(
-      unlist(inc_df[, "transpo", with = F]), "ones"
+      unlist(inc_df[, paste0("meas_", mtype), with = F]), "tens"
     )
 
     absdewma_transpo <- abs(inc_df$transpo - ewma_res)
