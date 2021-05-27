@@ -66,11 +66,7 @@ if (argv$sdrecenter != "") {
   sdrecenter <- ""
 }
 
-if (argv$numbatches > 1) {
-  parallel = TRUE
-} else {
-  parallel = FALSE
-}
+parallel <- argv$numbatches > 1
 num.batches <- argv$numbatches
 
 df_in <- fread(argv$infile)
