@@ -7,15 +7,15 @@
 simple_bmi(wide_df, wtcol = "wt", htcol = "ht")
 }
 \arguments{
-\item{wide_df}{A data frame containing heights and weights in wide format (e.g., after
-transformation with longwide()}
+\item{wide_df}{A data frame or data table containing heights and weights in
+wide format, e.g., after transformation with longwide()}
 
 \item{wtcol}{name of observation height value column, default 'wt'}
 
 \item{htcol}{name of subject weight value column, default 'ht'}
 }
 \value{
-Returns the data frame with the added column "bmi"
+Returns a data table with the added column "bmi"
 }
 \description{
 \code{simple_bmi} Computes BMI using standard formula. Assumes input compatible with
