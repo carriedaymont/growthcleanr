@@ -954,14 +954,13 @@ cleanadult <- function(df, weight_cap = Inf){
           })
 
           # check g2 v g1 -- true indicates use the original exclusions
-          # TODO: CHECK
           g2_g1_check <-
             if (!is.na(mean_ht[2])){
               (mean_ht[2] - mean_ht[1]) < 0 &
                 ((min_age[2] < 50 &
-                    (mean_ht[2] - mean_ht[1]) > ((-5 * 2.54) +.001)) |
+                    (mean_ht[2] - mean_ht[1]) < ((-5 * 2.54) +.001)) |
                    (min_age[2] >= 50 &
-                      (mean_ht[2] - mean_ht[1]) > ((-7 * 2.54) +.001)))
+                      (mean_ht[2] - mean_ht[1]) < ((-7 * 2.54) +.001)))
             } else {
               F
             }
