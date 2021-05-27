@@ -279,12 +279,12 @@ longwide <-
 #' \code{simple_bmi} Computes BMI using standard formula. Assumes input compatible with
 #' output from longwide().
 #'
-#' @param wide_df A data frame containing heights and weights in wide format, e.g., after
-#' transformation with longwide()
+#' @param wide_df A data frame or data table containing heights and weights in
+#' wide format, e.g., after transformation with longwide()
 #' @param wtcol name of observation height value column, default 'wt'
 #' @param htcol name of subject weight value column, default 'ht'
 #'
-#' @return Returns the data frame with the added column "bmi"
+#' @return Returns a data table with the added column "bmi"
 #'
 #' @export
 #' @import data.table
@@ -310,16 +310,16 @@ longwide <-
 #' wide_df_with_bmi <- simple_bmi(wide_df, wtcol = "weight", htcol = "height")
 simple_bmi <- function(wide_df, wtcol = "wt", htcol = "ht") {
   # Verify the specified columns are present
-  if (!all(c(wtcol, htcol) %in% names(wide_df))) {
+  if (!all(c(wtcol, htcol) %in% colnames(wide_df))) {
     stop("Specified column names are not all present")
   }
 
-  setDT(wide_df)
+  # coerce to data table
+  if (!is.data.table(wide_df)){
+    wide_df <- as.data.table(wide_df)
+  }
 
-  # Choose columns as specified and rename for convenience
-  wide_df %>% select(wtcol, htcol) -> bmi_df
-  setnames(bmi_df, old = c(wtcol, htcol), new = c("wt", "ht"))
-
-  wide_df$bmi <- bmi_df[, wt / ((ht * 0.01) ^ 2)]
+  # add bmi column
+  wide_df[, bmi := get(wtcol) / ((get(htcol) * 0.01) ^ 2)]
   return(wide_df)
 }
