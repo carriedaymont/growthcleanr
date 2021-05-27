@@ -33,11 +33,7 @@ cleanbatch <- function(data.df,
                        error.load.mincount) {
   data.df <- data.table(data.df, key = c('subjid', 'param', 'agedays', 'index'))
 
-  if (!quietly & parallel) {
-    # use local directory as default for logs
-    if (is.na(log.path)) {
-      log.path <- "."
-    }
+  if (parallel & !is.na(log.path)) {
     sink(
       sprintf(
         "%s/cleangrowth-%s-batch-%s.log",

@@ -114,7 +114,7 @@ using the default exponent.}
 Centers for Disease Control (CDC) reference data will be used.}
 
 \item{log.path}{Path to log file output when running in parallel (non-quiet mode). Default is ".". A new
-directory will be created if necessary.}
+directory will be created if necessary. Set to NA to disable log files.}
 
 \item{parallel}{Determines if function runs in parallel.  Defaults to FALSE.}
 
