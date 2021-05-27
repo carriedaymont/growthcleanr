@@ -208,8 +208,11 @@ continue with these next steps:
 # format for BMI calculation
 cleaned_data_wide <- longwide(cleaned_data)
 
+# Compute simple BMI
+cleaned_data_bmi <- simple_bmi(cleaned_data_wide)
+
 # Compute Z-scores and percentiles
-cleaned_data_bmi <- ext_bmiz(cleaned_data_wide)
+cleaned_data_bmiz <- ext_bmiz(cleaned_data_bmi)
 ```
 
 The `longwide()` function defaults to converting only records included
@@ -913,23 +916,26 @@ observation data must be in a wide format, i.e. with height and weight
 information on the same row. This is distinct from `cleangrowth()`,
 which performs longitudinal analysis on all observations for each
 subject, presented in a long format with one observation per row. To
-facilitate use of both functions, `growthcleanr` includes a utility
-function to transform data used with `cleangrowth()` for use with
-`ext_bmiz()`. It is optimized to move data directly from the output of
-`cleangrowth()` into input for `ext_bmiz()`, but has options to support
-independent use as well.
+facilitate use of both functions, `growthcleanr` includes utility
+functions to transform data used with `cleangrowth()` for use with
+`ext_bmiz()`. They are optimized to move data directly from the output
+of `cleangrowth()` into input for `ext_bmiz()`, but have options to
+support independent use as well.
 
 Using the `syngrowth` example dataset, to convert the data after it has
 been cleaned by `cleangrowth()` for use with `ext_bmiz()`, use
-`longwide()`:
+`longwide()` and `simple_bmi()`:
 
 ``` r
 # Use the built-in utility function to convert the input observations to wide
 # format for BMI calculation
 cleaned_data_wide <- longwide(cleaned_data)
 
+# Compute simple BMI values (adds column "bmi")
+cleaned_data_bmi <- simple_bmi(cleaned_data_wide)
+
 # Compute Z-scores and percentiles
-cleaned_data_bmi <- ext_bmiz(cleaned_data_wide)
+cleaned_data_bmiz <- ext_bmiz(cleaned_data_bmi)
 ```
 
 Note that this assumes that `cleaned_data` has the same structure as
@@ -947,19 +953,19 @@ be a shorter dataset (fewer rows) based on fewer observations.
 
 ``` r
 dim(cleaned_data)
-[1] 56703     7
+[1] 85728     7
 
 dim(cleaned_data_wide)
-[1] 17191     8
+[1] 26701     9
 
 head(cleaned_data_wide)
-           id    agey     agem      bmi sex   wt     ht agedays
-1: 1000287994 13.0795 156.9540 24.12048   1 57.8 154.80    4774
-2: 1000287994 14.0959 169.1508 25.03608   1 66.6 163.10    5145
-3: 1000287994  4.9479  59.3748 16.88341   1 19.5 107.47    1806
-4: 1000287994  5.9644  71.5728 17.66984   1 23.0 114.09    2177
-5: 1000287994  7.9973  95.9676 21.05954   1 33.7 126.50    2919
-6: 1000287994  9.0137 108.1644 20.27768   1 35.6 132.50    3290
+                                subjid    agey     agem sex   wt wt_id    ht ht_id  agedays
+1 002986c5-354d-bb9d-c180-4ce26813ca28 56.0964 673.1568   2 71.7 83331 151.1 83330 20489.22
+2 002986c5-354d-bb9d-c180-4ce26813ca28 57.1122 685.3464   2 73.2 83333 151.1 83332 20860.22
+3 002986c5-354d-bb9d-c180-4ce26813ca28 58.1279 697.5348   2 74.6 83336 151.1 83335 21231.22
+4 002986c5-354d-bb9d-c180-4ce26813ca28 59.1437 709.7244   2 72.8 83338 151.1 83337 21602.22
+5 002986c5-354d-bb9d-c180-4ce26813ca28 59.2012 710.4144   2 72.4 83340 151.1 83339 21623.22
+6 002986c5-354d-bb9d-c180-4ce26813ca28 60.1594 721.9128   2 69.4 83343 151.1 83342 21973.22
 ```
 
 In this example, the subject identifiers previously marked as `subjid`

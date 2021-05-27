@@ -164,13 +164,13 @@ recode_sex <- function(input_data,
 #'                                        df$sex,
 #'                                        df$measurement))
 #' # Convert to wide format
-#' long_df <- longwide(df)
+#' wide_df <- longwide(df)
 #'
 #' # Include all inclusion types
-#' long_df <- longwide(df, include_all = TRUE)
+#' wide_df <- longwide(df, include_all = TRUE)
 #'
 #' # Specify all inclusion codes
-#' long_df <- longwide(df, inclusion_types = c("Include", "Exclude-Carried-Forward"))
+#' wide_df <- longwide(df, inclusion_types = c("Include", "Exclude-Carried-Forward"))
 longwide <-
   function(long_df,
            id = "id",
@@ -197,7 +197,7 @@ longwide <-
                        "param",
                        "measurement",
                        "gcr_result")
-  } else{
+  } else {
     # catch error if any variables were not found
     stop("not all needed columns were present")
   }
@@ -268,9 +268,58 @@ longwide <-
   wide_df <- merge(height,
                    weight,
                    by = c("subjid", "agey", "agem", "agedays", "sex")) %>%
-    mutate(bmi = WEIGHTKG / ((HEIGHTCM * .01) ^ 2)) %>% # calculate bmi
     mutate(wt = WEIGHTKG, ht = HEIGHTCM) %>% # rename height and weight
-    select(subjid, agey, agem, bmi, sex, wt, wt_id, ht, ht_id, agedays)
+    select(subjid, agey, agem, sex, wt, wt_id, ht, ht_id, agedays)
 
+  return(wide_df)
+}
+
+#' simple_bmi
+#'
+#' \code{simple_bmi} Computes BMI using standard formula. Assumes input compatible with
+#' output from longwide().
+#'
+#' @param wide_df A data frame or data table containing heights and weights in
+#' wide format, e.g., after transformation with longwide()
+#' @param wtcol name of observation height value column, default 'wt'
+#' @param htcol name of subject weight value column, default 'ht'
+#'
+#' @return Returns a data table with the added column "bmi"
+#'
+#' @export
+#' @import data.table
+#' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
+#' @examples
+#' # Simple usage
+#' # Run on a small subset of given data
+#' df <- as.data.frame(syngrowth)
+#' df <- df[df$subjid %in% unique(df[, "subjid"])[1:5], ]
+#' df <- cbind(df,
+#'             "gcr_result" = cleangrowth(df$subjid,
+#'                                        df$param,
+#'                                        df$agedays,
+#'                                        df$sex,
+#'                                        df$measurement))
+#' # Convert to wide format
+#' wide_df <- longwide(df)
+#' wide_df_with_bmi <- simple_bmi(wide_df)
+#'
+#' # Specifying different column names; note that quotes are used
+#' colnames(wide_df)[colnames(wide_df) %in% c("wt", "ht")] <-
+#'   c("weight", "height")
+#' wide_df_with_bmi <- simple_bmi(wide_df, wtcol = "weight", htcol = "height")
+simple_bmi <- function(wide_df, wtcol = "wt", htcol = "ht") {
+  # Verify the specified columns are present
+  if (!all(c(wtcol, htcol) %in% colnames(wide_df))) {
+    stop("Specified column names are not all present")
+  }
+
+  # coerce to data table
+  if (!is.data.table(wide_df)){
+    wide_df <- as.data.table(wide_df)
+  }
+
+  # add bmi column
+  wide_df[, bmi := get(wtcol) / ((get(htcol) * 0.01) ^ 2)]
   return(wide_df)
 }
