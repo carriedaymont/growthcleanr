@@ -377,7 +377,8 @@ cleanadult <- function(df, weight_cap = Inf){
       # if it's a repeated value, we want to get rid of it as well
       rv_impl_ids <- as.character(
         w_subj_df$id[w_subj_df$meas_m %in% inc_df$meas_m[criteria &
-                                                           inc_df$is_first_rv]]
+                                                           inc_df$is_first_rv] &
+                       w_subj_df$is_rv]
       )
 
       # update and remove
@@ -414,7 +415,8 @@ cleanadult <- function(df, weight_cap = Inf){
       # if it's a repeated value, we want to get rid of it as well
       rv_impl_ids <- as.character(
         w_subj_df$id[w_subj_df$meas_m %in% inc_df$meas_m[criteria &
-                                                           inc_df$is_first_rv]]
+                                                           inc_df$is_first_rv] &
+                       w_subj_df$is_rv]
       )
 
       # update and remove
@@ -451,7 +453,8 @@ cleanadult <- function(df, weight_cap = Inf){
       # if it's a repeated value, we want to get rid of it as well
       rv_impl_ids <- as.character(
         w_subj_df$id[w_subj_df$meas_m %in% inc_df$meas_m[criteria &
-                                                           inc_df$is_first_rv]]
+                                                           inc_df$is_first_rv] &
+                       w_subj_df$is_rv]
       )
 
       # update and remove
@@ -579,7 +582,8 @@ cleanadult <- function(df, weight_cap = Inf){
         # if it's a repeated value, we want to get rid of it as well
         rv_impl_ids <- as.character(
           w_subj_df$id[w_subj_df$meas_m %in% comb_df$meas_m.w[criteria &
-                                                                comb_df$is_first_rv]]
+                                                                comb_df$is_first_rv] &
+                         w_subj_df$is_rv]
         )
 
         # update and remove -- weight
@@ -1143,10 +1147,12 @@ cleanadult <- function(df, weight_cap = Inf){
       rv_impl_ids <- as.character(
         w_subj_df$id[w_subj_df$meas_m %in%
                        inc_df_first$meas_m[criteria_first &
-                                             inc_df_first$is_first_rv]],
+                                             inc_df_first$is_first_rv] &
+                       w_subj_df$is_rv],
         w_subj_df$id[w_subj_df$meas_m %in%
                        inc_df_rv$meas_m[criteria_rv &
-                                          inc_df_rv$is_first_rv]]
+                                          inc_df_rv$is_first_rv] &
+                       w_subj_df$is_rv]
       )
 
       # update and remove
