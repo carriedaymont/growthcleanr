@@ -50,7 +50,7 @@ as.matrix.delta_dn <- function(agedays) {
 #'
 #' @param agedays Vector of age in days for each z score (potentially transformed to adjust weighting).
 #'
-#' @param z Input vector of numeric MEASUREMENT data.
+#' @param meas Input vector of numeric MEASUREMENT data.
 #'
 #' @param ewma.exp Exponent to use for weighting.
 #'
@@ -65,13 +65,13 @@ as.matrix.delta_dn <- function(agedays) {
 #'   and the subsequent observation.
 #' @keywords internal
 #' @noRd
-ewma_dn <- function(agedays, z, ewma.exp = -5, ewma.adjacent = T) {
+ewma_dn <- function(agedays, meas, ewma.exp = -5, ewma.adjacent = T) {
   # 6.  EWMA calculation description: Most of the next steps will involve calculating the exponentially weighted moving average for each subject and parameter. I will
   #     describe how to calculate EWMASDs, and will describe how it needs to be varied in subsequent steps.
   # a.	The overall goal of the EWMASD calculation is to identify the difference between the SD-score and what we might predict that DS-score should be, in order to
   #     determine whether it should be excluded.
   # b.	Only nonmissing SD-scores for a parameter that are not designated for exclusion are included in the following calculations.
-  # c.	For each SD-score SDi and associated agedaysi calculate the following for every other z-score (SDj...SDn) and associated agedays (agedaysj...agedaysn)  for the
+  # c.	For each SD-score SDi and associated agedaysi calculate the following for every other measurement (SDj...SDn) and associated agedays (agedaysj...agedaysn)  for the
   #     same subject and parameter
   #   i.	(delta)Agej=agedaysj-agedaysi
   #   ii.	EWMAZ=SDi=[(sigma)j->n(SDj*((5+(delta)Agej)^-1.5))]/[ (sigma)j->n((5+(delta)Agej)^-1.5)]
@@ -79,7 +79,7 @@ ewma_dn <- function(agedays, z, ewma.exp = -5, ewma.adjacent = T) {
   #     1.	EWMASDall calculated as above
   #     2.	EWMAZbef calculated excluding the SD-score just before the SD-score of interest (sorted by agedays). For the first observation for a parameter for a
   #         subject, this should be identical to EWMASDall rather than missing.
-  #     3.	EWMAZaft calculated excluding the z-score just after the SD-score of interest (sorted by agedays). For the lastobservation for a parameter for a subject,
+  #     3.	EWMAZaft calculated excluding the measurement just after the SD-score of interest (sorted by agedays). For the lastobservation for a parameter for a subject,
   #         this should be identical to EWMASDall rather than missing.
   #   iv.	For each of the three EWMASDs, calculate the dewma_*=SD-EWMASD
   # d.	EWMASDs and (delta)EWMASDs will change if a value is excluded or manipulated using one of the methods below, therefore EWMASDs and (delta)EWMASDs be recalculated for each
@@ -102,16 +102,16 @@ ewma_dn <- function(agedays, z, ewma.exp = -5, ewma.adjacent = T) {
     delta <- ifelse(delta == 0, 0, (delta) ^ ewma.exp)
 
     # calculate EWMAs, and return in order of original data
-    ewma.all[index] <- delta %*% z / apply(delta, 1, sum)
+    ewma.all[index] <- delta %*% meas / apply(delta, 1, sum)
 
     if (ewma.adjacent) {
       if (n > 2) {
         delta2 = delta
         delta2[col(delta2) == row(delta2) - 1] = 0
-        ewma.before[index] = delta2 %*% z / apply(delta2, 1, sum)
+        ewma.before[index] = delta2 %*% meas / apply(delta2, 1, sum)
         delta3 = delta
         delta3[col(delta3) == row(delta3) + 1] = 0
-        ewma.after[index] = delta3 %*% z / apply(delta3, 1, sum)
+        ewma.after[index] = delta3 %*% meas / apply(delta3, 1, sum)
       } else {
         ewma.before <- ewma.after <- ewma.all
       }
@@ -655,7 +655,7 @@ ht_3d_growth_compare <- function(mean_ht, min_age, glist,
 #' Function to remove data based on exponentially-weighted moving average
 #' (Daymont, et al.) for WEIGHT. Cutoff defaults adjusted for adults.
 #' inputs:
-#' subj_df: subject data frame, which has age in days and z-score
+#' subj_df: subject data frame, which has age in days and measurement
 #' ewma_cutoff: EWMA past which considered invalid (center value). left and right
 #'   are .5 less.
 #' outputs:
