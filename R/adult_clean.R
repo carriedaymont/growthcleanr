@@ -1666,7 +1666,21 @@ cleanadult <- function(df, weight_cap = Inf){
 
         h_subj_df <- h_subj_df[!h_subj_df$id %in% rem_ids_ht,]
         w_subj_df <- w_subj_df[!w_subj_df$id %in% rem_ids_wt,]
+      }
+
+      # combine again, then check if still 1D
+      if (nrow(h_subj_df) > 0 & nrow(w_subj_df) > 0){
+        # h = height, w = weight
+        comb_df <- comb_df_orig <-
+          merge(h_subj_df, w_subj_df, by = "age_days", all = T,
+                suffixes = c(".h", ".w"))
+        # remove ones that don't match
+        comb_df <- comb_df[!(is.na(comb_df$id.h) | (is.na(comb_df$id.w))),]
       } else {
+        comb_df <- data.table()
+      }
+      # no bmis available -- no matches
+      if (nrow(comb_df) == 0) {
         # no bmis available
         if (nrow(h_subj_df) > 0){
           exc_ht <-
