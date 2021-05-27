@@ -579,19 +579,13 @@ cleanadult <- function(df, weight_cap = Inf){
 
         # implausible ids from the step
         impl_ids <- as.character(comb_df$id.w)[criteria]
-        # if it's a repeated value, we want to get rid of it as well
-        rv_impl_ids <- as.character(
-          w_subj_df$id[w_subj_df$meas_m %in% comb_df$meas_m.w[criteria &
-                                                                comb_df$is_first_rv] &
-                         w_subj_df$is_rv]
-        )
+        # do not remove repeated values
 
         # update and remove -- weight
         w_subj_keep[impl_ids] <- step
-        w_subj_keep[rv_impl_ids] <- paste0(step, "-RV")
 
         # don't get rid of extraneous just yet -- shouldn't be in
-        w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids) |
+        w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids) |
                                  !w_subj_df$id %in% comb_df$id.w,]
 
         # update and remove -- height
