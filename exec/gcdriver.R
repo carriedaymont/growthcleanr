@@ -27,6 +27,13 @@ parser <- add_argument(
   default = "",
   help = "sd.recenter data file"
 )
+parser <- add_argument(
+  parser,
+  "--weightcap",
+  type = "numeric",
+  default = Inf,
+  help = "weight cap"
+)
 parser <- add_argument(parser,
   "--quietly",
   flag = TRUE,
@@ -57,6 +64,7 @@ df_out <- df_in[, exclude :=
     sex,
     measurement,
     sd.recenter = sdrecenter,
+    weight_cap = argv$weightcap,
     log.path = logfile,
     quietly = argv$quietly
   )]
