@@ -161,6 +161,7 @@ cleangrowth <- function(subjid,
     param,
     agedays = as.integer(agedays),
     v = ifelse(measurement == 0, NaN, measurement),
+    v_adult = measurement,
     sex = as.integer(ifelse(
       sex %in% c(0, 'm', 'M'), 0, ifelse(sex %in% c(1, 'f', 'F'), 1, NA)
     ))
@@ -608,7 +609,7 @@ cleangrowth <- function(subjid,
     # add age in years
     data.adult[, age_years := agedays/365.25]
     # rename for ease of use
-    data.adult[, measurement := v]
+    data.adult[, measurement := v_adult]
     data.adult[, id := line]
 
     if (!quietly)
