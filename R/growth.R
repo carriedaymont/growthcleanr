@@ -522,7 +522,7 @@ cleangrowth <- function(subjid,
       # create log directory if necessary
       if (!quietly)
         cat(sprintf("[%s] Writing batch logs to '%s'...\n", Sys.time(), log.path))
-      ifelse(!dir.exists(log.path), dir.create(log.path), FALSE)
+      ifelse(!dir.exists(log.path), dir.create(log.path, recursive = TRUE), FALSE)
 
       ret.df <- ddply(
         data.all,

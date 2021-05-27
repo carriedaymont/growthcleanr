@@ -27,6 +27,14 @@ parser <- add_argument(
   default = "",
   help = "sd.recenter data file"
 )
+parser <- add_argument(
+  parser,
+  "--numbatches",
+  type = "numeric",
+  nargs = 1,
+  default = 1,
+  help = "Number of batches"
+)
 parser <- add_argument(parser,
   "--quietly",
   flag = TRUE,
@@ -36,7 +44,7 @@ parser <- add_argument(parser,
 argv <- parse_args(parser)
 print(argv)
 
-logfile <- sprintf("output/log/log-%s.txt", argv$infile)
+log.path <- sprintf("output/log/%s/%s", Sys.Date(), basename(argv$infile))
 
 if (argv$sdrecenter != "") {
   if (argv$sdrecenter == "nhanes") {
@@ -48,6 +56,13 @@ if (argv$sdrecenter != "") {
   sdrecenter <- ""
 }
 
+if (argv$numbatches > 1) {
+  parallel = TRUE
+} else {
+  parallel = FALSE
+}
+num.batches <- argv$numbatches
+
 df_in <- fread(argv$infile)
 df_out <- df_in[, exclude :=
   cleangrowth(
@@ -57,7 +72,9 @@ df_out <- df_in[, exclude :=
     sex,
     measurement,
     sd.recenter = sdrecenter,
-    log.path = logfile,
+    log.path = log.path,
+    num.batches = num.batches,
+    parallel = parallel,
     quietly = argv$quietly
   )]
 fwrite(df_out, argv$outfile, row.names = FALSE)

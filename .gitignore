@@ -43,6 +43,7 @@ inst/doc
 packrat/lib*/
 packrat/src/
 
+*.swo
 *.swp
 output
 .Rproj.user
