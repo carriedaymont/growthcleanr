@@ -78,7 +78,7 @@
 #'  pediatric algorithm should not be applied (< adult_cutpoint), and the adult
 #'   algorithm should apply (>= adult_cutpoint). Numbers outside this range will be
 #'   changed to the closest number within the range. Defaults to 20.
-#' @param weight_cap Positive number, describing a weight cap (rounded to the
+#' @param weight_cap Positive number, describing a weight cap in kg (rounded to the
 #' nearest .1, +/- .1) within the adult dataset. If there is no weight cap, set
 #'  to Inf. Defaults to Inf.
 #' @param adult_columns_filename Name of file to save original adult data, with additional output columns to
