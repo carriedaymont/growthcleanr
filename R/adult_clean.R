@@ -377,7 +377,8 @@ cleanadult <- function(df, weight_cap = Inf){
       # if it's a repeated value, we want to get rid of it as well
       rv_impl_ids <- as.character(
         w_subj_df$id[w_subj_df$meas_m %in% inc_df$meas_m[criteria &
-                                                           inc_df$is_first_rv]]
+                                                           inc_df$is_first_rv] &
+                       w_subj_df$is_rv]
       )
 
       # update and remove
@@ -414,7 +415,8 @@ cleanadult <- function(df, weight_cap = Inf){
       # if it's a repeated value, we want to get rid of it as well
       rv_impl_ids <- as.character(
         w_subj_df$id[w_subj_df$meas_m %in% inc_df$meas_m[criteria &
-                                                           inc_df$is_first_rv]]
+                                                           inc_df$is_first_rv] &
+                       w_subj_df$is_rv]
       )
 
       # update and remove
@@ -451,7 +453,8 @@ cleanadult <- function(df, weight_cap = Inf){
       # if it's a repeated value, we want to get rid of it as well
       rv_impl_ids <- as.character(
         w_subj_df$id[w_subj_df$meas_m %in% inc_df$meas_m[criteria &
-                                                           inc_df$is_first_rv]]
+                                                           inc_df$is_first_rv] &
+                       w_subj_df$is_rv]
       )
 
       # update and remove
@@ -576,25 +579,22 @@ cleanadult <- function(df, weight_cap = Inf){
 
         # implausible ids from the step
         impl_ids <- as.character(comb_df$id.w)[criteria]
-        # if it's a repeated value, we want to get rid of it as well
-        rv_impl_ids <- as.character(
-          w_subj_df$id[w_subj_df$meas_m %in% comb_df$meas_m.w[criteria &
-                                                                comb_df$is_first_rv]]
-        )
+        # do not remove repeated values
 
         # update and remove -- weight
         w_subj_keep[impl_ids] <- step
-        w_subj_keep[rv_impl_ids] <- paste0(step, "-RV")
 
         # don't get rid of extraneous just yet -- shouldn't be in
-        w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids),]
+        w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids) |
+                                 !w_subj_df$id %in% comb_df$id.w,]
 
         # update and remove -- height
         h_subj_keep[as.character(comb_df$id.h)][criteria] <- step
 
         # don't get rid of extraneous just yet
         h_subj_df <- h_subj_df[h_subj_df$id %in% comb_df$id.h[!criteria] |
-                                 h_subj_df$extraneous,]
+                                 h_subj_df$extraneous |
+                                 !h_subj_df$id %in% comb_df$id.h,]
 
         # reevaluate temp same day -- don't need to reevaluate if nothing has
         # changed
@@ -707,15 +707,16 @@ cleanadult <- function(df, weight_cap = Inf){
       }
 
       # if dup ratio is too high, or any adjacent same days, we exclude all
+      # same day extraneous
       criteria <-
         if ((dup_ratio > .25) | adjacent){
-          rep(T, nrow(h_subj_df))
+          !is.na(h_subj_df$diff)
         } else {
           rep(F, nrow(h_subj_df))
         }
 
       # if criteria didn't catch it, we now compare with medians
-      if (!all(criteria) & any(h_subj_df$extraneous)){
+      if (!any(criteria) & any(h_subj_df$extraneous)){
         med <- median(h_subj_df$meas_m[
           !h_subj_df$age_days %in% dup_days
         ])
@@ -800,7 +801,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
       # check if pairs outside two inch range
       # imperial will also be unique
-      exc_2d <- abs(ht_1_imp - ht_2_imp) > 2
+      exc_2d <- round(abs(ht_1_imp - ht_2_imp), 2) > 2
 
       # only if outside the range
       if (exc_2d){
@@ -947,14 +948,13 @@ cleanadult <- function(df, weight_cap = Inf){
           })
 
           # check g2 v g1 -- true indicates use the original exclusions
-          # TODO: CHECK
           g2_g1_check <-
             if (!is.na(mean_ht[2])){
               (mean_ht[2] - mean_ht[1]) < 0 &
                 ((min_age[2] < 50 &
-                    (mean_ht[2] - mean_ht[1]) > ((-5 * 2.54) +.001)) |
+                    (mean_ht[2] - mean_ht[1]) < ((-5 * 2.54) +.001)) |
                    (min_age[2] >= 50 &
-                      (mean_ht[2] - mean_ht[1]) > ((-7 * 2.54) +.001)))
+                      (mean_ht[2] - mean_ht[1]) < ((-7 * 2.54) +.001)))
             } else {
               F
             }
@@ -1140,10 +1140,12 @@ cleanadult <- function(df, weight_cap = Inf){
       rv_impl_ids <- as.character(
         w_subj_df$id[w_subj_df$meas_m %in%
                        inc_df_first$meas_m[criteria_first &
-                                             inc_df_first$is_first_rv]],
+                                             inc_df_first$is_first_rv] &
+                       w_subj_df$is_rv],
         w_subj_df$id[w_subj_df$meas_m %in%
                        inc_df_rv$meas_m[criteria_rv &
-                                          inc_df_rv$is_first_rv]]
+                                          inc_df_rv$is_first_rv] &
+                       w_subj_df$is_rv]
       )
 
       # update and remove
@@ -1262,15 +1264,16 @@ cleanadult <- function(df, weight_cap = Inf){
       }
 
       # if dup ratio is too high, or any adjacent same days, we exclude all
+      # same day extraneous
       criteria <-
         if ((dup_ratio > .25) | adjacent){
-          rep(T, nrow(w_subj_df))
+          !is.na(w_subj_df$diff)
         } else {
           rep(F, nrow(w_subj_df))
         }
 
       # if criteria didn't catch it, we now compare with medians
-      if (!all(criteria) & any(w_subj_df$extraneous)){
+      if (!any(criteria) & any(w_subj_df$extraneous)){
         # calculate ewma
         # calculate ewma (using metric)
         ewma_res <- ewma_dn(w_subj_df$age_days, w_subj_df$meas_m,
@@ -1644,14 +1647,18 @@ cleanadult <- function(df, weight_cap = Inf){
         # within the limits AND it's 1D, we exclude
         h_bmi_out <-
           all(!check_between(comb_df$bmi, 16, 60)) &
+          !check_between(comb_df$meas_m.h, 139, 206) &
           length(unique(h_subj_df$meas_m)) == 1
         w_bmi_out <-
           all(!check_between(comb_df$bmi, 16, 60)) &
+          !check_between(comb_df$meas_m.w, 40, 225) &
           length(unique(w_subj_df$meas_m)) == 1
 
+        # if any are true for the above or below, remove all for that parameter
+
         # remove based on above criteria
-        rem_ids_ht <- comb_df$id.h[h_exc_btw | rep(h_bmi_out, nrow(comb_df))]
-        rem_ids_wt <- comb_df$id.w[w_exc_btw | rep(w_bmi_out, nrow(comb_df))]
+        rem_ids_ht <- h_subj_df$id[any(h_exc_btw | h_bmi_out)]
+        rem_ids_wt <- w_subj_df$id[any(w_exc_btw | w_bmi_out)]
 
         # update and remove
         h_subj_keep[rem_ids_ht] <- step
@@ -1673,7 +1680,8 @@ cleanadult <- function(df, weight_cap = Inf){
         comb_df <- data.table()
       }
       # no bmis available -- no matches
-      if (nrow(comb_df) == 0){
+      if (nrow(comb_df) == 0) {
+        # no bmis available
         if (nrow(h_subj_df) > 0){
           exc_ht <-
             !check_between(h_subj_df$meas_m, 139, 206) &
