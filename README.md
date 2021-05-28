@@ -624,8 +624,8 @@ later techniques.
     closest number within the range.
 
 -   `weight_cap` - default `Inf`; weight\_cap Positive number,
-    describing a weight cap (rounded to the nearest .1, +/- .1) within
-    the adult dataset. If there is no weight cap, set to Inf.
+    describing a weight cap in kg (rounded to the nearest .1, +/- .1)
+    within the adult dataset. If there is no weight cap, set to Inf.
 
 -   `adult_columns_filename` - default `""`; Name of file to save
     original adult data, with additional output columns to as CSV.
