@@ -1,8 +1,6 @@
-# growthcleanr
+# growthcleanr 1.2.5 - 2021-02-26
 
-## [1.2.5] - 2021-02-26
-
-### Changed
+## Changed
 
 - Updated behavior of `sd.recenter` option to include new NHANES reference
   medians and explicit specification with "NHANES" or "derive"
@@ -11,24 +9,24 @@
   @mcanouil) (#17)
 - Switched to use `file.path()` more consistently in `R/growth.R`
 
-### Added
+## Added
 
 - Added `inst/extdata/nhanes-reference-medians.csv`, reference medians for
   recentering derived from NHANES (described in README)
 
-## [1.2.4] - 2021-01-14
+# growthcleanr 1.2.4 - 2021-01-14
 
-### Changed
+## Changed
 
 - Minor update to WHO HT velocity 3SD files (#24)
 
-## [1.2.3] - 2021-01-07
+# growthcleanr 1.2.3 - 2021-01-07
 
-### Added
+## Added
 
 - New exclusion handling option on experimental carry forward adjustment
 
-### Changed
+## Changed
 
 - Improved experimental carry forward adjustment handling of strings of
   CF values, output handling, and documentation; renamed "Missing" values
@@ -39,13 +37,13 @@
 - Improved Dockerfile to standardize user/path, simplify install (thanks
   @mcanouil)
 
-## [1.2.2] - 2020-09-29
+# growthcleanr 1.2.2 - 2020-09-29
 
-### Added
+## Added
 
 - CITATION file, now `citation("growthcleanr")` works as expected
 
-### Changed
+## Changed
 
 - Standardized on arrow assignment
 - Moved functions previously within other functions to top level
@@ -60,20 +58,20 @@
 - Improved and corrected documentation
 - Re-compressed synthetic sample data (`syngrowth`) to improve compression
 
-## [1.2.1] - 2020-08-14
+# growthcleanr 1.2.1 - 2020-08-14
 
-### Added
+## Added
 
 - New tests in `tests/testthat/test-utils.R` and `tests/testthat/test-cdc.R`
   to support newly added functions
 
-### Changed
+## Changed
 
 - Improved error handling in `longwide()`; fixed missing import in DESCRIPTION
 
-## [1.2] - 2020-07-24
+# growthcleanr 1.2 - 2020-07-24
 
-### Added
+## Added
 
 - New CDC BMI calculation function `ext_bmiz()`, comparable to SAS program
   published at https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm
@@ -91,16 +89,16 @@
   and driver script `exec/testadjustcf.R` (see README-adjustcarryforward.md for
   details)
 
-### Changed
+## Changed
 
 - Reorganized code from `R/growth.R` into separate files for clarity and easier
   maintenance (all utility functions not directly used by `cleangrowth()` are
   now in `R/utils.R`)
 - Updated README with details and examples for added functions
 
-## [1.1] - 2020-02-07
+# growthcleanr 1.1 - 2020-02-07
 
-### Added
+## Added
 
 - New options to add flexibility:
   - `error.load.mincount` and `error.load.threshold`
@@ -110,7 +108,7 @@
 - New `splitinput()` function
 - New example synthetic data set `syngrowth` loads automatically.
 
-### Changed
+## Changed
 
 - Several updates to improve performance, including eliminating use of
   data.table in ewma function.
@@ -118,8 +116,8 @@
   details, examples, notes on handling large datasets, lists of parameters
   and exclusions.
 
-## [1.0.0] - 2018-09-11
+# growthcleanr 1.0.0 - 2018-09-11
 
-### Added
+## Added
 
 - Initial version posted to GitHub.

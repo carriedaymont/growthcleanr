@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{splitinput}
 \alias{splitinput}
-\title{splitinput}
+\title{Split input data into multiple files}
 \usage{
 splitinput(
   df,

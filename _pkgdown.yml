@@ -1,0 +1,22 @@
+reference:
+- title: "Cleaning height and weight observations"
+  desc: Functions for cleaning growth data
+- contents:
+  - cleangrowth
+  - ewma
+  - read_anthro
+  - sd_median
+- title: "Extended measures for pediatric BMI"
+  desc: >
+    Compute Z-scores and percentiles for pediatric subjects,
+    based on CDC SAS program at
+    https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm
+- contents:
+  - ext_bmiz
+- title: "Utilities"
+  desc: Support functions for common data cleaning workflows
+- contents:
+  - longwide
+  - recode_sex
+  - simple_bmi
+  - splitinput
