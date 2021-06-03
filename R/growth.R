@@ -84,6 +84,7 @@
 #' @param adult_columns_filename Name of file to save original adult data, with additional output columns to
 #' as CSV. Defaults to "", for which this data will not be saved. Useful
 #' for post-analysis. For more information on this output, please see README.
+#' @param adult_split Number of splits to run adult data on. Recommended for large datasets in conjunction with parallel and num.batches options. If no splits desired, set to Inf. Default Inf.
 #'
 #' @return Vector of exclusion codes for each of the input measurements.
 #'
@@ -151,7 +152,8 @@ cleangrowth <- function(subjid,
                         quietly = T,
                         adult_cutpoint = 20,
                         weight_cap = Inf,
-                        adult_columns_filename = "") {
+                        adult_columns_filename = "",
+                        adult_split = Inf) {
   # preprocessing ----
 
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
@@ -570,8 +572,20 @@ cleangrowth <- function(subjid,
 
   # no need to do this if there's no data
   if (nrow(data.adult) > 0){
-    # TODO: MAKE THIS BETTER -- FUNCTION OR SOMETHING
-    # TODO: BATCH LOGS??
+    # we'll process the adult data using a split, then do the work
+    if (adult_split < Inf & length(unique(data.adult$subjid)) < adult_split){
+      adult_split <- length(unique(data.adult$subjid))
+    }
+
+    if (adult_split < Inf & adult_split > 1){
+      split.list <- split(data.adult, 1:adult_split)
+    } else {
+      # no need for copy, they can refer to the same thing
+      split.adult <- data.adult
+      adult_split <- 1 # for Inf, just converting for later
+    }
+
+    # create cluster to use and reuse
     # if parallel processing is desired, load additional modules
     if (parallel) {
       if (is.na(num.batches)) {
@@ -595,45 +609,53 @@ cleangrowth <- function(subjid,
         num.batches <- 1
     }
 
-    subjid.unique <- data.adult[j = unique(subjid)]
-    batches.adult <- data.table(
-      subjid = subjid.unique,
-      batch = sample(num.batches, length(subjid.unique), replace = T)
-    )
-    # this is not the most efficient way to do this
-    data.adult[, batch := 1]
-    if (num.batches > 1){
-      for (b in 1:num.batches){
-        data.adult[subjid %in% batches.adult[batch == b, subjid], batch := b]
+    # this is where we do most of the adult work
+    full_adult_res <- lapply(1:adult_split, function(x){
+      if (!quietly){
+        cat(sprintf(
+          "[%s] Processing adult data split %g, using %d batch(es)...\n",
+          Sys.time(), x, num.batches))
       }
-    }
-    # add age in years
-    data.adult[, age_years := agedays/365.25]
-    # rename for ease of use
-    data.adult[, measurement := v_adult]
-    data.adult[, id := line]
 
-    if (!quietly)
-      cat(sprintf(
-        "[%s] Cleaning growth data in %d batch(es)...\n",
-        Sys.time(),
-        num.batches
-      ))
-    if (num.batches == 1) {
-      # do the cleaning
-      res <- cleanadult(copy(data.adult), weight_cap = weight_cap)
-    } else {
-      res <- ddply(
-        data.adult,
-        .(batch),
-        cleanadult,
-        .parallel = parallel,
-        .paropts = list(.packages = "data.table"),
-        weight_cap = weight_cap
+      if (adult_split > 1){
+        split.adult <- split.list[[x]]
+      } # otherwise, split adult has already been created
+
+      # is the randomness necessary here?
+      subjid.unique <- split.adult[j = unique(subjid)]
+      batches.adult <- data.table(
+        subjid = subjid.unique,
+        newbatch = sample(num.batches, length(subjid.unique), replace = T)
       )
-      stopCluster(cl)
-    }
+      split.adult <- merge(split.adult, batches.adult, by = "subjid")
 
+      # add age in years
+      split.adult[, age_years := agedays/365.25]
+      # rename for ease of use
+      split.adult[, measurement := v_adult]
+      split.adult[, id := line]
+
+      if (num.batches == 1) {
+        # do the cleaning
+        res <- cleanadult(split.adult, weight_cap = weight_cap)
+      } else {
+        res <- ddply(
+          split.adult,
+          .(newbatch),
+          cleanadult,
+          .parallel = parallel,
+          .paropts = list(.packages = "data.table"),
+          weight_cap = weight_cap
+        )
+      }
+
+      return(res)
+
+    })
+
+    stopCluster(cl)
+
+    res <- rbindlist(full_adult_res)
 
     if (adult_columns_filename != "") {
       write.csv(res, adult_columns_filename, row.names = F, na = "")
