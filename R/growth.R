@@ -578,7 +578,8 @@ cleangrowth <- function(subjid,
     }
 
     if (adult_split < Inf & adult_split > 1){
-      split.list <- split(data.adult, 1:adult_split)
+      # will warn if they're not exact multiples
+      split.list <- suppressWarnings(split(data.adult, 1:adult_split))
     } else {
       # no need for copy, they can refer to the same thing
       split.adult <- data.adult
