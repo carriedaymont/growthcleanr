@@ -654,7 +654,9 @@ cleangrowth <- function(subjid,
 
     })
 
-    stopCluster(cl)
+    if (parallel){
+      stopCluster(cl)
+    }
 
     res <- rbindlist(full_adult_res)
 
