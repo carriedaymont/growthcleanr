@@ -396,7 +396,7 @@ head(syngrowth)
 ```
 
 It can be used as in the example above. Note that processing the example data
-with `cleangrowth()` will likely take a few minutes to complete.
+with `cleangrowth()` will likely take several minutes to complete.
 
 ```{r, eval = FALSE}
 library(dplyr)
@@ -405,27 +405,27 @@ setkey(data, subjid, param, agedays)
 cleaned_data <- data[, gcr_result := cleangrowth(subjid, param, agedays, sex, measurement)]
 head(cleaned_data)
       id                               subjid sex  agedays    param measurement                  gcr_result
-1: 83330 002986c5-354d-bb9d-c180-4ce26813ca28   1 20489.22 HEIGHTCM       151.1                     Include
-2: 83332 002986c5-354d-bb9d-c180-4ce26813ca28   1 20860.22 HEIGHTCM       151.1                     Include
-3: 83334 002986c5-354d-bb9d-c180-4ce26813ca28   1 20860.22 HEIGHTCM       150.6 Exclude-Same-Day-Extraneous
-4: 83335 002986c5-354d-bb9d-c180-4ce26813ca28   1 21231.22 HEIGHTCM       151.1                     Include
-5: 83337 002986c5-354d-bb9d-c180-4ce26813ca28   1 21602.22 HEIGHTCM       151.1                     Include
-6: 83339 002986c5-354d-bb9d-c180-4ce26813ca28   1 21623.22 HEIGHTCM       151.1                     Include
+1: 18692 000a15ea-cdfc-37ec-4067-484e17f2a6cd HEIGHTCM   17760   0       176.5                     Include
+2: 18694 000a15ea-cdfc-37ec-4067-484e17f2a6cd HEIGHTCM   18131   0       176.5                     Include
+3: 18696 000a15ea-cdfc-37ec-4067-484e17f2a6cd HEIGHTCM   18131   0       176.2 Exclude-Same-Day-Extraneous
+4: 18697 000a15ea-cdfc-37ec-4067-484e17f2a6cd HEIGHTCM   18502   0       176.5                     Include
+5: 18699 000a15ea-cdfc-37ec-4067-484e17f2a6cd HEIGHTCM   18873   0       176.5                     Include
+6: 18702 000a15ea-cdfc-37ec-4067-484e17f2a6cd HEIGHTCM   19244   0       176.5                     Include
 cleaned_data %>% group_by(gcr_result) %>% tally(sort=TRUE)
-# A tibble: 26 x 2
+# A tibble: 28 x 2
    gcr_result                      n
    <fct>                       <int>
- 1 Include                     61652
- 2 Exclude-Extraneous-Same-Day 11263
- 3 Exclude-Carried-Forward      7093
- 4 Exclude-Same-Day-Extraneous  4010
- 5 Exclude-Same-Day-Identical    623
- 6 Exclude-SD-Cutoff             175
- 7 Exclude-EWMA-8                139
- 8 Exclude-Distinct-3-Or-More    125
- 9 Exclude-BIV                   108
-10 Exclude-EWMA-Extreme           99
-# … with 16 more rows
+ 1 Include                     57784
+ 2 Exclude-Same-Day-Extraneous  8058
+ 3 Exclude-Extraneous-Same-Day  5346
+ 4 Exclude-Carried-Forward      4338
+ 5 Exclude-Same-Day-Identical   1223
+ 6 Exclude-BIV                   207
+ 7 Exclude-Distinct-3-Or-More    170
+ 8 Exclude-EWMA-8                118
+ 9 Exclude-SD-Cutoff             103
+10 Exclude-EWMA-Extreme           66
+# … with 18 more rows
 ```
 
 If you are able to run these steps and see a similar result, you have the

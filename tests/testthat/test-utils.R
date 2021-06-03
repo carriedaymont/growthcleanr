@@ -217,9 +217,12 @@ test_that("longwide works as expected with default values", {
   # check that it has the correct amount of columns
   expect_equal(ncol(wide_syn), 9)
 
-  # check that all subjects are accounted for
-  expect(all(unique(sub_syn$subjid) %in% unique(wide_syn$subjid)),
-         "not all subjects appear in wide format")
+  # check that all but one subject are accounted for
+  ss <- unique(sub_syn$subjid)
+  ws <- unique(wide_syn$subjid)
+  expect_false(all(ss %in% ws),
+               "not all subjects appear in wide format")
+  expect_equal(setdiff(ss, ws), c("542abc54-c79f-9895-0350-ded2bf04af6e"))
 
   obs_ids <- c(wide_syn$wt_id, wide_syn$ht_id)
 
@@ -239,11 +242,12 @@ test_that("longwide works as expected with default values", {
     "longwide() includes inclusion values that were not specified"
   )
 
-  # check that all sexes have been correctly recoded
-  orig_sex <- sub_syn$sex[unique(sub_syn$subjid)]
-  names(orig_sex) <- unique(sub_syn$subjid)
-  aft_sex <- wide_syn$sex[unique(wide_syn$subjid)]
-  names(aft_sex) <- unique(wide_syn$subjid)
+  # check that all sexes have been correctly recoded, using values from ws
+  # because one will be missing in wide_syn otherwise
+  orig_sex <- sub_syn$sex[ws]
+  names(orig_sex) <- ws
+  aft_sex <- wide_syn$sex[ws]
+  names(aft_sex) <- ws
 
   expect_equal(aft_sex[names(orig_sex)], orig_sex + 1)
 
