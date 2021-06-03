@@ -1381,6 +1381,9 @@ cleanadult <- function(df, weight_cap = Inf){
       # 11wb, W moderate EWMA ----
       # 11wb. Check all other types, using a more moderate EWMA cutoff and other
       # criteria
+
+      # TODO: DO TWO STEPS: FIRST RVS, REMOVE, THEN DO ALL RVS
+
       step <- "Exclude-Moderate-EWMA"
 
       inc_df <- copy(w_subj_df)
@@ -1493,7 +1496,7 @@ cleanadult <- function(df, weight_cap = Inf){
         # prior is close in age but far in weight
         alt_ewma_exc <-
           agedays_bef <= 14 &
-          abs(wt_bef) > wta |
+          abs(wt_bef) > wta &
           (dewma$dewma.all > wta &
              dewma$dewma.after > (.75*wta)) |
           (dewma$dewma.all < -1*wta &
@@ -1501,7 +1504,7 @@ cleanadult <- function(df, weight_cap = Inf){
         # next is close in age but far in weight
         alt_ewma_exc <- alt_ewma_exc |
           (agedays_aft <= 14 &
-             abs(wt_aft) > wta |
+             abs(wt_aft) > wta &
              (dewma$dewma.all > wta &
                 dewma$dewma.before > (.75*wta)) |
              (dewma$dewma.all < -1*wta &
@@ -1524,7 +1527,7 @@ cleanadult <- function(df, weight_cap = Inf){
         alt_exc_binerr <- alt_exc_binerr |
           agedays_aft <= 14 &
           abs(wt_aft) > wta &
-          binerr_lepolate_p
+          binerr_lepolate_p # NA to something that is true
         exc_binerr <- exc_binerr | alt_exc_binerr
         exc_binerr[is.na(exc_binerr)] <- F
 
