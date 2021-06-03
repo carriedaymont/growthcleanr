@@ -1,0 +1,130 @@
+---
+title: "growthcleanr usage"
+date: "`r Sys.Date()`"
+vignette: >
+  %\VignetteIndexEntry{Usage}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\usepackage[utf8]{inputenc}
+---
+
+With the `growthcleanr` package installed as described in
+[Installation](installation.html), it can be loaded as a package:
+
+```{r}
+library(growthcleanr)
+```
+
+For convenience, `growthcleanr` ships with an example synthetic dataset created
+using [Synthea](https://synthetichealth.github.io/synthea/), with support for
+simulated pediatric growth measurement errors based on the protocol included as
+supplementary material to the [Daymont et al. paper](#cite). This dataset is
+automatically loaded with the `growthcleanr` library, and is called `syngrowth`.
+
+```{r}
+dim(syngrowth)
+head(syngrowth)
+```
+
+It can be used as in the example above. Note that processing the example data
+with `cleangrowth()` will likely take a few minutes to complete.
+
+```{r, eval = FALSE}
+library(dplyr)
+data <- as.data.table(syngrowth)
+setkey(data, subjid, param, agedays)
+cleaned_data <- data[, gcr_result := cleangrowth(subjid, param, agedays, sex, measurement)]
+head(cleaned_data)
+      id                               subjid sex  agedays    param measurement                  gcr_result
+1: 83330 002986c5-354d-bb9d-c180-4ce26813ca28   1 20489.22 HEIGHTCM       151.1                     Include
+2: 83332 002986c5-354d-bb9d-c180-4ce26813ca28   1 20860.22 HEIGHTCM       151.1                     Include
+3: 83334 002986c5-354d-bb9d-c180-4ce26813ca28   1 20860.22 HEIGHTCM       150.6 Exclude-Same-Day-Extraneous
+4: 83335 002986c5-354d-bb9d-c180-4ce26813ca28   1 21231.22 HEIGHTCM       151.1                     Include
+5: 83337 002986c5-354d-bb9d-c180-4ce26813ca28   1 21602.22 HEIGHTCM       151.1                     Include
+6: 83339 002986c5-354d-bb9d-c180-4ce26813ca28   1 21623.22 HEIGHTCM       151.1                     Include
+cleaned_data %>% group_by(gcr_result) %>% tally(sort=TRUE)
+# A tibble: 26 x 2
+   gcr_result                      n
+   <fct>                       <int>
+ 1 Include                     61652
+ 2 Exclude-Extraneous-Same-Day 11263
+ 3 Exclude-Carried-Forward      7093
+ 4 Exclude-Same-Day-Extraneous  4010
+ 5 Exclude-Same-Day-Identical    623
+ 6 Exclude-SD-Cutoff             175
+ 7 Exclude-EWMA-8                139
+ 8 Exclude-Distinct-3-Or-More    125
+ 9 Exclude-BIV                   108
+10 Exclude-EWMA-Extreme           99
+# … with 16 more rows
+```
+
+If you are able to run these steps and see a similar result, you have the
+`growthcleanr` package installed correctly. The resulting `cleaned_data` can be
+reviewed, subsetted, and compared in more detail using all the tools R provides.
+
+For complete information about the options that can be set on the
+`cleangrowth()` function, see [Configuration](#configuration). Below are a
+few additional examples:
+
+This example shows three configuration options in use:
+
+```{r, eval = FALSE}
+cleaned_data <- data[,
+  gcr_result_both := cleangrowth(
+    subjid, param, agedays, sex, measurement,
+    lt3.exclude.mode = "flag.both",
+    ref.data.path = "inst/extdata/",
+    quietly = FALSE
+  )
+]
+```
+
+- `lt3.exclude.mode = "flag.both"` will exclude both measurements for a
+  subject if they only have two unexcluded measurements of one parameter type
+  with at least one implausible value and no same age-day measurements of the
+  other parameter.
+
+- `ref.data.path = "inst/extdata"` shouldn't be necessary if you have the
+  `growthcleanr` package installed, but if you are running it from its
+  source directly you may need to specify its full path.
+
+- `quietly = F` enables verbose output, marking the progress of the algorithm
+  through its many processing steps. This can be very helpful while testing.
+
+This example shows built-in options for processing data in batches, which can
+speed the process while working with large data sets:
+
+```{r, eval = FALSE}
+cleaned_data <- data[,
+  gcr_result_both := cleangrowth(
+    subjid, param, agedays, sex, measurement,
+    parallel = TRUE,
+    num.batches = 4,
+    log.path = "logs"
+  )
+]
+```
+
+The best `num.batches` value for your environment may vary depending on the
+computing resources you have available. If you do not specify `num.batches`,
+`growthcleanr` will estimate a batch count based on R functions for checking the
+system hardware. If you are working with large datasets, you may need to
+experiment with these options to determine the best settings for your needs.
+Note that there are additional notes on
+[Working with large datasets](large-data-sets.html).
+
+The default value of `log.path` is `"."`, the current working directory.
+`growthcleanr` will write batch-specific log files to the `log.path` directory,
+and will create the directory if necessary.
+
+Note that if you run `growthcleanr` in parallel with multiple batches and see
+warning errors such as the following, they can be ignored.
+
+```{r, eval = FALSE}
+Warning messages:
+1: <anonymous>: ... may be used in an incorrect context: ‘.fun(piece, ...)’
+2: <anonymous>: ... may be used in an incorrect context: ‘.fun(piece, ...)’
+```
+
+This set of warnings is coming from one of `growthcleanr`'s dependencies, and
+does not indicate either failure or improper execution.

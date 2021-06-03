@@ -1,0 +1,96 @@
+---
+title: "Understanding growthcleanr output"
+date: "`r Sys.Date()`"
+vignette: >
+  %\VignetteIndexEntry{Understanding output}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\usepackage[utf8]{inputenc}
+---
+
+As seen [in the example above](#example), `growthcleanr` creates a vector of
+flags identifying which measurements should be included or excluded, and why.
+This vector can be added to the original dataset for further review. The flags
+`growthcleanr` sets are text labels, most of which are descriptive. The text
+does not always map directly back to the precise step in the algorithm.
+
+For convenience, the following table maps which `algorithm step` in the
+pediatric algorithm, as defined by Supplemental File 3 within the
+[Supplementary Material](https://academic.oup.com/jamia/article/24/6/1080/3767271#97610899)
+of the Daymont et al. paper, define exclusions in the algorithm by the exclusion
+identifier also prescribed in the algorithm ("`algorithm exc id`"). The
+`exclusion type` column identifies the text of the exclusion flag set by
+`growthcleanr`. The `notes` column at right identifies minor discrepancies between
+the algorithm's step labels and labels used in comment text in `growthcleanr`.
+
+| algorithm step | algorithm exc id | exclusion type                          | notes                       |
+| -------------- | ---------------- | --------------------------------------- | --------------------------- |
+| 2d             | 0                | Include                                 | -                           |
+| 2d             | 1                | Missing                                 | -                           |
+| 5b             | 2                | Exclude-Temporary-Extraneous-Same-Day   | -                           |
+| 7d             | -                | Swapped-Measurement                     | -                           |
+| 8f             | -                | Unit-Error-High                         | -                           |
+| 8f             | -                | Unit-Error-Low                          | -                           |
+| 8f             | -                | Unit-Error-Possible                     | Not set in R code           |
+| 9c             | 3                | Exclude-Carried-Forward                 | -                           |
+| 10c            | 4                | Exclude-SD-Cutoff                       | 10d, 10e                    |
+| 11d            | 5                | Exclude-EWMA-Extreme                    | 11e                         |
+| 11f.ii         | 6                | Exclude-EWMA-Extreme-Pair               | 11i (R only)                |
+| 12d.i          | 7                | Exclude-Extraneous-Same-Day             | 12diii, 12ei, 12f           |
+| 14f.i          | 8                | Exclude-EWMA-8                          | Set in 14h (in R)           |
+| 14f.ii         | 9                | Exclude-EWMA-9                          | Set in 14h (in R)           |
+| 14f.iii        | 10               | Exclude-EWMA-10                         | Set in 14h (in R)           |
+| 14f.iv         | 11               | Exclude-EWMA-11                         | Set in 14h (in R)           |
+| 14f.v          | 12               | Exclude-EWMA-12                         | Set in 14h (in R)           |
+| 14f.vi         | 13               | Exclude-EWMA-13                         | Set in 14h (in R)           |
+| 14f.vii        | 14               | Exclude-EWMA-14                         | Set in 14h (in R)           |
+| 15s            | 15               | Exclude-Min-Height-Change               | Set in 15q (in R), 15s, 15t |
+| 15s            | 16               | Exclude-Max-Height-Change               | Set in 15q (in R), 15s, 15t |
+| 16b            | 17               | Exclude-Pair-Delta-17                   | -                           |
+| 16b            | 18               | Exclude-Pair-Delta-18                   | -                           |
+| -              | -                | Exclude-Pair-Delta-19                   | Added `flag.both` mode      |
+| 16d            | 19               | Exclude-Single-Outlier                  | -                           |
+| 17a            | 20               | Exclude-Too-Many-Errors                 | -                           |
+| 17a            | 21               | Exclude-Too-Many-Errors-Other_Parameter | -                           |
+
+A researcher wanting to compare two datasets -- for example, one including only
+measurements `growthcleanr` flags for inclusion, and a second which also
+includes carried forward values -- could extract only measurements where the
+flag is set to "`Include`" for the first set and either "`Include`" or
+"`Exclude-Carried-Forward`" for the second set. This flexibility gives each
+researcher control over how to incorporate growthcleanr results into their own
+research.
+
+For the adult algorithm, the following exclusions apply. Note that a few types
+are described with the same exclusion codes.
+
+| algorithm step    | implementation step        | exclusion type                          | notes                                                                           |
+| ----------------- | -------------------------- | --------------------------------------- | ------------------------------------------------------------------------------- |
+| 1h                | H BIV                      | Exclude-BIV                             | -                                                                               |
+| 3h                | H temp extraneous          | -                                       | Nothing excluded in this step                                                   |
+| 5h                | H 100 metric               | Exclude-Hundreds                        | -                                                                               |
+| 6h                | H unit errors              | Exclude-Unit-Errors                     | -                                                                               |
+| 7h                | H transpositions           | Exclude-Transpositions                  | -                                                                               |
+| 8                 | swaps                      | Exclude-Swaps                           | -                                                                               |
+| 9h                | H same day extraneous      | Exclude-Same-Day-Extraneous             | Multiple error codes depending on outcome                                       |
+| 9h                | H same day extraneous      | Exclude-Same-Day-Identical              | Multiple error codes depending on outcome                                       |
+| 10ha              | H distinct pairs           | Exclude-Distinct-Pairs                  | -                                                                               |
+| 10hb              | H distinct 3+              | Exclude-Distinct-3-Or-More              | -                                                                               |
+| 11h               | H mean heights             | -                                       | Nothing excluded in this step                                                   |
+| 13                | distinct 1                 | Exclude-Distinct-Single                 | -                                                                               |
+| 14h               | H error load               | Exclude-Error-Load                      | -                                                                               |
+| 1w                | W BIV                      | Exclude-BIV                             | -                                                                               |
+| 2w                | W repeated values          | -                                       | Nothing excluded in this step                                                   |
+| 3w                | W temp extraneous          | -                                       | Nothing excluded in this step                                                   |
+| 4w                | W weight cap               | Exclude-Weight-Cap                      | Since "400" will be specified by user                                           |
+| 4w                | W weight cap               | Exclude-Weight-Cap-Identical            | Since "400" will be specified by user                                           |
+| 5w                | W hundreds                 | Exclude-Hundreds                        | -                                                                               |
+| 6w                | W unit errors              | Exclude-Unit-Errors                     | -                                                                               |
+| 7w                | W transpositions           | Exclude-Transpositions                  | -                                                                               |
+| 9w                | W extreme EWMA             | Exclude-Extreme-EWMA                    | -                                                                               |
+| 10w               | W same day extraneous      | Exclude-Same-Day-Extraneous             | Multiple error codes depending on outcome                                       |
+| 10w               | W same day extraneous      | Exclude-Same-Day-Identical              | Multiple error codes depending on outcome                                       |
+| 11wa              | W distinct ordered pairs   | Exclude-Distinct-Ordered-Pairs          | -                                                                               |
+| 11wb              | W moderate EWMA            | Exclude-Moderate-EWMA                   | -                                                                               |
+| 12w               | W weight cap influence     | Exclude-Possibly-Impacted-By-Weight-Cap | -                                                                               |
+| 14w               | W error load               | Exclude-Error-Load                      | -                                                                               |
+| Most weight steps | W repeated value exclusion | paste(proposed, -RV)                    | When a first repeated value is excluded, all other repeated values are excluded |
