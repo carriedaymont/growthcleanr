@@ -1523,11 +1523,11 @@ cleanadult <- function(df, weight_cap = Inf){
         alt_exc_binerr <-
           agedays_bef <= 14 &
           abs(wt_bef) > wta &
-          binerr_lepolate_n
+          !binerr_lepolate_n
         alt_exc_binerr <- alt_exc_binerr |
-          agedays_aft <= 14 &
-          abs(wt_aft) > wta &
-          binerr_lepolate_p # NA to something that is true
+          (agedays_aft <= 14 &
+             abs(wt_aft) > wta &
+             !binerr_lepolate_p)
         exc_binerr <- exc_binerr | alt_exc_binerr
         exc_binerr[is.na(exc_binerr)] <- F
 
