@@ -208,7 +208,11 @@
     log.path <span class="op">=</span> <span class="st">"logs"</span>
   <span class="op">)</span>
 <span class="op">]</span></code></pre></div>
-<p>The best <code>num.batches</code> value for your environment may vary depending on the computing resources you have available. If you do not specify <code>num.batches</code>, <code>growthcleanr</code> will estimate a batch count based on R functions for checking the system hardware. If you are working with large datasets, you may need to experiment with these options to determine the best settings for your needs. Note that there are additional notes on <a href="large-data-sets.html">Working with large datasets</a>.</p>
+<ul>
+<li><p><code>parallel</code> tells <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> to run in parallel; the default is <code>FALSE</code></p></li>
+<li><p><code>num.batches</code> specifies how many batches to process in parallel</p></li>
+</ul>
+<p>The best <code>num.batches</code> value for your environment may vary depending on the computing resources you have available. If you do not specify <code>num.batches</code>, <code>growthcleanr</code> will estimate a batch count based on R functions for checking the system hardware. If you are working with large datasets, you may need to experiment with these options to determine the best settings for your needs. You may also find it helpful to review the additional notes on <a href="large-data-sets.html">Working with large datasets</a>.</p>
 <p>The default value of <code>log.path</code> is <code>"."</code>, the current working directory. <code>growthcleanr</code> will write batch-specific log files to the <code>log.path</code> directory, and will create the directory if necessary.</p>
 <p>Note that if you run <code>growthcleanr</code> in parallel with multiple batches and see warning errors such as the following, they can be ignored.</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>Warning messages<span class="sc">:</span></span>
@@ -228,6 +232,7 @@
 <li><p><code>adult_cutpoint</code> defines a subject age in years at which to cut <code>growthcleanr</code> analysis into separate sets for pediatric and adult subjects. The default is 20 years, and this may be lowered to 18, as shown above.</p></li>
 <li><p><code>weight_cap</code> specifies a known hard limit clamp for weight values. sometimes data shared for research may have measurement values clamped to hard limits for privacy protection. The growthcleanr adult algorithm can be configured to watch for a known weight cap and adjust its assessment accordingly.</p></li>
 </ul>
+<p>The full algorithm for assessing adult measurements is described in detail in <a href="adult-algorithm.html">Adult algorithm</a>.</p>
 </div>
   </div>
 

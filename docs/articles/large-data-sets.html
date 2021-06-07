@@ -118,12 +118,12 @@
 
     
     
-<p>The nature of the <code>growthcleanr</code> algorithm is repetitive. It runs many checks over each individual subject’s measurements, in a specific sequence, and revises its assessments as it goes. Because of this, it can take some time to process even a modest dataset. For reference, the <code>syngrowth</code> synthetic data example packaged with <code>growthcleanr</code> takes 2-3 minutes to process on a contemporary laptop. <code>growthcleanr</code> uses optimized libraries (e.g. <code>data.table</code>) to go as fast as possible, but there are limits given the repeated passes over data required.</p>
-<p>If you have under one million records, using <code>growthcleanr</code> may just necessitate planning to wait a little while the job processes. There are several strategies to improve performance you might consider:</p>
+<p>The nature of the <code>growthcleanr</code> algorithm is repetitive. It runs many checks over each individual subject’s measurements, in a specific sequence, and revises its assessments as it goes. Because of this, it can take some time to process even a modest dataset. For reference, the <code>syngrowth</code> synthetic data example packaged with <code>growthcleanr</code> takes 2-3 minutes to process on a contemporary laptop. <code>growthcleanr</code> uses optimized libraries (e.g. <code>data.table</code>) to go as fast as possible, but there are limits given the repeated passes over data required. If you have under one million records, using <code>growthcleanr</code> may just necessitate planning to wait a little while the job processes.</p>
+<p>If you have a much larger dataset, there are several strategies to improve performance you might consider:</p>
 <ul>
 <li>The built-in <code>parallel</code> option should take advantage of multiple CPU cores when your hardware allows.</li>
 <li>Running <code>growthcleanr</code> on a machine with more CPU cores and more RAM can improve this further.</li>
-<li>Verify that supporting libraries like <code>data.table</code> are <a href="#platform">installed properly</a> for your machine</li>
+<li>Verify that supporting libraries like <code>data.table</code> are <a href="installation.html">installed properly</a> for your machine</li>
 <li>Anecdotally, Windows users have sometimes seen slower performance when compared with similarly-appointed hardware running Linux or macOS.</li>
 </ul>
 <p>For very large datasets, on the order of millions of records or more, cleaning data can take several hours or more. When running this kind of job, the risk of failures due to external factors such as power outages increases. The current structure of <code>growthcleanr</code> does not checkpoint results as progress is made, so if a job has to run overnight and fails in the middle, a researcher would likely need to start over from scratch.</p>

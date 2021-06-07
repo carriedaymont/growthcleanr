@@ -14,18 +14,18 @@ even a modest dataset. For reference, the `syngrowth` synthetic data example
 packaged with `growthcleanr` takes 2-3 minutes to process on a contemporary
 laptop. `growthcleanr` uses optimized libraries (e.g. `data.table`) to go as
 fast as possible, but there are limits given the repeated passes over data
-required.
+required. If you have under one million records, using `growthcleanr` may just
+necessitate planning to wait a little while the job processes.
 
-If you have under one million records, using `growthcleanr` may just
-necessitate planning to wait a little while the job processes. There are
-several strategies to improve performance you might consider:
+If you have a much larger dataset, there are several strategies to improve
+performance you might consider:
 
 - The built-in `parallel` option should take advantage of multiple CPU cores
   when your hardware allows.
 - Running `growthcleanr` on a machine with more CPU cores and more RAM can
   improve this further.
 - Verify that supporting libraries like `data.table` are
-  [installed properly](#platform) for your machine
+  [installed properly](installation.html) for your machine
 - Anecdotally, Windows users have sometimes seen slower performance when
   compared with similarly-appointed hardware running Linux or macOS.
 

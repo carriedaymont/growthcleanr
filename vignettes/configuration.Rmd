@@ -14,7 +14,7 @@ discover which work best for your research and your dataset.
 All of the following options may be set as additional parameters in the call to
 `cleangrowth()`.
 
-### Algorithm-related options
+## Algorithm-related options
 
 The following options change the behavior of the growthcleanr algorithm.
 
@@ -91,21 +91,19 @@ techniques.
   range (731-7305 days). A summary of how the NHANES reference medians were derived is
   below under [NHANES reference data](#nhanes).
 
-- `adult_cutpoint` - default `20`; number between 18 and 20, describing ages when the
-  pediatric algorithm should not be applied (< adult_cutpoint), and the adult algorithm
-  should apply (>= adult_cutpoint). Numbers outside this range will be changed to the
-  closest number within the range.
+- `adult_cutpoint` - default `20`; number between 18 and 20, describing age
+  limit in years above which the pediatric algorithm should not apply (<
+  adult_cutpoint), and the adult algorithm should apply (>= adult_cutpoint).
+  Numbers outside this range will be changed to the closest number within the
+  range.
 
 - `weight_cap` - default `Inf`; weight_cap Positive number, describing a weight
-  cap in kg (rounded to the nearest .1, +/- .1) within the adult dataset. If
-  there is no weight cap, set to Inf.
+  cap in kg (rounded to the nearest .1, +/- .1) within an adult dataset. This
+  may be used when a dataset shared for research is known to clamp values for
+  privacy reasons. If there is no weight cap, set to Inf (default). This option
+  is not used with pediatric subjects.
 
-- `adult_columns_filename` - default `""`; Name of file to save original adult data,
-  with additional output columns to as CSV. Defaults to "", for which this data will not
-  be saved. Useful for post-analysis. For more information on this output, please see
-  README.
-
-### Operational options
+## Operational options
 
 The following options change the execution of the program overall, with no
 effect on the algorithm itself.
@@ -131,24 +129,30 @@ effect on the algorithm itself.
   Defaults to "", for which this data will not be saved. Useful for
   post-processing and debugging.
 
+- `adult_columns_filename` - default `""`; Name of file to save original adult
+  data, with additional output columns to as CSV. Defaults to "", for which this
+  data will not be saved. Useful for post-analysis. For more information on this
+  output, please see README.
+
 - `quietly` - default `TRUE`; when `TRUE`, displays function messages and will
   output log files when `parallel` is `TRUE`.
 
 - `log.path` - default `"."`; sets directory for batch log file output when
   processing with `parallel = TRUE`. A new directory will be created if necessary.
 
-### NHANES reference medians
+## NHANES reference medians
 
-`growthcleanr` [releases](https://github.com/carriedaymont/growthcleanr/releases) up to
-1.2.4 offered two options for recentering medians, either the default of deriving
-medians from the input set, or supplying an externally-defined set of medians. These
-left out an option for researchers working with either small datasets or with data
-which might otherwise not be representative of the population, as deriving medians from
-the input set in those cases might be problematic. To provide a standard default
-reference to address these latter cases, a set of medians were derived from the
-[National Health and Nutrition Examination
-Survey](https://wwwn.cdc.gov/nchs/nhanes/Default.aspx) (NHANES). A summary of that
-process is below. As of release 1.2.5, the default behavior is:
+`growthcleanr`
+[releases](https://github.com/carriedaymont/growthcleanr/releases) up to 1.2.4
+offered two options for recentering medians, either the default of deriving
+medians from the input set, or supplying an externally-defined set of medians.
+These left out an option for researchers working with either small datasets or
+with data which might otherwise not be representative of the population, as
+deriving medians from the input set in those cases might be problematic. To
+provide a standard default reference to address these latter cases, a set of
+medians were derived from the [National Health and Nutrition Examination
+Survey](https://wwwn.cdc.gov/nchs/nhanes/Default.aspx) (NHANES). A summary of
+that process is below. As of release 1.2.5, the default behavior is:
 
 - If `sd.recenter` is specified as a data set, use the data set
 - If `sd.recenter` is specified as `nhanes`, use NHANES
@@ -157,34 +161,39 @@ process is below. As of release 1.2.5, the default behavior is:
   - If the input set has at least 5,000 observations, derive medians from input
   - If the input set has fewer than 5,000 observations, use NHANES
 
-With the verbose `cleangrowth()` option `quietly = FALSE`, the recentering medians
-approach used will be noted in the output. If the input set has fewer than 100
-observations for any age-year, this will also be noted in the output.
+With the verbose `cleangrowth()` option `quietly = FALSE`, the recentering
+medians approach used will be noted in the output. If the input set has fewer
+than 100 observations for any age-year, this will also be noted in the output.
 
-The NHANES reference medians are based primarily on data from NHANES 2009-2010 through
-2017-2018, including approximately 39,000 heights/lengths and weights from children and
-adolescents between the ages of 0 months and <240 months. Weight and height SD scores
-were calculated from the [L, M, and S
-parameters](https://www.cdc.gov/growthcharts/percentile_data_files.htm) for the [CDC
-growth charts](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm) were
-used as the reference to calculate weight and height SD scores for the NHANES 2009-2010
-through 2017-2018 samples. Based on the distributions of age-days in children at 0
-months, an age adjustment was made based on the median number of days among these
-infants. This adjustment was made after consultation with the National Center for
-Health Statistics confirmed that a general assumption of ages occurring at the midpoint
-of the indicated integer month of age did not apply to children recorded as 0 months,
-and uses 0.75 months instead.
+### Derivation process
 
-Weights were supplemented with a random sample of birthweights from NCHS's [Vital
-Statistics Natality Birth
-Data](https://www.nber.org/research/data/vital-statistics-natality-birth-data) for 2018. These had sample weights assigned so that the sum of the sample weights for the
-sample equalled the sum of the sample weights for each month for infants in NHANES, as
-NHANES is a multi-stage complex survey. The reference data was then smoothed using the
-`svysmooth()` function in the R
+The NHANES reference medians are based primarily on data from NHANES 2009-2010
+through 2017-2018, including approximately 39,000 heights/lengths and weights
+from children and adolescents between the ages of 0 months and <240 months.
+Weight and height SD scores were calculated from the [L, M, and S
+parameters](https://www.cdc.gov/growthcharts/percentile_data_files.htm) for the
+[CDC growth
+charts](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm) were
+used as the reference to calculate weight and height SD scores for the NHANES
+2009-2010 through 2017-2018 samples. Based on the distributions of age-days in
+children at 0 months, an age adjustment was made based on the median number of
+days among these infants. This adjustment was made after consultation with the
+National Center for Health Statistics confirmed that a general assumption of
+ages occurring at the midpoint of the indicated integer month of age did not
+apply to children recorded as 0 months, and uses 0.75 months instead.
+
+Weights were supplemented with a random sample of birthweights from NCHS's
+[Vital Statistics Natality Birth
+Data](https://www.nber.org/research/data/vital-statistics-natality-birth-data)
+for 2018. These had sample weights assigned so that the sum of the sample
+weights for the sample equalled the sum of the sample weights for each month for
+infants in NHANES, as NHANES is a multi-stage complex survey. The reference data
+was then smoothed using the `svysmooth()` function in the R
 [`survey`](https://cran.r-project.org/web/packages/survey/index.html) package to
 estimate the weight and height SD scores for each day up to 7,305 days, with a
-bandwidth chosen to balance between over- and under-fitting, and interpolation between
-the estimates from this function was used to obtain an estimate for each day of age.
-Predictions from a regression model fit to smoothed height SDs between 23 and 365 days
-(the youngest child in NHANES had an estimated age in days of 23) were used to extend
-smoothed height SD scores to children between 1 and 22 days of age.
+bandwidth chosen to balance between over- and under-fitting, and interpolation
+between the estimates from this function was used to obtain an estimate for each
+day of age. Predictions from a regression model fit to smoothed height SDs
+between 23 and 365 days (the youngest child in NHANES had an estimated age in
+days of 23) were used to extend smoothed height SD scores to children between 1
+and 22 days of age.
