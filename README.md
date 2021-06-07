@@ -60,7 +60,7 @@ prepared for use in `growthcleanr`.
 
 The rest of this documentation includes:
 
-Getting started:
+### Getting started:
 
 -   [Quickstart](articles/quickstart.html) - a brief tour of using
     growthcleanr, including data preparation
@@ -69,7 +69,7 @@ Getting started:
 -   [Usage](articles/usage.html) - examples of cleaning data, multiple
     options, example data
 
-Advanced topics:
+### Advanced topics:
 
 -   [Configuration options](articles/configuration.html) - changing
     growthcleanr operational settings
