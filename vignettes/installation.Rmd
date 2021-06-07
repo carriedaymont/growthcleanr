@@ -7,26 +7,16 @@ vignette: >
   %\usepackage[utf8]{inputenc}
 ---
 
-`growthcleanr has been developed and tested using R version 3 (most recently
-3.6+). It should work using R on Windows, macOS, or Unix/Linux, although there
-are some additional [platform-specific notes](#platform) you may wish to review.
-
-In an up-to-date R environment such as RStudio, first install the dependencies:
-
-```{r, eval = FALSE}
-# Required packages for growthcleanr operation
-install.packages("devtools")
-# Optional additional packages referenced in this document
-install.packages("argparser")
-install.packages("bit64")
-```
-
-Note that this might take some time.
+`growthcleanr` has been developed and tested using R version 3.6 and more
+recently version 4+. It should work using R on Windows, macOS, or Unix/Linux,
+although there are some additional [platform-specific notes](#platform) you may
+wish to review.
 
 You can install the `growthcleanr` package directly from GitHub using `devtools`
 in the R console with:
 
 ```{r, eval = FALSE}
+install.packages("devtools")
 devtools::install_github("carriedaymont/growthcleanr", ref="main")
 ```
 
@@ -44,29 +34,28 @@ remotes::install_github("carriedaymont/growthcleanr", ref="main")
 Note that `ref="main"` is required; the default branch is "main", and must be
 referred to explicitly.
 
-### Source-level install for developers
+`growthcleanr` itself has several dependencies, so it may take a little while to
+download and install everything on your machine.
 
-If you want to work with and potentially change the `growthcleanr` code itself,
-you can download or clone the `growthcleanr` source code and then install it from
-source. To clone the source using `git`:
+## Optional packages
 
-```{bash, eval = FALSE}
-% git clone https://github.com/carriedaymont/growthcleanr.git
-```
+These packages are not required for running `cleangrowth()` and the other main
+functions of `growthcleanr`, but may be necessary for certain use cases.
 
-Either way, once you have the `growthcleanr` package source, open an R session
-from the `growthcleanr` base directory. Then install growthcleanr using the R
-`devtools` package:
+* `argparser` is used by the `gcdriver.R` script for command line
+operation as described in [Working with large data sets](large-data-sets.html)
+
+* `bit64` is necessary if you have long (64-bit) integer `subjid` values
+
+These can be installed the usual way:
 
 ```{r, eval = FALSE}
-devtools::install(".")
+install.packages(c("argparser", "bit64"))
 ```
 
-You can also install the package from an installation file if one is obtained.
+## <a name="platform"></a>Platform-specific notes
 
-### <a name="platform"></a>Platform-specific notes
-
-#### Windows
+### Windows
 
 We have observed an issue with using `growthcleanr` with Windows in a large
 agency where some R packages are installed by an administrator for a user who
@@ -79,7 +68,7 @@ write permissions. These steps should help to avoid this problem.
 Some users have reported that `growthcleanr` runs more slowly on Windows
 compared with Linux or macOS.
 
-#### macOS
+### macOS
 
 `growthcleanr` uses the
 [`data.table`](https://rdatatable.gitlab.io/data.table/) package for R
@@ -104,9 +93,9 @@ Users have reported errors running multiple batches with `parallel = T` from
 within RStudio. If this happens, the problem may be resolved by running from
 RGui or from the command line using `Rscript`. An example standalone script that
 may be used for this purpose is documented in [Working with large data
-sets](articles/large-data/sets.html).
+sets](large-data-sets.html).
 
-#### Docker
+### Docker
 
 This package includes a `Dockerfile` that enables easy installation of R and
 `growthcleanr` on a machine with [Docker](https://www.docker.com/) installed. It
@@ -158,3 +147,23 @@ directory.
 
 Exit the Docker R environment with `quit()` as you normally would. Any new files you
 saved will appear in the desktop folder you mapped.
+
+## Source-level install for developers
+
+If you want to work with and potentially change the `growthcleanr` code itself,
+you can download or clone the `growthcleanr` source code and then install it from
+source. To clone the source using `git`:
+
+```{bash, eval = FALSE}
+% git clone https://github.com/carriedaymont/growthcleanr.git
+```
+
+Either way, once you have the `growthcleanr` package source, open an R session
+from the `growthcleanr` base directory. Then install growthcleanr using the R
+`devtools` package:
+
+```{r, eval = FALSE}
+devtools::install(".")
+```
+
+You can also install the package from an installation file if one is obtained.

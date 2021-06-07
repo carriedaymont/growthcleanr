@@ -9,27 +9,37 @@ vignette: >
 
 ## R setup
 
-The `growthcleanr` package must be installed, which will in turn install the
-following packages:
+To get started with `growthcleanr`, the `growthcleanr` package must be
+installed. Installing `growthcleanr` will in turn install several additional
+packages. `growthcleanr` is not currently on CRAN.
 
-- `data.table`
-- `foreach`
-- `doParallel`
-- `parallel`
-- `dplyr`
-- `labelled`
-- `plyr`
-- `tidyr`
-- `magrittr`
+One option for installation is using the `devtools` package. Install `devtools`
+and `growthcleanr` with the following commands:
 
-In addition, an R environment with `devtools` installed is also required.
+```{r, eval = FALSE}
+install.packages("devtools")
+devtools::install_github("carriedaymont/growthcleanr", ref="main")
+```
+
+If you are unable to install `devtools`, a similar function is available in the
+`remotes` package:
+
+```{r, eval = FALSE}
+install.packages("remotes")
+remotes::install_github("carriedaymont/growthcleanr", ref="main")
+```
+
+Note that `ref="main"` is required whether you use `devtools` or `remotes`. The
+default `growthcleanr` code branch is "main", and this must be referred to
+explicitly.
+
 Further installation details and notes can be found under
 [Installation](installation.html).
 
 ## Data preparation
 
 Once the `growthcleanr` package and its dependencies are installed, the minimal
-data vectors needed are:
+input data vectors needed for cleaning data are:
 
 1. `subjid` - a unique identifier for each subject; if you have long (64-bit)
    integer `subjid` values, add the `bit64` R package to your install list to
@@ -71,11 +81,11 @@ Starting with a dataset such as the following:
 Note that in this example, we see data from two subjects, sorted as described
 above, with two pairs of height/weight measurements for the first patient and
 four pairs for the second. Most of these values pass the "eyeball test", but the
-third weight measurement for `subjid` 2 looks like it might be a carried forward
-value, given that their same ageday height has changed by several centimeters
-and their third height value is exactly the same as their second. This is an
-example of an implausible value and exclusion type that `growthcleanr` might
-identify.
+third weight measurement for `subjid` 2 looks like it might be a value that has
+been carried forward from the previous value, given that their same ageday
+height has changed by several centimeters but their third height value is
+exactly the same as their second. This is an example of an implausible value and
+exclusion type that `growthcleanr` might identify.
 
 The `cleangrowth()` function provided by `growthcleanr` will return a vector
 that specifies, for each measurement, whether to:
@@ -83,7 +93,7 @@ that specifies, for each measurement, whether to:
 - "`Include`" the measurement,
 - Conclude that the measurement is "`Missing`",
 - Or to "`Exclude`" the measurement (numerous variations of `Exclude` exist, as
-  specified below in Understanding output).
+  specified in [Understanding growthcleanr output](output.html)).
 
 For a data.frame object `source_data` containing growth data:
 
@@ -126,6 +136,11 @@ In this sample output, we see that `growthcleanr` has indeed flagged the third
 weight measurement for `subjid 2` as an apparent carried forward value. The
 measurement remains in the dataset, and it is up to the researcher to determine
 which exclusions to accept directly or investigate further.
+
+This example uses the default configuration options for `cleangrowth()`. Longer
+examples demonstrating some common options are in [Usage](usage.html), and full
+details about all options are documented in
+[Configuration](configuration.html).
 
 To compute percentiles and Z-scores using the included CDC macro, continue with
 these next steps:

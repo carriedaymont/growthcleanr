@@ -1,3 +1,24 @@
+navbar:
+  structure:
+    left: [home, articles, reference, news]
+    right: [github]
+
+articles:
+- title: Getting started
+  navbar: Getting started
+  contents:
+  - quickstart
+  - installation
+  - usage
+- title: Advanced
+  navbar: Advanced topics
+  contents:
+  - configuration
+  - output
+  - adult-algorithm
+  - utilities
+  - large-data-sets
+
 reference:
 - title: "Cleaning height and weight observations"
   desc: Functions for cleaning growth data
@@ -20,3 +41,9 @@ reference:
   - recode_sex
   - simple_bmi
   - splitinput
+
+repo:
+  url:
+    home: https://github.com/mitre/growthcleanr
+    source: https://github.com/mitre/growthcleanr/blob/main/
+    issue: https://github.com/mitre/growthcleanr/issues/

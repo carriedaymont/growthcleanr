@@ -1,5 +1,5 @@
 ---
-title: "growthcleanr usage"
+title: "Usage"
 date: "`r Sys.Date()`"
 vignette: >
   %\VignetteIndexEntry{Usage}
@@ -14,9 +14,11 @@ With the `growthcleanr` package installed as described in
 library(growthcleanr)
 ```
 
+## Basic operations using example synthetic data
+
 For convenience, `growthcleanr` ships with an example synthetic dataset created
 using [Synthea](https://synthetichealth.github.io/synthea/), with support for
-simulated pediatric growth measurement errors based on the protocol included as
+simulated growth measurement errors based on the protocol included as
 supplementary material to the [Daymont et al. paper](#cite). This dataset is
 automatically loaded with the `growthcleanr` library, and is called `syngrowth`.
 
@@ -25,14 +27,24 @@ dim(syngrowth)
 head(syngrowth)
 ```
 
-It can be used as in the example above. Note that processing the example data
+It can be used as in the following example. Note that processing the example data
 with `cleangrowth()` will likely take a few minutes to complete.
 
 ```{r, eval = FALSE}
+library(data.table)
 library(dplyr)
+
+# Convert the `syngrowth` data frame to a `data.table`
 data <- as.data.table(syngrowth)
+
+# `setkey()` creates an efficient sorting key on the `data.table`; this is required
+# for `cleangrowth()`
 setkey(data, subjid, param, agedays)
+
+# Add a column `gcr_result` using `cleangrowth`
 cleaned_data <- data[, gcr_result := cleangrowth(subjid, param, agedays, sex, measurement)]
+
+# View a sample of the results
 head(cleaned_data)
       id                               subjid sex  agedays    param measurement                  gcr_result
 1: 83330 002986c5-354d-bb9d-c180-4ce26813ca28   1 20489.22 HEIGHTCM       151.1                     Include
@@ -41,6 +53,8 @@ head(cleaned_data)
 4: 83335 002986c5-354d-bb9d-c180-4ce26813ca28   1 21231.22 HEIGHTCM       151.1                     Include
 5: 83337 002986c5-354d-bb9d-c180-4ce26813ca28   1 21602.22 HEIGHTCM       151.1                     Include
 6: 83339 002986c5-354d-bb9d-c180-4ce26813ca28   1 21623.22 HEIGHTCM       151.1                     Include
+
+# Summarize results by result type
 cleaned_data %>% group_by(gcr_result) %>% tally(sort=TRUE)
 # A tibble: 26 x 2
    gcr_result                      n
@@ -62,9 +76,11 @@ If you are able to run these steps and see a similar result, you have the
 `growthcleanr` package installed correctly. The resulting `cleaned_data` can be
 reviewed, subsetted, and compared in more detail using all the tools R provides.
 
+## Basic configuration options
+
 For complete information about the options that can be set on the
-`cleangrowth()` function, see [Configuration](#configuration). Below are a
-few additional examples:
+`cleangrowth()` function, see [Configuration](#configuration). Below are a few
+additional examples:
 
 This example shows three configuration options in use:
 
@@ -91,8 +107,8 @@ cleaned_data <- data[,
 - `quietly = F` enables verbose output, marking the progress of the algorithm
   through its many processing steps. This can be very helpful while testing.
 
-This example shows built-in options for processing data in batches, which can
-speed the process while working with large data sets:
+This example shows built-in options for processing data in parallel batches,
+which can speed the process while working with large data sets:
 
 ```{r, eval = FALSE}
 cleaned_data <- data[,
@@ -105,12 +121,16 @@ cleaned_data <- data[,
 ]
 ```
 
+- `parallel` tells `cleangrowth()` to run in parallel; the default is `FALSE`
+
+- `num.batches` specifies how many batches to process in parallel
+
 The best `num.batches` value for your environment may vary depending on the
 computing resources you have available. If you do not specify `num.batches`,
 `growthcleanr` will estimate a batch count based on R functions for checking the
 system hardware. If you are working with large datasets, you may need to
-experiment with these options to determine the best settings for your needs.
-Note that there are additional notes on
+experiment with these options to determine the best settings for your needs. You
+may also find it helpful to review the additional notes on
 [Working with large datasets](large-data-sets.html).
 
 The default value of `log.path` is `"."`, the current working directory.
@@ -128,3 +148,28 @@ Warning messages:
 
 This set of warnings is coming from one of `growthcleanr`'s dependencies, and
 does not indicate either failure or improper execution.
+
+This final example demonstrates using two option specific to adult subjects,
+`adult_cutpoint` and `weight_cap`.
+
+```{r, eval = FALSE}
+cleaned_data <- data[,
+  gcr_result_both := cleangrowth(
+    subjid, param, agedays, sex, measurement,
+    adult_cutpoint = 18,
+    weight_cap = 181.4
+  )
+]
+```
+
+- `adult_cutpoint` defines a subject age in years at which to cut `growthcleanr`
+  analysis into separate sets for pediatric and adult subjects. The default is
+  20 years, and this may be lowered to 18, as shown above.
+
+- `weight_cap` specifies a known hard limit clamp for weight values. sometimes
+  data shared for research may have measurement values clamped to hard limits
+  for privacy protection. The growthcleanr adult algorithm can be configured to
+  watch for a known weight cap and adjust its assessment accordingly.
+
+The full algorithm for assessing adult measurements is described in detail in
+[Adult algorithm](adult-algorithm.html).

@@ -1,5 +1,5 @@
 ---
-title: "Configuration options"
+title: "Configuration"
 date: "`r Sys.Date()`"
 vignette: >
   %\VignetteIndexEntry{Configuration}

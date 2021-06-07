@@ -84,9 +84,6 @@
      
   </a>
 </li>
-<li>
-  <a href="../reference/index.html">Reference</a>
-</li>
 <li class="dropdown">
   <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
     Articles
@@ -94,38 +91,50 @@
     <span class="caret"></span>
   </a>
   <ul class="dropdown-menu" role="menu">
+    <li class="divider"></li>
+    <li class="dropdown-header">Getting started</li>
     <li>
-      <a href="../articles/configuration.html">Configuration options</a>
+      <a href="../articles/quickstart.html">Quickstart</a>
     </li>
     <li>
       <a href="../articles/installation.html">Installation</a>
     </li>
     <li>
-      <a href="../articles/introduction.html">Introduction to growthcleanr</a>
+      <a href="../articles/usage.html">Usage</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Advanced topics</li>
     <li>
-      <a href="../articles/large-data-sets.html">Working with large data sets</a>
+      <a href="../articles/configuration.html">Configuration</a>
     </li>
     <li>
       <a href="../articles/output.html">Understanding growthcleanr output</a>
     </li>
     <li>
-      <a href="../articles/quickstart.html">Quickstart</a>
-    </li>
-    <li>
-      <a href="../articles/usage.html">growthcleanr usage</a>
+      <a href="../articles/adult-algorithm.html">Adult algorithm</a>
     </li>
     <li>
       <a href="../articles/utilities.html">Utilities for computing pediatric BMI percentiles, Z-scores, and related tools</a>
     </li>
+    <li>
+      <a href="../articles/large-data-sets.html">Working with large data sets</a>
+    </li>
   </ul>
+</li>
+<li>
+  <a href="../reference/index.html">Reference</a>
 </li>
 <li>
   <a href="../news/index.html">Changelog</a>
 </li>
       </ul>
       <ul class="nav navbar-nav navbar-right">
-        
+        <li>
+  <a href="https://github.com/mitre/growthcleanr">
+    <span class="fab fa-github fa-lg"></span>
+     
+  </a>
+</li>
       </ul>
       
     </div><!--/.nav-collapse -->
@@ -140,7 +149,7 @@
   <div class="col-md-9 contents">
     <div class="page-header">
     <h1>Clean growth measurements</h1>
-    
+    <small class="dont-index">Source: <a href='https://github.com/mitre/growthcleanr/blob/main/R/growth.R'><code>R/growth.R</code></a></small>
     <div class="hidden name"><code>cleangrowth.Rd</code></div>
     </div>
 
@@ -371,7 +380,7 @@ for post-analysis. For more information on this output, please see README.</p></
                            measurement <span class='op'>=</span> <span class='va'>df_stats</span><span class='op'>$</span><span class='va'>measurement</span>,
                            parallel <span class='op'>=</span> <span class='cn'>TRUE</span>,
                            num.batches <span class='op'>=</span> <span class='fl'>2</span><span class='op'>)</span>
-</div><div class='output co'>#&gt; [2021-06-03 14:52:41] Writing batch logs to '.'...</div><div class='output co'>#&gt; <span class='warning'>Warning: &lt;anonymous&gt;: ... may be used in an incorrect context: ‘.fun(piece, ...)’</span></div><div class='output co'>#&gt; <span class='warning'>Warning: &lt;anonymous&gt;: ... may be used in an incorrect context: ‘.fun(piece, ...)’</span></div></pre>
+</div><div class='output co'>#&gt; [2021-06-07 14:24:41] Writing batch logs to '.'...</div><div class='output co'>#&gt; <span class='warning'>Warning: &lt;anonymous&gt;: ... may be used in an incorrect context: ‘.fun(piece, ...)’</span></div><div class='output co'>#&gt; <span class='warning'>Warning: &lt;anonymous&gt;: ... may be used in an incorrect context: ‘.fun(piece, ...)’</span></div></pre>
   </div>
   <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">
     <nav id="toc" data-toggle="toc" class="sticky-top">

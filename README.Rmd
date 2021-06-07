@@ -65,21 +65,32 @@ packages is required, as is a growth measurement dataset prepared for use in
 
 The rest of this documentation includes:
 
-- [Quickstart](articles/quickstart.html) - a brief tour of using growthcleanr, including data
-  preparation
+Getting started:
+
+- [Quickstart](articles/quickstart.html) - a brief tour of using growthcleanr,
+  including data preparation
 - [Installation](articles/installation.html) - including required dependencies and
   OS-specific notes
-- [Usage](articles/usage.html) - examples of cleaning data, multiple options, example data
+- [Usage](articles/usage.html) - examples of cleaning data, multiple options,
+  example data
+
+Advanced topics:
+
 - [Configuration options](articles/configuration.html) - changing growthcleanr operational
   settings
-- [Understanding output](articles/output.html) - the exclusion types growthcleanr identifies
-- [Working with large datasets](articles/large-data-sets.html) - notes and suggestions
-- [Computing BMI percentiles and Z-scores](articles/utilities.html) - additional functions for
-  determining percentiles and Z-scores using the CDC method
-- [Changes](news/index.html) - notes about algorithm or package changes
+- [Understanding growthclenar output](articles/output.html) - the exclusion
+  types growthcleanr identifies
+- [Adult algorithm](articles/adult-algorithm.html) - a detailed description of
+  how growthcleanr assesses observations from adult subjects
+- [Computing BMI percentiles and Z-scores](articles/utilities.html) - additional
+  functions for common data transforms and determining percentiles and Z-scores
+  using the CDC method
+- [Working with large datasets](articles/large-data-sets.html) - notes and
+  suggestions for running `growthcleanr` with large data sources
 
 ## Changes
 
-For a detailed history of released versions, see `NEWS.md`. Tagged releases, starting
-with 1.2.3 in January 2021, are listed [at
+For a detailed history of released versions, see the
+[Changelog](news/index.html) or`NEWS.md`. Tagged releases, starting with 1.2.3
+in January 2021, are listed [at
 GitHub](https://github.com/carriedaymont/growthcleanr/releases).

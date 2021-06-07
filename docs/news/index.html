@@ -83,9 +83,6 @@
      
   </a>
 </li>
-<li>
-  <a href="../reference/index.html">Reference</a>
-</li>
 <li class="dropdown">
   <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
     Articles
@@ -93,38 +90,50 @@
     <span class="caret"></span>
   </a>
   <ul class="dropdown-menu" role="menu">
+    <li class="divider"></li>
+    <li class="dropdown-header">Getting started</li>
     <li>
-      <a href="../articles/configuration.html">Configuration options</a>
+      <a href="../articles/quickstart.html">Quickstart</a>
     </li>
     <li>
       <a href="../articles/installation.html">Installation</a>
     </li>
     <li>
-      <a href="../articles/introduction.html">Introduction to growthcleanr</a>
+      <a href="../articles/usage.html">Usage</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Advanced topics</li>
     <li>
-      <a href="../articles/large-data-sets.html">Working with large data sets</a>
+      <a href="../articles/configuration.html">Configuration</a>
     </li>
     <li>
       <a href="../articles/output.html">Understanding growthcleanr output</a>
     </li>
     <li>
-      <a href="../articles/quickstart.html">Quickstart</a>
-    </li>
-    <li>
-      <a href="../articles/usage.html">growthcleanr usage</a>
+      <a href="../articles/adult-algorithm.html">Adult algorithm</a>
     </li>
     <li>
       <a href="../articles/utilities.html">Utilities for computing pediatric BMI percentiles, Z-scores, and related tools</a>
     </li>
+    <li>
+      <a href="../articles/large-data-sets.html">Working with large data sets</a>
+    </li>
   </ul>
+</li>
+<li>
+  <a href="../reference/index.html">Reference</a>
 </li>
 <li>
   <a href="../news/index.html">Changelog</a>
 </li>
       </ul>
       <ul class="nav navbar-nav navbar-right">
-        
+        <li>
+  <a href="https://github.com/mitre/growthcleanr">
+    <span class="fab fa-github fa-lg"></span>
+     
+  </a>
+</li>
       </ul>
       
     </div><!--/.nav-collapse -->
@@ -139,7 +148,7 @@
   <div class="col-md-9 contents">
     <div class="page-header">
       <h1 data-toc-skip>Changelog <small></small></h1>
-      
+      <small>Source: <a href='https://github.com/mitre/growthcleanr/blob/main/NEWS.md'><code>NEWS.md</code></a></small>
     </div>
 
     <div id="growthcleanr-125---2021-02-26" class="section level1">
@@ -151,7 +160,7 @@
 <ul>
 <li>Updated behavior of <code>sd.recenter</code> option to include new NHANES reference medians and explicit specification with “NHANES” or “derive” (<a href="https://github.com/mitre/growthcleanr/issues/9" class="uri">https://github.com/mitre/growthcleanr/issues/9</a>)</li>
 <li>Switched <code>README.md</code> to be generated from <code>README.Rmd</code> w/knitr (thanks
-@mcanouil) (#17)</li>
+@mcanouil) (<a href='https://github.com/mitre/growthcleanr/issues/17'>#17</a>)</li>
 <li>Switched to use <code><a href="https://rdrr.io/r/base/file.path.html">file.path()</a></code> more consistently in <code>R/growth.R</code>
 </li>
 </ul>
@@ -172,7 +181,7 @@
 <a href="#changed-1" class="anchor"></a>Changed</h2>
 <ul>
 <li>
-<p>Minor update to WHO HT velocity 3SD files to correct a small number of errors (#24). Affected files were:</p>
+<p>Minor update to WHO HT velocity 3SD files to correct a small number of errors (<a href='https://github.com/mitre/growthcleanr/issues/24'>#24</a>). Affected files were:</p>
 <ul>
 <li><code>inst/extdata/who_ht_maxvel_3sd.csv</code></li>
 <li><code>inst/extdata/who_ht_vel_3sd.csv</code></li>
@@ -199,7 +208,7 @@
 <a href="#changed-2" class="anchor"></a>Changed</h2>
 <ul>
 <li>Improved experimental carry forward adjustment handling of strings of CF values, output handling, and documentation; renamed “Missing” values</li>
-<li>Updated DESCRIPTION, imports, documentation to address testing issue (#12)</li>
+<li>Updated DESCRIPTION, imports, documentation to address testing issue (<a href='https://github.com/mitre/growthcleanr/issues/12'>#12</a>)</li>
 <li>Switched to R-native argparser library to support script options</li>
 <li>Switched to GitHub Actions for continuous integration / testing (thanks
 @mcanouil)</li>
