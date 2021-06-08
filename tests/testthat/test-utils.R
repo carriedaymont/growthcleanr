@@ -394,7 +394,8 @@ test_that("simple_bmi works as expected", {
   data("syngrowth")
 
   # Similar strategy as for longwide, create subset for speed
-  sub_syn <- syngrowth[syngrowth$subjid %in% unique(syngrowth$subjid)[101:200], ]
+  sub_syn <-
+    syngrowth[syngrowth$subjid %in% unique(syngrowth$subjid)[101:200],]
   sub_syn <- cbind(
     sub_syn,
     "cv" = cleangrowth(
@@ -406,13 +407,14 @@ test_that("simple_bmi works as expected", {
     )
   )
 
-  wide_syn <- longwide(sub_syn, gcr_result = "cv", include_all = TRUE)
+  wide_syn <-
+    longwide(sub_syn, gcr_result = "cv", include_all = TRUE)
   bmi_syn <- simple_bmi(wide_syn)
   expect_equal(TRUE, "wt" %in% names(bmi_syn))
   expect_equal(bmi_syn$bmi,
                bmi_syn$wt / ((bmi_syn$ht * .01) ^ 2))
 
   # Verify that invalid column names throw an error
-  expect_error(simple_bmi(wide_syn, ht="invalid_column"))
-  expect_error(simple_bmi(wide_syn, wt="invalid_wt_col", ht="invalid_ht_col"))
+  expect_error(simple_bmi(wide_syn, ht = "invalid_column"))
+  expect_error(simple_bmi(wide_syn, wt = "invalid_wt_col", ht = "invalid_ht_col"))
 })
