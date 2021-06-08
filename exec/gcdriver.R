@@ -50,6 +50,12 @@ parser <- add_argument(
   flag = TRUE,
   help = "Disable verbose output"
 )
+parser <- add_argument(
+  parser,
+  "--adult_split",
+  flag = Inf,
+  help = "Number of splits to run data on"
+)
 
 argv <- parse_args(parser)
 print(argv)
@@ -70,18 +76,69 @@ parallel <- argv$numbatches > 1
 num.batches <- argv$numbatches
 
 df_in <- fread(argv$infile)
-df_out <- df_in[, exclude :=
-  cleangrowth(
-    subjid,
-    param,
-    agedays,
-    sex,
-    measurement,
+df_in$id_order <- 1:nrow(df_in)
+
+# handle adult split arguments
+adult_split <- argv$adult_split
+
+# we'll process the adult data using a split, then do the work
+if (adult_split < Inf & length(unique(df_in$subjid)) < adult_split){
+  adult_split <- length(unique(df_in$subjid))
+}
+
+if (adult_split < Inf & adult_split > 1){
+  # will warn if they're not exact multiples
+  # split by subject
+  subj_split <- suppressWarnings(split(unique(df_in$subjid), 1:adult_split))
+  subj_split <- data.frame(
+    entry = rep(seq_along(subj_split),lengths(subj_split)),
+    subjid =unlist(subj_split)
+  )
+  # add batch to df_in
+  df_in <- merge(df_in, subj_split, by = "subjid")
+
+  # split based on subject id
+  split.list <- suppressWarnings(split(df_in, df_in$entry))
+} else {
+  # no need for copy, they can refer to the same thing
+  split.df <- df_in
+  adult_split <- 1 # for Inf, just converting for later
+}
+
+# do split based on number of adult splits
+df_out <- lapply(1:adult_split, function(x){
+  if (!argv$quietly){
+    cat(sprintf(
+      "[%s] Processing adult data split %g, using %d batch(es)...\n",
+      Sys.time(), x, num.batches))
+  }
+
+  if (adult_split > 1){
+    split.df <- split.list[[x]]
+  } # otherwise, split adult has already been created
+
+  split.df$exclude <- cleangrowth(
+    split.df$subjid,
+    split.df$param,
+    split.df$agedays,
+    split.df$sex,
+    split.df$measurement,
     sd.recenter = sdrecenter,
     weight_cap = argv$weightcap,
     log.path = log.path,
     num.batches = num.batches,
     parallel = parallel,
     quietly = argv$quietly
-  )]
+  )
+
+  return(split.df)
+})
+
+# put all the splits together
+df_out <- rbindlist(df_out)
+# get it in the original order
+df_out <- df_out[order(df_out$id_order),]
+# remove indexing variables
+df_out <- df_out[, -c("id_order", "entry")]
+
 fwrite(df_out, argv$outfile, row.names = FALSE)
