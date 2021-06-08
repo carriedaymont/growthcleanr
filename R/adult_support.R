@@ -306,8 +306,8 @@ redo_identify_rv <- function(w_subj_df){
 #' @noRd
 rem_hundreds <- function(inc_df, dewma, meas_col, hundreds, ptype = "weight"){
   # calculate difference between values -- ENDS ARE PROTECTED ON EITHER SIDE
-  inc_df$diff_prev <- c(NA, diff(unlist(inc_df[,..meas_col])))
-  inc_df$diff_next <- c(diff(unlist(inc_df[,..meas_col])), NA)
+  inc_df$diff_prev <- c(NA, diff(unlist(inc_df[, meas_col, with = FALSE])))
+  inc_df$diff_next <- c(diff(unlist(inc_df[, meas_col, with = FALSE])), NA)
 
   # state upper and lower limits (hundreds +/- 2)
   # modifier for height vs weight
@@ -731,9 +731,3 @@ remove_ewma_wt <- function(subj_df, ewma_cutoff_low = 60,
 
   return(criteria)
 }
-
-
-
-
-
-
