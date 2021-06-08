@@ -29,8 +29,7 @@ cleangrowth(
   quietly = T,
   adult_cutpoint = 20,
   weight_cap = Inf,
-  adult_columns_filename = "",
-  adult_split = Inf
+  adult_columns_filename = ""
 )
 }
 \arguments{
@@ -138,8 +137,6 @@ to Inf. Defaults to Inf.}
 \item{adult_columns_filename}{Name of file to save original adult data, with additional output columns to
 as CSV. Defaults to "", for which this data will not be saved. Useful
 for post-analysis. For more information on this output, please see README.}
-
-\item{adult_split}{Number of splits to run adult data on. Recommended for large datasets in conjunction with parallel and num.batches options. If no splits desired, set to Inf. Default Inf.}
 }
 \value{
 Vector of exclusion codes for each of the input measurements.
