@@ -357,7 +357,7 @@ rem_hundreds <- function(inc_df, dewma, meas_col, hundreds, ptype = "weight"){
   }
   # end criteria depends on the number of distinct values
   criteria <-
-    if ((ptype == "height" & length(unique(inc_df$meas_m)) > 2) &
+    if ((ptype == "height" & length(unique(inc_df$meas_m)) > 2) |
         (ptype == "weight" & length(inc_df$meas_m) > 2)){
       exc_hundred
     } else {
