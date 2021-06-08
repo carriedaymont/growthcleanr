@@ -1,29 +1,38 @@
-# adjustcarryforward
+---
+title: "Testing carried forward adjustments"
+date: "`r Sys.Date()`"
+vignette: >
+  %\VignetteIndexEntry{Testing carried forward adjustments}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\usepackage[utf8]{inputenc}
+---
 
 An experiment in re-assessing height measurements initially marked as
-`Exclude-Carried-Forward` based on growth velocity is included in the current version of
-this package.
+`Exclude-Carried-Forward` based on growth velocity is included in the current
+version of this package.
 
 Because of the complexity involved in this approach, this is implemented as an
-independent function with its own driver script for further study. Our hope is to revise
-this strategy, and, if feasible, incorporate it into the main `cleangrowth()` algorithm.
+independent function with its own driver script for further study. Our hope is
+to revise this strategy, and, if feasible, incorporate it into the main
+`cleangrowth()` algorithm.
 
 ## Running the experiment
 
-The primary function is called `adjustcarryforward()`, and is implemented in the file
-`R/adjustcarryforward.R`. It is separate from the main `R/growth.R` file as it is set up
-to be run separately, using the output from `cleangrowth()`. The `adjustcarryforward()`
-function is available in the main package namespace.
+The primary function is called `adjustcarryforward()`, and is implemented in the
+file `R/adjustcarryforward.R`. It is separate from the main `R/growth.R` file as
+it is set up to be run separately, using the output from `cleangrowth()`. The
+`adjustcarryforward()` function is available in the main package namespace.
 
-The primary tool from running this function is the script `exec/testadjustcf.R`. This
-will run the experimental function on an existing dataset (specified as a CSV file) and
-pass it a sweep of parameter values for testing the new strategy. This tool will
-produce a combined output file that includes the original result alongside the resulting
-re-inclusion determination for each measurement for each parameter value run.
+The primary tool from running this function is the script `exec/testadjustcf.R`.
+This will run the experimental function on an existing dataset (specified as a
+CSV file) and pass it a sweep of parameter values for testing the new strategy.
+This tool will produce a combined output file that includes the original result
+alongside the resulting re-inclusion determination for each measurement for each
+parameter value run.
 
-For example, if you have run `cleangrowth()` on the `syngrowth` synthetic data set
-provided with `growthcleanr` as described in the main `README.md` file, save it to a CSV
-file:
+For example, if you have run `cleangrowth()` on the `syngrowth` synthetic data
+set provided with `growthcleanr` as described in the main `README.md` file, save
+it to a CSV file:
 
 ```R
 > fwrite(cleaned_data, "cleaned.csv", row.names = F)
@@ -32,10 +41,11 @@ file:
 Note that the column names should be as described for `cleaned_data` the Example
 under Quickstart.
 
-First navigate to the growthcleanr package directory in the command line. Then execute
-the sweep script is executed from the command line on the cleaned data file for as
-follows (with the assumption that cleaned.csv is in your current directory; otherwise,
-make sure to specify the path relative to your current directory):
+First navigate to the growthcleanr package directory in the command line. Then
+execute the sweep script is executed from the command line on the cleaned data
+file for as follows (with the assumption that cleaned.csv is in your current
+directory; otherwise, make sure to specify the path relative to your current
+directory):
 
 ```bash
 % Rscript exec/testadjustcf.R cleaned.csv
@@ -97,18 +107,19 @@ option `--searchtype`:
 The default number of sweep steps is 9; this can be changed with the option
 `--gridlength`.
 
-For testing options of handling strings of multiple carried forward
-values, several options from 0 to 3 have been incorporated. 0 (no change) is the
-default option, and can be changed `--exclude_opt`. More information on each
-option can be found in the `adjustcarryforward()` documentation.
+For testing options of handling strings of multiple carried forward values,
+several options from 0 to 3 have been incorporated. 0 (no change) is the default
+option, and can be changed `--exclude_opt`. More information on each option can
+be found in the `adjustcarryforward()` documentation.
 
-In addition to multiple options for carried-forward strings, "answers" for a given
-dataset have been incorporated. When the `--add_answers` flag is set to `TRUE`
-(`TRUE` by default), a column called `acf_answers` will have, for each height value, "Definitely Exclude", "Definitely Include", or "Unknown" (if it does not fall in
-either category). Weight values are set as `NA`.
+In addition to multiple options for carried-forward strings, "answers" for a
+given dataset have been incorporated. When the `--add_answers` flag is set to
+`TRUE` (`TRUE` by default), a column called `acf_answers` will have, for each
+height value, "Definitely Exclude", "Definitely Include", or "Unknown" (if it
+does not fall in either category). Weight values are set as `NA`.
 
-For example, for a 9-step sweep with the default search type, `random`, the parameters
-passed to the function in each pass will be:
+For example, for a 9-step sweep with the default search type, `random`, the
+parameters passed to the function in each pass will be:
 
 ```R
 run	minfactor	maxfactor	banddiff	banddiff_plus	min_ht.exp_under	min_ht.exp_over	max_ht.exp_under	max_ht.exp_over
@@ -195,10 +206,11 @@ id     subjid    sex  agedays  param     measurement  gcr_result                
 1518   775155    0    889      WEIGHTKG  13.1         Include                     No Change  No Change  No Change  No Change  No Change
 ```
 
-The fifth row in the example above demonstrates the results of the experimental script;
-for runs 1 and 2, the result is not changes, but for runs 3-5, the measurement is
-adjusted for reinclusion. To demonstrate the range, the following is an extract of
-measurements only marked as carried forward exclusions by `cleangrowth()`:
+The fifth row in the example above demonstrates the results of the experimental
+script; for runs 1 and 2, the result is not changes, but for runs 3-5, the
+measurement is adjusted for reinclusion. To demonstrate the range, the following
+is an extract of measurements only marked as carried forward exclusions by
+`cleangrowth()`:
 
 ```R
 id     subjid     sex  agedays  param     measurement  gcr_result                   run-1      run-2      run-3      run-4      run-5
@@ -213,5 +225,5 @@ id     subjid     sex  agedays  param     measurement  gcr_result               
 30016  5792371    1    1071     WEIGHTKG  15.9         Exclude-Carried-Forward  No Change  No Change  No Change  No Change  No Change
 ```
 
-Some of these values are not adjusted at all; one is from run 1 on, a few are from run 2
-on, and one is from run 3 on.
+Some of these values are not adjusted at all; one is from run 1 on, a few are
+from run 2 on, and one is from run 3 on.

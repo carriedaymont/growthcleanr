@@ -83,6 +83,10 @@ The rest of this documentation includes:
     percentiles and Z-scores using the CDC method
 -   [Working with large datasets](articles/large-data-sets.html) - notes
     and suggestions for running `growthcleanr` with large data sources
+-   [Testing carried forward
+    adjustments](articles/adjust-carry-forward.html) - notes on an
+    experimental tool for refining how pediatric measurements are
+    assessed
 
 ## Changes
 

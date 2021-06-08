@@ -18,6 +18,7 @@ articles:
   - adult-algorithm
   - utilities
   - large-data-sets
+  - adjust-carry-forward
 
 reference:
 - title: "Cleaning height and weight observations"
