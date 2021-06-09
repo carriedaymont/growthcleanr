@@ -169,8 +169,11 @@ ext_bmiz <- function(data,
     system.file("extdata/CDCref_d.csv", package = "growthcleanr"),
     paste(ref.data.path, "CDCref_d.csv", sep = "")
   )
+  # Note: referring to underscore-leading column as `_AGEMOS1`, i.e. with
+  # backticks, results in a no visible binding warning, but vars can't start
+  # with an "_", so we can't assign NULL to "_AGEMOS1". Use get() instead.
   dref <-
-    fread(dref_path)["_AGEMOS1" > 23 & denom == 'age']
+    fread(dref_path)[get("_AGEMOS1") > 23 & denom == 'age']
   names(dref) <- tolower(names(dref))
   names(dref) <- gsub('^_', '', names(dref))
 
