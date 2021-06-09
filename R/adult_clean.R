@@ -755,8 +755,10 @@ cleanadult <- function(df, weight_cap = Inf){
               ""
             }
           # the rest are to be excluded
-          rem_ids <- h_subj_df$id[h_subj_df$age_days == dd &
-                                    h_subj_df$id != comp_id]
+          rem_ids <- c(rem_ids,
+                       h_subj_df$id[h_subj_df$age_days == dd &
+                                      h_subj_df$id != comp_id]
+          )
         }
         # update criteria
         criteria <- h_subj_df$id %in% rem_ids
@@ -1296,8 +1298,10 @@ cleanadult <- function(df, weight_cap = Inf){
               ""
             }
           # the rest are to be excluded
-          rem_ids <- w_subj_df$id[w_subj_df$age_days == dd &
-                                    w_subj_df$id != comp_id]
+          rem_ids <- c(rem_ids,
+                       w_subj_df$id[w_subj_df$age_days == dd &
+                                      w_subj_df$id != comp_id]
+          )
         }
         # update criteria
         criteria <- w_subj_df$id %in% rem_ids
