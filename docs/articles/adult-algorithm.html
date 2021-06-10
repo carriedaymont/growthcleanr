@@ -78,6 +78,9 @@
     <li>
       <a href="../articles/large-data-sets.html">Working with large data sets</a>
     </li>
+    <li>
+      <a href="../articles/adjust-carry-forward.html">Testing carried forward adjustments</a>
+    </li>
   </ul>
 </li>
 <li>
@@ -109,7 +112,7 @@
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Adult algorithm</h1>
             
-            <h4 class="date">2021-06-08</h4>
+            <h4 class="date">2021-06-10</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mitre/growthcleanr/blob/main/vignettes/adult-algorithm.Rmd"><code>vignettes/adult-algorithm.Rmd</code></a></small>
       <div class="hidden name"><code>adult-algorithm.Rmd</code></div>
@@ -258,7 +261,10 @@
 <h4 class="hasAnchor">
 <a href="#h-3w-temp-extraneous" class="anchor"></a>3H 3W, Temp extraneous</h4>
 <p>We identify where there is more than one WT or HT for the same subject, parameter, and day of age (designated same days). For each day with same days, we select the value closest to the median WT or HT for that subject (not including any same days) and set all other same days to “temp extraneous”. Then RVs are redone for WT. This will often be redone in future steps and will be designated as “temp extraneous is redone” – this includes redoing WT RVs.</p>
-<p>#### 4W, Weight cap: WT Weight-cap, Weight-cap-identical</p>
+</div>
+<div id="w-weight-cap-wt-weight-cap-weight-cap-identical" class="section level4">
+<h4 class="hasAnchor">
+<a href="#w-weight-cap-wt-weight-cap-weight-cap-identical" class="anchor"></a>4W, Weight cap: WT Weight-cap, Weight-cap-identical</h4>
 <p>Some hospitals, vendors, or other data providers may place caps on elements of the data. It seems that a cap on the upper limit of weight is most likely to affect this algorithm. If the user enters a parameter indicating that there is a weight cap in the provided dataset, this step will do three things. If no weight cap is entered, the algorithm will skip to step 5. A) If a subject has all WTs equal to the cap, it will exclude all WTs and all HTs for that subject with code weight-cap-identical. B) If a subject has at least 1 WT equal to the cap, and that WT (or WTs) is not in line with the subject’s other WTs, it will exclude the WT(s) equal to the cap with code weight-cap. C) If a subject has at least 1 WT equal to the cap that IS in line with the subject’s other WT, then there is the concern that the capped WT is inaccurate, and the subject’s true WT is higher. In this case the WT(s) equal to the cap is/are retained. Temp extraneous is redone.</p>
 </div>
 </div>

@@ -297,7 +297,7 @@ including any same days) and set all other same days to “temp extraneous”. T
 RVs are redone for WT. This will often be redone in future steps and will be
 designated as “temp extraneous is redone” – this includes redoing WT RVs.
 
- #### 4W, Weight cap: WT Weight-cap, Weight-cap-identical
+#### 4W, Weight cap: WT Weight-cap, Weight-cap-identical
 
 Some hospitals, vendors, or other data providers may place caps on elements of
 the data. It seems that a cap on the upper limit of weight is most likely to
