@@ -53,6 +53,7 @@ parser <- add_argument(
 parser <- add_argument(
   parser,
   "--adult_split",
+  type = "numeric",
   flag = Inf,
   help = "Number of splits to run data on"
 )
