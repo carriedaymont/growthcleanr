@@ -93,8 +93,10 @@ if (adult_split < Inf & adult_split > 1){
   subj_split <- suppressWarnings(split(unique(df_in$subjid), 1:adult_split))
   subj_split <- data.frame(
     entry = rep(seq_along(subj_split),lengths(subj_split)),
-    subjid =unlist(subj_split)
+    subjid = as.character(unlist(subj_split))
   )
+  df_in$subjid <- as.character(df_in$subjid)
+
   # add batch to df_in
   df_in <- merge(df_in, subj_split, by = "subjid")
 
