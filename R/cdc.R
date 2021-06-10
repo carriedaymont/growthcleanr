@@ -140,7 +140,7 @@ ext_bmiz <- function(data,
   mbmi <- mbmi1 <- mbmi2 <- mht1 <- mht2 <- mref <- mwt1 <- NULL
   mwt2 <- p95 <- s <- sbmi <- sbmi1 <- sbmi2 <- seq_ <- NULL
   sex <- sht1 <- sht2 <- sigma <- sref <- swt1 <- NULL
-  swt2 <- waz <- z1 <- NULL
+  swt2 <- waz <- z1 <- `_AGEMOS1` <- NULL
 
   setDT(data)
 
@@ -171,9 +171,9 @@ ext_bmiz <- function(data,
   )
   # Note: referring to underscore-leading column as `_AGEMOS1`, i.e. with
   # backticks, results in a no visible binding warning, but vars can't start
-  # with an "_", so we can't assign NULL to "_AGEMOS1". Use get() instead.
+  # with an "_", so we have to use backticks at assignment up above as well.
   dref <-
-    fread(dref_path)[get("_AGEMOS1") > 23 & denom == 'age']
+    fread(dref_path)[`_AGEMOS1` > 23 & denom == 'age']
   names(dref) <- tolower(names(dref))
   names(dref) <- gsub('^_', '', names(dref))
 
