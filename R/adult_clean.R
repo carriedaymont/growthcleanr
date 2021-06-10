@@ -1572,7 +1572,7 @@ cleanadult <- function(df, weight_cap = Inf){
       # compute errors -- without sde
       num_err <- sum(!grepl("Same-Day", h_subj_keep) & h_subj_keep != "Include")
       # compute include -- without sde
-      num_inc <- sum(!grepl("Same-Day", h_subj_keep) & h_subj_keep == "Include")
+      num_inc <- sum(!grepl("Same-Day", h_subj_keep))
 
       # if there are greater than 40% errors for a subject, fill everything
       # with errors
@@ -1599,7 +1599,7 @@ cleanadult <- function(df, weight_cap = Inf){
       # compute errors -- without sde
       num_err <- sum(!grepl("Same-Day", w_subj_keep) & w_subj_keep != "Include")
       # compute include -- without sde
-      num_inc <- sum(!grepl("Same-Day", w_subj_keep) & w_subj_keep == "Include")
+      num_inc <- sum(!grepl("Same-Day", w_subj_keep))
 
       # if there are greater than 40% errors for a subject, fill everything
       # with errors
