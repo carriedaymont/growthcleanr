@@ -140,6 +140,11 @@ df_out <- rbindlist(df_out)
 # get it in the original order
 df_out <- df_out[order(df_out$id_order),]
 # remove indexing variables
-df_out <- df_out[, -c("id_order", "entry")]
+idx_var <- if (adult_split == 1){
+  c("id_order")
+} else {
+  c("id_order", "entry")
+}
+df_out <- df_out[, -idx_var]
 
 fwrite(df_out, argv$outfile, row.names = FALSE)
