@@ -1,6 +1,30 @@
 # growthcleanr
 
+## [2.0.0] - 2021-06-11
+
+### Added
+
+- Support for cleaning adult (18-65) observations with `adult_cutpoint` and
+  `weightcap` options (https://github.com/mitre/growthcleanr/pull/17, others)
+- Added documentation describing adult algorithm, examples, and exclusions (#30)
+- Added tests support adult observations (#49)
+
+### Changed
+
+- Removed BMI calculation from `longwide()`, added `simple_bmi()` (#47)
+- Enhanced `gcdriver.R` to support adult options, parallel operation
+  (https://github.com/mitre/growthcleanr/pull/23)
+- Refreshed `syngrowth` synthetic test data, now includes adults (#50)
+- Reorganized documentation from README, now using
+  [pkgdown](https://pkgdown.r-lib.org/) (#30)
+- Improved code layout to pass `CHECK` cleanly
+
 ## [1.2.5] - 2021-02-26
+
+### Added
+
+- Added `inst/extdata/nhanes-reference-medians.csv`, reference medians for
+  recentering derived from NHANES (described in README)
 
 ### Changed
 
@@ -10,11 +34,6 @@
 - Switched `README.md` to be generated from `README.Rmd` w/knitr (thanks
   @mcanouil) (#17)
 - Switched to use `file.path()` more consistently in `R/growth.R`
-
-### Added
-
-- Added `inst/extdata/nhanes-reference-medians.csv`, reference medians for
-  recentering derived from NHANES (described in README)
 
 ## [1.2.4] - 2021-01-14
 
