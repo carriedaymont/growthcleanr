@@ -94,6 +94,7 @@ test_that("growthcleanr works without either adult or pediatric data", {
   # using default cutpoint -- 20
   only_peds <- syngrowth[syngrowth$agedays < 20*365.25,][1:50,]
   only_adult <- syngrowth[syngrowth$agedays >= 20*365.25,][1:50,]
+  nobody <- syngrowth[syngrowth$agedays > 120*365.25,]
 
   # testing cleangrowth works without adult data
   peds_res <- cleangrowth(
@@ -119,4 +120,15 @@ test_that("growthcleanr works without either adult or pediatric data", {
 
   expect_equal(length(adult_res), nrow(only_adult))
 
+  # testing cleangrowth works with no data
+  no_res <- cleangrowth(
+    nobody$subjid,
+    nobody$param,
+    nobody$agedays,
+    nobody$sex,
+    nobody$measurement,
+    quietly = T
+  )
+
+  expect_equal(length(no_res), nrow(nobody))
 })

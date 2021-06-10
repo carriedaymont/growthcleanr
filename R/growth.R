@@ -564,12 +564,12 @@ cleangrowth <- function(subjid,
 
   # adult: send to cleanadult to do most of the work ----
 
-  if (!quietly){
-    cat(sprintf("[%s] Begin processing adult data...\n", Sys.time()))
-  }
-
   # no need to do this if there's no data
   if (nrow(data.adult) > 0){
+    if (!quietly){
+      cat(sprintf("[%s] Begin processing adult data...\n", Sys.time()))
+    }
+
     # TODO: MAKE THIS BETTER -- FUNCTION OR SOMETHING
     # TODO: BATCH LOGS??
     # if parallel processing is desired, load additional modules
@@ -659,19 +659,23 @@ cleangrowth <- function(subjid,
   }
 
 
-  # join with pediatric data
-  full_out <- data.table(
-    line = c(ret.df$line, res$line),
-    exclude = c(as.character(ret.df$exclude), res$result),
-    mean_sde = c(rep(NA, nrow(ret.df)), res$mean_sde)
-  )
-  full_out[, exclude := factor(exclude, levels = unique(c(exclude.levels,
-                                                   unique(exclude))))]
-  full_out <- full_out[order(line),]
-  # remove column added for keeping track
-  full_out[, line := NULL]
+  if (any(nrow(data.all) > 0, nrow(data.adult) > 0)) {
+    # join with pediatric data
+    full_out <- data.table(
+      line = c(ret.df$line, res$line),
+      exclude = c(as.character(ret.df$exclude), res$result),
+      mean_sde = c(rep(NA, nrow(ret.df)), res$mean_sde)
+    )
+    full_out[, exclude := factor(exclude, levels = unique(c(exclude.levels,
+                                                    unique(exclude))))]
+    full_out <- full_out[order(line),]
+    # remove column added for keeping track
+    full_out[, line := NULL]
 
-  return(full_out$exclude)
+    return(full_out$exclude)
+  } else {
+    return(c())
+  }
 
 }
 
