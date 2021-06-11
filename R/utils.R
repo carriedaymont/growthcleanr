@@ -1,4 +1,4 @@
-#' splitinput
+#' Split input data into multiple files
 #'
 #' \code{splitinput} Splits input based on keepcol specified, yielding csv files each with at least the mininum
 #' number of rows that are written and saved separately (except for the last split file written, which may be
@@ -85,7 +85,7 @@ splitinput <-
   }
 
 
-#' recode_sex
+#' Recode binary sex variable for compatibility
 #'
 #' \code{recode_sex} recodes a binary sex variable for a given source column in a data frame or data table.
 #' Useful in transforming output from growthcleanr::cleangrowth() into a format suitable for growthcleanr::ext_bmiz().
@@ -134,7 +134,7 @@ recode_sex <- function(input_data,
 }
 
 
-#' longwide
+#' Transform data in growthcleanr format into wide structure for BMI calculation
 #'
 #' \code{longwide} transforms data from long to wide format. Ideal for transforming output from growthcleanr::cleangrowth() into a format suitable for growthcleanr::ext_bmiz().
 #'
@@ -279,7 +279,7 @@ longwide <-
   return(wide_df)
 }
 
-#' simple_bmi
+#' Compute BMI using standard formula
 #'
 #' \code{simple_bmi} Computes BMI using standard formula. Assumes input compatible with
 #' output from longwide().

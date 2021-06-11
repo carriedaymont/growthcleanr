@@ -2,7 +2,7 @@
 % Please edit documentation in R/cdc.R
 \name{ext_bmiz}
 \alias{ext_bmiz}
-\title{ext_bmiz}
+\title{Calculate extended BMI measures}
 \usage{
 ext_bmiz(
   data,

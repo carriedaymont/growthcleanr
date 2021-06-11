@@ -1,0 +1,119 @@
+---
+title: "Working with large data sets"
+date: "`r Sys.Date()`"
+vignette: >
+  %\VignetteIndexEntry{Large data sets}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\usepackage[utf8]{inputenc}
+---
+
+The nature of the `growthcleanr` algorithm is repetitive. It runs many checks
+over each individual subject's measurements, in a specific sequence, and revises
+its assessments as it goes. Because of this, it can take some time to process
+even a modest dataset. For reference, the `syngrowth` synthetic data example
+packaged with `growthcleanr` takes 2-3 minutes to process on a contemporary
+laptop. `growthcleanr` uses optimized libraries (e.g. `data.table`) to go as
+fast as possible, but there are limits given the repeated passes over data
+required. If you have under one million records, using `growthcleanr` may just
+necessitate planning to wait a little while the job processes.
+
+If you have a much larger dataset, there are several strategies to improve
+performance you might consider:
+
+- The built-in `parallel` option should take advantage of multiple CPU cores
+  when your hardware allows.
+- Running `growthcleanr` on a machine with more CPU cores and more RAM can
+  improve this further.
+- Verify that supporting libraries like `data.table` are
+  [installed properly](installation.html) for your machine
+- Anecdotally, Windows users have sometimes seen slower performance when
+  compared with similarly-appointed hardware running Linux or macOS.
+
+For very large datasets, on the order of millions of records or more, cleaning
+data can take several hours or more. When running this kind of job, the risk of
+failures due to external factors such as power outages increases. The current
+structure of `growthcleanr` does not checkpoint results as progress is made, so
+if a job has to run overnight and fails in the middle, a researcher would likely
+need to start over from scratch.
+
+Because `growthcleanr` operates for the most part on individual subjects one at
+a time, however, this issue might be mitigated by splitting the input data into
+many small files, then running `growthcleanr` separately on each file, with
+results re-combined at the end. The primary benefit of this strategy would be
+the saving of the results of each file as it completes, allowing a researcher
+whose job fails overnight to resume processing on only the as yet incomplete
+input files. A secondary benefit might be a slight improvement of use of
+available RAM.
+
+Adopting this approach might require some custom code, and there are few
+pitfalls to avoid. The following lays out a rough approach:
+
+- Extract `sd.median` values for the entire dataset as a whole using the
+  `sdmedian.filename` option. This is critical, as `growthcleanr` will generate
+  these values itself for an input dataset if they are not provided. If a large
+  dataset is split into 1,000 smaller files to be cleaned separately, each of
+  those 1,000 `growthcleanr` jobs needs to use the same `sd.median` values to
+  recenter or the results will be inconsistent. Pass this data in to
+  `cleangrowth()` using the parameter `sd.recenter`.
+- Split the data into many small files, but keep each individual subject's
+  measurements together in one file. If, for example, a subject has 12
+  measurements, all 12 should be in one and only one of the smaller files to
+  maximize the longitudinal analysis of their values. The `splitinput()`
+  function will perform this split safely, e.g.:
+
+```{r}
+library(growthcleanr)
+count <- splitinput(syngrowth, fname = "mydata", fdir = tempdir())
+count
+list.files(tempdir(), pattern = "mydata.*")
+```
+
+- Use the standalone driver script `exec/gcdriver.R` to execute growthcleanr`
+  on each separate file, then write out its results when complete. An example
+  is below.
+- Invoke the job using a tool like
+  [GNU Parallel](https://www.gnu.org/software/parallel/), which can be run on
+  all major platforms. An example invocation is below as well.
+- If a failure occurs, set aside both the completed inputs and their results.
+  Then re-run the job on only the remaining input data.
+- When complete, re-combine the data into one file or as otherwise appropriate.
+
+To invoke `gcdriver.R` on a single input file using `Rscript`:
+
+```{bash, eval = FALSE}
+% Rscript gcdriver.R --quietly --sdrecenter sdmedians.csv mydata.csv mydata-cleaned.csv
+```
+
+If you have many small files saved, for example, as `mydata.00001.csv`,
+`mydata.00002.csv`, etc., this driver can be invoked using `parallel`:
+
+```{bash, eval = FALSE}
+% ls mydata.?????.csv | parallel -j2 --eta \
+  "Rscript gcdriver.R --quietly --sdrecenter sdmedians.csv {} {}-clean"
+```
+
+This lists your input files, and passes the filename list to parallel to use in
+invoking the driver script, one file at a time, and to process as parallel jobs
+as resources are available. Each run of the job then saves the cleaned output
+with `-clean` appended to the input filename, and as each completes, the next
+file on the list will be started until all are complete. A few things to note:
+
+- The careful use of naming and wildcards when listing input files and naming
+  output files can save accidental re-running of data from output files
+- The `-j2` option specifies running two jobs at once; `-j0` would use as many
+  CPU cores as a machine has available. This might need to vary to match
+  specific hardware.
+- The `--eta` option will report on progress.
+- The `--quietly` option on the driver script will make it easier to monitor
+  progress with less verbose output coming from `growthcleanr`.
+- The `--sdrecenter` option on the driver script should be set to ensure each
+  individual file is recentered using the same set for the entire input.
+- If multiple cores are available, the job should proceed with speedup roughly
+  similar to what can be gained using the parallel batching feature built in to
+  `growthcleanr`, with the main difference being the saving of intermediate
+  output as each smaller file completes.
+
+If your data to be cleaned is very large, it might help to store it compressed,
+for example with `gzip` and its corresponding `.gz` filename extension.
+`growthcleanr` can read in `.gz` input, but you might need to install the
+`R.utils` package first. `R` will provide a message if this is required.

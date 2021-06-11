@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{longwide}
 \alias{longwide}
-\title{longwide}
+\title{Transform data in growthcleanr format into wide structure for BMI calculation}
 \usage{
 longwide(
   long_df,

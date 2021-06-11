@@ -33,7 +33,7 @@ set_cols_first <- function(DT, cols, intersection = TRUE)
   }
 }
 
-#' ext_bmiz
+#' Calculate extended BMI measures 
 #'
 #' \code{ext_bmiz} Calculates the sigma (scale parameter for the half-normal
 #' distribution), extended BMI percentile, extended BMIz, and the CDC LMS

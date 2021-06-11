@@ -1,0 +1,15 @@
+pandoc: 2.14.0.1
+pkgdown: 1.6.1
+pkgdown_sha: ~
+articles:
+  adjust-carry-forward: adjust-carry-forward.html
+  adult-algorithm: adult-algorithm.html
+  configuration: configuration.html
+  installation: installation.html
+  large-data-sets: large-data-sets.html
+  output: output.html
+  quickstart: quickstart.html
+  usage: usage.html
+  utilities: utilities.html
+last_built: 2021-06-10T22:18Z
+
