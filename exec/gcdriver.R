@@ -132,7 +132,7 @@ df_out <- lapply(1:adult_split, function(x){
   } # otherwise, split adult has already been created
 
   # Separate the logs or they'll overwrite each other
-  split.log.path <- sprintf("%s/split-%s", log.path, x)
+  split.log.path <- sprintf("%s/split-%03d", log.path, x)
 
   split.df$exclude <- cleangrowth(
     split.df$subjid,

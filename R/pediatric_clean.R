@@ -36,7 +36,7 @@ cleanbatch <- function(data.df,
   if (parallel & !is.na(log.path)) {
     sink(
       sprintf(
-        "%s/cleangrowth-%s-batch-%s.log",
+        "%s/cleangrowth-%s-batch-%03d.log",
         log.path,
         Sys.Date(),
         data.df$batch[1]
