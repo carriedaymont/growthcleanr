@@ -161,7 +161,7 @@
 </ul>
 </li>
 </ul>
-<p>If specifying a data set, columns must include param, sex, agedays, and sd.median (referred to elsewhere as “modified Z-score”), and those medians will be used for centering. This data set must include a row for every ageday present in the dataset to be cleaned; the NHANES reference medians include a row for every ageday in the range (731-7305 days). A summary of how the NHANES reference medians were derived is below under <a href="#nhanes">NHANES reference data</a>.</p>
+<p>If specifying a data set, columns must include param, sex, agedays, and sd.median (referred to elsewhere as “modified Z-score”), and those medians will be used for centering. This data set must include a row for every ageday present in the dataset to be cleaned; the NHANES reference medians include a row for every ageday in the range (731-7305 days). A summary of how the NHANES reference medians were derived is below under <a href="#nhanes-reference-medians-1">NHANES reference data</a>.</p>
 </li>
 <li><p><code>adult_cutpoint</code> - default <code>20</code>; number between 18 and 20, describing age limit in years above which the pediatric algorithm should not apply (&lt; adult_cutpoint), and the adult algorithm should apply (&gt;= adult_cutpoint). Numbers outside this range will be changed to the closest number within the range.</p></li>
 <li><p><code>weight_cap</code> - default <code>Inf</code>; weight_cap Positive number, describing a weight cap in kg (rounded to the nearest .1, +/- .1) within an adult dataset. This may be used when a dataset shared for research is known to clamp values for privacy reasons. If there is no weight cap, set to Inf (default). This option is not used with pediatric subjects.</p></li>

@@ -30,10 +30,6 @@
 #' # Specifying a different subject ID column
 #' colnames(df)[colnames(df) == "subjid"] <- "sub_id"
 #' splitinput(df, keepcol = "sub_id")
-#'
-#' # Clean up any lingering files during package builds
-#' split_files <- grepl("df.*.csv", list.files("."))
-#' file.remove(list.files("."), full.names = TRUE)[split_files]
 #' }
 splitinput <-
   function(df,

@@ -155,7 +155,7 @@ cleangrowth <- function(subjid,
                         adult_columns_filename = "") {
   # avoid "no visible binding" warnings
   N <- age_years <- batch <- exclude <- index <- line <- NULL
-  sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
+  newbatch <- sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
   v <- v_adult <- whoagegrp.ht <- whoagegrp_ht <- z.orig <- NULL
 
   # preprocessing ----
