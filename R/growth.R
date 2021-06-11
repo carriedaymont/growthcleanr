@@ -155,7 +155,7 @@ cleangrowth <- function(subjid,
                         adult_columns_filename = "") {
   # avoid "no visible binding" warnings
   N <- age_years <- batch <- exclude <- index <- line <- NULL
-  sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
+  newbatch <- sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
   v <- v_adult <- whoagegrp.ht <- whoagegrp_ht <- z.orig <- NULL
 
   # preprocessing ----
@@ -576,8 +576,7 @@ cleangrowth <- function(subjid,
 
   # no need to do this if there's no data
   if (nrow(data.adult) > 0){
-    # TODO: MAKE THIS BETTER -- FUNCTION OR SOMETHING
-    # TODO: BATCH LOGS??
+    # create cluster to use and reuse
     # if parallel processing is desired, load additional modules
     if (parallel) {
       if (is.na(num.batches)) {
@@ -601,45 +600,38 @@ cleangrowth <- function(subjid,
         num.batches <- 1
     }
 
+    # this is where we do most of the adult work
+    # is the randomness necessary here?
     subjid.unique <- data.adult[j = unique(subjid)]
     batches.adult <- data.table(
       subjid = subjid.unique,
-      batch = sample(num.batches, length(subjid.unique), replace = T)
+      newbatch = sample(num.batches, length(subjid.unique), replace = T)
     )
-    # this is not the most efficient way to do this
-    data.adult[, batch := 1]
-    if (num.batches > 1){
-      for (b in 1:num.batches){
-        data.adult[subjid %in% batches.adult[batch == b, subjid], batch := b]
-      }
-    }
+    data.adult <- merge(data.adult, batches.adult, by = "subjid")
+
     # add age in years
     data.adult[, age_years := agedays/365.25]
     # rename for ease of use
     data.adult[, measurement := v_adult]
     data.adult[, id := line]
 
-    if (!quietly)
-      cat(sprintf(
-        "[%s] Cleaning growth data in %d batch(es)...\n",
-        Sys.time(),
-        num.batches
-      ))
     if (num.batches == 1) {
       # do the cleaning
-      res <- cleanadult(copy(data.adult), weight_cap = weight_cap)
+      res <- cleanadult(data.adult, weight_cap = weight_cap)
     } else {
       res <- ddply(
         data.adult,
-        .(batch),
+        .(newbatch),
         cleanadult,
         .parallel = parallel,
         .paropts = list(.packages = "data.table"),
         weight_cap = weight_cap
       )
-      stopCluster(cl)
     }
 
+    if (parallel){
+      stopCluster(cl)
+    }
 
     if (adult_columns_filename != "") {
       write.csv(res, adult_columns_filename, row.names = F, na = "")

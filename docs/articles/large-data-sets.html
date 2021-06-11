@@ -124,16 +124,21 @@
 <p>The nature of the <code>growthcleanr</code> algorithm is repetitive. It runs many checks over each individual subject’s measurements, in a specific sequence, and revises its assessments as it goes. Because of this, it can take some time to process even a modest dataset. For reference, the <code>syngrowth</code> synthetic data example packaged with <code>growthcleanr</code> takes 2-3 minutes to process on a contemporary laptop. <code>growthcleanr</code> uses optimized libraries (e.g. <code>data.table</code>) to go as fast as possible, but there are limits given the repeated passes over data required. If you have under one million records, using <code>growthcleanr</code> may just necessitate planning to wait a little while the job processes.</p>
 <p>If you have a much larger dataset, there are several strategies to improve performance you might consider:</p>
 <ul>
-<li>The built-in <code>parallel</code> option should take advantage of multiple CPU cores when your hardware allows.</li>
+<li>The built-in <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> option <code>parallel</code> should take advantage of multiple CPU cores when your hardware allows.</li>
 <li>Running <code>growthcleanr</code> on a machine with more CPU cores and more RAM can improve this further.</li>
 <li>Verify that supporting libraries like <code>data.table</code> are <a href="installation.html">installed properly</a> for your machine</li>
+<li>If you are cleaning very large datasets with several million observations or more, you might consider the techniques for splitting input and processing in parallel jobs described below.</li>
+<li>If you are cleaning adult data, an in-memory data-splitting technique is implemented in the <code>gcdriver.R</code> script described below.</li>
 <li>Anecdotally, Windows users have sometimes seen slower performance when compared with similarly-appointed hardware running Linux or macOS.</li>
 </ul>
+<div id="splitting-input-datasets" class="section level2">
+<h2 class="hasAnchor">
+<a href="#splitting-input-datasets" class="anchor"></a>Splitting input datasets</h2>
 <p>For very large datasets, on the order of millions of records or more, cleaning data can take several hours or more. When running this kind of job, the risk of failures due to external factors such as power outages increases. The current structure of <code>growthcleanr</code> does not checkpoint results as progress is made, so if a job has to run overnight and fails in the middle, a researcher would likely need to start over from scratch.</p>
 <p>Because <code>growthcleanr</code> operates for the most part on individual subjects one at a time, however, this issue might be mitigated by splitting the input data into many small files, then running <code>growthcleanr</code> separately on each file, with results re-combined at the end. The primary benefit of this strategy would be the saving of the results of each file as it completes, allowing a researcher whose job fails overnight to resume processing on only the as yet incomplete input files. A secondary benefit might be a slight improvement of use of available RAM.</p>
 <p>Adopting this approach might require some custom code, and there are few pitfalls to avoid. The following lays out a rough approach:</p>
 <ul>
-<li>Extract <code>sd.median</code> values for the entire dataset as a whole using the <code>sdmedian.filename</code> option. This is critical, as <code>growthcleanr</code> will generate these values itself for an input dataset if they are not provided. If a large dataset is split into 1,000 smaller files to be cleaned separately, each of those 1,000 <code>growthcleanr</code> jobs needs to use the same <code>sd.median</code> values to recenter or the results will be inconsistent. Pass this data in to <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> using the parameter <code>sd.recenter</code>.</li>
+<li>For cleaning pediatric data, ensure that <code>growthcleanr</code> uses a consistent set of recentering means for each run. This can be achieved a few ways, the simplest of which is to specify the <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> option <code>sd.recenter</code> as <code>"NHANES"</code>, which will use a built-in reference set of recentering means <a href="configuration.html#nhanes-reference-medians-1">derived from NHANES</a>. Another option is to run <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> once on your entire dataset to extract <code>sd.median</code> values for the entire dataset as a whole using the <code>sdmedian.filename</code> option. This would then create a recentering means file you could specify using <code>sd.recenter</code> on each run on a subset of your data. Either way, addressing this concern is critical, as <code>growthcleanr</code> will may otherwise generate these values itself for a large input dataset if they are not otherwise specified. In other words, if a large dataset is split into 1,000 smaller files to be cleaned separately, each of those 1,000 <code>growthcleanr</code> jobs needs to use the same <code>sd.median</code> values to recenter or the results will be inconsistent.</li>
 <li>Split the data into many small files, but keep each individual subject’s measurements together in one file. If, for example, a subject has 12 measurements, all 12 should be in one and only one of the smaller files to maximize the longitudinal analysis of their values. The <code><a href="../reference/splitinput.html">splitinput()</a></code> function will perform this split safely, e.g.:</li>
 </ul>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
@@ -152,26 +157,70 @@
 <li>If a failure occurs, set aside both the completed inputs and their results. Then re-run the job on only the remaining input data.</li>
 <li>When complete, re-combine the data into one file or as otherwise appropriate.</li>
 </ul>
-<p>To invoke <code>gcdriver.R</code> on a single input file using <code>Rscript</code>:</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">%</span> Rscript gcdriver.R <span class="at">--quietly</span> <span class="at">--sdrecenter</span> sdmedians.csv mydata.csv mydata-cleaned.csv</span></code></pre></div>
+<p>To invoke <code>exec/gcdriver.R</code> on a single input file using <code>Rscript</code>:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> exec/gcdriver.R <span class="at">--quietly</span> <span class="at">--sdrecenter</span> nhanes mydata.csv mydata-cleaned.csv</span></code></pre></div>
 <p>If you have many small files saved, for example, as <code>mydata.00001.csv</code>, <code>mydata.00002.csv</code>, etc., this driver can be invoked using <code>parallel</code>:</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">%</span> ls mydata.<span class="pp">?????</span>.csv <span class="kw">|</span> <span class="ex">parallel</span> <span class="at">-j2</span> <span class="at">--eta</span> <span class="dt">\</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Rscript gcdriver.R --quietly --sdrecenter sdmedians.csv {} {}-clean"</span></span></code></pre></div>
-<p>This lists your input files, and passes the filename list to parallel to use in invoking the driver script, one file at a time, and to process as parallel jobs as resources are available. Each run of the job then saves the cleaned output with <code>-clean</code> appended to the input filename, and as each completes, the next file on the list will be started until all are complete. A few things to note:</p>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Rscript exec/gcdriver.R --quietly --sdrecenter nhanes {} {}-clean.csv"</span></span></code></pre></div>
+<p>This lists your input files, and passes the filename list to parallel to use in invoking the driver script, one file at a time, and to process as parallel jobs as resources are available. Each run of the job then saves the cleaned output with <code>-clean.csv</code> appended to the input filename, and as each completes, the next file on the list will be started until all are complete. A few things to note:</p>
 <ul>
 <li>The careful use of naming and wildcards when listing input files and naming output files can save accidental re-running of data from output files</li>
 <li>The <code>-j2</code> option specifies running two jobs at once; <code>-j0</code> would use as many CPU cores as a machine has available. This might need to vary to match specific hardware.</li>
 <li>The <code>--eta</code> option will report on progress.</li>
 <li>The <code>--quietly</code> option on the driver script will make it easier to monitor progress with less verbose output coming from <code>growthcleanr</code>.</li>
-<li>The <code>--sdrecenter</code> option on the driver script should be set to ensure each individual file is recentered using the same set for the entire input.</li>
+<li>The <code>--sdrecenter</code> option on the driver script should be set to ensure each individual file is recentered using the same set for the entire input. This example uses the built-in <a href="configuration.html#nhanes-reference-medians-1">NHANES reference set</a>; you could substitute your own.</li>
 <li>If multiple cores are available, the job should proceed with speedup roughly similar to what can be gained using the parallel batching feature built in to <code>growthcleanr</code>, with the main difference being the saving of intermediate output as each smaller file completes.</li>
 </ul>
 <p>If your data to be cleaned is very large, it might help to store it compressed, for example with <code>gzip</code> and its corresponding <code>.gz</code> filename extension. <code>growthcleanr</code> can read in <code>.gz</code> input, but you might need to install the <code>R.utils</code> package first. <code>R</code> will provide a message if this is required.</p>
+</div>
+<div id="batch-splitting-for-adult-data" class="section level2">
+<h2 class="hasAnchor">
+<a href="#batch-splitting-for-adult-data" class="anchor"></a>Batch splitting for adult data</h2>
+<p>The <a href="adult-algorithm.html">adult algorithm</a> is new as of release 2.0.0 and may require further optimization to improve speed performance. Testing discovered that performing an inline data split (as opposed to physically splitting the data into many small input sets and processing each separately, as described above) can gain substantial performance on a single machine with many cores available. Two options to the <code>exec/gcdriver.R</code> script take advantage of this performance improvement.</p>
+<p>The following example may be used on a large dataset of adult data.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> exec/gcdriver.R <span class="at">--numbatches</span> 4 <span class="at">--adult_split</span> 50 my-large-input.csv my-large-input-cleaned.csv</span></code></pre></div>
+<ul>
+<li>
+<code>--numbatches 4</code> may be a good starting point for testing on a desktop-class machine with four virtual cores.</li>
+<li>
+<code>--adult_split 50</code> will divide the input set into 50 smaller subsets, keeping all records for individual subjects together</li>
+</ul>
+<p>You may find that adjusting these numbers to take advantage of your available hardware can make a difference in overall run time.</p>
+</div>
+<div id="reference-for-gcdriver-r" class="section level2">
+<h2 class="hasAnchor">
+<a href="#reference-for-gcdriver-r" class="anchor"></a>Reference for <code>gcdriver.R</code>
+</h2>
+<p>All available options for <code>gcdriver.R</code> are described below.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> exec/gcdriver.R <span class="at">--help</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">usage:</span> gcdriver.R [--] [--help] [--quietly] [--opts OPTS] [--sdrecenter</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>       <span class="ex">SDRECENTER]</span> [--weightcap WEIGHTCAP] [--numbatches NUMBATCHES]</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>       <span class="ex">[--adult_split</span> ADULT_SPLIT] infile outfile</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="ex">CLI</span> driver for growthcleanr</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="ex">positional</span> arguments:</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  <span class="ex">infile</span>             input file</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  <span class="ex">outfile</span>            output file</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="ex">flags:</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>  <span class="ex">-h,</span> <span class="at">--help</span>         show this help message and exit</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  <span class="ex">-q,</span> <span class="at">--quietly</span>      Disable verbose output</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a><span class="ex">optional</span> arguments:</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  <span class="ex">-x,</span> <span class="at">--opts</span>         RDS file containing argument values</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>  <span class="ex">-s,</span> <span class="at">--sdrecenter</span>   sd.recenter data file [default: ]</span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>  <span class="ex">-w,</span> <span class="at">--weightcap</span>    weight cap [default: Inf]</span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>  <span class="ex">-n,</span> <span class="at">--numbatches</span>   Number of batches [default: 1]</span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>  <span class="ex">-a,</span> <span class="at">--adult_split</span>  Number of splits to run data on [default: Inf]</span></code></pre></div>
+</div>
   </div>
 
   <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">
 
-      </div>
+        <nav id="toc" data-toggle="toc"><h2 data-toc-skip>Contents</h2>
+    </nav>
+</div>
 
 </div>
 
