@@ -48,3 +48,5 @@ packrat/src/
 output
 .Rproj.user
 .Rprofile
+docs/reference/*.csv
+docs/reference/*.log

@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{recode_sex}
 \alias{recode_sex}
-\title{recode_sex}
+\title{Recode binary sex variable for compatibility}
 \usage{
 recode_sex(
   input_data,

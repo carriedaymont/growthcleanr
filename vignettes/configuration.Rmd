@@ -1,0 +1,199 @@
+---
+title: "Configuration"
+date: "`r Sys.Date()`"
+vignette: >
+  %\VignetteIndexEntry{Configuration}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\usepackage[utf8]{inputenc}
+---
+
+`growthcleanr` offers several options for configuration, with default values set
+to address common cases. You may wish to experiment with the settings to
+discover which work best for your research and your dataset.
+
+All of the following options may be set as additional parameters in the call to
+`cleangrowth()`.
+
+## Algorithm-related options
+
+The following options change the behavior of the growthcleanr algorithm.
+
+- `recover.unit.error` - default `FALSE`; when `FALSE`, measurements identified
+  as unit errors (e.g., apparent height values in inches instead of centimeters)
+  will be flagged but not corrected, when `TRUE` these values will be corrected
+  and included as valid measurements for cleaning.
+
+- `sd.extreme` - default `25`; a very extreme value check on modified
+  (recentered) Z-scores used as a first-pass elimination of clearly implausible
+  values, often due to misplaced decimals.
+
+- `z.extreme` - default `25`; similar usage as `sd.extreme`, for absolute
+  Z-scores.
+
+**NOTE**: many different steps in the `growthcleanr` algorithm use highly
+refined techniques to identify implausible values that require more subtlety to
+detect. These default values for `sd.extreme` and `z.extreme` are set very high
+by design to eliminate completely implausible values early in the process; these
+extreme values require none of `growthcleanr`'s additional, more subtle
+approaches to be identified as exclusions. If `sd.extreme` and `z.extreme` are
+configured to be lower values, measurements eliminated at the early step which
+checks against these extreme values will not be further considered using later
+techniques.
+
+- `include.carryforward` - default `FALSE`; if set to `TRUE`, `growthcleanr`
+  will skip algorithm step 9, which identifies carried forward measurements, and
+  will not flag these values for exclusion.
+
+- `ewma.exp` - default `-1.5`; the exponent used for weighting measurements when
+  calculating exponentially weighted moving average (EWMA). This exponent should
+  be negative to weight growth measurements closer to the measurement being
+  evaluated more strongly. Exponents that are further from zero (e.g., `-3`)
+  will increase the relative influence of measurements close in time to the
+  measurement being evaluated compared to using the default exponent.
+
+- `ref.data.path` - defaults to using CDC reference data from year 2000; supply
+  a file path to use alternate reference data. Note that when running from an
+  installed `growthcleanr` package (e.g. having called `library(growthcleanr)`),
+  this path does not need to be specified. Developers testing the source code
+  directly from the source directory will need to specify this as well.
+
+- `error.load.mincount` - default `2`; minimum count of exclusions on parameter
+  for one subject before considering excluding all measurements.
+
+- `error.load.threshold` - default `0.5`; threshold to exceed for percentage
+  of excluded measurement count relative to count of included other measurement
+  (e.g., if 3 of 5 WTs are excluded, and 5 corresponding HTs are included, this
+  exceeds the 0.5 threshold and the other two WTs will be excluded).
+
+- `lt3.exclude.mode` - default `default`; determines type of exclusion procedure
+  to use for 1 or 2 measurements of one type without matching same ageday
+  measurements for the other parameter. Options include:
+
+  - `default` - standard growthcleanr approach
+  - `flag.both` - in case of two measurements with at least one beyond
+    thresholds, flag both instead of one (as in default)
+
+- `sd.recenter` - default `NA`; specifies how to recenter medians. May be a data frame
+  or table w/median SD-scores per day of life by gender and parameter, or "`nhanes`"
+  or "`derive`" as a character vector.
+
+  - If `sd.recenter` is specified as a data set, use the data set
+  - If `sd.recenter` is specified as "`nhanes`", use NHANES reference medians
+  - If `sd.recenter` is specified as "`derive`", derive from input
+  - If `sd.recenter` is not specified or `NA`:
+    - If the input set has at least 5,000 observations, derive medians from input
+    - If the input set has fewer than 5,000 observations, use NHANES
+
+  If specifying a data set, columns must include param, sex, agedays, and sd.median
+  (referred to elsewhere as "modified Z-score"), and those medians will be used for
+  centering. This data set must include a row for every ageday present in the dataset
+  to be cleaned; the NHANES reference medians include a row for every ageday in the
+  range (731-7305 days). A summary of how the NHANES reference medians were derived is
+  below under [NHANES reference data](#nhanes).
+
+- `adult_cutpoint` - default `20`; number between 18 and 20, describing age
+  limit in years above which the pediatric algorithm should not apply (<
+  adult_cutpoint), and the adult algorithm should apply (>= adult_cutpoint).
+  Numbers outside this range will be changed to the closest number within the
+  range.
+
+- `weight_cap` - default `Inf`; weight_cap Positive number, describing a weight
+  cap in kg (rounded to the nearest .1, +/- .1) within an adult dataset. This
+  may be used when a dataset shared for research is known to clamp values for
+  privacy reasons. If there is no weight cap, set to Inf (default). This option
+  is not used with pediatric subjects.
+
+## Operational options
+
+The following options change the execution of the program overall, with no
+effect on the algorithm itself.
+
+- `parallel` - default `FALSE`; set to `TRUE` to run `growthcleanr` in parallel.
+  Running in parallel will split the input data into batches (while keeping all
+  records for each subject together) and process each batch on a different
+  processor/core to maximize throughput. Recommended for large datasets with more
+  than 100K rows.
+
+- `num.batches` - specifies the number of batches to run in parallel; only
+  applies if `parallel` is set to `TRUE`. Defaults to the number of workers
+  returned by the `getDoParWorkers()` function in the `foreach` package. Note
+  that processing in parallel may affect overall system performance.
+
+- `sdmedian.filename` - filename for optionally saving sd.median data calculated
+  on the input dataset to as CSV. Defaults to `""`, for which this data will not
+  be saved. Use for extracting medians for parallel processing scenarios other
+  than the built-in parallel option. See notes on [large data sets](#largedata)
+  for details.
+
+- `sdrecentered.filename` - filename to save re-centered data to as CSV.
+  Defaults to "", for which this data will not be saved. Useful for
+  post-processing and debugging.
+
+- `adult_columns_filename` - default `""`; Name of file to save original adult
+  data, with additional output columns to as CSV. Defaults to "", for which this
+  data will not be saved. Useful for post-analysis. For more information on this
+  output, please see README.
+
+- `quietly` - default `TRUE`; when `TRUE`, displays function messages and will
+  output log files when `parallel` is `TRUE`.
+
+- `log.path` - default `"."`; sets directory for batch log file output when
+  processing with `parallel = TRUE`. A new directory will be created if necessary.
+
+## NHANES reference medians
+
+`growthcleanr`
+[releases](https://github.com/carriedaymont/growthcleanr/releases) up to 1.2.4
+offered two options for recentering medians, either the default of deriving
+medians from the input set, or supplying an externally-defined set of medians.
+These left out an option for researchers working with either small datasets or
+with data which might otherwise not be representative of the population, as
+deriving medians from the input set in those cases might be problematic. To
+provide a standard default reference to address these latter cases, a set of
+medians were derived from the [National Health and Nutrition Examination
+Survey](https://wwwn.cdc.gov/nchs/nhanes/Default.aspx) (NHANES). A summary of
+that process is below. As of release 1.2.5, the default behavior is:
+
+- If `sd.recenter` is specified as a data set, use the data set
+- If `sd.recenter` is specified as `nhanes`, use NHANES
+- If `sd.recenter` is specified as `derive`, derive from input
+- If `sd.recenter` is not specified or `NA`:
+  - If the input set has at least 5,000 observations, derive medians from input
+  - If the input set has fewer than 5,000 observations, use NHANES
+
+With the verbose `cleangrowth()` option `quietly = FALSE`, the recentering
+medians approach used will be noted in the output. If the input set has fewer
+than 100 observations for any age-year, this will also be noted in the output.
+
+### Derivation process
+
+The NHANES reference medians are based primarily on data from NHANES 2009-2010
+through 2017-2018, including approximately 39,000 heights/lengths and weights
+from children and adolescents between the ages of 0 months and <240 months.
+Weight and height SD scores were calculated from the [L, M, and S
+parameters](https://www.cdc.gov/growthcharts/percentile_data_files.htm) for the
+[CDC growth
+charts](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm) were
+used as the reference to calculate weight and height SD scores for the NHANES
+2009-2010 through 2017-2018 samples. Based on the distributions of age-days in
+children at 0 months, an age adjustment was made based on the median number of
+days among these infants. This adjustment was made after consultation with the
+National Center for Health Statistics confirmed that a general assumption of
+ages occurring at the midpoint of the indicated integer month of age did not
+apply to children recorded as 0 months, and uses 0.75 months instead.
+
+Weights were supplemented with a random sample of birthweights from NCHS's
+[Vital Statistics Natality Birth
+Data](https://www.nber.org/research/data/vital-statistics-natality-birth-data)
+for 2018. These had sample weights assigned so that the sum of the sample
+weights for the sample equalled the sum of the sample weights for each month for
+infants in NHANES, as NHANES is a multi-stage complex survey. The reference data
+was then smoothed using the `svysmooth()` function in the R
+[`survey`](https://cran.r-project.org/web/packages/survey/index.html) package to
+estimate the weight and height SD scores for each day up to 7,305 days, with a
+bandwidth chosen to balance between over- and under-fitting, and interpolation
+between the estimates from this function was used to obtain an estimate for each
+day of age. Predictions from a regression model fit to smoothed height SDs
+between 23 and 365 days (the youngest child in NHANES had an estimated age in
+days of 23) were used to extend smoothed height SD scores to children between 1
+and 22 days of age.
