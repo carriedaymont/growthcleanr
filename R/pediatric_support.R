@@ -52,6 +52,10 @@ na_as_false <- function(v) {
 #' @keywords internal
 #' @noRd
 temporary_extraneous <- function(df) {
+  # avoid "no visible binding" warnings
+  agedays <- delta.median.sd <- extraneous <- extraneous.this.day <- NULL
+  index <- median.sd <- param <- subjid <- tbc.sd <- NULL
+
   # add subjid and param if needed (may be missing depending on where this is called from)
   if (is.null(df$subjid))
     df[, subjid := NA]
@@ -120,6 +124,9 @@ swap_parameters <- function(param.1 = 'WEIGHTKG',
                             param.2 = 'HEIGHTCM',
                             field.name = 'tbc.sd',
                             df) {
+  # avoid "no visible binding" warnings
+  agedays <- agedays.other <- param <- param.other <- subjid <- subjid.other <- swap <- NULL
+
   valid.rows <- valid(df)
   # copy swap field to a new value for convenience in the code below
   df$swap <- df[, field.name, with = F]

@@ -98,8 +98,9 @@ set_cols_first <- function(DT, cols, intersection = TRUE)
 #' @export
 #' @import data.table
 #' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
-#' @import magrittr
 #' @import labelled
+#' @import magrittr
+#' @importFrom stats approx pnorm qnorm
 #' @examples
 #' # Run on a small subset of given data
 #' df <- as.data.frame(syngrowth)
@@ -132,6 +133,15 @@ ext_bmiz <- function(data,
                      bmi = "bmi",
                      adjust.integer.age = T,
                      ref.data.path = "") {
+  # avoid "no visible binding" warnings
+  agemos <- agemos1 <- agemos2 <- agey <- NULL
+  bmip95 <- bp <- bz <- denom <- ebp <- ebz <- haz <- l <- NULL
+  lbmi1 <- lbmi2 <- lht1 <- lht2 <- lwt1 <- lwt2 <- m <- NULL
+  mbmi <- mbmi1 <- mbmi2 <- mht1 <- mht2 <- mref <- mwt1 <- NULL
+  mwt2 <- p95 <- s <- sbmi <- sbmi1 <- sbmi2 <- seq_ <- NULL
+  sex <- sht1 <- sht2 <- sigma <- sref <- swt1 <- NULL
+  swt2 <- waz <- z1 <- `_AGEMOS1` <- NULL
+
   setDT(data)
 
   setnames(data,
@@ -159,6 +169,9 @@ ext_bmiz <- function(data,
     system.file("extdata/CDCref_d.csv", package = "growthcleanr"),
     paste(ref.data.path, "CDCref_d.csv", sep = "")
   )
+  # Note: referring to underscore-leading column as `_AGEMOS1`, i.e. with
+  # backticks, results in a no visible binding warning, but vars can't start
+  # with an "_", so we have to use backticks at assignment up above as well.
   dref <-
     fread(dref_path)[`_AGEMOS1` > 23 & denom == 'age']
   names(dref) <- tolower(names(dref))
@@ -207,7 +220,8 @@ ext_bmiz <- function(data,
       .d <- dref[sex == i]
       fapp <- function(vars, ...)
         approx(.d$age, vars, xout = uages)$y
-      data.frame(sapply(.d[, ..v], fapp))
+      # Note: specifying v with "..v" gives no visible binding warning, use with option
+      data.frame(sapply(.d[, v, with = FALSE], fapp))
     }
     dref <- rbindlist(lapply(1:2, fapprox))
   }
@@ -304,7 +318,7 @@ ext_bmiz <- function(data,
     "sev_obese",
     "obese"
   )
-  dt <- dt[, ..v]
+  dt <- dt[, v, with = FALSE]
 
   setkey(dt, seq_)
   setkey(dorig, seq_)
