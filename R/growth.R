@@ -104,6 +104,7 @@
 #' @import foreach
 #' @import doParallel
 #' @import parallel
+#' @importFrom utils write.csv
 #' @examples
 #' # Run calculation using a small subset of given data
 #' df_stats <- as.data.frame(syngrowth)
@@ -152,6 +153,11 @@ cleangrowth <- function(subjid,
                         adult_cutpoint = 20,
                         weight_cap = Inf,
                         adult_columns_filename = "") {
+  # avoid "no visible binding" warnings
+  N <- age_years <- batch <- exclude <- index <- line <- NULL
+  sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
+  v <- v_adult <- whoagegrp.ht <- whoagegrp_ht <- z.orig <- NULL
+
   # preprocessing ----
 
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
@@ -675,6 +681,7 @@ cleangrowth <- function(subjid,
 #' @return Function for calculating BMI based on measurement, age in days, sex, and measurement value.
 #' @export
 #' @import data.table
+#' @importFrom utils read.csv read.table
 #' @examples
 #' # Return calculating function with all defaults
 #' afunc <- read_anthro()
@@ -683,6 +690,10 @@ cleangrowth <- function(subjid,
 #' afunc <- read_anthro(path = system.file("extdata", package = "growthcleanr"),
 #'                      cdc.only = TRUE)
 read_anthro <- function(path = "", cdc.only = F) {
+  # avoid "no visible bindings" warning
+  src <- param <- sex <- age <- ret <- m <- NULL
+  csdneg <- csdpos <- s <- NULL
+
   # set correct path based on input reference table path (if any)
   weianthro_path <- ifelse(
     path == "",
@@ -962,6 +973,10 @@ sd_median <- function(param, sex, agedays, sd.orig) {
   #     (stands for "to be cleaned") will be used for most of the rest of the analyses.
   # f.	In future steps I will sometimes refer to measprev and measnext which refer to the previous or next wt or ht measurement
   #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject, parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
+
+  # avoid "no visible binding" warnings
+  ageyears <- sd.median <- NULL
+
   dt <- data.table(param, sex, agedays, ageyears = floor(agedays / 365.25), sd.orig)
   setkey(dt, param, sex, agedays)
   # determine ages (in days) we need to cover from min to max age in years

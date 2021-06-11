@@ -18,8 +18,15 @@
 #'       or is implausible (designated with an error code).
 #'     mean_sde, mean of similar same day extraneous values
 #' @keywords internal
+#' @importFrom stats setNames
 #' @noRd
 cleanadult <- function(df, weight_cap = Inf){
+
+  # avoid "no visible binding" warnings
+  age_years <- embed <- i.all_exc_weight_cap <- i.gain_groups <- i.keep <- NULL
+  i.loss_groups <- i.mean_ht <- i.mean_sde <- i.orig_sde <- mean_sde <- NULL
+  median <- orig_sde <- param <- result <- NULL
+
   # method specific constants ----
   # this includes specified cutoffs, etc.
 

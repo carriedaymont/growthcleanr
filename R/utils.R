@@ -15,6 +15,7 @@
 #' @return the count number referring to the last split file written
 #'
 #' @export
+#' @importFrom utils tail
 #' @examples
 #' \donttest{
 #' # Run on given data
@@ -186,6 +187,10 @@ longwide <-
            gcr_result = "gcr_result",
            include_all = FALSE,
            inclusion_types = c("Include")) {
+  # avoid "no visible binding" warnings
+  sex_recoded <- agey <- agem <- HEIGHTCM <- WEIGHTKG <- NULL
+  wt <- wt_id <- ht <- ht_id <- NULL
+
   # selects each column with specified / default variable name
   long_df %>%
     select(id, subjid, sex, agedays,
@@ -324,6 +329,6 @@ simple_bmi <- function(wide_df, wtcol = "wt", htcol = "ht") {
   }
 
   # add bmi column
-  wide_df[, bmi := get(wtcol) / ((get(htcol) * 0.01) ^ 2)]
+  wide_df[, "bmi" := get(wtcol) / ((get(htcol) * 0.01) ^ 2)]
   return(wide_df)
 }
