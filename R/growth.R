@@ -583,7 +583,7 @@ cleangrowth <- function(subjid,
         "remove_biv_low", "identify_rv", "temp_sde", "redo_identify_rv",
         "rem_hundreds", "rem_unit_errors", "get_num_places", "switch_tens_ones",
         "rem_transpositions", "ht_allow", "ht_change_groups",
-        "ht_3d_growth_compare", "remove_ewma_wt"
+        "ht_3d_growth_compare", "remove_ewma_wt", "remove_mod_ewma_wt"
       )
 
       cl <- makeCluster(num.batches)

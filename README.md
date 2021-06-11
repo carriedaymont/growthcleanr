@@ -178,7 +178,7 @@ only_included_data <- cleaned_data[gcr_result == "Include"]
 If our Example dataset above were named `source_data`, examining
 `cleaned_data` would show:
 
-| subjid | param    | agedays | sex | measurement | gcr\_result             |
+| subjid | param    | agedays | sex | measurement | gcr_result              |
 |--------|----------|---------|-----|-------------|-------------------------|
 | 1      | HEIGHTCM | 2790    | 0   | 118.5       | Include                 |
 | 1      | HEIGHTCM | 3677    | 0   | 148.22      | Include                 |
@@ -401,19 +401,19 @@ al. paper](#cite). This dataset is automatically loaded with the
 
 ``` r
 dim(syngrowth)
-#> [1] 85728     6
+#> [1] 77721     6
 head(syngrowth)
-#>   id     subjid sex agedays    param measurement
-#> 1  1 1575544570   1    2177 HEIGHTCM      104.40
-#> 2  2 1575544570   1    2548 HEIGHTCM      117.70
-#> 3  3 1575544570   1    2548 HEIGHTCM      117.74
-#> 4  4 1575544570   1    2919 HEIGHTCM      117.70
-#> 5  5 1575544570   1    3290 HEIGHTCM      129.20
-#> 6  6 1575544570   1    3661 HEIGHTCM      133.90
+#>   id                               subjid    param agedays sex measurement
+#> 1  1 001aa16d-bf0e-a077-3b3d-5ab8b58545ad HEIGHTCM    1435   1       102.6
+#> 2  2 001aa16d-bf0e-a077-3b3d-5ab8b58545ad WEIGHTKG    1435   1        16.6
+#> 3  3 001aa16d-bf0e-a077-3b3d-5ab8b58545ad HEIGHTCM    1806   1       102.6
+#> 4  4 001aa16d-bf0e-a077-3b3d-5ab8b58545ad WEIGHTKG    1806   1        16.6
+#> 5  5 001aa16d-bf0e-a077-3b3d-5ab8b58545ad WEIGHTKG    1806   1        19.6
+#> 6  6 001aa16d-bf0e-a077-3b3d-5ab8b58545ad HEIGHTCM    2177   1       117.0
 ```
 
 It can be used as in the example above. Note that processing the example
-data with `cleangrowth()` will likely take a few minutes to complete.
+data with `cleangrowth()` will likely take several minutes to complete.
 
 ``` r
 library(dplyr)
@@ -422,27 +422,27 @@ setkey(data, subjid, param, agedays)
 cleaned_data <- data[, gcr_result := cleangrowth(subjid, param, agedays, sex, measurement)]
 head(cleaned_data)
       id                               subjid sex  agedays    param measurement                  gcr_result
-1: 83330 002986c5-354d-bb9d-c180-4ce26813ca28   1 20489.22 HEIGHTCM       151.1                     Include
-2: 83332 002986c5-354d-bb9d-c180-4ce26813ca28   1 20860.22 HEIGHTCM       151.1                     Include
-3: 83334 002986c5-354d-bb9d-c180-4ce26813ca28   1 20860.22 HEIGHTCM       150.6 Exclude-Same-Day-Extraneous
-4: 83335 002986c5-354d-bb9d-c180-4ce26813ca28   1 21231.22 HEIGHTCM       151.1                     Include
-5: 83337 002986c5-354d-bb9d-c180-4ce26813ca28   1 21602.22 HEIGHTCM       151.1                     Include
-6: 83339 002986c5-354d-bb9d-c180-4ce26813ca28   1 21623.22 HEIGHTCM       151.1                     Include
+1: 18692 000a15ea-cdfc-37ec-4067-484e17f2a6cd HEIGHTCM   17760   0       176.5                     Include
+2: 18694 000a15ea-cdfc-37ec-4067-484e17f2a6cd HEIGHTCM   18131   0       176.5                     Include
+3: 18696 000a15ea-cdfc-37ec-4067-484e17f2a6cd HEIGHTCM   18131   0       176.2 Exclude-Same-Day-Extraneous
+4: 18697 000a15ea-cdfc-37ec-4067-484e17f2a6cd HEIGHTCM   18502   0       176.5                     Include
+5: 18699 000a15ea-cdfc-37ec-4067-484e17f2a6cd HEIGHTCM   18873   0       176.5                     Include
+6: 18702 000a15ea-cdfc-37ec-4067-484e17f2a6cd HEIGHTCM   19244   0       176.5                     Include
 cleaned_data %>% group_by(gcr_result) %>% tally(sort=TRUE)
-# A tibble: 26 x 2
+# A tibble: 28 x 2
    gcr_result                      n
    <fct>                       <int>
- 1 Include                     61652
- 2 Exclude-Extraneous-Same-Day 11263
- 3 Exclude-Carried-Forward      7093
- 4 Exclude-Same-Day-Extraneous  4010
- 5 Exclude-Same-Day-Identical    623
- 6 Exclude-SD-Cutoff             175
- 7 Exclude-EWMA-8                139
- 8 Exclude-Distinct-3-Or-More    125
- 9 Exclude-BIV                   108
-10 Exclude-EWMA-Extreme           99
-# … with 16 more rows
+ 1 Include                     57784
+ 2 Exclude-Same-Day-Extraneous  8058
+ 3 Exclude-Extraneous-Same-Day  5346
+ 4 Exclude-Carried-Forward      4338
+ 5 Exclude-Same-Day-Identical   1223
+ 6 Exclude-BIV                   207
+ 7 Exclude-Distinct-3-Or-More    170
+ 8 Exclude-EWMA-8                118
+ 9 Exclude-SD-Cutoff             103
+10 Exclude-EWMA-Extreme           66
+# … with 18 more rows
 ```
 
 If you are able to run these steps and see a similar result, you have
@@ -619,17 +619,17 @@ later techniques.
 
 -   `adult_cutpoint` - default `20`; number between 18 and 20,
     describing ages when the pediatric algorithm should not be applied
-    (&lt; adult\_cutpoint), and the adult algorithm should apply (&gt;=
-    adult\_cutpoint). Numbers outside this range will be changed to the
+    (\< adult_cutpoint), and the adult algorithm should apply (>=
+    adult_cutpoint). Numbers outside this range will be changed to the
     closest number within the range.
 
--   `weight_cap` - default `Inf`; weight\_cap Positive number,
-    describing a weight cap in kg (rounded to the nearest .1, +/- .1)
-    within the adult dataset. If there is no weight cap, set to Inf.
+-   `weight_cap` - default `Inf`; weight_cap Positive number, describing
+    a weight cap in kg (rounded to the nearest .1, +/- .1) within the
+    adult dataset. If there is no weight cap, set to Inf.
 
 -   `adult_columns_filename` - default `""`; Name of file to save
     original adult data, with additional output columns to as CSV.
-    Defaults to "", for which this data will not be saved. Useful for
+    Defaults to ““, for which this data will not be saved. Useful for
     post-analysis. For more information on this output, please see
     README.
 
@@ -657,7 +657,7 @@ no effect on the algorithm itself.
     option. See notes on [large data sets](#largedata) for details.
 
 -   `sdrecentered.filename` - filename to save re-centered data to as
-    CSV. Defaults to "", for which this data will not be saved. Useful
+    CSV. Defaults to ““, for which this data will not be saved. Useful
     for post-processing and debugging.
 
 -   `quietly` - default `TRUE`; when `TRUE`, displays function messages
@@ -687,35 +687,35 @@ of the exclusion flag set by `growthcleanr`. The `notes` column at right
 identifies minor discrepancies between the algorithm’s step labels and
 labels used in comment text in `growthcleanr`.
 
-| algorithm step | algorithm exc id | exclusion type                           | notes                       |
-|----------------|------------------|------------------------------------------|-----------------------------|
-| 2d             | 0                | Include                                  | \-                          |
-| 2d             | 1                | Missing                                  | \-                          |
-| 5b             | 2                | Exclude-Temporary-Extraneous-Same-Day    | \-                          |
-| 7d             | \-               | Swapped-Measurement                      | \-                          |
-| 8f             | \-               | Unit-Error-High                          | \-                          |
-| 8f             | \-               | Unit-Error-Low                           | \-                          |
-| 8f             | \-               | Unit-Error-Possible                      | Not set in R code           |
-| 9c             | 3                | Exclude-Carried-Forward                  | \-                          |
-| 10c            | 4                | Exclude-SD-Cutoff                        | 10d, 10e                    |
-| 11d            | 5                | Exclude-EWMA-Extreme                     | 11e                         |
-| 11f.ii         | 6                | Exclude-EWMA-Extreme-Pair                | 11i (R only)                |
-| 12d.i          | 7                | Exclude-Extraneous-Same-Day              | 12diii, 12ei, 12f           |
-| 14f.i          | 8                | Exclude-EWMA-8                           | Set in 14h (in R)           |
-| 14f.ii         | 9                | Exclude-EWMA-9                           | Set in 14h (in R)           |
-| 14f.iii        | 10               | Exclude-EWMA-10                          | Set in 14h (in R)           |
-| 14f.iv         | 11               | Exclude-EWMA-11                          | Set in 14h (in R)           |
-| 14f.v          | 12               | Exclude-EWMA-12                          | Set in 14h (in R)           |
-| 14f.vi         | 13               | Exclude-EWMA-13                          | Set in 14h (in R)           |
-| 14f.vii        | 14               | Exclude-EWMA-14                          | Set in 14h (in R)           |
-| 15s            | 15               | Exclude-Min-Height-Change                | Set in 15q (in R), 15s, 15t |
-| 15s            | 16               | Exclude-Max-Height-Change                | Set in 15q (in R), 15s, 15t |
-| 16b            | 17               | Exclude-Pair-Delta-17                    | \-                          |
-| 16b            | 18               | Exclude-Pair-Delta-18                    | \-                          |
-| \-             | \-               | Exclude-Pair-Delta-19                    | Added `flag.both` mode      |
-| 16d            | 19               | Exclude-Single-Outlier                   | \-                          |
-| 17a            | 20               | Exclude-Too-Many-Errors                  | \-                          |
-| 17a            | 21               | Exclude-Too-Many-Errors-Other\_Parameter | \-                          |
+| algorithm step | algorithm exc id | exclusion type                          | notes                       |
+|----------------|------------------|-----------------------------------------|-----------------------------|
+| 2d             | 0                | Include                                 | \-                          |
+| 2d             | 1                | Missing                                 | \-                          |
+| 5b             | 2                | Exclude-Temporary-Extraneous-Same-Day   | \-                          |
+| 7d             | \-               | Swapped-Measurement                     | \-                          |
+| 8f             | \-               | Unit-Error-High                         | \-                          |
+| 8f             | \-               | Unit-Error-Low                          | \-                          |
+| 8f             | \-               | Unit-Error-Possible                     | Not set in R code           |
+| 9c             | 3                | Exclude-Carried-Forward                 | \-                          |
+| 10c            | 4                | Exclude-SD-Cutoff                       | 10d, 10e                    |
+| 11d            | 5                | Exclude-EWMA-Extreme                    | 11e                         |
+| 11f.ii         | 6                | Exclude-EWMA-Extreme-Pair               | 11i (R only)                |
+| 12d.i          | 7                | Exclude-Extraneous-Same-Day             | 12diii, 12ei, 12f           |
+| 14f.i          | 8                | Exclude-EWMA-8                          | Set in 14h (in R)           |
+| 14f.ii         | 9                | Exclude-EWMA-9                          | Set in 14h (in R)           |
+| 14f.iii        | 10               | Exclude-EWMA-10                         | Set in 14h (in R)           |
+| 14f.iv         | 11               | Exclude-EWMA-11                         | Set in 14h (in R)           |
+| 14f.v          | 12               | Exclude-EWMA-12                         | Set in 14h (in R)           |
+| 14f.vi         | 13               | Exclude-EWMA-13                         | Set in 14h (in R)           |
+| 14f.vii        | 14               | Exclude-EWMA-14                         | Set in 14h (in R)           |
+| 15s            | 15               | Exclude-Min-Height-Change               | Set in 15q (in R), 15s, 15t |
+| 15s            | 16               | Exclude-Max-Height-Change               | Set in 15q (in R), 15s, 15t |
+| 16b            | 17               | Exclude-Pair-Delta-17                   | \-                          |
+| 16b            | 18               | Exclude-Pair-Delta-18                   | \-                          |
+| \-             | \-               | Exclude-Pair-Delta-19                   | Added `flag.both` mode      |
+| 16d            | 19               | Exclude-Single-Outlier                  | \-                          |
+| 17a            | 20               | Exclude-Too-Many-Errors                 | \-                          |
+| 17a            | 21               | Exclude-Too-Many-Errors-Other_Parameter | \-                          |
 
 A researcher wanting to compare two datasets – for example, one
 including only measurements `growthcleanr` flags for inclusion, and a
@@ -823,11 +823,10 @@ pitfalls to avoid. The following lays out a rough approach:
 ``` r
 count <- splitinput(syngrowth, fname = "mydata", fdir = tempdir())
 count
-#> [1] 8
+#> [1] 7
 list.files(tempdir(), pattern = "mydata.*")
 #> [1] "mydata.00000.csv" "mydata.00001.csv" "mydata.00002.csv" "mydata.00003.csv"
 #> [5] "mydata.00004.csv" "mydata.00005.csv" "mydata.00006.csv" "mydata.00007.csv"
-#> [9] "mydata.00008.csv"
 ```
 
 -   Use the standalone driver script `exec/gcdriver.R` to execute
@@ -896,7 +895,7 @@ for the half-normal distribution, extended BMI percentile), extended
 BMIz, and the CDC LMS z-scores for weight, height, and BMI. Note that
 for BMIs ≤ 95th percentile of the CDC growth charts, the extended values
 for BMI are equal to the LMS values. The extended values differ only for
-children who have a BMI &gt; 95th percentile.
+children who have a BMI \> 95th percentile.
 
 The function assumes a variable ‘sex’ (coded as 1=boys / 2=girls) and
 variables for age in months, weight (kg), height (cm), and BMI
@@ -905,11 +904,11 @@ and use the most accurate information available (e.g., 23.4928 months.
 The extended BMIz is the inverse cumulative distribution function (CDF)
 of the extended BMI percentile. If the extended percentile is very close
 to 100, the `qnorm` function in R produces an infinite value. The occurs
-only if the extended BMI percentile is &gt; 99.99999999999999. This
-occurs infrequently, such as a 48-month-old with a BMI &gt; 39, and it
-is likely that these BMIs represent data entry errors. For these cases,
-extended BMIz is set to 8.21, a value that is slightly greater than the
-largest value that can be calculated.
+only if the extended BMI percentile is \> 99.99999999999999. This occurs
+infrequently, such as a 48-month-old with a BMI \> 39, and it is likely
+that these BMIs represent data entry errors. For these cases, extended
+BMIz is set to 8.21, a value that is slightly greater than the largest
+value that can be calculated.
 
 Because `ext_bmiz()` performs cross-sectional analysis of BMI,
 observation data must be in a wide format, i.e. with height and weight
@@ -1054,16 +1053,16 @@ head(cleaned_data_bmi)
 
 The output columns include:
 
-| variable                     | description                                                                                                                                                                       |
-|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| waz, wp                      | LMS Weight-for-sex/age z-score and percentile                                                                                                                                     |
-| haz, hp                      | LMS Height-for-sex/age z-score and percentile                                                                                                                                     |
-| bmiz, bmip                   | LMS BMI-for-sex/age z-score and percentile                                                                                                                                        |
-| mod\_waz, mod\_haz, mod\_bmi | Modified z-scores for identifying outliers (see the information in the [CDC SAS growth charts program website](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm)) |
-| bmip95                       | BMI expressed as a percentage of the 95th percentile. A value ≥ 120 is widely used as the cut point for severe obesity.                                                           |
-| sigma                        | Scale parameter of the half-normal distribution                                                                                                                                   |
-| ext\_bmip                    | Extended BMI percentile                                                                                                                                                           |
-| ext\_bmiz                    | Extended BMI z-score                                                                                                                                                              |
+| variable                  | description                                                                                                                                                                       |
+|---------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| waz, wp                   | LMS Weight-for-sex/age z-score and percentile                                                                                                                                     |
+| haz, hp                   | LMS Height-for-sex/age z-score and percentile                                                                                                                                     |
+| bmiz, bmip                | LMS BMI-for-sex/age z-score and percentile                                                                                                                                        |
+| mod_waz, mod_haz, mod_bmi | Modified z-scores for identifying outliers (see the information in the [CDC SAS growth charts program website](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm)) |
+| bmip95                    | BMI expressed as a percentage of the 95th percentile. A value ≥ 120 is widely used as the cut point for severe obesity.                                                           |
+| sigma                     | Scale parameter of the half-normal distribution                                                                                                                                   |
+| ext_bmip                  | Extended BMI percentile                                                                                                                                                           |
+| ext_bmiz                  | Extended BMI z-score                                                                                                                                                              |
 
 For convenience, these labels are available on the output of
 `ext_bmiz()`, e.g., when viewed in RStudio with
@@ -1149,7 +1148,7 @@ also be noted in the output.
 The NHANES reference medians are based primarily on data from NHANES
 2009-2010 through 2017-2018, including approximately 39,000
 heights/lengths and weights from children and adolescents between the
-ages of 0 months and &lt;240 months. Weight and height SD scores were
+ages of 0 months and \<240 months. Weight and height SD scores were
 calculated from the [L, M, and S
 parameters](https://www.cdc.gov/growthcharts/percentile_data_files.htm)
 for the [CDC growth
