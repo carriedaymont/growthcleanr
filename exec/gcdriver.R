@@ -54,7 +54,7 @@ parser <- add_argument(
   parser,
   "--adult_split",
   type = "numeric",
-  flag = Inf,
+  default = Inf,
   help = "Number of splits to run data on"
 )
 
@@ -91,17 +91,28 @@ if (adult_split < Inf & adult_split > 1){
   # will warn if they're not exact multiples
   # split by subject
   subj_split <- suppressWarnings(split(unique(df_in$subjid), 1:adult_split))
-  subj_split <- data.frame(
-    entry = rep(seq_along(subj_split),lengths(subj_split)),
-    subjid = as.character(unlist(subj_split))
-  )
+  # map indices to subjects
+  # subj_split <- data.frame(
+  #   entry = rep(seq_along(subj_split), length(subj_split)),
+  #   subjid = as.character(unlist(subj_split))
+  # )
+  subj_split_df <- data.frame()
+  for (spl in 1:length(subj_split)){
+    subj_split_df <- rbind(
+      subj_split_df,
+      data.frame(
+        "entry" = spl,
+        "subjid" = as.character(subj_split[[spl]])
+      ))
+  }
   df_in$subjid <- as.character(df_in$subjid)
 
   # add batch to df_in
-  df_in <- merge(df_in, subj_split, by = "subjid")
+  df_in <- merge(df_in, subj_split_df, by = "subjid")
 
   # split based on subject id
   split.list <- suppressWarnings(split(df_in, df_in$entry))
+
 } else {
   # no need for copy, they can refer to the same thing
   split.df <- df_in
@@ -120,6 +131,9 @@ df_out <- lapply(1:adult_split, function(x){
     split.df <- split.list[[x]]
   } # otherwise, split adult has already been created
 
+  # Separate the logs or they'll overwrite each other
+  split.log.path <- sprintf("%s/split-%s", log.path, x)
+
   split.df$exclude <- cleangrowth(
     split.df$subjid,
     split.df$param,
@@ -128,7 +142,7 @@ df_out <- lapply(1:adult_split, function(x){
     split.df$measurement,
     sd.recenter = sdrecenter,
     weight_cap = argv$weightcap,
-    log.path = log.path,
+    log.path = split.log.path,
     num.batches = num.batches,
     parallel = parallel,
     quietly = argv$quietly
@@ -147,6 +161,6 @@ idx_var <- if (adult_split == 1){
 } else {
   c("id_order", "entry")
 }
-df_out <- df_out[, -idx_var]
+df_out <- df_out[, !idx_var, with = FALSE]
 
 fwrite(df_out, argv$outfile, row.names = FALSE)
