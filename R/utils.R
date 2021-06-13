@@ -17,7 +17,7 @@
 #' @export
 #' @importFrom utils tail
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Run on given data
 #' df <- as.data.frame(syngrowth)
 #'
