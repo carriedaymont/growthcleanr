@@ -88,7 +88,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 1h, H BIV ----
     # 1h. remove biologically impossible height records
-    step <- "Exclude-BIV"
+    step <- "Exclude-Adult-BIV"
 
     if (nrow(h_subj_df) > 0){
       # overwrite measurement with metric (bivs are in metric)
@@ -116,7 +116,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 5h, H hundreds ----
     # 5h. when height goes down by 100 cm -- is it valid?
-    step <- "Exclude-Hundreds"
+    step <- "Exclude-Adult-Hundreds"
 
     inc_df <- if (nrow(h_subj_df) > 0){
       # we only want to consider subjects without temp extraneous
@@ -148,7 +148,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 6h, H unit errors ----
     # 6h. checking whether or not height should be a different type of value
-    step <- "Exclude-Unit-Errors"
+    step <- "Exclude-Adult-Unit-Errors"
 
     inc_df <- if (nrow(h_subj_df) > 0){
       # we only want to consider subjects without temp extraneous
@@ -175,7 +175,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 7h, H transpositions ----
     # 7h. checking whether or not 10s and 1s digit should be switched
-    step <- "Exclude-Transpositions"
+    step <- "Exclude-Adult-Transpositions"
 
     inc_df <- if (nrow(h_subj_df) > 0){
       # we only want to consider subjects without temp extraneous
@@ -234,7 +234,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # if there are no valid heights, skip
     if (nrow(w_subj_df) > 0){
-      step <- "Exclude-BIV"
+      step <- "Exclude-Adult-BIV"
 
       # overwrite measurement with metric (bivs are in metric)
       w_subj_df$measurement <- w_subj_df$meas_m
@@ -325,9 +325,9 @@ cleanadult <- function(df, weight_cap = Inf){
       impl_ids <- as.character(inc_df$id)[criteria]
 
       step <- if (all(is_wc)){
-        "Exclude-Weight-Cap-Identical"
+        "Exclude-Adult-Weight-Cap-Identical"
       } else {
-        "Exclude-Weight-Cap"
+        "Exclude-Adult-Weight-Cap"
       }
 
       # update and remove
@@ -346,7 +346,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 5w, W hundreds ----
     # 5w. when weight goes up/down by 100/200 kg/100-300 lbs -- is it valid?
-    step <- "Exclude-Hundreds"
+    step <- "Exclude-Adult-Hundreds"
 
     inc_df <- if (nrow(w_subj_df) > 0){
       # we only want to consider subjects without temp extraneous and rvs
@@ -403,7 +403,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 6w, W unit errors ----
     # 6w. if a record recorded as metric should be imperial for interior values
-    step <- "Exclude-Unit-Errors"
+    step <- "Exclude-Adult-Unit-Errors"
 
     inc_df <- if (nrow(w_subj_df) > 0){
       # we only want to consider subjects without temp extraneous and rvs
@@ -441,7 +441,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 7w, W transpositions ----
     # 7w. if a record should have swapped the 10s and 1s digits
-    step <- "Exclude-Transpositions"
+    step <- "Exclude-Adult-Transpositions"
 
     inc_df <- if (nrow(w_subj_df) > 0){
       # we only want to consider subjects without temp extraneous and rvs
@@ -479,7 +479,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # do step 8: swaps (both height and weight) ----
     # 8. checking whether heights and weights should have been swapped
-    step <- "Exclude-Swaps"
+    step <- "Exclude-Adult-Swapped-Measurement"
 
     if (nrow(h_subj_df) > 0 & nrow(w_subj_df) > 0){
       # we only want to consider subjects without temp extraneous
@@ -621,7 +621,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # don't do this if there aren't any non extraneous for the subject
     if (nrow(h_subj_df) > 0 & any(h_subj_df$extraneous)){
-      step <- "Exclude-Same-Day-Identical"
+      step <- "Exclude-Adult-Identical-Same-Day"
 
       # identify duplicate days
       dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
@@ -659,7 +659,7 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
       }
 
-      step <- "Exclude-Same-Day-Extraneous"
+      step <- "Exclude-Adult-Extraneous-Same-Day"
       # now the rest!
 
       # check if heights on duplicate days are trivially the same, keep both,
@@ -796,7 +796,7 @@ cleanadult <- function(df, weight_cap = Inf){
     # go through each type of exclusion
     if (num_distinct == 2){
       # 10ha, H distinct pairs ----
-      step <- "Exclude-Distinct-Pairs"
+      step <- "Exclude-Adult-Distinct-Pairs"
 
       # identify "height 1 and 2" and their corresponding ages
       ht_1 <- unique(h_subj_df$meas_m[order(h_subj_df$age_days)])[1]
@@ -870,7 +870,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     } else if (num_distinct >= 3){
       # 10ha, H distinct 3 or more ----
-      step <- "Exclude-Distinct-3-Or-More"
+      step <- "Exclude-Adult-Distinct-3-Or-More"
 
       h_subj_df <- h_subj_df[order(h_subj_df$age_years),]
       # create w2 (w/in 2) and o2  (outside 2) groups
@@ -1114,7 +1114,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 9w, W extreme EWMA ----
     # 9w. mark extreme values using EWMA method
-    step <- "Exclude-Extreme-EWMA"
+    step <- "Exclude-Adult-EWMA-Extreme"
 
     if (nrow(w_subj_df) > 0){
       # first, remove ewma without temp extraneous and repeated values
@@ -1180,7 +1180,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # don't do this if there aren't any non extraneous for the subject
     if (nrow(w_subj_df) > 0 & any(w_subj_df$extraneous)){
-      step <- "Exclude-Same-Day-Identical"
+      step <- "Exclude-Adult-Identical-Same-Day"
 
       # identify duplicate days
       dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
@@ -1218,7 +1218,7 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
       }
 
-      step <- "Exclude-Same-Day-Extraneous"
+      step <- "Exclude-Adult-Extraneous-Same-Day"
       # now the rest!
 
       # check if heights on duplicate days are trivially the same, keep both,
@@ -1348,7 +1348,7 @@ cleanadult <- function(df, weight_cap = Inf){
       # 11wa, W distinct ordered pairs ----
       # 11wa. Check pairs (2 distinct ordered values), where all first values are
       # of ages less than second values
-      step <- "Exclude-Distinct-Ordered-Pairs"
+      step <- "Exclude-Adult-Distinct-Ordered-Pairs"
 
       # use all RV
 
@@ -1404,7 +1404,7 @@ cleanadult <- function(df, weight_cap = Inf){
       # 11wb, W moderate EWMA ----
       # 11wb. Check all other types, using a more moderate EWMA cutoff and other
       # criteria
-      step <- "Exclude-Moderate-EWMA"
+      step <- "Exclude-Adult-EWMA-Moderate"
 
       # DO TWO STEPS: FIRST RVS, REMOVE, THEN DO ALL RVS
 
@@ -1440,7 +1440,7 @@ cleanadult <- function(df, weight_cap = Inf){
     # 12w, W weight cap influence ----
     # 12w. Check, if a weight cap is specified, if there are any remaining after
     # the preceding steps -- they may have some influence on remaining data.
-    step <- "Exclude-Possibly-Impacted-By-Weight-Cap"
+    step <- "Exclude-Adult-Possibly-Impacted-By-Weight-Cap"
 
     if (weight_cap < Inf & nrow(w_subj_df) > 0){
       # weight cap is evaluated with +/ .1 (for precision)
@@ -1466,7 +1466,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 13, distinct 1 ----
     # 13.  determine if single values in height/weight fall within BMI criteria
-    step <- "Exclude-Distinct-Single"
+    step <- "Exclude-Adult-Distinct-Single"
 
     # only do this if there's 1 distinct in either height or weight
     if (length(unique(h_subj_df$meas_m)) == 1 |
@@ -1572,7 +1572,7 @@ cleanadult <- function(df, weight_cap = Inf){
     # 14h, H error load ----
     # 14h. compute error load -- whether there are too many errors and all
     # should be excluded
-    step <- "Exclude-Error-Load"
+    step <- "Exclude-Adult-Too-Many-Errors"
 
     # no need to do this if everything is already excluded
     if (nrow(h_subj_df) > 0){
@@ -1599,7 +1599,7 @@ cleanadult <- function(df, weight_cap = Inf){
     # 14w, W error load ----
     # 14w. compute error load -- whether there are too many errors and all
     # should be excluded
-    step <- "Exclude-Error-Load"
+    step <- "Exclude-Adult-Too-Many-Errors"
 
     # no need to do this if everything is already excluded
     if (nrow(w_subj_df) > 0){
