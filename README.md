@@ -73,7 +73,7 @@ The rest of this documentation includes:
 
 -   [Configuration options](articles/configuration.html) - changing
     growthcleanr operational settings
--   [Understanding growthclenar output](articles/output.html) - the
+-   [Understanding growthcleanr output](articles/output.html) - the
     exclusion types growthcleanr identifies
 -   [Adult algorithm](articles/adult-algorithm.html) - a detailed
     description of how growthcleanr assesses observations from adult
