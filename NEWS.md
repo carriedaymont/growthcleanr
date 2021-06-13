@@ -1,5 +1,15 @@
 # growthcleanr
 
+## [1.2.6] - 2021-06-10
+
+### Changed
+
+- Corrected four duplicated age-rows in NHANES reference medians (#40)
+- Added missing non-newborn constraint in 14h.ii (thanks Lusha Cao)
+- Removed `Hmisc` dependency (#36)
+- Replaced `clean_value` result column name in docs with `gcr_result` for
+  clarity (#35)
+
 ## [1.2.5] - 2021-02-26
 
 ### Changed
