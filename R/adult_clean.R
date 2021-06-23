@@ -839,7 +839,7 @@ cleanadult <- function(df, weight_cap = Inf){
             min(ht_2_ageyears) > max(ht_1_ageyears)
         } else {
           # this is not a check to apply if they're outside the age range
-          pairhtgain <- T
+          pairhtgain <- F
         }
 
         # potential reallow: falls are <= 3 (+2) in or <= 5 (+2) for ageyears > 50
@@ -850,7 +850,7 @@ cleanadult <- function(df, weight_cap = Inf){
           min(ht_2_ageyears) > max(ht_1_ageyears)
 
         # exclude if there are no reallow for loss and gain
-        exc_pairs <- !(pairhtloss & pairhtgain)
+        exc_pairs <- !(pairhtloss | pairhtgain)
         if (exc_pairs){
           criteria <- rep(T, nrow(h_subj_df))
         }
