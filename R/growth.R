@@ -570,13 +570,12 @@ cleangrowth <- function(subjid,
 
   # adult: send to cleanadult to do most of the work ----
 
-  if (!quietly){
-    cat(sprintf("[%s] Begin processing adult data...\n", Sys.time()))
-  }
-
   # no need to do this if there's no data
   if (nrow(data.adult) > 0){
-    # create cluster to use and reuse
+    if (!quietly){
+      cat(sprintf("[%s] Begin processing adult data...\n", Sys.time()))
+    }
+
     # if parallel processing is desired, load additional modules
     if (parallel) {
       if (is.na(num.batches)) {
