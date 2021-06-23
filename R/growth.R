@@ -656,20 +656,23 @@ cleangrowth <- function(subjid,
     }
   }
 
+  if (any(nrow(data.all) > 0, nrow(data.adult) > 0)) {
+    # join with pediatric data
+    full_out <- data.table(
+      line = c(ret.df$line, res$line),
+      exclude = c(as.character(ret.df$exclude), res$result),
+      mean_sde = c(rep(NA, nrow(ret.df)), res$mean_sde)
+    )
+    full_out[, exclude := factor(exclude, levels = unique(c(exclude.levels,
+                                                            unique(exclude))))]
+    full_out <- full_out[order(line),]
+    # remove column added for keeping track
+    full_out[, line := NULL]
 
-  # join with pediatric data
-  full_out <- data.table(
-    line = c(ret.df$line, res$line),
-    exclude = c(as.character(ret.df$exclude), res$result),
-    mean_sde = c(rep(NA, nrow(ret.df)), res$mean_sde)
-  )
-  full_out[, exclude := factor(exclude, levels = unique(c(exclude.levels,
-                                                   unique(exclude))))]
-  full_out <- full_out[order(line),]
-  # remove column added for keeping track
-  full_out[, line := NULL]
-
-  return(full_out$exclude)
+    return(full_out$exclude)
+  } else {
+    return(c())
+  }
 
 }
 
