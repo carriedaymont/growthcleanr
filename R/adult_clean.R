@@ -940,14 +940,14 @@ cleanadult <- function(df, weight_cap = Inf){
         # g3: first height outside g2 + 2 inches
         # ^ if any heights out, we want to go with what we had originally
 
-        gtotal_loss <- ht_change_groups(h_subj_df, 3)
+        gtotal_loss <- ht_change_groups(h_subj_df, 3, type = "loss")
         glist <- glist_loss <- gtotal_loss$meas # groups with measurements
         galist <- gtotal_loss$age # groups with ages, in years
 
         # if there are any outside these groups, we don't attempt to fix
         # we need all of them to be in some group
         # if (all(Reduce("|", glist))){
-        if (length(glist) <= 3){
+        if (length(glist) > 0 & length(glist) <= 3){
           # create a mean ht and a min age for each group
           mean_ht <- sapply(glist, function(g){
             suppressWarnings(mean(g))
@@ -1010,13 +1010,13 @@ cleanadult <- function(df, weight_cap = Inf){
         # g2: first height outside g1 + 2 inches ....
         # ^ if any heights out, we want to go with what we had originally
 
-        gtotal_gain <- ht_change_groups(h_subj_df, 6)
+        gtotal_gain <- ht_change_groups(h_subj_df, 6, type = "gain")
         glist <- glist_gain <- gtotal_gain$meas # groups with measurements
         galist <- gtotal_gain$age # groups with ages
 
         # if there are any outside these groups, we don't attempt to fix
         # we need all of them to be in some group
-        if (length(glist) <= 6){
+        if (length(glist) > 0 & length(glist) <= 6){
           # create a mean ht and a min age for each group
           mean_ht <- sapply(glist, function(g){
             suppressWarnings(mean(g))
