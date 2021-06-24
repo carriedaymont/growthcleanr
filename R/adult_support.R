@@ -565,9 +565,10 @@ ht_allow <- function(velocity, ageyears1, ageyears2){
 }
 
 #' function to generate height growth/loss groups
+#' returns either empty lists or too long lists if it fails
 #' @keywords internal
 #' @noRd
-ht_change_groups <- function(h_subj_df, cutoff){
+ht_change_groups <- function(h_subj_df, cutoff, type = "loss"){
   # already ordered by age
   glist <- galist <- list()
   # keep track of some current group variables
@@ -579,6 +580,10 @@ ht_change_groups <- function(h_subj_df, cutoff){
 
     # find range of group with current measurement added
     crng <- max(c(glist[[cg]], cm)) - min(c(glist[[cg]], cm))
+
+    # store temporary difference between current and minimum/maximum
+    temp_mindiff <- min(glist[[cg]]) - cm
+    temp_maxdiff <- max(glist[[cg]]) - cm
 
     # if the range is below 2 inches with the added value, add and move on
     # we're also going to set the names on the measurements as ids for ease later
@@ -597,6 +602,19 @@ ht_change_groups <- function(h_subj_df, cutoff){
     # this test
     if (cg > cutoff){
       break
+    }
+
+    # if you're going the wrong direction, you're out
+    if (type == "loss"){
+      if (temp_mindiff < -(5.08 + .001)){
+        glist <- galist <- list()
+        break
+      }
+    } else { # type is gain
+      if (temp_maxdiff > (5.08 + .001)){
+        glist <- galist <- list()
+        break
+      }
     }
   }
 
@@ -642,9 +660,8 @@ ht_3d_growth_compare <- function(mean_ht, min_age, glist,
       }
 
     origexc <- origexc |
-      (((mh2 - mh1) < 0 |
-      (mh2 - mh1) > hta) &
-        ageyears1 < 25)
+      ((mh2 - mh1) < 0 |
+      (mh2 - mh1) > hta)
   }
 
   return(origexc)
