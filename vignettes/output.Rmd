@@ -53,7 +53,7 @@ between the algorithm's step labels and labels used in comment text in
 | -              | -                | Exclude-Pair-Delta-19                   | Added `flag.both` mode      |
 | 16d            | 19               | Exclude-Single-Outlier                  | -                           |
 | 17a            | 20               | Exclude-Too-Many-Errors                 | -                           |
-| 17a            | 21               | Exclude-Too-Many-Errors-Other_Parameter | -                           |
+| 17a            | 21               | Exclude-Too-Many-Errors-Other-Parameter | -                           |
 
 A researcher wanting to compare two datasets -- for example, one including only
 measurements `growthcleanr` flags for inclusion, and a second which also
@@ -88,7 +88,7 @@ narrative describing the algorithm is available at
 | 10hb              | H distinct 3+              | Exclude-Adult-Distinct-3-Or-More              | -                                                                               |
 | 11h               | H mean heights             | -                                             | Nothing excluded in this step                                                   |
 | 13                | distinct 1                 | Exclude-Adult-Distinct-Single                 | -                                                                               |
-| 14h               | H error load               | Exclude-Adult-Error-Load                      | -                                                                               |
+| 14h               | H error load               | Exclude-Adult-Too-Many-Errors                 | -                                                                               |
 | 1w                | W BIV                      | Exclude-Adult-BIV                             | -                                                                               |
 | 2w                | W repeated values          | -                                             | Nothing excluded in this step                                                   |
 | 3w                | W temp extraneous          | -                                             | Nothing excluded in this step                                                   |

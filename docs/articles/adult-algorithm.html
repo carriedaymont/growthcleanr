@@ -107,12 +107,12 @@
 
       
 
-      </header><script src="adult-algorithm_files/header-attrs-2.8/header-attrs.js"></script><div class="row">
+      </header><script src="adult-algorithm_files/header-attrs-2.9/header-attrs.js"></script><div class="row">
   <div class="col-md-9 contents">
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Adult algorithm</h1>
             
-            <h4 class="date">2021-06-11</h4>
+            <h4 class="date">2021-06-25</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mitre/growthcleanr/blob/main/vignettes/adult-algorithm.Rmd"><code>vignettes/adult-algorithm.Rmd</code></a></small>
       <div class="hidden name"><code>adult-algorithm.Rmd</code></div>
@@ -354,9 +354,9 @@
 <a href="#distinct-1-distinct-single" class="anchor"></a>13, Distinct 1: Distinct-single</h4>
 <p>In this step subjects with only one remaining distinct value for WT or HT, or both, are evaluated. BMI is calculated where possible to assist in providing evidence about whether a WT or HT is plausible or not. If a subject has at least one day on which a BMI can be calculated, and at least one BMI is between 16 and 60 (inclusive), then the following limits apply to parameters with only one distinct value: exclude HT&lt;88, HT&gt;231, WT&lt;30, WT&gt;273. If there is at least one BMI and no BMIs are between 16 and 60, then any HT or WT for which there is only one distinct value is excluded. For example, if the only BMIs are ~117, and the HTs are 68, 68, 68 and the WTs are 54, 53, 52, then the HTs would be excluded, and the WTs remain included. But if the only BMIs are ~117 and the HTs are 68, 68, 68 and the WTs are 54, 54, 54, then all HTs and all WTs are excluded. After these two steps, BMIs are recalculated and subjects with one distinct value are reidentified because the initial steps may have changed these results. Then, for subjects with no remaining BMI the following limits apply to parameters with only one distinct value: exclude HT&lt;139, HT&gt;206, WT&lt;40, WT&gt;225. It is very reasonable to consider adjusting these limits for specific projects, depending on your population(s) of interest.</p>
 </div>
-<div id="h-14w-error-load-error-load" class="section level4">
+<div id="h-14w-error-load-too-many-errors" class="section level4">
 <h4 class="hasAnchor">
-<a href="#h-14w-error-load-error-load" class="anchor"></a>14H, 14W, Error load: Error-load</h4>
+<a href="#h-14w-error-load-too-many-errors" class="anchor"></a>14H, 14W, Error load: Too-Many-Errors</h4>
 <p>In this step, subjects with a large proportion of HT or WT values for a parameter excluded are identified, and all HT or WT values for that subject are excluded, because a very high number of errors makes it difficult to make reliable decisions for all values for that subject. The error ratio is calculated as Errors/Total. Errors are everything that is not included, missing, or a same day extraneous or an included value. The total is everything that is not missing or a same day extraneous. If the error ratio is &gt;0.4 all values for that parameter for that subject are excluded.</p>
 </div>
 </div>
