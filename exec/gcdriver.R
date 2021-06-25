@@ -31,6 +31,13 @@ parser <- add_argument(
 )
 parser <- add_argument(
   parser,
+  "--adult_cutpoint",
+  type = "numeric",
+  default = 20,
+  help = "adult cutpoint"
+)
+parser <- add_argument(
+  parser,
   "--weightcap",
   type = "numeric",
   default = Inf,
@@ -141,6 +148,7 @@ df_out <- lapply(1:adult_split, function(x){
     split.df$sex,
     split.df$measurement,
     sd.recenter = sdrecenter,
+    adult_cutpoint = argv$adult_cutpoint,
     weight_cap = argv$weightcap,
     log.path = split.log.path,
     num.batches = num.batches,
