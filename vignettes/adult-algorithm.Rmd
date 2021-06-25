@@ -564,7 +564,7 @@ only one distinct value: exclude HT\<139, HT>206, WT\<40, WT>225. It is very
 reasonable to consider adjusting these limits for specific projects, depending
 on your population(s) of interest.
 
-#### 14H, 14W, Error load: Error-load
+#### 14H, 14W, Error load: Too-Many-Errors
 
 In this step, subjects with a large proportion of HT or WT values for a
 parameter excluded are identified, and all HT or WT values for that subject are

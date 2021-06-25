@@ -107,12 +107,12 @@
 
       
 
-      </header><script src="usage_files/header-attrs-2.8/header-attrs.js"></script><div class="row">
+      </header><script src="usage_files/header-attrs-2.9/header-attrs.js"></script><div class="row">
   <div class="col-md-9 contents">
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Usage</h1>
             
-            <h4 class="date">2021-06-11</h4>
+            <h4 class="date">2021-06-25</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mitre/growthcleanr/blob/main/vignettes/usage.Rmd"><code>vignettes/usage.Rmd</code></a></small>
       <div class="hidden name"><code>usage.Rmd</code></div>
@@ -130,16 +130,16 @@
 <p>For convenience, <code>growthcleanr</code> ships with an example synthetic dataset created using <a href="https://synthetichealth.github.io/synthea/">Synthea</a>, with support for simulated growth measurement errors based on the protocol included as supplementary material to the <a href="#cite">Daymont et al. paper</a>. This dataset is automatically loaded with the <code>growthcleanr</code> library, and is called <code>syngrowth</code>.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="fu"><a href="https://rdrr.io/r/base/dim.html">dim</a></span><span class="op">(</span><span class="va">syngrowth</span><span class="op">)</span></code></pre></div>
-<pre><code>## [1] 85728     6</code></pre>
+<pre><code>## [1] 77721     6</code></pre>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="fu"><a href="https://rdrr.io/r/utils/head.html">head</a></span><span class="op">(</span><span class="va">syngrowth</span><span class="op">)</span></code></pre></div>
-<pre><code>##   id     subjid sex agedays    param measurement
-## 1  1 1575544570   1    2177 HEIGHTCM      104.40
-## 2  2 1575544570   1    2548 HEIGHTCM      117.70
-## 3  3 1575544570   1    2548 HEIGHTCM      117.74
-## 4  4 1575544570   1    2919 HEIGHTCM      117.70
-## 5  5 1575544570   1    3290 HEIGHTCM      129.20
-## 6  6 1575544570   1    3661 HEIGHTCM      133.90</code></pre>
+<pre><code>##   id                               subjid    param agedays sex measurement
+## 1  1 001aa16d-bf0e-a077-3b3d-5ab8b58545ad HEIGHTCM    1435   1       102.6
+## 2  2 001aa16d-bf0e-a077-3b3d-5ab8b58545ad WEIGHTKG    1435   1        16.6
+## 3  3 001aa16d-bf0e-a077-3b3d-5ab8b58545ad HEIGHTCM    1806   1       102.6
+## 4  4 001aa16d-bf0e-a077-3b3d-5ab8b58545ad WEIGHTKG    1806   1        16.6
+## 5  5 001aa16d-bf0e-a077-3b3d-5ab8b58545ad WEIGHTKG    1806   1        19.6
+## 6  6 001aa16d-bf0e-a077-3b3d-5ab8b58545ad HEIGHTCM    2177   1       117.0</code></pre>
 <p>It can be used as in the following example. Note that processing the example data with <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> will likely take a few minutes to complete.</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(data.table)</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
