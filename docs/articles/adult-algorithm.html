@@ -79,7 +79,7 @@
       <a href="../articles/large-data-sets.html">Working with large data sets</a>
     </li>
     <li>
-      <a href="../articles/adjust-carry-forward.html">Testing carried forward adjustments</a>
+      <a href="../articles/next-steps.html">Next steps</a>
     </li>
   </ul>
 </li>
@@ -112,7 +112,7 @@
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Adult algorithm</h1>
             
-            <h4 class="date">2021-06-25</h4>
+            <h4 class="date">2021-06-29</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mitre/growthcleanr/blob/main/vignettes/adult-algorithm.Rmd"><code>vignettes/adult-algorithm.Rmd</code></a></small>
       <div class="hidden name"><code>adult-algorithm.Rmd</code></div>
@@ -149,6 +149,7 @@
 <p><em>Repeated values are different in very important ways from carried forwards in growthcleanr-pediatrics. The biggest differences are: 1) In growthcleanr-adults, most repeated values are retained (in growthcleanr-pediatrics essentially all carried forwards are excluded). 2) In growthcleanr-adults, repeated values are identified as part of the repeated value group regardless of whether they are consecutive (in growthcleanr -pediatrics carried forwards are only consecutive). 3) In growthcleanr-adults, groups of repeated values often (not always) get excluded in the same step (this is not a possibility in growthcleanr-pediatrics because later carried forward values are excluded early, and nonconsecutive values are not identified).</em></p>
 </blockquote>
 <p>Changes in recorded HT that are commonly seen in EHR data can have a substantial impact on BMI that are likely not reflective of differences in adiposity in most patients. For this reason, in addition to cleaning HT data we can optionally output a mean HT. For patients in whom we see evidence of HT gain or loss the mean HT changes as the HT changes, otherwise the mean HT is averaged over all of the subject’s included HTs. People using the dataset can decide to use the original HT or the mean HT. Note that in all cases, based on the way the algorithm works, the mean HT will be within 2 inches of the original HT.</p>
+<p>While the adult algorithm is considered complete, several areas for potential improvement remain. These are noted as <a href="next-steps.html#adult-algorithm-potential-enhancements">next steps</a> for future work.</p>
 </div>
 <div id="input" class="section level2">
 <h2 class="hasAnchor">
@@ -299,7 +300,10 @@
 <div id="h-same-day-extraneous-same-day-extraneoussame-day-identical" class="section level4">
 <h4 class="hasAnchor">
 <a href="#h-same-day-extraneous-same-day-extraneoussame-day-identical" class="anchor"></a>9H, Same day extraneous: Same-day-extraneous/Same-day-identical</h4>
-<p>This is the final step in which same day extraneous HTs (multiple HT measurements for the same subject on the same day) are evaluated. The criteria to keep a same day extraneous value are fairly strict. First, if all HTs on the same day are identical, one is set to be included and the rest are included. Then, it is determined if all HTs on the same day for a subject vary by a trivial amount (&lt;1 inch). If so, the recorded values are replaced with the mean of the same day extraneous values for that day. The original values are stored in <strong>orig_wt_sde</strong>. Then, if more than 25% of days for a subject have same day extraneous values OR if there are adjacent days that have same day extraneous values, all remaining same day extraneous values for that subject are excluded. For remaining subjects with same day extraneous values, if there is 1 (and only 1) HT that is within 1 cm of the HT before it, within 1 cm of the HT after it, and 1 cm of the median HT, that value is included and the rest of the same day extraneous values on that day are excluded. If no value meets that criteria on that day, all same day extraneous values for that day are excluded.</p>
+<p>This is the final step in which same day extraneous HTs (multiple HT measurements for the same subject on the same day) are evaluated. The criteria to keep a same day extraneous value are fairly strict. First, if all HTs on the same day are identical, one is set to be included and the rest are included. Then, it is determined if all HTs on the same day for a subject vary by a trivial amount (&lt;1 inch). If so, the recorded values are replaced with the mean of the same day extraneous values for that day. The original values are stored in <strong>orig_wt_sde</strong>. Then, if more than 25% of days for a subject have same day extraneous values OR if there are adjacent days that have same day extraneous values, all remaining same day extraneous values for that subject are excluded. For remaining subjects with same day extraneous values, if there is 1 (and only</p>
+<ol style="list-style-type: decimal">
+<li>HT that is within 1 cm of the HT before it, within 1 cm of the HT after it, and 1 cm of the median HT, that value is included and the rest of the same day extraneous values on that day are excluded. If no value meets that criteria on that day, all same day extraneous values for that day are excluded.</li>
+</ol>
 </div>
 <div id="ha-distinct-pairs-distinct-pairs" class="section level4">
 <h4 class="hasAnchor">

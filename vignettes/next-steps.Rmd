@@ -1,13 +1,18 @@
 ---
-title: "Testing carried forward adjustments"
+title: "Next steps"
 date: "`r Sys.Date()`"
 vignette: >
-  %\VignetteIndexEntry{Testing carried forward adjustments}
+  %\VignetteIndexEntry{Next steps}
   %\VignetteEngine{knitr::rmarkdown}
   %\usepackage[utf8]{inputenc}
 ---
 
-An experiment in re-assessing height measurements initially marked as
+While both the pediatric and adult algorithms are considered complete, we have
+identified several areas for additional research and potential enhancement.
+
+# Pediatric algorithm - carried forward adjustments
+
+An experiment in re-assessing pediatric height measurements initially marked as
 `Exclude-Carried-Forward` based on growth velocity is included in the current
 version of this package.
 
@@ -227,3 +232,45 @@ id     subjid     sex  agedays  param     measurement  gcr_result               
 
 Some of these values are not adjusted at all; one is from run 1 on, a few are
 from run 2 on, and one is from run 3 on.
+
+# Adult algorithm - potential enhancements
+
+The [adult algorithm](adult-algorithm.html) added in release 2.0 is complete, but
+has some known limitations that present areas for future research and
+enhancement. These areas are enumerated below.
+
+We welcome your ideas on these or any additional enhancements via email,
+tickets, or pull requests.
+
+Any active work on these areas will be ticketed and managed through GitHub.
+
+## "Evil twins"
+
+In some cases, runs of two or three similar - but not necessarily identical -
+deviant weights can occur, which are difficult to detect. One approach to
+address these could involve modifying the moderate EWMA step, but capturing
+these reliably may be a very challenging task.
+
+## Moderate EWMA adjustments
+
+A number of adjustments are possible to improve this step, such as tweaks to the
+weight change allowance, polation, and prioritization. This might require fewer
+changes to code but more extensive testing to ensure confidence in new threshold
+numbers/details.
+
+## Loosen criteria on hundreds, unit errors, etc.
+
+The criteria for some of these steps may be loosened to catch more implausible
+values. For unit error correction, we could consider having two levels: one
+suitable for correction, the other not.
+
+## Number of height loss events
+
+While maintaining overall height loss limits, we could allow for the possibility
+of more height loss events rather than assuming height loss will occur in no
+more than two big jumps.
+
+## Error load
+
+We could consider a change so that error load is not triggered if the only
+exclusions are for heights 3+D outside of w2.
