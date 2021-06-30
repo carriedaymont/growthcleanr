@@ -132,7 +132,7 @@
       </ul>
       <ul class="nav navbar-nav navbar-right">
         <li>
-  <a href="https://github.com/mitre/growthcleanr">
+  <a href="https://github.com/carriedaymont/growthcleanr">
     <span class="fab fa-github fa-lg"></span>
      
   </a>
@@ -151,40 +151,78 @@
   <div class="col-md-9 contents">
     <div class="page-header">
       <h1 data-toc-skip>Changelog <small></small></h1>
-      <small>Source: <a href='https://github.com/mitre/growthcleanr/blob/main/NEWS.md'><code>NEWS.md</code></a></small>
+      <small>Source: <a href='https://github.com/carriedaymont/growthcleanr/blob/main/NEWS.md'><code>NEWS.md</code></a></small>
     </div>
 
-    <div id="growthcleanr-125---2021-02-26" class="section level1">
-<h1 class="page-header" data-toc-text="1.2.5">
-<a href="#growthcleanr-125---2021-02-26" class="anchor"></a>growthcleanr 1.2.5 - 2021-02-26</h1>
-<div id="changed" class="section level2">
-<h2 class="hasAnchor">
-<a href="#changed" class="anchor"></a>Changed</h2>
-<ul>
-<li>Updated behavior of <code>sd.recenter</code> option to include new NHANES reference medians and explicit specification with “NHANES” or “derive” (<a href="https://github.com/mitre/growthcleanr/issues/9" class="uri">https://github.com/mitre/growthcleanr/issues/9</a>)</li>
-<li>Switched <code>README.md</code> to be generated from <code>README.Rmd</code> w/knitr (thanks
-@mcanouil) (<a href='https://github.com/mitre/growthcleanr/issues/17'>#17</a>)</li>
-<li>Switched to use <code><a href="https://rdrr.io/r/base/file.path.html">file.path()</a></code> more consistently in <code>R/growth.R</code>
-</li>
-</ul>
-</div>
+    <div id="growthcleanr-200---2021-06-30" class="section level1">
+<h1 class="page-header" data-toc-text="2.0.0">
+<a href="#growthcleanr-200---2021-06-30" class="anchor"></a>growthcleanr 2.0.0 - 2021-06-30</h1>
 <div id="added" class="section level2">
 <h2 class="hasAnchor">
 <a href="#added" class="anchor"></a>Added</h2>
 <ul>
+<li>Support for cleaning adult (18-65) observations with <code>adult_cutpoint</code> and <code>weightcap</code> options (<a href="https://github.com/mitre/growthcleanr/pull/17" class="uri">https://github.com/mitre/growthcleanr/pull/17</a>, others)</li>
+<li>Added documentation describing adult algorithm, examples, and exclusions (<a href='https://github.com/carriedaymont/growthcleanr/issues/30'>#30</a>), next steps (<a href='https://github.com/carriedaymont/growthcleanr/issues/63'>#63</a>)</li>
+<li>Added tests supporting adult observations (<a href='https://github.com/carriedaymont/growthcleanr/issues/49'>#49</a>)</li>
+</ul>
+</div>
+<div id="changed" class="section level2">
+<h2 class="hasAnchor">
+<a href="#changed" class="anchor"></a>Changed</h2>
+<ul>
+<li>Removed BMI calculation from <code><a href="../reference/longwide.html">longwide()</a></code>, added <code><a href="../reference/simple_bmi.html">simple_bmi()</a></code> (<a href='https://github.com/carriedaymont/growthcleanr/issues/47'>#47</a>)</li>
+<li>Enhanced <code>gcdriver.R</code> to support adult options, parallel operation (<a href="https://github.com/mitre/growthcleanr/pull/23" class="uri">https://github.com/mitre/growthcleanr/pull/23</a>)</li>
+<li>Refreshed <code>syngrowth</code> synthetic test data, now includes adults (<a href='https://github.com/carriedaymont/growthcleanr/issues/50'>#50</a>)</li>
+<li>Reorganized documentation from README, now using <a href="https://pkgdown.r-lib.org/">pkgdown</a> (<a href='https://github.com/carriedaymont/growthcleanr/issues/30'>#30</a>)</li>
+<li>Improved code layout to pass <code>CHECK</code> cleanly (<a href='https://github.com/carriedaymont/growthcleanr/issues/18'>#18</a>, <a href='https://github.com/carriedaymont/growthcleanr/issues/60'>#60</a>)</li>
+</ul>
+</div>
+</div>
+    <div id="growthcleanr-126---2021-06-10" class="section level1">
+<h1 class="page-header" data-toc-text="1.2.6">
+<a href="#growthcleanr-126---2021-06-10" class="anchor"></a>growthcleanr 1.2.6 - 2021-06-10</h1>
+<div id="changed-1" class="section level2">
+<h2 class="hasAnchor">
+<a href="#changed-1" class="anchor"></a>Changed</h2>
+<ul>
+<li>Corrected four duplicated age-rows in NHANES reference medians (<a href='https://github.com/carriedaymont/growthcleanr/issues/40'>#40</a>)</li>
+<li>Added missing non-newborn constraint in 14h.ii (thanks Lusha Cao)</li>
+<li>Removed <code>Hmisc</code> dependency (<a href='https://github.com/carriedaymont/growthcleanr/issues/36'>#36</a>)</li>
+<li>Replaced <code>clean_value</code> result column name in docs with <code>gcr_result</code> for clarity (<a href='https://github.com/carriedaymont/growthcleanr/issues/35'>#35</a>)</li>
+</ul>
+</div>
+</div>
+    <div id="growthcleanr-125---2021-02-26" class="section level1">
+<h1 class="page-header" data-toc-text="1.2.5">
+<a href="#growthcleanr-125---2021-02-26" class="anchor"></a>growthcleanr 1.2.5 - 2021-02-26</h1>
+<div id="added-1" class="section level2">
+<h2 class="hasAnchor">
+<a href="#added-1" class="anchor"></a>Added</h2>
+<ul>
 <li>Added <code>inst/extdata/nhanes-reference-medians.csv</code>, reference medians for recentering derived from NHANES (described in README)</li>
+</ul>
+</div>
+<div id="changed-2" class="section level2">
+<h2 class="hasAnchor">
+<a href="#changed-2" class="anchor"></a>Changed</h2>
+<ul>
+<li>Updated behavior of <code>sd.recenter</code> option to include new NHANES reference medians and explicit specification with “NHANES” or “derive” (<a href="https://github.com/mitre/growthcleanr/issues/9" class="uri">https://github.com/mitre/growthcleanr/issues/9</a>)</li>
+<li>Switched <code>README.md</code> to be generated from <code>README.Rmd</code> w/knitr (thanks
+@mcanouil) (<a href='https://github.com/carriedaymont/growthcleanr/issues/17'>#17</a>)</li>
+<li>Switched to use <code><a href="https://rdrr.io/r/base/file.path.html">file.path()</a></code> more consistently in <code>R/growth.R</code>
+</li>
 </ul>
 </div>
 </div>
     <div id="growthcleanr-124---2021-01-14" class="section level1">
 <h1 class="page-header" data-toc-text="1.2.4">
 <a href="#growthcleanr-124---2021-01-14" class="anchor"></a>growthcleanr 1.2.4 - 2021-01-14</h1>
-<div id="changed-1" class="section level2">
+<div id="changed-3" class="section level2">
 <h2 class="hasAnchor">
-<a href="#changed-1" class="anchor"></a>Changed</h2>
+<a href="#changed-3" class="anchor"></a>Changed</h2>
 <ul>
 <li>
-<p>Minor update to WHO HT velocity 3SD files to correct a small number of errors (<a href='https://github.com/mitre/growthcleanr/issues/24'>#24</a>). Affected files were:</p>
+<p>Minor update to WHO HT velocity 3SD files to correct a small number of errors (<a href='https://github.com/carriedaymont/growthcleanr/issues/24'>#24</a>). Affected files were:</p>
 <ul>
 <li><code>inst/extdata/who_ht_maxvel_3sd.csv</code></li>
 <li><code>inst/extdata/who_ht_vel_3sd.csv</code></li>
@@ -199,19 +237,19 @@
     <div id="growthcleanr-123---2021-01-07" class="section level1">
 <h1 class="page-header" data-toc-text="1.2.3">
 <a href="#growthcleanr-123---2021-01-07" class="anchor"></a>growthcleanr 1.2.3 - 2021-01-07</h1>
-<div id="added-1" class="section level2">
+<div id="added-2" class="section level2">
 <h2 class="hasAnchor">
-<a href="#added-1" class="anchor"></a>Added</h2>
+<a href="#added-2" class="anchor"></a>Added</h2>
 <ul>
 <li>New exclusion handling option on experimental carry forward adjustment</li>
 </ul>
 </div>
-<div id="changed-2" class="section level2">
+<div id="changed-4" class="section level2">
 <h2 class="hasAnchor">
-<a href="#changed-2" class="anchor"></a>Changed</h2>
+<a href="#changed-4" class="anchor"></a>Changed</h2>
 <ul>
 <li>Improved experimental carry forward adjustment handling of strings of CF values, output handling, and documentation; renamed “Missing” values</li>
-<li>Updated DESCRIPTION, imports, documentation to address testing issue (<a href='https://github.com/mitre/growthcleanr/issues/12'>#12</a>)</li>
+<li>Updated DESCRIPTION, imports, documentation to address testing issue (<a href='https://github.com/carriedaymont/growthcleanr/issues/12'>#12</a>)</li>
 <li>Switched to R-native argparser library to support script options</li>
 <li>Switched to GitHub Actions for continuous integration / testing (thanks
 @mcanouil)</li>
@@ -223,16 +261,16 @@
     <div id="growthcleanr-122---2020-09-29" class="section level1">
 <h1 class="page-header" data-toc-text="1.2.2">
 <a href="#growthcleanr-122---2020-09-29" class="anchor"></a>growthcleanr 1.2.2 - 2020-09-29</h1>
-<div id="added-2" class="section level2">
+<div id="added-3" class="section level2">
 <h2 class="hasAnchor">
-<a href="#added-2" class="anchor"></a>Added</h2>
+<a href="#added-3" class="anchor"></a>Added</h2>
 <ul>
 <li>CITATION file, now <code><a href="https://rdrr.io/r/utils/citation.html">citation("growthcleanr")</a></code> works as expected</li>
 </ul>
 </div>
-<div id="changed-3" class="section level2">
+<div id="changed-5" class="section level2">
 <h2 class="hasAnchor">
-<a href="#changed-3" class="anchor"></a>Changed</h2>
+<a href="#changed-5" class="anchor"></a>Changed</h2>
 <ul>
 <li>Standardized on arrow assignment</li>
 <li>Moved functions previously within other functions to top level</li>
@@ -251,16 +289,16 @@
     <div id="growthcleanr-121---2020-08-14" class="section level1">
 <h1 class="page-header" data-toc-text="1.2.1">
 <a href="#growthcleanr-121---2020-08-14" class="anchor"></a>growthcleanr 1.2.1 - 2020-08-14</h1>
-<div id="added-3" class="section level2">
+<div id="added-4" class="section level2">
 <h2 class="hasAnchor">
-<a href="#added-3" class="anchor"></a>Added</h2>
+<a href="#added-4" class="anchor"></a>Added</h2>
 <ul>
 <li>New tests in <code>tests/testthat/test-utils.R</code> and <code>tests/testthat/test-cdc.R</code> to support newly added functions</li>
 </ul>
 </div>
-<div id="changed-4" class="section level2">
+<div id="changed-6" class="section level2">
 <h2 class="hasAnchor">
-<a href="#changed-4" class="anchor"></a>Changed</h2>
+<a href="#changed-6" class="anchor"></a>Changed</h2>
 <ul>
 <li>Improved error handling in <code><a href="../reference/longwide.html">longwide()</a></code>; fixed missing import in DESCRIPTION</li>
 </ul>
@@ -269,9 +307,9 @@
     <div id="growthcleanr-12---2020-07-24" class="section level1">
 <h1 class="page-header" data-toc-text="1.2">
 <a href="#growthcleanr-12---2020-07-24" class="anchor"></a>growthcleanr 1.2 - 2020-07-24</h1>
-<div id="added-4" class="section level2">
+<div id="added-5" class="section level2">
 <h2 class="hasAnchor">
-<a href="#added-4" class="anchor"></a>Added</h2>
+<a href="#added-5" class="anchor"></a>Added</h2>
 <ul>
 <li>New CDC BMI calculation function <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, comparable to SAS program published at <a href="https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm" class="uri">https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm</a>
 </li>
@@ -289,9 +327,9 @@
 <li>New experimental function <code><a href="../reference/adjustcarryforward.html">adjustcarryforward()</a></code> in <code>R/adjustcarryforward.R</code> and driver script <code>exec/testadjustcf.R</code> (see README-adjustcarryforward.md for details)</li>
 </ul>
 </div>
-<div id="changed-5" class="section level2">
+<div id="changed-7" class="section level2">
 <h2 class="hasAnchor">
-<a href="#changed-5" class="anchor"></a>Changed</h2>
+<a href="#changed-7" class="anchor"></a>Changed</h2>
 <ul>
 <li>Reorganized code from <code>R/growth.R</code> into separate files for clarity and easier maintenance (all utility functions not directly used by <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> are now in <code>R/utils.R</code>)</li>
 <li>Updated README with details and examples for added functions</li>
@@ -301,9 +339,9 @@
     <div id="growthcleanr-11---2020-02-07" class="section level1">
 <h1 class="page-header" data-toc-text="1.1">
 <a href="#growthcleanr-11---2020-02-07" class="anchor"></a>growthcleanr 1.1 - 2020-02-07</h1>
-<div id="added-5" class="section level2">
+<div id="added-6" class="section level2">
 <h2 class="hasAnchor">
-<a href="#added-5" class="anchor"></a>Added</h2>
+<a href="#added-6" class="anchor"></a>Added</h2>
 <ul>
 <li>New options to add flexibility:
 <ul>
@@ -321,9 +359,9 @@
 <li>New example synthetic data set <code>syngrowth</code> loads automatically.</li>
 </ul>
 </div>
-<div id="changed-6" class="section level2">
+<div id="changed-8" class="section level2">
 <h2 class="hasAnchor">
-<a href="#changed-6" class="anchor"></a>Changed</h2>
+<a href="#changed-8" class="anchor"></a>Changed</h2>
 <ul>
 <li>Several updates to improve performance, including eliminating use of data.table in ewma function.</li>
 <li>Updated README with link to paper, detailed introduction, more installation details, examples, notes on handling large datasets, lists of parameters and exclusions.</li>
@@ -333,9 +371,9 @@
     <div id="growthcleanr-100---2018-09-11" class="section level1">
 <h1 class="page-header" data-toc-text="1.0.0">
 <a href="#growthcleanr-100---2018-09-11" class="anchor"></a>growthcleanr 1.0.0 - 2018-09-11</h1>
-<div id="added-6" class="section level2">
+<div id="added-7" class="section level2">
 <h2 class="hasAnchor">
-<a href="#added-6" class="anchor"></a>Added</h2>
+<a href="#added-7" class="anchor"></a>Added</h2>
 <ul>
 <li>Initial version posted to GitHub.</li>
 </ul>
