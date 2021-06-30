@@ -43,7 +43,10 @@ inst/doc
 packrat/lib*/
 packrat/src/
 
+*.swo
 *.swp
 output
 .Rproj.user
 .Rprofile
+docs/reference/*.csv
+docs/reference/*.log

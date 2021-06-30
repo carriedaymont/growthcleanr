@@ -33,7 +33,7 @@ set_cols_first <- function(DT, cols, intersection = TRUE)
   }
 }
 
-#' ext_bmiz
+#' Calculate extended BMI measures 
 #'
 #' \code{ext_bmiz} Calculates the sigma (scale parameter for the half-normal
 #' distribution), extended BMI percentile, extended BMIz, and the CDC LMS
@@ -98,8 +98,9 @@ set_cols_first <- function(DT, cols, intersection = TRUE)
 #' @export
 #' @import data.table
 #' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
-#' @import magrittr
 #' @import labelled
+#' @import magrittr
+#' @importFrom stats approx pnorm qnorm
 #' @examples
 #' # Run on a small subset of given data
 #' df <- as.data.frame(syngrowth)
@@ -110,19 +111,21 @@ set_cols_first <- function(DT, cols, intersection = TRUE)
 #'                                        df$agedays,
 #'                                        df$sex,
 #'                                        df$measurement))
-#' df <- longwide(df) # convert to wide format for ext_bmiz
+#' df_wide <- longwide(df) # convert to wide format for ext_bmiz
+#' df_wide_bmi <- simple_bmi(df_wide) # compute simple BMI
 #'
 #' # Calling the function with default column names
-#' d_bmi <- ext_bmiz(df)
+#' df_bmiz <- ext_bmiz(df_wide_bmi)
 #'
 #' # Specifying different column names; note that quotes are used
-#' dfc <- df
+#' dfc <- simple_bmi(df_wide)
 #' colnames(dfc)[colnames(dfc) %in% c("agem", "wt", "ht")] <-
 #'   c("agemos", "weightkg", "heightcm")
-#' d_bmi <- ext_bmiz(dfc, age="agemos", wt="weightkg", ht="heightcm")
+#' df_bmiz <- ext_bmiz(dfc, age="agemos", wt="weightkg", ht="heightcm")
 #'
 #' # Disabling conversion of all-integer age in months to (age + 0.5)
-#' d_bmi <- ext_bmiz(df, adjust.integer.age=FALSE)
+#' dfc <- simple_bmi(df_wide)
+#' df_bmiz <- ext_bmiz(dfc, adjust.integer.age=FALSE)
 ext_bmiz <- function(data,
                      age = "agem",
                      wt = "wt",
@@ -130,6 +133,15 @@ ext_bmiz <- function(data,
                      bmi = "bmi",
                      adjust.integer.age = T,
                      ref.data.path = "") {
+  # avoid "no visible binding" warnings
+  agemos <- agemos1 <- agemos2 <- agey <- NULL
+  bmip95 <- bp <- bz <- denom <- ebp <- ebz <- haz <- l <- NULL
+  lbmi1 <- lbmi2 <- lht1 <- lht2 <- lwt1 <- lwt2 <- m <- NULL
+  mbmi <- mbmi1 <- mbmi2 <- mht1 <- mht2 <- mref <- mwt1 <- NULL
+  mwt2 <- p95 <- s <- sbmi <- sbmi1 <- sbmi2 <- seq_ <- NULL
+  sex <- sht1 <- sht2 <- sigma <- sref <- swt1 <- NULL
+  swt2 <- waz <- z1 <- `_AGEMOS1` <- NULL
+
   setDT(data)
 
   setnames(data,
@@ -157,6 +169,9 @@ ext_bmiz <- function(data,
     system.file("extdata/CDCref_d.csv", package = "growthcleanr"),
     paste(ref.data.path, "CDCref_d.csv", sep = "")
   )
+  # Note: referring to underscore-leading column as `_AGEMOS1`, i.e. with
+  # backticks, results in a no visible binding warning, but vars can't start
+  # with an "_", so we have to use backticks at assignment up above as well.
   dref <-
     fread(dref_path)[`_AGEMOS1` > 23 & denom == 'age']
   names(dref) <- tolower(names(dref))
@@ -205,7 +220,8 @@ ext_bmiz <- function(data,
       .d <- dref[sex == i]
       fapp <- function(vars, ...)
         approx(.d$age, vars, xout = uages)$y
-      data.frame(sapply(.d[, ..v], fapp))
+      # Note: specifying v with "..v" gives no visible binding warning, use with option
+      data.frame(sapply(.d[, v, with = FALSE], fapp))
     }
     dref <- rbindlist(lapply(1:2, fapprox))
   }
@@ -302,7 +318,7 @@ ext_bmiz <- function(data,
     "sev_obese",
     "obese"
   )
-  dt <- dt[, ..v]
+  dt <- dt[, v, with = FALSE]
 
   setkey(dt, seq_)
   setkey(dorig, seq_)

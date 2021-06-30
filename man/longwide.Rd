@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{longwide}
 \alias{longwide}
-\title{longwide}
+\title{Transform data in growthcleanr format into wide structure for BMI calculation}
 \usage{
 longwide(
   long_df,
@@ -55,11 +55,11 @@ df <- cbind(df,
                                        df$sex,
                                        df$measurement))
 # Convert to wide format
-long_df <- longwide(df)
+wide_df <- longwide(df)
 
 # Include all inclusion types
-long_df <- longwide(df, include_all = TRUE)
+wide_df <- longwide(df, include_all = TRUE)
 
 # Specify all inclusion codes
-long_df <- longwide(df, inclusion_types = c("Include", "Exclude-Carried-Forward"))
+wide_df <- longwide(df, inclusion_types = c("Include", "Exclude-Carried-Forward"))
 }

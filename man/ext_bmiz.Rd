@@ -2,7 +2,7 @@
 % Please edit documentation in R/cdc.R
 \name{ext_bmiz}
 \alias{ext_bmiz}
-\title{ext_bmiz}
+\title{Calculate extended BMI measures}
 \usage{
 ext_bmiz(
   data,
@@ -93,17 +93,19 @@ df <- cbind(df,
                                        df$agedays,
                                        df$sex,
                                        df$measurement))
-df <- longwide(df) # convert to wide format for ext_bmiz
+df_wide <- longwide(df) # convert to wide format for ext_bmiz
+df_wide_bmi <- simple_bmi(df_wide) # compute simple BMI
 
 # Calling the function with default column names
-d_bmi <- ext_bmiz(df)
+df_bmiz <- ext_bmiz(df_wide_bmi)
 
 # Specifying different column names; note that quotes are used
-dfc <- df
+dfc <- simple_bmi(df_wide)
 colnames(dfc)[colnames(dfc) \%in\% c("agem", "wt", "ht")] <-
   c("agemos", "weightkg", "heightcm")
-d_bmi <- ext_bmiz(dfc, age="agemos", wt="weightkg", ht="heightcm")
+df_bmiz <- ext_bmiz(dfc, age="agemos", wt="weightkg", ht="heightcm")
 
 # Disabling conversion of all-integer age in months to (age + 0.5)
-d_bmi <- ext_bmiz(df, adjust.integer.age=FALSE)
+dfc <- simple_bmi(df_wide)
+df_bmiz <- ext_bmiz(dfc, adjust.integer.age=FALSE)
 }
