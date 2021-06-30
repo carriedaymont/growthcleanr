@@ -7,11 +7,11 @@ vignette: >
   %\usepackage[utf8]{inputenc}
 ---
 
-*There will be notes in italics throughout the introductory material discussing
+_There will be notes in italics throughout the introductory material discussing
 similarities and differences between growthcleanr-adults and
 growthcleanr-pediatrics for those who are familiar with growthcleanr-pediatrics
 and are interested. The nonitalicized text of the narrative does not assume any
-prior knowledge of growthcleanr-pediatrics*.
+prior knowledge of growthcleanr-pediatrics_.
 
 ## Goal
 
@@ -35,12 +35,12 @@ each other. HT and WT measurements for each subject are also evaluated
 separately from each other except for two small exceptions that will be detailed
 in the detailed description of steps.
 
-> *Growthcleanr-adult does not require sex, which is required for
+> _Growthcleanr-adult does not require sex, which is required for
 > growthcleanr-pediatrics to determine standard deviation scores. There is no
 > recentering step as there is in growthcleanr-pediatrics. Also, except for the
 > swap step and the 1 distinct value step (similar to ‘singles’) in which BMI is
 > generated, both of which can be bypassed, there is no use of the other
-> parameter as there is in some steps of growthcleanr-pediatrics.*
+> parameter as there is in some steps of growthcleanr-pediatrics._
 
 ## Key challenges and overall strategy
 
@@ -59,7 +59,7 @@ later, and rarely are multiple errors for a subject excluded in one step.
 Additionally, much of each step is devoted to checks to confirm that any value
 should be excluded and determine which value that should be.
 
-> *These general principles are the same as for growthcleanr-pediatrics.*
+> _These general principles are the same as for growthcleanr-pediatrics._
 
 Overall, it was expected that WT in adults could remain stable or could have
 multiple gain/loss cycles within a subject. Expected changes included shorter
@@ -81,13 +81,13 @@ first years after 18) and who demonstrated one or more periods of HT gain
 without evidence of subsequent HTs inconsistent with the proposed HT gain
 pattern.
 
-> *The expected patterns of WT and HT are two of the biggest differences with
+> _The expected patterns of WT and HT are two of the biggest differences with
 > growthcleanr-pediatrics. Although growthcleanr-pediatrics accounted for weight
 > loss, it was not written into the code the way it is for growthcleanr-adults,
 > and growthcleanr-pediatrics would likely exclude some WTs in people with gains
 > and losses that growthcleanr-adults can handle. Also, growthcleanr-pediatrics
 > could not handle a HT loss of \>3 cm (and that 3 cm was meant to cover
-> measurement error, not actual HT loss).*
+> measurement error, not actual HT loss)._
 
 In the primary dataset used to derive growthcleanr-adults, many values are
 repeated for both HT and WT. To a certain extent, this is expected because HT
@@ -110,7 +110,7 @@ member of a repeated value group is excluded, all members of that group are
 excluded. A lot of attention was paid to avoid inappropriately excluding
 repeated values.
 
-> *Repeated values are different in very important ways from carried forwards in
+> _Repeated values are different in very important ways from carried forwards in
 > growthcleanr-pediatrics. The biggest differences are: 1) In
 > growthcleanr-adults, most repeated values are retained (in
 > growthcleanr-pediatrics essentially all carried forwards are excluded). 2) In
@@ -120,7 +120,7 @@ repeated values.
 > groups of repeated values often (not always) get excluded in the same step
 > (this is not a possibility in growthcleanr-pediatrics because later carried
 > forward values are excluded early, and nonconsecutive values are not
-> identified).*
+> identified)._
 
 Changes in recorded HT that are commonly seen in EHR data can have a substantial
 impact on BMI that are likely not reflective of differences in adiposity in most
@@ -130,6 +130,9 @@ mean HT changes as the HT changes, otherwise the mean HT is averaged over all of
 the subject’s included HTs. People using the dataset can decide to use the
 original HT or the mean HT. Note that in all cases, based on the way the
 algorithm works, the mean HT will be within 2 inches of the original HT.
+
+While the adult algorithm is considered complete, several areas for potential
+improvement remain. These are noted as [next steps](next-steps.html#adult-algorithm-potential-enhancements) for future work.
 
 ## Input
 
@@ -185,13 +188,13 @@ criteria to determine if a value gets excluded. Often D-EWMA-BEF and D-EWMA-AFT
 are required as well, serving as extra checks to exclude only the correct
 measurements.
 
-> *There are important differences in EWMA between growthcleanr-adults and
+> _There are important differences in EWMA between growthcleanr-adults and
 > growthcleanr -pediatrics. First, the parameters are different so that closer
 > WTs/HTs are counted much more heavily in growthcleanr -adults. This is because
 > of WT gain and loss, but the new parameters worked well for HT as well. Also,
 > instead of making a EWMA of standard deviation scores, in adults we just make
 > the EWMA of the raw WT or HT itself. So, the EWMAs and D-EWMAs are in kgs and
-> cms, and the cutoffs are very different than for pediatrics.*
+> cms, and the cutoffs are very different than for pediatrics._
 
 ### Extrapolation
 
@@ -212,7 +215,7 @@ meet).
 An example of the extrapolation calculations is provided below:
 
 |                    | **Agedays** | **WT** |
-|--------------------|-------------|--------|
+| ------------------ | ----------- | ------ |
 | **P2**             | 10000       | 61     |
 | **P1**             | 10014       | 65     |
 | **WT<sub>i</sub>** | 10028       | 72     |
@@ -221,33 +224,33 @@ An example of the extrapolation calculations is provided below:
 
 ### Prior WT extrapolation
 
-* Subject gained 4 kg in 14 days from P1 to P2
+- Subject gained 4 kg in 14 days from P1 to P2
 
-* There are 14 days from P2 to WTi, so extrapolating would give 4 more kg on top
+- There are 14 days from P2 to WTi, so extrapolating would give 4 more kg on top
   of P2
 
-* P-Extrap-WT = 65+4 = 69
+- P-Extrap-WT = 65+4 = 69
 
-* Allowable range for WT<sub>i</sub> is P2 to P-Extrap-WT (61-69) with 5 kg
+- Allowable range for WT<sub>i</sub> is P2 to P-Extrap-WT (61-69) with 5 kg
   error on either side (56-74)
 
-* WT<sub>i</sub> (72) is within the allowable range, therefore, this
+- WT<sub>i</sub> (72) is within the allowable range, therefore, this
   WT<sub>i</sub> would not get excluded through standard criteria.
 
 ### Next WT extrapolation
 
-* Subject “gained” 10 kg in 56 days from N2 to N1 (helps to think about this
+- Subject “gained” 10 kg in 56 days from N2 to N1 (helps to think about this
   going back in time)
 
-* There are 28 days from N1 to WT<sub>i</sub>, and 28=56\*0.5, so extrapolating
+- There are 28 days from N1 to WT<sub>i</sub>, and 28=56\*0.5, so extrapolating
   would give 10\*0.5 more kg on top of N1
 
-* N-Extrap-WT = 68+5 = 73
+- N-Extrap-WT = 68+5 = 73
 
-* Allowable range for WT<sub>i</sub> is P2 to P-Extrap-WT (58-73) with 5 kg
+- Allowable range for WT<sub>i</sub> is P2 to P-Extrap-WT (58-73) with 5 kg
   error on either side (53-78)
 
-* WT<sub>i</sub> (72) is within the allowable range</u>; nothing changes because
+- WT<sub>i</sub> (72) is within the allowable range</u>; nothing changes because
   it was already ineligible to get excluded through standard criteria.
 
 ## Description of each step
@@ -391,10 +394,11 @@ in **orig_wt_sde**. Then, if more than 25% of days for a subject have same day
 extraneous values OR if there are adjacent days that have same day extraneous
 values, all remaining same day extraneous values for that subject are excluded.
 For remaining subjects with same day extraneous values, if there is 1 (and only
-1) HT that is within 1 cm of the HT before it, within 1 cm of the HT after it,
-and 1 cm of the median HT, that value is included and the rest of the same day
-extraneous values on that day are excluded. If no value meets that criteria on
-that day, all same day extraneous values for that day are excluded.
+
+1. HT that is within 1 cm of the HT before it, within 1 cm of the HT after it,
+   and 1 cm of the median HT, that value is included and the rest of the same day
+   extraneous values on that day are excluded. If no value meets that criteria on
+   that day, all same day extraneous values for that day are excluded.
 
 #### 10Ha, Distinct pairs: Distinct-pairs
 
@@ -487,8 +491,7 @@ are in order so that all of one WT come before all of another WT. As examples,
 ordered pair. But 81, 81, 74, 81, 74 would not be an ordered pair. The amount
 that the WTs in an ordered pair are allowed to differ is determined the by the
 difference in ages between the last day of the distinct WT 1 and the first day
-of distinct WT 2. The formula is `wtallow = 4 +
-18 * ln(1 + ageinterval [in months])`. If the absolute difference between WT1 and
+of distinct WT 2. The formula is `wtallow = 4 + 18 * ln(1 + ageinterval [in months])`. If the absolute difference between WT1 and
 WT2 is below wtallow, all WTs stay included. If the absolute difference is above
 wtallow, all WTs are excluded. Very low WTs that are not consistent with a
 subject’s other WT do not necessarily trigger the wtallow criteria; for this

@@ -5,13 +5,13 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Testing carried forward adjustments • growthcleanr</title>
+<title>Next steps • growthcleanr</title>
 <!-- jquery --><script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js" integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script><!-- Bootstrap --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha256-bZLfwXAP04zRMK2BjiO8iu9pf4FbLqX6zitd+tIvLhE=" crossorigin="anonymous">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha256-nuL8/2cJ5NDSSwnKD8VqreErSWHtnEP9E7AySL+1ev4=" crossorigin="anonymous"></script><!-- bootstrap-toc --><link rel="stylesheet" href="../bootstrap-toc.css">
 <script src="../bootstrap-toc.js"></script><!-- Font Awesome icons --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css" integrity="sha256-mmgLkCYLUQbXn0B1SRqzHar6dCnv9oZFPEC1g1cwlkk=" crossorigin="anonymous">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/v4-shims.min.css" integrity="sha256-wZjR52fzng1pJHwx4aV2AO3yyTOXrcDW7jBpJtTwVxw=" crossorigin="anonymous">
 <!-- clipboard.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min.js" integrity="sha256-inc5kl9MA1hkeYUt+EC3BhlIgyp/2jDIyBLS6k3UxPI=" crossorigin="anonymous"></script><!-- headroom.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/headroom.min.js" integrity="sha256-AsUX4SJE1+yuDu5+mAVzJbuYNPHj/WroHuZ8Ir/CkE0=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/jQuery.headroom.min.js" integrity="sha256-ZX/yNShbjqsohH1k95liqY9Gd8uOiE1S4vZc+9KQ1K4=" crossorigin="anonymous"></script><!-- pkgdown --><link href="../pkgdown.css" rel="stylesheet">
-<script src="../pkgdown.js"></script><meta property="og:title" content="Testing carried forward adjustments">
+<script src="../pkgdown.js"></script><meta property="og:title" content="Next steps">
 <meta property="og:description" content="growthcleanr">
 <!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
 <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
@@ -79,7 +79,7 @@
       <a href="../articles/large-data-sets.html">Working with large data sets</a>
     </li>
     <li>
-      <a href="../articles/adjust-carry-forward.html">Testing carried forward adjustments</a>
+      <a href="../articles/next-steps.html">Next steps</a>
     </li>
   </ul>
 </li>
@@ -107,21 +107,25 @@
 
       
 
-      </header><script src="adjust-carry-forward_files/header-attrs-2.9/header-attrs.js"></script><div class="row">
+      </header><script src="next-steps_files/header-attrs-2.9/header-attrs.js"></script><div class="row">
   <div class="col-md-9 contents">
     <div class="page-header toc-ignore">
-      <h1 data-toc-skip>Testing carried forward adjustments</h1>
+      <h1 data-toc-skip>Next steps</h1>
             
-            <h4 class="date">2021-06-25</h4>
+            <h4 class="date">2021-06-29</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/mitre/growthcleanr/blob/main/vignettes/adjust-carry-forward.Rmd"><code>vignettes/adjust-carry-forward.Rmd</code></a></small>
-      <div class="hidden name"><code>adjust-carry-forward.Rmd</code></div>
+      <small class="dont-index">Source: <a href="https://github.com/mitre/growthcleanr/blob/main/vignettes/next-steps.Rmd"><code>vignettes/next-steps.Rmd</code></a></small>
+      <div class="hidden name"><code>next-steps.Rmd</code></div>
 
     </div>
 
     
     
-<p>An experiment in re-assessing height measurements initially marked as <code>Exclude-Carried-Forward</code> based on growth velocity is included in the current version of this package.</p>
+<p>While both the pediatric and adult algorithms are considered complete, we have identified several areas for additional research and potential enhancement.</p>
+<div id="pediatric-algorithm---carried-forward-adjustments" class="section level1">
+<h1 class="hasAnchor">
+<a href="#pediatric-algorithm---carried-forward-adjustments" class="anchor"></a>Pediatric algorithm - carried forward adjustments</h1>
+<p>An experiment in re-assessing pediatric height measurements initially marked as <code>Exclude-Carried-Forward</code> based on growth velocity is included in the current version of this package.</p>
 <p>Because of the complexity involved in this approach, this is implemented as an independent function with its own driver script for further study. Our hope is to revise this strategy, and, if feasible, incorporate it into the main <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> algorithm.</p>
 <div id="running-the-experiment" class="section level2">
 <h2 class="hasAnchor">
@@ -334,6 +338,39 @@
 <span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="dv">30013</span>  <span class="dv">5792371</span>    <span class="dv">1</span>    <span class="dv">4032</span>     HEIGHTCM  <span class="fl">145.4</span>        Exclude<span class="sc">-</span>Carried<span class="sc">-</span>Forward  No Change  No Change  No Change  No Change  No Change</span>
 <span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="dv">30016</span>  <span class="dv">5792371</span>    <span class="dv">1</span>    <span class="dv">1071</span>     WEIGHTKG  <span class="fl">15.9</span>         Exclude<span class="sc">-</span>Carried<span class="sc">-</span>Forward  No Change  No Change  No Change  No Change  No Change</span></code></pre></div>
 <p>Some of these values are not adjusted at all; one is from run 1 on, a few are from run 2 on, and one is from run 3 on.</p>
+</div>
+</div>
+<div id="adult-algorithm---potential-enhancements" class="section level1">
+<h1 class="hasAnchor">
+<a href="#adult-algorithm---potential-enhancements" class="anchor"></a>Adult algorithm - potential enhancements</h1>
+<p>The <a href="adult-algorithm.html">adult algorithm</a> added in release 2.0 is complete, but has some known limitations that present areas for future research and enhancement. These areas are enumerated below.</p>
+<p>We welcome your ideas on these or any additional enhancements via email, tickets, or pull requests.</p>
+<p>Any active work on these areas will be ticketed and managed through GitHub.</p>
+<div id="evil-twins" class="section level2">
+<h2 class="hasAnchor">
+<a href="#evil-twins" class="anchor"></a>“Evil twins”</h2>
+<p>In some cases, runs of two or three similar - but not necessarily identical - deviant weights can occur, which are difficult to detect. One approach to address these could involve modifying the moderate EWMA step, but capturing these reliably may be a very challenging task.</p>
+</div>
+<div id="moderate-ewma-adjustments" class="section level2">
+<h2 class="hasAnchor">
+<a href="#moderate-ewma-adjustments" class="anchor"></a>Moderate EWMA adjustments</h2>
+<p>A number of adjustments are possible to improve this step, such as tweaks to the weight change allowance, polation, and prioritization. This might require fewer changes to code but more extensive testing to ensure confidence in new threshold numbers/details.</p>
+</div>
+<div id="loosen-criteria-on-hundreds-unit-errors-etc-" class="section level2">
+<h2 class="hasAnchor">
+<a href="#loosen-criteria-on-hundreds-unit-errors-etc-" class="anchor"></a>Loosen criteria on hundreds, unit errors, etc.</h2>
+<p>The criteria for some of these steps may be loosened to catch more implausible values. For unit error correction, we could consider having two levels: one suitable for correction, the other not.</p>
+</div>
+<div id="number-of-height-loss-events" class="section level2">
+<h2 class="hasAnchor">
+<a href="#number-of-height-loss-events" class="anchor"></a>Number of height loss events</h2>
+<p>While maintaining overall height loss limits, we could allow for the possibility of more height loss events rather than assuming height loss will occur in no more than two big jumps.</p>
+</div>
+<div id="error-load" class="section level2">
+<h2 class="hasAnchor">
+<a href="#error-load" class="anchor"></a>Error load</h2>
+<p>We could consider a change so that error load is not triggered if the only exclusions are for heights 3+D outside of w2.</p>
+</div>
 </div>
   </div>
 
