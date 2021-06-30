@@ -13,6 +13,8 @@
 #' set up function to process one patient.  Function to parallelize batches is below.
 #'
 #' @keywords internal
+#' @import data.table
+#' @importFrom stats median
 #' @noRd
 cleanbatch <- function(data.df,
                        log.path,
@@ -31,12 +33,34 @@ cleanbatch <- function(data.df,
                        lt3.exclude.mode,
                        error.load.threshold,
                        error.load.mincount) {
+  # avoid "no visible binding" warnings
+  abs.2ndlast.sd <- abs.tbc.sd <- abs.tbc.sd.next <- abs.tbc.sd.prev <- abssum2 <- NULL
+  aft.g.befp1 <- agedays <- agedays.other <- bef.g.aftm1 <- delta <- NULL
+  delta.agedays.next <- delta.agedays.prev <- delta.next.ht <- delta.next.sd <- NULL
+  delta.prev.ht <- delta.prev.sd <- dewma.after <- dewma.after.prev <- NULL
+  dewma.all <- dewma.before <- dewma.before.next <- dnext.sd <- dnext.sd.minus <- NULL
+  dnext.sd.plus <- dprev.sd <- dprev.sd.minus <- dprev.sd.plus <- dup <- NULL
+  dup.ratio <- ewma.after <- ewma.all <- ewma.before <- exclude <- exclude.count <- NULL
+  extraneous <- extraneous.this.day <- first.of.three.or.more <- ht.exp <- NULL
+  include.count <- index <- last.of.three.or.more <- line <- max.ht.vel <- NULL
+  max.whoinc.1.ht <- max.whoinc.2.ht <- max.whoinc.3.ht <- max.whoinc.4.ht <- NULL
+  max.whoinc.6.ht <- maxdiff.next.ht <- maxdiff.prev.ht <- median.other.sd <- NULL
+  min.ht.vel <- mindiff.next.ht <- mindiff.prev.ht <- pair <- pair.next <- NULL
+  pair.prev <- param <- param.other <- prev.v <- sd.median <- sex <- subjid <- NULL
+  swap.flag.1 <- swap.flag.2 <- tanner.months <- tbc.other.sd <- tbc.sd <- NULL
+  tbc.sd.d <- tbc.sd.max <- tbc.sd.min <- tbc.sd.minus <- tbc.sd.next <- tbc.sd.plus <- NULL
+  tbc.sd.prev <- tbc.sd.sw <- tbc.sd.t <- temp.diff <- temp.exclude <- v <- NULL
+  v.d <- v.minus <- v.next <- v.orig <- v.plus <- v.prev <- v.sw <- v.t <- NULL
+  valid.interior.measurement <- who.maxdiff.next.ht <- who.mindiff.next.ht <- NULL
+  whoagegrp.ht <- whoinc.1.ht <- whoinc.2.ht <- whoinc.3.ht <- whoinc.4.ht <- NULL
+  whoinc.6.ht <- whoinc.age.ht <- z.orig <- NULL
+
   data.df <- data.table(data.df, key = c('subjid', 'param', 'agedays', 'index'))
 
   if (parallel & !is.na(log.path)) {
     sink(
       sprintf(
-        "%s/cleangrowth-%s-batch-%s.log",
+        "%s/cleangrowth-%s-batch-%03d.log",
         log.path,
         Sys.Date(),
         data.df$batch[1]
@@ -487,7 +511,7 @@ cleanbatch <- function(data.df,
 
   # 12d.  For each subject/parameter/age with extraneous and at least one non-extraneous value:
   #   i.  Replace exc_*=7 for all values except the value that has the smallest abssum2_*.
-  data.df[J(subj.param.not.all.dups), extraneous := seq_along(abssum2) != which.min(abssum2), by =
+  data.df[data.table(subj.param.not.all.dups), extraneous := seq_along(abssum2) != which.min(abssum2), by =
             .(subjid, param, agedays)]
   data.df[temp.dups, exclude := 'Include']
   data.df[(valid.rows |
@@ -499,7 +523,7 @@ cleanbatch <- function(data.df,
   #       for each age where the  largest measurement minus the smallest measurement for that subject/parameter/age is larger than
   #       the maximum difference (ht 3cm; wt 0-9.999 kg 0.25kg; wt 10-29.9999 kg 0.5 kg; wt 30kg and higher 1 kg).
 
-  data.df[J(dup.ratio.df[dup.ratio > 1 / 2, list(subjid, param)]), exclude := (function(df) {
+  data.df[data.table(dup.ratio.df[dup.ratio > 1 / 2, list(subjid, param)]), exclude := (function(df) {
     df[, `:=`(tbc.sd.min = as.double(NaN),
               tbc.sd.max = as.double(NaN))]
     df[valid(

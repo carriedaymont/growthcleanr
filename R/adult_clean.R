@@ -18,8 +18,15 @@
 #'       or is implausible (designated with an error code).
 #'     mean_sde, mean of similar same day extraneous values
 #' @keywords internal
+#' @importFrom stats setNames
 #' @noRd
 cleanadult <- function(df, weight_cap = Inf){
+
+  # avoid "no visible binding" warnings
+  age_years <- embed <- i.all_exc_weight_cap <- i.gain_groups <- i.keep <- NULL
+  i.loss_groups <- i.mean_ht <- i.mean_sde <- i.orig_sde <- mean_sde <- NULL
+  median <- orig_sde <- param <- result <- NULL
+
   # method specific constants ----
   # this includes specified cutoffs, etc.
 
@@ -81,7 +88,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 1h, H BIV ----
     # 1h. remove biologically impossible height records
-    step <- "Exclude-BIV"
+    step <- "Exclude-Adult-BIV"
 
     if (nrow(h_subj_df) > 0){
       # overwrite measurement with metric (bivs are in metric)
@@ -109,7 +116,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 5h, H hundreds ----
     # 5h. when height goes down by 100 cm -- is it valid?
-    step <- "Exclude-Hundreds"
+    step <- "Exclude-Adult-Hundreds"
 
     inc_df <- if (nrow(h_subj_df) > 0){
       # we only want to consider subjects without temp extraneous
@@ -141,7 +148,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 6h, H unit errors ----
     # 6h. checking whether or not height should be a different type of value
-    step <- "Exclude-Unit-Errors"
+    step <- "Exclude-Adult-Unit-Errors"
 
     inc_df <- if (nrow(h_subj_df) > 0){
       # we only want to consider subjects without temp extraneous
@@ -168,7 +175,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 7h, H transpositions ----
     # 7h. checking whether or not 10s and 1s digit should be switched
-    step <- "Exclude-Transpositions"
+    step <- "Exclude-Adult-Transpositions"
 
     inc_df <- if (nrow(h_subj_df) > 0){
       # we only want to consider subjects without temp extraneous
@@ -227,7 +234,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # if there are no valid heights, skip
     if (nrow(w_subj_df) > 0){
-      step <- "Exclude-BIV"
+      step <- "Exclude-Adult-BIV"
 
       # overwrite measurement with metric (bivs are in metric)
       w_subj_df$measurement <- w_subj_df$meas_m
@@ -318,9 +325,9 @@ cleanadult <- function(df, weight_cap = Inf){
       impl_ids <- as.character(inc_df$id)[criteria]
 
       step <- if (all(is_wc)){
-        "Exclude-Weight-Cap-Identical"
+        "Exclude-Adult-Weight-Cap-Identical"
       } else {
-        "Exclude-Weight-Cap"
+        "Exclude-Adult-Weight-Cap"
       }
 
       # update and remove
@@ -339,7 +346,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 5w, W hundreds ----
     # 5w. when weight goes up/down by 100/200 kg/100-300 lbs -- is it valid?
-    step <- "Exclude-Hundreds"
+    step <- "Exclude-Adult-Hundreds"
 
     inc_df <- if (nrow(w_subj_df) > 0){
       # we only want to consider subjects without temp extraneous and rvs
@@ -396,7 +403,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 6w, W unit errors ----
     # 6w. if a record recorded as metric should be imperial for interior values
-    step <- "Exclude-Unit-Errors"
+    step <- "Exclude-Adult-Unit-Errors"
 
     inc_df <- if (nrow(w_subj_df) > 0){
       # we only want to consider subjects without temp extraneous and rvs
@@ -434,7 +441,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 7w, W transpositions ----
     # 7w. if a record should have swapped the 10s and 1s digits
-    step <- "Exclude-Transpositions"
+    step <- "Exclude-Adult-Transpositions"
 
     inc_df <- if (nrow(w_subj_df) > 0){
       # we only want to consider subjects without temp extraneous and rvs
@@ -472,7 +479,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # do step 8: swaps (both height and weight) ----
     # 8. checking whether heights and weights should have been swapped
-    step <- "Exclude-Swaps"
+    step <- "Exclude-Adult-Swapped-Measurement"
 
     if (nrow(h_subj_df) > 0 & nrow(w_subj_df) > 0){
       # we only want to consider subjects without temp extraneous
@@ -614,7 +621,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # don't do this if there aren't any non extraneous for the subject
     if (nrow(h_subj_df) > 0 & any(h_subj_df$extraneous)){
-      step <- "Exclude-Same-Day-Identical"
+      step <- "Exclude-Adult-Identical-Same-Day"
 
       # identify duplicate days
       dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
@@ -652,7 +659,7 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
       }
 
-      step <- "Exclude-Same-Day-Extraneous"
+      step <- "Exclude-Adult-Extraneous-Same-Day"
       # now the rest!
 
       # check if heights on duplicate days are trivially the same, keep both,
@@ -755,8 +762,10 @@ cleanadult <- function(df, weight_cap = Inf){
               ""
             }
           # the rest are to be excluded
-          rem_ids <- h_subj_df$id[h_subj_df$age_days == dd &
-                                    h_subj_df$id != comp_id]
+          rem_ids <- c(rem_ids,
+                       h_subj_df$id[h_subj_df$age_days == dd &
+                                      h_subj_df$id != comp_id]
+          )
         }
         # update criteria
         criteria <- h_subj_df$id %in% rem_ids
@@ -787,7 +796,7 @@ cleanadult <- function(df, weight_cap = Inf){
     # go through each type of exclusion
     if (num_distinct == 2){
       # 10ha, H distinct pairs ----
-      step <- "Exclude-Distinct-Pairs"
+      step <- "Exclude-Adult-Distinct-Pairs"
 
       # identify "height 1 and 2" and their corresponding ages
       ht_1 <- unique(h_subj_df$meas_m[order(h_subj_df$age_days)])[1]
@@ -830,7 +839,7 @@ cleanadult <- function(df, weight_cap = Inf){
             min(ht_2_ageyears) > max(ht_1_ageyears)
         } else {
           # this is not a check to apply if they're outside the age range
-          pairhtgain <- T
+          pairhtgain <- F
         }
 
         # potential reallow: falls are <= 3 (+2) in or <= 5 (+2) for ageyears > 50
@@ -841,7 +850,7 @@ cleanadult <- function(df, weight_cap = Inf){
           min(ht_2_ageyears) > max(ht_1_ageyears)
 
         # exclude if there are no reallow for loss and gain
-        exc_pairs <- !(pairhtloss & pairhtgain)
+        exc_pairs <- !(pairhtloss | pairhtgain)
         if (exc_pairs){
           criteria <- rep(T, nrow(h_subj_df))
         }
@@ -861,7 +870,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     } else if (num_distinct >= 3){
       # 10ha, H distinct 3 or more ----
-      step <- "Exclude-Distinct-3-Or-More"
+      step <- "Exclude-Adult-Distinct-3-Or-More"
 
       h_subj_df <- h_subj_df[order(h_subj_df$age_years),]
       # create w2 (w/in 2) and o2  (outside 2) groups
@@ -931,14 +940,14 @@ cleanadult <- function(df, weight_cap = Inf){
         # g3: first height outside g2 + 2 inches
         # ^ if any heights out, we want to go with what we had originally
 
-        gtotal_loss <- ht_change_groups(h_subj_df, 3)
+        gtotal_loss <- ht_change_groups(h_subj_df, 3, type = "loss")
         glist <- glist_loss <- gtotal_loss$meas # groups with measurements
         galist <- gtotal_loss$age # groups with ages, in years
 
         # if there are any outside these groups, we don't attempt to fix
         # we need all of them to be in some group
         # if (all(Reduce("|", glist))){
-        if (length(glist) <= 3){
+        if (length(glist) > 0 & length(glist) <= 3){
           # create a mean ht and a min age for each group
           mean_ht <- sapply(glist, function(g){
             suppressWarnings(mean(g))
@@ -949,15 +958,15 @@ cleanadult <- function(df, weight_cap = Inf){
 
           # check g2 v g1 -- true indicates use the original exclusions
           g2_g1_check <-
-            if (!is.na(mean_ht[2])){
+            !(if (!is.na(mean_ht[2])){
               (mean_ht[2] - mean_ht[1]) < 0 &
                 ((min_age[2] < 50 &
-                    (mean_ht[2] - mean_ht[1]) < ((-5 * 2.54) +.001)) |
+                    (mean_ht[2] - mean_ht[1]) > ((-5 * 2.54) +.001)) |
                    (min_age[2] >= 50 &
-                      (mean_ht[2] - mean_ht[1]) < ((-7 * 2.54) +.001)))
+                      (mean_ht[2] - mean_ht[1]) > ((-7 * 2.54) +.001)))
             } else {
               F
-            }
+            })
 
           # check g3 v g2 -- true indicates use the original exclusions
           g3_g2_check <-
@@ -1001,13 +1010,13 @@ cleanadult <- function(df, weight_cap = Inf){
         # g2: first height outside g1 + 2 inches ....
         # ^ if any heights out, we want to go with what we had originally
 
-        gtotal_gain <- ht_change_groups(h_subj_df, 6)
+        gtotal_gain <- ht_change_groups(h_subj_df, 6, type = "gain")
         glist <- glist_gain <- gtotal_gain$meas # groups with measurements
         galist <- gtotal_gain$age # groups with ages
 
         # if there are any outside these groups, we don't attempt to fix
         # we need all of them to be in some group
-        if (length(glist) <= 6){
+        if (length(glist) > 0 & length(glist) <= 6){
           # create a mean ht and a min age for each group
           mean_ht <- sapply(glist, function(g){
             suppressWarnings(mean(g))
@@ -1105,7 +1114,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 9w, W extreme EWMA ----
     # 9w. mark extreme values using EWMA method
-    step <- "Exclude-Extreme-EWMA"
+    step <- "Exclude-Adult-EWMA-Extreme"
 
     if (nrow(w_subj_df) > 0){
       # first, remove ewma without temp extraneous and repeated values
@@ -1171,7 +1180,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # don't do this if there aren't any non extraneous for the subject
     if (nrow(w_subj_df) > 0 & any(w_subj_df$extraneous)){
-      step <- "Exclude-Same-Day-Identical"
+      step <- "Exclude-Adult-Identical-Same-Day"
 
       # identify duplicate days
       dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
@@ -1209,7 +1218,7 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
       }
 
-      step <- "Exclude-Same-Day-Extraneous"
+      step <- "Exclude-Adult-Extraneous-Same-Day"
       # now the rest!
 
       # check if heights on duplicate days are trivially the same, keep both,
@@ -1296,8 +1305,10 @@ cleanadult <- function(df, weight_cap = Inf){
               ""
             }
           # the rest are to be excluded
-          rem_ids <- w_subj_df$id[w_subj_df$age_days == dd &
-                                    w_subj_df$id != comp_id]
+          rem_ids <- c(rem_ids,
+                       w_subj_df$id[w_subj_df$age_days == dd &
+                                      w_subj_df$id != comp_id]
+          )
         }
         # update criteria
         criteria <- w_subj_df$id %in% rem_ids
@@ -1329,15 +1340,17 @@ cleanadult <- function(df, weight_cap = Inf){
       F
     }
 
-    # use all RV
-    criteria <- rep(F, nrow(inc_df))
+    # for pairs: use all RV
+    # for >=2, use first RV, remove, then use all RV, remove
 
     # first, identify implausible for distinct pairs
     if (pair_distinct){
       # 11wa, W distinct ordered pairs ----
       # 11wa. Check pairs (2 distinct ordered values), where all first values are
       # of ages less than second values
-      step <- "Exclude-Distinct-Ordered-Pairs"
+      step <- "Exclude-Adult-Distinct-Ordered-Pairs"
+
+      # use all RV
 
       # get first and last weight -- already ordered by age
       # all first are before all last, so these will be the two distinct values
@@ -1377,212 +1390,57 @@ cleanadult <- function(df, weight_cap = Inf){
       exc_pairs <- exc_pairs | wt_perc < perc_limit
 
       criteria <- exc_pairs
-    } else if (length(unique(w_subj_df$meas_m)) >= 2){ # (but not ordered)
-      # 11wb, W moderate EWMA ----
-      # 11wb. Check all other types, using a more moderate EWMA cutoff and other
-      # criteria
-      step <- "Exclude-Moderate-EWMA"
 
-      inc_df <- copy(w_subj_df)
-
-      # exclude the most extreme, then recalculate again and again
-      rem_ids <- c()
-      change <- T
-      iter <- 1
-      while (change){
-        # set a limit for wts to be percent of other wts, focused on lower wts
-        perc_limit <- rep(.7, nrow(inc_df))
-        perc_limit[inc_df$meas_m > 45] <- .4
-
-        # figure out time difference between points
-        ageyears_bef <- c(Inf, diff(inc_df$age_years))
-        ageyears_aft <- c(diff(inc_df$age_years), Inf)
-        minagediff <- ageyears_bef
-        minagediff[ageyears_aft < ageyears_bef] <-
-          ageyears_aft[ageyears_aft < ageyears_bef]
-        # convert to days - rounded
-        agedays_bef <- round(ageyears_bef*365.25)
-        agedays_aft <- round(ageyears_aft*365.25)
-
-        # figure out weight difference between points
-        wt_bef <- c(NA, diff(inc_df$meas_m))
-        wt_aft <- c(diff(inc_df$meas_m), NA)
-
-        # 'polation (inter/extra-polation)
-        # "interpolation" - between prior and next with error of 5 on either end
-        binerr_interpol <-
-          if (nrow(inc_df) >= 3){
-            c(NA, sapply(2:(nrow(inc_df)-1), function(x){
-              check_between(inc_df$meas_m[x],
-                            inc_df$meas_m[x-1]-5, inc_df$meas_m[x+1]+5) |
-                check_between(inc_df$meas_m[x],
-                              inc_df$meas_m[x+1]-5, inc_df$meas_m[x-1]+5)
-            }), NA)
-          } else {
-            c(NA, NA)
-          }
-        # extrapolation -- prior weights
-        lepolate_p <- binerr_lepolate_p <- c(rep(NA,2))
-        if (nrow(inc_df) >= 3){
-          for (x in 3:nrow(inc_df)){
-            slope <- (inc_df$meas_m[x-1] - inc_df$meas_m[x-2])/
-              (inc_df$age_days[x-1] - inc_df$age_days[x-2])
-            lepolate_p <- c(lepolate_p, round_pt(
-              inc_df$meas_m[x-1] +
-                slope*(inc_df$meas_m[x]-inc_df$meas_m[x-1]),
-              .2
-            ))
-
-            # is current value between extrapolated and 2 previous
-            binerr_lepolate_p <- c(
-              binerr_lepolate_p,
-              check_between(inc_df$meas_m[x],
-                            inc_df$meas_m[x - 2] - 5, lepolate_p[x] + 5) |
-                check_between(inc_df$meas_m[x],
-                              lepolate_p[x] - 5, inc_df$meas_m[x - 2] + 5)
-            )
-          }
-        }
-        # extrapolation -- next weights
-        lepolate_n <- binerr_lepolate_n <- c()
-        if (nrow(inc_df) >= 3){
-          for (x in 1:(nrow(inc_df)-2)){
-            slope <- (inc_df$meas_m[x+1] - inc_df$meas_m[x+2])/
-              (inc_df$age_days[x+1] - inc_df$age_days[x+2])
-            lepolate_n <- c(lepolate_n, round_pt(
-              inc_df$meas_m[x+1] +
-                slope*(inc_df$meas_m[x+1]-inc_df$meas_m[x]),
-              .2
-            ))
-
-            # is current value between extrapolated and 2 next
-            binerr_lepolate_n <- c(
-              binerr_lepolate_n,
-              check_between(inc_df$meas_m[x],
-                            inc_df$meas_m[x + 2] - 5, lepolate_n[x] + 5) |
-                check_between(inc_df$meas_m[x],
-                              lepolate_n[x] - 5, inc_df$meas_m[x + 2] + 5)
-            )
-          }
-        }
-        lepolate_n <- c(lepolate_n, rep(NA,2))
-        binerr_lepolate_n <- c(binerr_lepolate_n, rep(NA,2))
-
-        # compute "weight allow" how much change is allowed over time
-        wta <- 4 + 18*log(1 + (minagediff*12))
-        # cap at 60
-        wta[wta > 60] <- 60
-
-        # calculate ewma
-        ewma_res <- ewma_dn(inc_df$age_days, inc_df$meas_m)
-
-        dewma <- inc_df$meas_m - ewma_res
-        colnames(dewma) <- paste0("d",colnames(ewma_res))
-
-        # moderate EWMA exclusion criteria
-        exc_mod_ewma <-
-          (dewma$dewma.all > wta &
-             dewma$dewma.before > (.75*wta) &
-             dewma$dewma.after > (.75*wta)) |
-          (dewma$dewma.all < -1*wta &
-             dewma$dewma.before < (-1*.75*wta) &
-             dewma$dewma.after < (-1*.75*wta))
-
-        # alternate ewma criteria -- if difference with adjacent within wta and
-        # difference in agedays <= 14
-        # prior is close in age but far in weight
-        alt_ewma_exc <-
-          agedays_bef <= 14 &
-          abs(wt_bef) > wta |
-          (dewma$dewma.all > wta &
-             dewma$dewma.after > (.75*wta)) |
-          (dewma$dewma.all < -1*wta &
-             dewma$dewma.after < (-1*.75*wta))
-        # next is close in age but far in weight
-        alt_ewma_exc <- alt_ewma_exc |
-          (agedays_aft <= 14 &
-             abs(wt_aft) > wta |
-             (dewma$dewma.all > wta &
-                dewma$dewma.before > (.75*wta)) |
-             (dewma$dewma.all < -1*wta &
-                dewma$dewma.before < (-1*.75*wta)))
-        exc_mod_ewma[is.na(exc_mod_ewma)] <- F
-        alt_ewma_exc[is.na(alt_ewma_exc)] <- F
-        exc_mod_ewma <- exc_mod_ewma | alt_ewma_exc
-
-        # identify binerr criteria -- edge ones are marked as true
-        binerr_lepolate_n[is.na(binerr_lepolate_n)] <- F
-        binerr_lepolate_p[is.na(binerr_lepolate_p)] <- F
-        binerr_interpol[is.na(binerr_interpol)] <- F
-        exc_binerr <- !binerr_lepolate_p & !binerr_lepolate_n & !binerr_interpol
-        # alternate binerr crtieria -- if difference with adjacent within wta and
-        # difference in agedays <= 14
-        alt_exc_binerr <-
-          agedays_bef <= 14 &
-          abs(wt_bef) > wta &
-          binerr_lepolate_n
-        alt_exc_binerr <- alt_exc_binerr |
-          agedays_aft <= 14 &
-          abs(wt_aft) > wta &
-          binerr_lepolate_p
-        exc_binerr <- exc_binerr | alt_exc_binerr
-        exc_binerr[is.na(exc_binerr)] <- F
-
-        # ratio to ewma can also lead to exclusion
-        percewma <- inc_df$meas_m/ewma_res
-        exc_perc <- percewma$ewma.all < perc_limit &
-          percewma$ewma.before < perc_limit &
-          percewma$ewma.after < perc_limit
-        exc_perc[is.na(exc_perc)] <- F
-
-        criteria_new <- (exc_mod_ewma & exc_binerr) | exc_perc
-
-        if (all(!criteria_new)){
-          change <- F
-        } else {
-          # ewma ratio determines which to exclude -- highest ewmaratio
-          ewmaratio <- abs(dewma$dewma.all)/wta
-          # boost middle values -- be more strict
-          ewmaratio[-c(1, length(ewmaratio))] <-
-            ewmaratio[-c(1, length(ewmaratio))] + .2
-
-          # figure out the most extreme value and remove it and rerun
-          to_rem <- which.max(ewmaratio[criteria_new])
-
-          # keep the ids that failed and remove
-          rem_ids[length(rem_ids)+1] <- unlist(inc_df[criteria_new,][to_rem, "id"])
-          inc_df <- inc_df[inc_df$id != rem_ids[length(rem_ids)],]
-
-          # check if this is viable -- you need at least three points, otherwise
-          # we're done
-          if (nrow(inc_df) < 3){
-            change <- F
-          }
-          # update iteration
-          iter <- iter + 1
-        }
-      }
-
-      # form results into a logical vector
-      criteria <- rep(F, nrow(w_subj_df))
-      criteria[w_subj_df$id %in% rem_ids] <- T
-    }
-
-    if (nrow(w_subj_df) > 0){
+      # do removal
       # implausible ids from the step
       impl_ids <- as.character(w_subj_df$id)[criteria]
 
       # update and remove
       w_subj_keep[c(impl_ids)] <- step
 
-      w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids, rv_impl_ids),]
+      w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids),]
+
+    } else if (length(unique(w_subj_df$meas_m)) >= 2){ # (but not ordered)
+      # 11wb, W moderate EWMA ----
+      # 11wb. Check all other types, using a more moderate EWMA cutoff and other
+      # criteria
+      step <- "Exclude-Adult-EWMA-Moderate"
+
+      # DO TWO STEPS: FIRST RVS, REMOVE, THEN DO ALL RVS
+
+      # first, do only first rvs
+      inc_df <- copy(w_subj_df[!w_subj_df$is_rv,])
+
+      criteria <- remove_mod_ewma_wt(inc_df)
+
+      # implausible ids from the step
+      impl_ids <- as.character(inc_df$id)[criteria]
+
+      # update and remove
+      w_subj_keep[impl_ids] <- step
+
+      w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids),]
+
+      # then, do all RVs
+      inc_df <- copy(w_subj_df)
+
+      criteria <- remove_mod_ewma_wt(inc_df)
+
+      # implausible ids from the step
+      impl_ids <- as.character(inc_df$id)[criteria]
+
+      # update and remove
+      w_subj_keep[impl_ids] <- step
+
+      w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids),]
     }
+
     # no need to do rvs -- no need in the future
 
     # 12w, W weight cap influence ----
     # 12w. Check, if a weight cap is specified, if there are any remaining after
     # the preceding steps -- they may have some influence on remaining data.
-    step <- "Exclude-Possibly-Impacted-By-Weight-Cap"
+    step <- "Exclude-Adult-Possibly-Impacted-By-Weight-Cap"
 
     if (weight_cap < Inf & nrow(w_subj_df) > 0){
       # weight cap is evaluated with +/ .1 (for precision)
@@ -1608,7 +1466,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # 13, distinct 1 ----
     # 13.  determine if single values in height/weight fall within BMI criteria
-    step <- "Exclude-Distinct-Single"
+    step <- "Exclude-Adult-Distinct-Single"
 
     # only do this if there's 1 distinct in either height or weight
     if (length(unique(h_subj_df$meas_m)) == 1 |
@@ -1714,14 +1572,14 @@ cleanadult <- function(df, weight_cap = Inf){
     # 14h, H error load ----
     # 14h. compute error load -- whether there are too many errors and all
     # should be excluded
-    step <- "Exclude-Error-Load"
+    step <- "Exclude-Adult-Too-Many-Errors"
 
     # no need to do this if everything is already excluded
     if (nrow(h_subj_df) > 0){
       # compute errors -- without sde
       num_err <- sum(!grepl("Same-Day", h_subj_keep) & h_subj_keep != "Include")
       # compute include -- without sde
-      num_inc <- sum(!grepl("Same-Day", h_subj_keep) & h_subj_keep == "Include")
+      num_inc <- sum(!grepl("Same-Day", h_subj_keep))
 
       # if there are greater than 40% errors for a subject, fill everything
       # with errors
@@ -1741,14 +1599,14 @@ cleanadult <- function(df, weight_cap = Inf){
     # 14w, W error load ----
     # 14w. compute error load -- whether there are too many errors and all
     # should be excluded
-    step <- "Exclude-Error-Load"
+    step <- "Exclude-Adult-Too-Many-Errors"
 
     # no need to do this if everything is already excluded
     if (nrow(w_subj_df) > 0){
       # compute errors -- without sde
       num_err <- sum(!grepl("Same-Day", w_subj_keep) & w_subj_keep != "Include")
       # compute include -- without sde
-      num_inc <- sum(!grepl("Same-Day", w_subj_keep) & w_subj_keep == "Include")
+      num_inc <- sum(!grepl("Same-Day", w_subj_keep))
 
       # if there are greater than 40% errors for a subject, fill everything
       # with errors

@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{simple_bmi}
 \alias{simple_bmi}
-\title{simple_bmi}
+\title{Compute BMI using standard formula}
 \usage{
 simple_bmi(wide_df, wtcol = "wt", htcol = "ht")
 }

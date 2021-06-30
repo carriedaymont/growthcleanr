@@ -1,0 +1,169 @@
+---
+title: "Installation"
+date: "`r Sys.Date()`"
+vignette: >
+  %\VignetteIndexEntry{Installation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\usepackage[utf8]{inputenc}
+---
+
+`growthcleanr` has been developed and tested using R version 3.6 and more
+recently version 4+. It should work using R on Windows, macOS, or Unix/Linux,
+although there are some additional [platform-specific notes](#platform) you may
+wish to review.
+
+You can install the `growthcleanr` package directly from GitHub using `devtools`
+in the R console with:
+
+```{r, eval = FALSE}
+install.packages("devtools")
+devtools::install_github("carriedaymont/growthcleanr", ref="main")
+```
+
+Note that `ref="main"` is required; the default branch is "main", and must be
+referred to explicitly.
+
+If you are unable to install `devtools`, a similar function is available in the
+`remotes` package:
+
+```{r, eval = FALSE}
+install.packages("remotes")
+remotes::install_github("carriedaymont/growthcleanr", ref="main")
+```
+
+Note that `ref="main"` is required; the default branch is "main", and must be
+referred to explicitly.
+
+`growthcleanr` itself has several dependencies, so it may take a little while to
+download and install everything on your machine.
+
+## Optional packages
+
+These packages are not required for running `cleangrowth()` and the other main
+functions of `growthcleanr`, but may be necessary for certain use cases.
+
+* `argparser` is used by the `gcdriver.R` script for command line
+operation as described in [Working with large data sets](large-data-sets.html)
+
+* `bit64` is necessary if you have long (64-bit) integer `subjid` values
+
+These can be installed the usual way:
+
+```{r, eval = FALSE}
+install.packages(c("argparser", "bit64"))
+```
+
+## <a name="platform"></a>Platform-specific notes
+
+### Windows
+
+We have observed an issue with using `growthcleanr` with Windows in a large
+agency where some R packages are installed by an administrator for a user who
+may not have write access permissions on the package folder. Similar issues may
+occur with some networked drives. This caused problems with `growthcleanr`'s
+parallel processing option. If possible, install R and its packages in locations
+hosted on the same local machine and folder(s) for which the primary user has
+write permissions. These steps should help to avoid this problem.
+
+Some users have reported that `growthcleanr` runs more slowly on Windows
+compared with Linux or macOS.
+
+### macOS
+
+`growthcleanr` uses the
+[`data.table`](https://rdatatable.gitlab.io/data.table/) package for R
+extensively. `data.table` provides a faster version of R's data frames, and is
+used to improve `growthcleanr` performance. Typically `data.table` installs in a
+manner that will be able to take advantage of multiple threads. You will know it
+worked successfully if, when you load the `data.table` library in R, you see
+something like the following:
+
+```{r, eval = FALSE}
+library(data.table)
+data.table 1.12.2 using 2 threads (see ?getDTthreads).  Latest news: r-datatable.com
+```
+
+That data.table reports "using 2 threads" indicates that installation has
+succeeded. If the message reports using only one thread, see the advice under
+the ["OpenMP enabled compiler for Mac"
+instructions](https://github.com/Rdatatable/data.table/wiki/Installation#openmp-enabled-compiler-for-mac)
+to re-install `data.table`.
+
+Users have reported errors running multiple batches with `parallel = T` from
+within RStudio. If this happens, the problem may be resolved by running from
+RGui or from the command line using `Rscript`. An example standalone script that
+may be used for this purpose is documented in [Working with large data
+sets](large-data-sets.html).
+
+### Docker
+
+This package includes a `Dockerfile` that enables easy installation of R and
+`growthcleanr` on a machine with [Docker](https://www.docker.com/) installed. It
+requires an up-to-date Docker install, and a few command-line steps, but can save time
+over installing R and `growthcleanr`'s dependencies manually.
+
+To install and run `growthcleanr` using Docker, open the PowerShell on Windows, or open
+the Terminal on macOS, and enter this `docker` command:
+
+```{bash, eval = FALSE}
+% docker run -it mitre/growthcleanr:latest R
+```
+
+The first time this command is run, it might take a few minutes to download and extract
+several necessary components, but this should be fully automated. If successful, you
+should see an R prompt, from which you can use `growthcleanr` as described below.
+
+This R environment is virtualized inside Docker, however, and isolated from your local
+machine. Because of this, you will need to map a local folder on your computer into the
+Docker environment to work with your own data. For example, if you are on Windows, and
+your data is in `C:\Users\exampleuser\analysis`, specify a mapping using the added `-v`
+step below:
+
+```{bash, eval = FALSE}
+% docker run -it -v C:\Users\exampleusers\analysis:/usr/src/app mitre/growthcleanr:latest R
+```
+
+Note that the slashes in file paths reverse direction from the reference to the folder
+location on your Windows machine (before the colon) to the folder location on the Docker
+container (after the colon); this is intentional, and accounts for how the two different
+environments reference disk locations.
+
+Note also that when mapping a folder on Windows, you may be prompted to confirm that you
+indeed want to "Share" the folder. This is a standard Windows security practice, and it
+is okay to confirm and proceed.
+
+If you are on macOS, and your data is in `/Users/exampleuser/analysis`, specify a folder
+mapping like this:
+
+```{bash, eval = FALSE}
+% docker run -it -v /Users/exampleuser/analysis:/usr/src/app mitre/growthcleanr:latest R
+```
+
+If you mapped a folder, then inside the Docker environment's R prompt, when you then
+issue a command like `list.files()`, you should see a list of the same files in the R
+session that you see in that folder on your desktop. You can now open and read your data
+files, run `cleangrowth()` and other analyses, and write result files to that same
+directory.
+
+Exit the Docker R environment with `quit()` as you normally would. Any new files you
+saved will appear in the desktop folder you mapped.
+
+## Source-level install for developers
+
+If you want to work with and potentially change the `growthcleanr` code itself,
+you can download or clone the `growthcleanr` source code and then install it from
+source. To clone the source using `git`:
+
+```{bash, eval = FALSE}
+% git clone https://github.com/carriedaymont/growthcleanr.git
+```
+
+Either way, once you have the `growthcleanr` package source, open an R session
+from the `growthcleanr` base directory. Then install growthcleanr using the R
+`devtools` package:
+
+```{r, eval = FALSE}
+devtools::install(".")
+```
+
+You can also install the package from an installation file if one is obtained.

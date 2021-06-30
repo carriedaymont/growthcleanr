@@ -104,6 +104,7 @@
 #' @import foreach
 #' @import doParallel
 #' @import parallel
+#' @importFrom utils write.csv
 #' @examples
 #' # Run calculation using a small subset of given data
 #' df_stats <- as.data.frame(syngrowth)
@@ -152,6 +153,11 @@ cleangrowth <- function(subjid,
                         adult_cutpoint = 20,
                         weight_cap = Inf,
                         adult_columns_filename = "") {
+  # avoid "no visible binding" warnings
+  N <- age_years <- batch <- exclude <- index <- line <- NULL
+  newbatch <- sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
+  v <- v_adult <- whoagegrp.ht <- whoagegrp_ht <- z.orig <- NULL
+
   # preprocessing ----
 
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
@@ -564,14 +570,12 @@ cleangrowth <- function(subjid,
 
   # adult: send to cleanadult to do most of the work ----
 
-  if (!quietly){
-    cat(sprintf("[%s] Begin processing adult data...\n", Sys.time()))
-  }
-
   # no need to do this if there's no data
   if (nrow(data.adult) > 0){
-    # TODO: MAKE THIS BETTER -- FUNCTION OR SOMETHING
-    # TODO: BATCH LOGS??
+    if (!quietly){
+      cat(sprintf("[%s] Begin processing adult data...\n", Sys.time()))
+    }
+
     # if parallel processing is desired, load additional modules
     if (parallel) {
       if (is.na(num.batches)) {
@@ -584,7 +588,7 @@ cleangrowth <- function(subjid,
         "remove_biv_low", "identify_rv", "temp_sde", "redo_identify_rv",
         "rem_hundreds", "rem_unit_errors", "get_num_places", "switch_tens_ones",
         "rem_transpositions", "ht_allow", "ht_change_groups",
-        "ht_3d_growth_compare", "remove_ewma_wt"
+        "ht_3d_growth_compare", "remove_ewma_wt", "remove_mod_ewma_wt"
       )
 
       cl <- makeCluster(num.batches)
@@ -595,45 +599,38 @@ cleangrowth <- function(subjid,
         num.batches <- 1
     }
 
+    # this is where we do most of the adult work
+    # is the randomness necessary here?
     subjid.unique <- data.adult[j = unique(subjid)]
     batches.adult <- data.table(
       subjid = subjid.unique,
-      batch = sample(num.batches, length(subjid.unique), replace = T)
+      newbatch = sample(num.batches, length(subjid.unique), replace = T)
     )
-    # this is not the most efficient way to do this
-    data.adult[, batch := 1]
-    if (num.batches > 1){
-      for (b in 1:num.batches){
-        data.adult[subjid %in% batches.adult[batch == b, subjid], batch := b]
-      }
-    }
+    data.adult <- merge(data.adult, batches.adult, by = "subjid")
+
     # add age in years
     data.adult[, age_years := agedays/365.25]
     # rename for ease of use
     data.adult[, measurement := v_adult]
     data.adult[, id := line]
 
-    if (!quietly)
-      cat(sprintf(
-        "[%s] Cleaning growth data in %d batch(es)...\n",
-        Sys.time(),
-        num.batches
-      ))
     if (num.batches == 1) {
       # do the cleaning
-      res <- cleanadult(copy(data.adult), weight_cap = weight_cap)
+      res <- cleanadult(data.adult, weight_cap = weight_cap)
     } else {
       res <- ddply(
         data.adult,
-        .(batch),
+        .(newbatch),
         cleanadult,
         .parallel = parallel,
         .paropts = list(.packages = "data.table"),
         weight_cap = weight_cap
       )
-      stopCluster(cl)
     }
 
+    if (parallel){
+      stopCluster(cl)
+    }
 
     if (adult_columns_filename != "") {
       write.csv(res, adult_columns_filename, row.names = F, na = "")
@@ -658,20 +655,23 @@ cleangrowth <- function(subjid,
     }
   }
 
+  if (any(nrow(data.all) > 0, nrow(data.adult) > 0)) {
+    # join with pediatric data
+    full_out <- data.table(
+      line = c(ret.df$line, res$line),
+      exclude = c(as.character(ret.df$exclude), res$result),
+      mean_sde = c(rep(NA, nrow(ret.df)), res$mean_sde)
+    )
+    full_out[, exclude := factor(exclude, levels = unique(c(exclude.levels,
+                                                            unique(exclude))))]
+    full_out <- full_out[order(line),]
+    # remove column added for keeping track
+    full_out[, line := NULL]
 
-  # join with pediatric data
-  full_out <- data.table(
-    line = c(ret.df$line, res$line),
-    exclude = c(as.character(ret.df$exclude), res$result),
-    mean_sde = c(rep(NA, nrow(ret.df)), res$mean_sde)
-  )
-  full_out[, exclude := factor(exclude, levels = unique(c(exclude.levels,
-                                                   unique(exclude))))]
-  full_out <- full_out[order(line),]
-  # remove column added for keeping track
-  full_out[, line := NULL]
-
-  return(full_out$exclude)
+    return(full_out$exclude)
+  } else {
+    return(c())
+  }
 
 }
 
@@ -683,6 +683,7 @@ cleangrowth <- function(subjid,
 #' @return Function for calculating BMI based on measurement, age in days, sex, and measurement value.
 #' @export
 #' @import data.table
+#' @importFrom utils read.csv read.table
 #' @examples
 #' # Return calculating function with all defaults
 #' afunc <- read_anthro()
@@ -691,6 +692,10 @@ cleangrowth <- function(subjid,
 #' afunc <- read_anthro(path = system.file("extdata", package = "growthcleanr"),
 #'                      cdc.only = TRUE)
 read_anthro <- function(path = "", cdc.only = F) {
+  # avoid "no visible bindings" warning
+  src <- param <- sex <- age <- ret <- m <- NULL
+  csdneg <- csdpos <- s <- NULL
+
   # set correct path based on input reference table path (if any)
   weianthro_path <- ifelse(
     path == "",
@@ -970,6 +975,10 @@ sd_median <- function(param, sex, agedays, sd.orig) {
   #     (stands for "to be cleaned") will be used for most of the rest of the analyses.
   # f.	In future steps I will sometimes refer to measprev and measnext which refer to the previous or next wt or ht measurement
   #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject, parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
+
+  # avoid "no visible binding" warnings
+  ageyears <- sd.median <- NULL
+
   dt <- data.table(param, sex, agedays, ageyears = floor(agedays / 365.25), sd.orig)
   setkey(dt, param, sex, agedays)
   # determine ages (in days) we need to cover from min to max age in years
