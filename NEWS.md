@@ -1,13 +1,14 @@
 # growthcleanr
 
-## [2.0.0] - 2021-06-11
+## [2.0.0] - 2021-06-30
 
 ### Added
 
 - Support for cleaning adult (18-65) observations with `adult_cutpoint` and
   `weightcap` options (https://github.com/mitre/growthcleanr/pull/17, others)
-- Added documentation describing adult algorithm, examples, and exclusions (#30)
-- Added tests support adult observations (#49)
+- Added documentation describing adult algorithm, examples, and exclusions
+  (#30), next steps (#63)
+- Added tests supporting adult observations (#49)
 
 ### Changed
 
@@ -17,7 +18,18 @@
 - Refreshed `syngrowth` synthetic test data, now includes adults (#50)
 - Reorganized documentation from README, now using
   [pkgdown](https://pkgdown.r-lib.org/) (#30)
-- Improved code layout to pass `CHECK` cleanly
+- Improved code layout to pass `CHECK` cleanly (#18, #60)
+
+
+## [1.2.6] - 2021-06-10
+
+### Changed
+
+- Corrected four duplicated age-rows in NHANES reference medians (#40)
+- Added missing non-newborn constraint in 14h.ii (thanks Lusha Cao)
+- Removed `Hmisc` dependency (#36)
+- Replaced `clean_value` result column name in docs with `gcr_result` for
+  clarity (#35)
 
 ## [1.2.5] - 2021-02-26
 
