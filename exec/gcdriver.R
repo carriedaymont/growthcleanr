@@ -141,7 +141,7 @@ df_out <- lapply(1:adult_split, function(x){
   # Separate the logs or they'll overwrite each other
   split.log.path <- sprintf("%s/split-%03d", log.path, x)
 
-  split.df$exclude <- cleangrowth(
+  split.df$gcr_result<- cleangrowth(
     split.df$subjid,
     split.df$param,
     split.df$agedays,

@@ -479,7 +479,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # do step 8: swaps (both height and weight) ----
     # 8. checking whether heights and weights should have been swapped
-    step <- "Exclude-Adult-Swapped-Measurement"
+    step <- "Exclude-Adult-Swapped-Measurements"
 
     if (nrow(h_subj_df) > 0 & nrow(w_subj_df) > 0){
       # we only want to consider subjects without temp extraneous

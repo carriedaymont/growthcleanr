@@ -167,23 +167,25 @@ All available options for `gcdriver.R` are described below.
 ```{bash, eval = FALSE}
 Rscript exec/gcdriver.R --help
 usage: gcdriver.R [--] [--help] [--quietly] [--opts OPTS] [--sdrecenter
-       SDRECENTER] [--weightcap WEIGHTCAP] [--numbatches NUMBATCHES]
-       [--adult_split ADULT_SPLIT] infile outfile
+       SDRECENTER] [--adult_cutpoint ADULT_CUTPOINT] [--weightcap
+       WEIGHTCAP] [--numbatches NUMBATCHES] [--adult_split ADULT_SPLIT]
+       infile outfile
 
 CLI driver for growthcleanr
 
 positional arguments:
-  infile             input file
-  outfile            output file
+  infile                input file
+  outfile               output file
 
 flags:
-  -h, --help         show this help message and exit
-  -q, --quietly      Disable verbose output
+  -h, --help            show this help message and exit
+  -q, --quietly         Disable verbose output
 
 optional arguments:
-  -x, --opts         RDS file containing argument values
-  -s, --sdrecenter   sd.recenter data file [default: ]
-  -w, --weightcap    weight cap [default: Inf]
-  -n, --numbatches   Number of batches [default: 1]
-  -a, --adult_split  Number of splits to run data on [default: Inf]
+  -x, --opts            RDS file containing argument values
+  -s, --sdrecenter      sd.recenter data file [default: ]
+  -a, --adult_cutpoint  adult cutpoint [default: 20]
+  -w, --weightcap       weight cap [default: Inf]
+  -n, --numbatches      Number of batches [default: 1]
+  --adult_split         Number of splits to run data on [default: Inf]
 ```

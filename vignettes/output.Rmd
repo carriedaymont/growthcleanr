@@ -30,7 +30,7 @@ between the algorithm's step labels and labels used in comment text in
 | 2d             | 0                | Include                                 | -                           |
 | 2d             | 1                | Missing                                 | -                           |
 | 5b             | 2                | Exclude-Temporary-Extraneous-Same-Day   | -                           |
-| 7d             | -                | Swapped-Measurement                     | -                           |
+| 7d             | -                | Swapped-Measurements                    | -                           |
 | 8f             | -                | Unit-Error-High                         | -                           |
 | 8f             | -                | Unit-Error-Low                          | -                           |
 | 8f             | -                | Unit-Error-Possible                     | Not set in R code           |
@@ -81,7 +81,7 @@ narrative describing the algorithm is available at
 | 5h                | H 100 metric               | Exclude-Adult-Hundreds                        | -                                                                               |
 | 6h                | H unit errors              | Exclude-Adult-Unit-Errors                     | -                                                                               |
 | 7h                | H transpositions           | Exclude-Adult-Transpositions                  | -                                                                               |
-| 8                 | swaps                      | Exclude-Adult-Swapped-Measurement             | -                                                                               |
+| 8                 | swaps                      | Exclude-Adult-Swapped-Measurements            | -                                                                               |
 | 9h                | H same day extraneous      | Exclude-Adult-Extraneous-Same-Day             | Multiple error codes depending on outcome                                       |
 | 9h                | H same day extraneous      | Exclude-Adult-Identical-Same-Day              | Multiple error codes depending on outcome                                       |
 | 10ha              | H distinct pairs           | Exclude-Adult-Distinct-Pairs                  | -                                                                               |
