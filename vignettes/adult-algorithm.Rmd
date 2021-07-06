@@ -26,14 +26,15 @@ are atypical for a population is particularly important.
 Growthcleanr-adults is designed to be as flexible as possible. In addition to
 data on HT and/or WT and a subject identifier, growthcleanr-adults requires only
 a variable for age to run, making it feasible to run on datasets from many
-sources. It is designed to work in people with many conditions that can affect
-anthropometrics, and modifications can likely be made to accommodate additional
-conditions that users identify. It can work on datasets of almost any size, from
-a dataset with one subject with one observation to datasets with hundreds of
-millions of observations. Subjects are evaluated completely independently from
-each other. HT and WT measurements for each subject are also evaluated
-separately from each other except for two small exceptions that will be detailed
-in the detailed description of steps.
+sources. To date, it has been designed and tested in outpatient data. It is
+designed to work in people with many conditions that can affect anthropometrics,
+and modifications can likely be made to accommodate additional conditions that
+users identify. It can work on datasets of almost any size, from a dataset with
+one subject with one observation to datasets with hundreds of millions of
+observations. Subjects are evaluated completely independently from each other.
+HT and WT measurements for each subject are also evaluated separately from each
+other except for two small exceptions that will be detailed in the detailed
+description of steps.
 
 > _Growthcleanr-adult does not require sex, which is required for
 > growthcleanr-pediatrics to determine standard deviation scores. There is no
