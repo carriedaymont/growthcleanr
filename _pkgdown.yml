@@ -1,0 +1,50 @@
+navbar:
+  structure:
+    left: [home, articles, reference, news]
+    right: [github]
+
+articles:
+  - title: Getting started
+    navbar: Getting started
+    contents:
+      - quickstart
+      - installation
+      - usage
+  - title: Advanced
+    navbar: Advanced topics
+    contents:
+      - configuration
+      - output
+      - adult-algorithm
+      - utilities
+      - large-data-sets
+      - next-steps
+
+reference:
+  - title: "Cleaning height and weight observations"
+    desc: Functions for cleaning growth data
+  - contents:
+      - cleangrowth
+      - ewma
+      - read_anthro
+      - sd_median
+  - title: "Extended measures for pediatric BMI"
+    desc: >
+      Compute Z-scores and percentiles for pediatric subjects,
+      based on CDC SAS program at
+      https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm
+  - contents:
+      - ext_bmiz
+  - title: "Utilities"
+    desc: Support functions for common data cleaning workflows
+  - contents:
+      - longwide
+      - recode_sex
+      - simple_bmi
+      - splitinput
+
+repo:
+  url:
+    home: https://github.com/carriedaymont/growthcleanr
+    source: https://github.com/carriedaymont/growthcleanr/blob/main/
+    issue: https://github.com/carriedaymont/growthcleanr/issues/

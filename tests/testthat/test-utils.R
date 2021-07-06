@@ -215,11 +215,14 @@ test_that("longwide works as expected with default values", {
   wide_syn <- longwide(sub_syn)
 
   # check that it has the correct amount of columns
-  expect_equal(ncol(wide_syn), 10)
+  expect_equal(ncol(wide_syn), 9)
 
-  # check that all subjects are accounted for
-  expect(all(unique(sub_syn$subjid) %in% unique(wide_syn$subjid)),
-         "not all subjects appear in wide format")
+  # check that all but one subject are accounted for
+  ss <- unique(sub_syn$subjid)
+  ws <- unique(wide_syn$subjid)
+  expect_false(all(ss %in% ws),
+               "not all subjects appear in wide format")
+  expect_equal(setdiff(ss, ws), c("542abc54-c79f-9895-0350-ded2bf04af6e"))
 
   obs_ids <- c(wide_syn$wt_id, wide_syn$ht_id)
 
@@ -239,11 +242,12 @@ test_that("longwide works as expected with default values", {
     "longwide() includes inclusion values that were not specified"
   )
 
-  # check that all sexes have been correctly recoded
-  orig_sex <- sub_syn$sex[unique(sub_syn$subjid)]
-  names(orig_sex) <- unique(sub_syn$subjid)
-  aft_sex <- wide_syn$sex[unique(wide_syn$subjid)]
-  names(aft_sex) <- unique(wide_syn$subjid)
+  # check that all sexes have been correctly recoded, using values from ws
+  # because one will be missing in wide_syn otherwise
+  orig_sex <- sub_syn$sex[ws]
+  names(orig_sex) <- ws
+  aft_sex <- wide_syn$sex[ws]
+  names(aft_sex) <- ws
 
   expect_equal(aft_sex[names(orig_sex)], orig_sex + 1)
 
@@ -265,11 +269,6 @@ test_that("longwide works as expected with default values", {
     # check height
     expect_equal(wide_syn$ht[w_idx], ht_sub$measurement[ht_idx])
 
-    # check bmi
-    expect_equal(wide_syn$bmi[w_idx],
-                 sub_syn$measurement[sub_syn$id == wide_syn$wt_id[w_idx]] /
-                   ((ht_sub$measurement[ht_idx] * .01) ^ 2))
-
   }
 
   # check weight ids
@@ -287,13 +286,6 @@ test_that("longwide works as expected with default values", {
 
     # check height
     expect_equal(wide_syn$wt[w_idx], wt_sub$measurement[wt_idx])
-
-    # check bmi
-    expect_equal(wide_syn$bmi[w_idx],
-                 wt_sub$measurement[wt_idx] /
-                   ((sub_syn$measurement[sub_syn$id == wide_syn$ht_id[w_idx]] *
-                       .01) ^ 2))
-
   }
 
 })
@@ -321,7 +313,7 @@ test_that("longwide works as expected with custom values", {
                        include_all = T)
 
   # check that it has the correct amount of columns
-  expect_equal(ncol(wide_syn), 10)
+  expect_equal(ncol(wide_syn), 9)
 
   # check that all subjects are accounted for
   expect(all(unique(sub_syn$subjid) %in% unique(wide_syn$subjid)),
@@ -346,7 +338,7 @@ test_that("longwide works as expected with custom values", {
                        inclusion_types = inc_types)
 
   # check that it has the correct amount of columns
-  expect_equal(ncol(wide_syn), 10)
+  expect_equal(ncol(wide_syn), 9)
 
   # check that all subjects are accounted for
   expect(all(unique(sub_syn$subjid) %in% unique(wide_syn$subjid)),
@@ -396,4 +388,33 @@ test_that("longwide throws errors correctly", {
   # test duplicated ids
   sub_syn$id <- 1
   expect_error(longwide(sub_syn))
+})
+
+test_that("simple_bmi works as expected", {
+  data("syngrowth")
+
+  # Similar strategy as for longwide, create subset for speed
+  sub_syn <-
+    syngrowth[syngrowth$subjid %in% unique(syngrowth$subjid)[101:200],]
+  sub_syn <- cbind(
+    sub_syn,
+    "cv" = cleangrowth(
+      subjid = sub_syn$subjid,
+      param = sub_syn$param,
+      agedays = sub_syn$agedays,
+      sex = sub_syn$sex,
+      measurement = sub_syn$measurement
+    )
+  )
+
+  wide_syn <-
+    longwide(sub_syn, gcr_result = "cv", include_all = TRUE)
+  bmi_syn <- simple_bmi(wide_syn)
+  expect_equal(TRUE, "wt" %in% names(bmi_syn))
+  expect_equal(bmi_syn$bmi,
+               bmi_syn$wt / ((bmi_syn$ht * .01) ^ 2))
+
+  # Verify that invalid column names throw an error
+  expect_error(simple_bmi(wide_syn, ht = "invalid_column"))
+  expect_error(simple_bmi(wide_syn, wt = "invalid_wt_col", ht = "invalid_ht_col"))
 })

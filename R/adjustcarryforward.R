@@ -15,6 +15,21 @@ calc_temp_exclusion_15 <- function(
   ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels,
   ewma.exp, minfactor, maxfactor, banddiff, banddiff_plus,
   min_ht.exp_under, min_ht.exp_over, max_ht.exp_under, max_ht.exp_over){
+
+  # avoid "no visible binding" warnings
+  abs.tbc.sd <- abs.tbc.sd.next <- abs.tbc.sd.prev <- aft.g.befp1 <- NULL
+  agedays <- agedays.next <- bef.g.aftm1 <- delta.agedays.next <- NULL
+  delta.next.ht <- delta.prev.ht <- dewma.after <- dewma.after.prev <- NULL
+  dewma.before <- dewma.before.next <- ewma.after <- ewma.all <- ewma.before <- NULL
+  ht.exp <- index <- max.ht.vel <- max.whoinc.1.ht <- max.whoinc.2.ht <- max.whoinc.3.ht <- NULL
+  max.whoinc.4.ht <- max.whoinc.6.ht <- maxdiff.next.ht <- maxdiff.prev.ht <- NULL
+  mid.agedays <- min.ht.vel <- mindiff.next.ht <- mindiff.prev.ht <- pair <- NULL
+  pair.next <- pair.prev <- sex <- tanner.months <- tbc.sd <- temp.diff <- temp.exclude <- NULL
+  v <- v.next <- v.prev <- who.maxdiff.next.ht <- who.mindiff.next.ht <- whoagegrp.ht <- NULL
+  whoinc.1.ht <- whoinc.2.ht <- whoinc.3.ht <- whoinc.4.ht <- whoinc.6.ht <- NULL
+  whoinc.age.ht <- NULL
+
+
   # initialize fields
   df[, (ewma.fields) := as.double(NaN)]
   df[, `:=`(
@@ -373,6 +388,18 @@ calc_step_15_no_param <- function(
   eval_type = "exclude",
   ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels,
   ewma.exp){
+
+  # avoid "no visible binding for global variable" warnings
+  agedays <- tbc.sd <- ewma.all <- ewma.before <- ewma.after <- v <- dewma.before <- NULL
+  abs.tbc.sd <- sex <- tanner.months <- ht.exp <- delta.agedays.next <- mindiff.next.ht <- NULL
+  min.ht.vel <- maxdiff.next.ht <- max.ht.vel <- minhtvel.exp <- min.ht.vel.2sd <- NULL
+  max.ht.vel.2sd <- whoagegrp.ht <- whoinc.age.ht <- index <- who.mindiff.next.ht <- NULL
+  whoinc.1.ht <- whoinc.2.ht <- whoinc.3.ht <- whoinc.4.ht <- whoinc.6.ht <- NULL
+  who.maxdiff.next.ht <- max.whoinc.1.ht <- max.whoinc.2.ht <- max.whoinc.3.ht <- NULL
+  max.whoinc.4.ht <- max.whoinc.6.ht <- dewma.after <- v.prev <- v.next <- pair <- NULL
+  delta.prev.ht <- mindiff.prev.ht <- delta.next.ht <- maxdiff.prev.ht <- NULL
+  dewma.after.prev <- pair.prev <- dewma.before.next <- pair.next <- temp.diff <- NULL
+  bef.g.aftm1 <- aft.g.befp1 <- abs.tbc.sd.prev <- abs.tbc.sd.next <- temp.exclude <- NULL
 
   # initialize fields
   df[, (ewma.fields) := as.double(NaN)]
@@ -743,6 +770,11 @@ acf_answers <- function(subjid,
                         ewma.exp = -1.5,
                         ref.data.path = "",
                         quietly = T){
+
+  # avoid "no visible binding for global variable" warnings
+  tanner.months <- whoagegrp_ht <- whoagegrp.ht <- z.orig <- z.orig <- v <- sd.orig <- NULL
+  index <- exclude <- tbc.sd <- sd.median <- acf_answer <- NULL
+
   # process ----
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
   data.all <- data.table(
@@ -1088,6 +1120,20 @@ adjustcarryforward <- function(subjid,
                                min_ht.exp_over = 0,
                                max_ht.exp_under = 0.33,
                                max_ht.exp_over = 1.5) {
+
+  # Avoid "undefined global functions/variables" warnings
+  v <- sd.orig <- sd.median <- tbc.sd <- agedays.next <- mid.agedays <- min.ht.vel <- NULL
+  delta.agedays.next <- ht.exp <- max.ht.vel <- mindiff.next.ht <- temp.exclude <- NULL
+  ecf_tmp <- ewma.all <- ewma.before <- ewma.after <- abs.tbc.sd <- whoinc.1.ht <- NULL
+  whoinc.2.ht <- whoinc.3.ht <- whoinc.4.ht <- whoinc.6.ht <- max.whoinc.1.ht <- NULL
+  max.whoinc.2.ht <- max.whoinc.3.ht <- max.whoinc.4.ht <- max.whoinc.6.ht <- NULL
+  whoinc.age.ht <- whoinc.age.ht <- who.mindiff.next.ht <- who.maxdiff.next.ht <- NULL
+  dewma.after <- maxdiff.next.ht <- v.prev <- v.next <- delta.prev.ht <- NULL
+  mindiff.prev.ht <- delta.next.ht <- maxdiff.prev.ht <- pair <- dewma.after.prev <- NULL
+  pair.prev <- dewma.before.next <- pair.next <- bef.g.aftm1 <- aft.g.befp1 <- NULL
+  abs.tbc.sd.prev <- abs.tbc.sd.next <- exclude <- n <- dewma.before <- NULL
+  tanner.months <- whoagegrp_ht <- whoagegrp.ht <- z.orig <- index <- temp.diff <- NULL
+
   # check option is valid
   if (!exclude_opt %in% 0:3){
     stop("Invalid exclude_opt. Enter a number from 0 to 3.")
