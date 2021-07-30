@@ -231,7 +231,3 @@ also implemented for `growthcleanr` in the function `ext_bmiz()`, described abov
 `growthcleanr` assesses data, packaged in a Jupyter notebook. It ships with the
 same `syngrowth` synthetic example dataset as `growthcleanr`, with cleaning
 results included.
-
-### This is a test - remove
-
-Testing added pkgdown workflow. Will this text render to HTML and be deployed as hoped?
