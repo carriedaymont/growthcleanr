@@ -1,23 +1,4 @@
-#!/usr/bin/env Rscript
-
-### CARRY FORWARD ADJUSTMENT SCRIPT
-# The goal of this script is to consider the height values that growthcleanr
-# excludes as “carried forward” for potential re-inclusion by using a reverse
-# absolute height velocity check based on step 15 of the Daymont et al.
-# algorithm.
-
-# Specify libraries ----
-
-library(argparser, quietly = TRUE)
-# Load plyr before dplyr intentionally
-library(plyr, quietly = T)
-library(dplyr, quietly = T)
-
-library(data.table, quietly = T)
-
-library(growthcleanr)
-
-# Specify functions ----
+# testadjustcf.R functions: to test adjust carryforward
 
 # Function to make a grid vector for future sweep
 # inputs:
@@ -29,6 +10,8 @@ library(growthcleanr)
 # - fg_val: value to use for non-used param in full-grid search
 # outputs
 # - numeric vector with specified qualities
+#' @keywords internal
+#' @noRd
 make_grid_vect <- function(low,
                            high,
                            grid.length,
@@ -70,6 +53,8 @@ make_grid_vect <- function(low,
 # - grid_df: data frame of parameters to sweep
 # outputs:
 # - combined input file and result of each run
+#' @keywords internal
+#' @noRd
 exec_sweep <- function(grid_df, exclude_opt) {
   for (index in 1:nrow(grid_df)) {
     if (!quietly) {
@@ -121,105 +106,54 @@ exec_sweep <- function(grid_df, exclude_opt) {
   return(combo)
 }
 
-# function to run adjust carried forward
+#' Function to test adjust carried forward
+#'
+#' The goal of this script is to consider the height values that growthcleanr
+#' excludes as “carried forward” for potential re-inclusion by using a reverse
+#' absolute height velocity check based on step 15 of the Daymont et al.
+#' algorithm
+#'
+#' @param infile Input data frame/data table, cleaned by cleangrowth(), with columns as described in main README.md
+#' @param seed Numeric random seed, used only when performing random search
+#' @param searchtype Type of search to perform: random (default), line-grid,
+#' full-grid
+#' @param gridlength Number of steps in grid to search
+#' @param writeout Write output to file? Default FALSE.
+#' @param outfile "Output file name, default 'test_adjustcarrforward_DATE_TIME', where DATE is the current system date and time"
+#' @param quietly Verbose progress info
+#' @param param "none", or data frame to specify which parameters to run full search on, and values to use if not, used only when performing full-grid search
+#' @param debug Produce extra data files for debugging
+#' @param maxrecs Limit to specified # subjects, default 0 (no limit)
+#' @param exclude_opt Type of exclusion method for carried forward strings, 0 to 3. See adjustcarryforward documentation for more information
+#' @param add_answers TRUE or FALSE, indicating whether or not to add answers (definely include/exclude) for the given dataset. Defaults to TRUE
+#'
+#' @return A list containing:
+#'   testacf_res: data frame with adjustcarryforward results for each run,
+#    params: a data frame containing parameter values for each run.
+#'   debug_filtered_data: data frame with original data, returned if debug TRUE
+#'
+#' @export
+#' @import data.table
+# NOTE: no examples, since this is a temporary function
 testacf <- function(
   infile,
   seed = 7,
   searchtype = "random",
   gridlength = 9,
-  outdir = "output",
+  writeout = F,
+  outfile = paste0(
+    "test_adjustcarryforward_",
+    format(Sys.time(), "%m-%d-%Y_%H-%M-%S")
+  ),
   quietly = F,
   param = "none",
   debug = F,
   maxrecs = 0,
-  exclude_opt = 0
+  exclude_opt = 0,
+  add_answers = T
 ){
 
-  parser <- arg_parser("CLI driver for carry forward adjustments")
-  parser <- add_argument(parser,
-                         "infile",
-                         type = "character",
-                         nargs = 1,
-                         help = "Input file, cleaned by cleangrowth()"
-  )
-  parser <- add_argument(
-    parser,
-    "--searchtype",
-    default = "random",
-    type = "character",
-    help = "Type of search to perform: random (default), line-grid, full-grid"
-  )
-  parser <- add_argument(
-    parser,
-    "--gridlength",
-    default = 9,
-    type = "integer",
-    help = "Number of steps in grid to search"
-  )
-  parser <- add_argument(parser,
-                         "--seed",
-                         default = 7,
-                         type = "integer",
-                         help = "Random seed, used only when performing random search"
-  )
-  parser <- add_argument(parser,
-                         "--param",
-                         default = "none",
-                         type = "character",
-                         help = "CSV to specify which parameters to run full search on, and values to use if not, used only when performing full-grid search"
-  )
-  parser <- add_argument(parser,
-                         "--quietly",
-                         flag = TRUE,
-                         help = "Verbose debugging info"
-  )
-  parser <- add_argument(parser,
-                         "--debug",
-                         flag = TRUE,
-                         help = "Produce extra data files for debugging; use w/--outdir"
-  )
-  parser <- add_argument(
-    parser,
-    "--maxrecs",
-    default = 0,
-    type = "integer",
-    help = "Limit to specified # recs, default 0 (no limit)"
-  )
-  parser <- add_argument(parser, "--outfile",
-                         default = paste0(
-                           "test_adjustcarryforward_",
-                           format(Sys.time(), "%m-%d-%Y_%H-%M-%S")
-                         ),
-                         type = "character",
-                         help = "Output file name, default 'test_adjustcarrforward_DATE_TIME', where DATE is the current system date and time"
-  )
-  parser <- add_argument(
-    parser,
-    "--exclude_opt",
-    default = 0,
-    type = "integer",
-    help = "Type of exclusion method for carried forward strings, 0 to 3. See adjustcarryforward documentation for more information"
-  )
-  parser <- add_argument(
-    parser,
-    "--add_answers",
-    default = TRUE,
-    type = "logical",
-    help = "TRUE or FALSE, indicating whether or not to add answers (definely include/exclude) for the given dataset. Defaults to TRUE"
-  )
-
   # Parse arguments for ease ----
-
-  argv <- parse_args(parser)
-
-  seed <- argv$seed
-  searchtype <- argv$searchtype
-  grid.length <- argv$gridlength
-  outfile <- argv$outfile
-  quietly <- argv$quietly
-  param_choice <- argv$param
-  exclude_opt <- argv$exclude_opt
-  add_answers <- argv$add_answers
 
   if (searchtype == "random") {
     # if the line search isn't odd, add one so that it includes the midpoint
@@ -234,19 +168,19 @@ testacf <- function(
   # Prepare the data ----
 
   # Read in data
-  dm <- fread(argv$infile)
+  dm <- as.data.table(infile)
   setkey(dm, subjid, param, agedays)
 
   # limit dataset for debugging/performance reasons if specified
-  if (argv$maxrecs > 0) {
+  if (maxrecs > 0) {
     if (!quietly) {
       cat(sprintf(
         "[%s] Taking max %s recs for debugging\n",
         Sys.time(),
-        argv$maxrecs
+        maxrecs
       ))
     }
-    dm_filt <- dm[subjid %in% unique(dm[, subjid])[1:argv$maxrecs], ]
+    dm_filt <- dm[subjid %in% unique(dm[, subjid])[1:maxrecs], ]
   } else {
     dm_filt <- dm
   }
@@ -380,35 +314,43 @@ testacf <- function(
     }
   }
 
-
   # Execute
   combo <- exec_sweep(grid_df, exclude_opt)
 
   # Write out results ----
 
-  # Combined adjusted set
-  fwrite(combo %>% select(-n), paste0(outfile, ".csv"), row.names = F)
+  if (writeout){
+    # Combined adjusted set
+    fwrite(combo %>% select(-n), paste0(outfile, ".csv"), row.names = F)
 
-  # Record the sweep parameters for review
-  grid <- cbind("run" = 1:nrow(grid_df), grid_df)
-  fwrite(grid, paste0(outfile, "_parameters.csv"), row.names = F)
+    # Record the sweep parameters for review
+    grid <- cbind("run" = 1:nrow(grid_df), grid_df)
+    fwrite(grid, paste0(outfile, "_parameters.csv"), row.names = F)
 
-  # Any additional debugging output
-  if (argv$debug) {
-    if (!quietly) {
-      cat(sprintf("[%s] Writing debugging output files\n", Sys.time()))
+    # Any additional debugging output
+    if (debug) {
+      if (!quietly) {
+        cat(sprintf("[%s] Writing debugging output files\n", Sys.time()))
+      }
+      # Filtered data
+      fwrite(dm_filt, paste0(outfile, "_debug_filtered_data.csv"), row.names = F)
     }
-    # Filtered data
-    fwrite(dm_filt, paste0(outfile, "_debug_filtered_data.csv"), row.names = F)
   }
 
   # Write out results ----
 
+  out_list <- list(
+    # Combined adjusted set
+    "testacf_res" = combo %>% select(-n),
+    "params" = cbind("run" = 1:nrow(grid_df), grid_df)
+  )
+
+  # any additional debugging output
+  if (debug){
+    out_list$debug_filtered_data <- dm_filt
+  }
+
   return(
-    list(
-      # Combined adjusted set
-      "testacf_res" = combo %>% select(-n),
-      "params" = cbind("run" = 1:nrow(grid_df), grid_df)
-    )
+    out_list
   )
 }
