@@ -12,6 +12,7 @@
 # - numeric vector with specified qualities
 #' @keywords internal
 #' @noRd
+#' @importFrom stats runif
 make_grid_vect <- function(low,
                            high,
                            grid.length,
@@ -55,7 +56,16 @@ make_grid_vect <- function(low,
 # - combined input file and result of each run
 #' @keywords internal
 #' @noRd
-exec_sweep <- function(grid_df, exclude_opt) {
+exec_sweep <- function(grid_df,
+                       exclude_opt,
+                       subjid,
+                       param,
+                       agedays,
+                       sex,
+                       measurement,
+                       orig.exclude,
+                       dm_filt,
+                       quietly = F) {
   for (index in 1:nrow(grid_df)) {
     if (!quietly) {
       cat(
@@ -117,7 +127,7 @@ exec_sweep <- function(grid_df, exclude_opt) {
 #' @param seed Numeric random seed, used only when performing random search
 #' @param searchtype Type of search to perform: random (default), line-grid,
 #' full-grid
-#' @param gridlength Number of steps in grid to search
+#' @param grid.length Number of steps in grid to search
 #' @param writeout Write output to file? Default FALSE.
 #' @param outfile "Output file name, default 'test_adjustcarrforward_DATE_TIME', where DATE is the current system date and time"
 #' @param quietly Verbose progress info
@@ -139,7 +149,7 @@ testacf <- function(
   infile,
   seed = 7,
   searchtype = "random",
-  gridlength = 9,
+  grid.length = 9,
   writeout = F,
   outfile = paste0(
     "test_adjustcarryforward_",
@@ -259,8 +269,8 @@ testacf <- function(
   # Define the params to test
   if (searchtype == "full-grid") {
     # specify parameter choices -- default to choosing all
-    if (param_choice != "none") {
-      param_df <- read.csv(param_choice)
+    if (param != "none" & is.data.frame(param)) {
+      param_df <- param
       colnames(param_df) <- c("param", "include", "value")
     } else {
       param_df <- data.frame(
@@ -315,7 +325,16 @@ testacf <- function(
   }
 
   # Execute
-  combo <- exec_sweep(grid_df, exclude_opt)
+  combo <- exec_sweep(grid_df,
+                      exclude_opt,
+                      subjid,
+                      param,
+                      agedays,
+                      sex,
+                      measurement,
+                      orig.exclude,
+                      dm_filt,
+                      quietly)
 
   # Write out results ----
 
