@@ -49,6 +49,7 @@ full-grid}
 \value{
 A list containing:
 testacf_res: data frame with adjustcarryforward results for each run,
+params: a data frame containing parameter values for each run.
 debug_filtered_data: data frame with original data, returned if debug TRUE
 }
 \description{

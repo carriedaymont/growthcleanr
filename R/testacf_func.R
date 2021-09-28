@@ -138,9 +138,9 @@ exec_sweep <- function(grid_df,
 #' @param add_answers TRUE or FALSE, indicating whether or not to add answers (definely include/exclude) for the given dataset. Defaults to TRUE
 #'
 #' @return A list containing:
-#'   testacf_res: data frame with adjustcarryforward results for each run,
-#    params: a data frame containing parameter values for each run.
-#'   debug_filtered_data: data frame with original data, returned if debug TRUE
+#'     testacf_res: data frame with adjustcarryforward results for each run,
+#'     params: a data frame containing parameter values for each run.
+#'     debug_filtered_data: data frame with original data, returned if debug TRUE
 #'
 #' @export
 #' @import data.table

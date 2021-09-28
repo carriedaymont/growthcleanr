@@ -28,25 +28,23 @@ file `R/adjustcarryforward.R`. It is separate from the main `R/growth.R` file as
 it is set up to be run separately, using the output from `cleangrowth()`. The
 `adjustcarryforward()` function is available in the main package namespace.
 
-The primary tool from running this function is the script `exec/testadjustcf.R`.
-This will run the experimental function on an existing dataset (specified as a
-CSV file) and pass it a sweep of parameter values for testing the new strategy.
-This tool will produce a combined output file that includes the original result
+The primary tools for running this function are the script `exec/testadjustcf.R` and the function `testacf()`. 
+These will run the experimental function on an existing dataset (specified as a
+CSV file or data frame) and pass it a sweep of parameter values for testing the new strategy.
+This tool will produce a combined output file or list that includes the original result
 alongside the resulting re-inclusion determination for each measurement for each
 parameter value run.
 
 For example, if you have run `cleangrowth()` on the `syngrowth` synthetic data
 set provided with `growthcleanr` as described in the main `README.md` file, save
-it to a CSV file:
+it to a CSV file for `exec/testadjustcf.R`:
 
 ```R
 > fwrite(cleaned_data, "cleaned.csv", row.names = F)
 ```
+For `testacf()`, keep cleaned_data in your environment. Note that the column names should be as described for `cleaned_data` the Example under Quickstart.
 
-Note that the column names should be as described for `cleaned_data` the Example
-under Quickstart.
-
-First navigate to the growthcleanr package directory in the command line. Then
+To use `exec/testadjustcf.R`, first navigate to the growthcleanr package directory in the command line. Then
 execute the sweep script is executed from the command line on the cleaned data
 file for as follows (with the assumption that cleaned.csv is in your current
 directory; otherwise, make sure to specify the path relative to your current
@@ -56,7 +54,18 @@ directory):
 % Rscript exec/testadjustcf.R cleaned.csv
 ```
 
-By default, the script will generate a range of values with nine steps for the
+To use `testacf()`, run the following in the console (with `cleaned_data` in the environment):
+
+```{r, eval=FALSE}
+result_list <- testacf(cleaned_data)
+```
+
+This `result_list` will contain 2 or 3 objects;
+- `testacf_res`: a data frame with adjustcarryforward results for each run
+- `params`: a data frame containing the parameters for each run
+- `debug_filtered_data`: data frame with original data, returned if debug is `TRUE`
+
+By default, the script/function will generate a range of values with nine steps for the
 following parameters, where the min and max surround the default value:
 
 | parameter          | default | min | max  |
@@ -71,22 +80,22 @@ following parameters, where the min and max surround the default value:
 | `max_ht.exp_over`  | 1.5     | 0   | 3    |
 
 The determination of these values depends on the search type (specified with the
-option `--searchtype`:
+option `--searchtype` (script)/argument `searchtype` (function):
 
 - `random` (default): Values will be generated randomly, with equal amounts of values
   on either side of the midpoint. The midpoint is always included.
-  - Note that if an even number is specified for `--gridlength`, one will be added to
+  - Note that if an even number is specified for `--gridlength`/`grid.length`, one will be added to
     include the midpoint in the run.
-  - A random seed can be specified with `--seed` (default 7).
+  - A random seed can be specified with `--seed`/`seed` (default 7).
 - `line-grid`: Values will be evenly distributed along the range for each parameter.
-  If the `--gridlength` specified is odd, this will include the midpoint.
+  If the `--gridlength`/`grid.length` specified is odd, this will include the midpoint.
 - `full-grid`: Values for each included parameter will evenly distributed along the
   range for each parameter and in a full combination between all parameters.
 
-  - Thus, the amount of runs done will be the `--gridlength`^(number of included
+  - Thus, the amount of runs done will be the `--gridlength`/`gridlength`^(number of included
     parameters).
   - Default includes a full grid search among all parameters. To specify use of only
-    specific parameters, use the `--param` option, which specifies a CSV of the following
+    specific parameters, use the `--param`/`param` option, which specifies a CSV of the following
     format:
 
   | parameter          | include | value |
@@ -110,15 +119,15 @@ option `--searchtype`:
   - Warning: this will take much longer!
 
 The default number of sweep steps is 9; this can be changed with the option
-`--gridlength`.
+`--gridlength`/`gridlength`.
 
 For testing options of handling strings of multiple carried forward values,
 several options from 0 to 3 have been incorporated. 0 (no change) is the default
-option, and can be changed `--exclude_opt`. More information on each option can
+option, and can be changed `--exclude_opt`/`exclude_opt`. More information on each option can
 be found in the `adjustcarryforward()` documentation.
 
 In addition to multiple options for carried-forward strings, "answers" for a
-given dataset have been incorporated. When the `--add_answers` flag is set to
+given dataset have been incorporated. When the `--add_answers` flag/`add_answers` argument is set to
 `TRUE` (`TRUE` by default), a column called `acf_answers` will have, for each
 height value, "Definitely Exclude", "Definitely Include", or "Unknown" (if it
 does not fall in either category). Weight values are set as `NA`.
@@ -155,7 +164,7 @@ run  minfactor  maxfactor  banddiff  banddiff_plus  min_ht.exp_under  min_ht.exp
 9    1          4          6         11             4                 1                0.66              3
 ```
 
-In a 3-step sweep with a `full-grid` search type, with the `--param` CSV specified as
+In a 3-step sweep with a `full-grid` search type, with the `--param` CSV/`param` data frame specified as
 in the above example, the parameters passed to the function in each pass will be:
 
 ```R
@@ -171,10 +180,10 @@ run minfactor maxfactor banddiff banddiff_plus min_ht.exp_under min_ht.exp_over 
 9       1.0         3        3           5.5                4               0              0.5             1.5
 ```
 
-The output in the working directory will contain the sweep parameters, like the above,
+For the script, the output in the working directory will contain the sweep parameters, like the above,
 in a file called `test_adjustcarrforward_DATE_TIME_parameters.csv`, and the output with
 adjustment results in a file called `test_adjustcarrforward_DATE_TIME.csv`, where DATE
-and TIME are the system date and time.
+and TIME are the system date and time. For the function, a list will be returned with the parameters as a data.frame in the `params` entry and output adjustment results as a data.frame in the `testacf_res` entry.
 
 For example, a 5-step sweep with the `line-grid` search would be run with this command:
 
@@ -182,7 +191,17 @@ For example, a 5-step sweep with the `line-grid` search would be run with this c
 % Rscript exec/textadjustcf.R --gridlength 5 --searchtype line-grid cleaned.csv
 ```
 
-The parameter set for the sweep in file `test_adjustcarrforward_DATE_TIME_parameters.csv` would be:
+or with this function execution:
+
+```{r, eval=FALSE}
+result_list <- testacf(
+  cleaned_data,
+  grid.length = 5,
+  searchtype = "line-grid"
+)
+```
+
+The parameter set for the sweep in file `test_adjustcarrforward_DATE_TIME_parameters.csv` (script)/`params` data frame of `result_list` (function) would be:
 
 ```R
 run  minfactor  maxfactor  banddiff  banddiff_plus  min_ht.exp_under  min_ht.exp_over  max_ht.exp_under  max_ht.exp_over
@@ -194,9 +213,9 @@ run  minfactor  maxfactor  banddiff  banddiff_plus  min_ht.exp_under  min_ht.exp
 ```
 
 Note that an odd-numbered length will include the default values in the middle run of the
-sweep (hence the examples w/5 and 9 step sweeps).
+sweep (hence the examples with 5 and 9 step sweeps).
 
-And the first few result rows in `test_adjustcarrforward_DATE_TIME.csv` would be:
+And the first few result rows in `test_adjustcarrforward_DATE_TIME.csv` (script)/`testacf_res` data frame of `result_list` (function) would be:
 
 ```R
 id     subjid    sex  agedays  param     measurement  gcr_result                      run-1      run-2      run-3      run-4      run-5
@@ -212,7 +231,7 @@ id     subjid    sex  agedays  param     measurement  gcr_result                
 ```
 
 The fifth row in the example above demonstrates the results of the experimental
-script; for runs 1 and 2, the result is not changes, but for runs 3-5, the
+script; for runs 1 and 2, the result is not changed, but for runs 3-5, the
 measurement is adjusted for reinclusion. To demonstrate the range, the following
 is an extract of measurements only marked as carried forward exclusions by
 `cleangrowth()`:
