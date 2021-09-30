@@ -1154,6 +1154,9 @@ adjustcarryforward <- function(subjid,
 
   ### ADJUSTCF EDIT
   data.all <- data.all[, n := 1:.N]
+
+  # also order by subject, then agedays
+  data.all <- data.all[order(subjid, agedays),]
   ### ENDEDIT
 
   data.orig <- data.all
@@ -1219,6 +1222,48 @@ adjustcarryforward <- function(subjid,
   data.all <- data.all %>%
     filter(subjid %in% data.all$subjid[data.all$orig.exclude == "Exclude-Carried-Forward"]) %>%
     as.data.table()
+
+  # IF OPTION 4: for each carried forward, we want to identify the include before
+  # and after
+  if (exclude_opt == 4){
+    # note: already ordered by subjid and days
+    # initially: do an apply, figure out something more optimal
+    nearest_incl <-
+      lapply(
+        which(data.all$orig.exclude == "Exclude-Carried-Forward"),
+        function(x){
+          # subset to only the given subject
+          sub.df <- data.all[subjid == subjid[x],]
+
+          # find the index corresponding to the given subject
+          idx <- which(sub.df$line == data.all$line[x])
+
+          # now find the closest include before (there will always be one before)
+          incl_bef <-
+            tail(sub.df[1:(idx-1),][orig.exclude == "Include", line], n = 1)
+          # find the closest include after
+          incl_aft <-
+            if (idx+1 <= nrow(sub.df)){
+              head(
+                sub.df[(idx+1):nrow(sub.df),][orig.exclude == "Include", line],
+                n = 1
+              )
+            } else {
+              NA
+            }
+
+          return(c(incl_bef, incl_aft))
+        })
+    # combine into a data.frame
+    nearest_incl <-
+      setNames(do.call(rbind.data.frame, nearest_incl), c("incl.bef", "incl.aft"))
+
+    # add to main dataframe
+    data.all[orig.exclude == "Exclude-Carried-Forward",
+             incl.bef := nearest_incl$incl.bef]
+    data.all[orig.exclude == "Exclude-Carried-Forward",
+             incl.aft := nearest_incl$incl.aft]
+  }
 
   ### END EDIT ####
 
