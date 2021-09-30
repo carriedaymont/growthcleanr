@@ -1058,6 +1058,13 @@ acf_answers <- function(subjid,
 #'    string from 1:N. Exclude all after the first that is flagged for
 #'    exclusion when comparing to the Include before and after. Make sure
 #'    remove things designated as include.
+#'    4. Evaluate all carried-forwards based on position in string from i=1:n
+#'    (n = the maximum length of a CF-string). Evaluate each CF based on the
+#'    include before and after (if available). At the end of each evaluation
+#'    for each subject's CF at position i, do not further evaluate strings where
+#'    the CF at the current position has been marked for exclusion. Whittle down
+#'    the search space in this manner until either there are no more subjects to
+#'    evaluate or we have evaluated all subjects.
 #' @param sd.recenter Data frame or table with median SD-scores per day of life
 #' @param ewma.exp Exponent to use for weighting measurements in the exponentially weighted moving
 #'  average calculations. Defaults to -1.5. This exponent should be negative in order to weight growth
@@ -1135,8 +1142,8 @@ adjustcarryforward <- function(subjid,
   tanner.months <- whoagegrp_ht <- whoagegrp.ht <- z.orig <- index <- temp.diff <- NULL
 
   # check option is valid
-  if (!exclude_opt %in% 0:3){
-    stop("Invalid exclude_opt. Enter a number from 0 to 3.")
+  if (!exclude_opt %in% 0:4){
+    stop("Invalid exclude_opt. Enter a number from 0 to 4.")
   }
 
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
@@ -1483,7 +1490,13 @@ adjustcarryforward <- function(subjid,
   # string from 1:N. exclude all after the first that is flagged for
   # exclusion when comparing to the Include before and after. make sure
   # remove things designated as include.
-  # 4. sweeping strategy NEW, ADD HERE
+  #  Evaluate all carried-forwards based on position in string from i=1:n
+  #    (n = the maximum length of a CF-string). Evaluate each CF based on the
+  #    include before and after (if available). At the end of each evaluation
+  #    for each subject's CF at position i, do not further evaluate strings where
+  #    the CF at the current position has been marked for exclusion. Whittle down
+  #    the search space in this manner until either there are no more subjects to
+  #    evaluate or we have evaluated all subjects.
 
 
   # for (opt in all_opts){
@@ -1848,11 +1861,6 @@ adjustcarryforward <- function(subjid,
       # keep track of which CF position we're on
       cf_pos <- 1
       while (cf_pos <= fin_pos & nrow(all_df) > 0) {
-        print("begin:")
-        print(cf_pos)
-        print(fin_pos)
-        print(nrow(all_df))
-
         # go through all remaining subjects and evaluate them at the position
         all_df[, exclude := (function(subj.df){
           # preallocate exclusion value
@@ -1915,10 +1923,6 @@ adjustcarryforward <- function(subjid,
               'Exclude-Min-Height-Change',
               'Exclude-Max-Height-Change'
             )],]
-
-        print("end:")
-        print(cf_pos)
-        print(nrow(all_df))
         # update cf_pos and max possible position
         cf_pos <- cf_pos + 1
         if (nrow(all_df) > 0){
