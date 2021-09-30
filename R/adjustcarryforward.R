@@ -1970,11 +1970,16 @@ adjustcarryforward <- function(subjid,
                   data.all[, exclude])
   colnames(acf_df)[-1] <- "adjustcarryforward"
 
-  # return results
-  return(rbind(
+  # add not considered results
+  acf_df <- rbind(
     acf_df,
     data.frame(
       filter(data.orig,!n %in% data.all$n) %>% mutate(adjustcarryforward = "Not Considered")  %>% select(adjustcarryforward, n)
     )
-  ))
+  )
+  # order to original order
+  acf_df <- acf_df[order(acf_df$n),]
+
+  # return results
+  return(acf_df)
 }
