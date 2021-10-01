@@ -122,7 +122,7 @@ The default number of sweep steps is 9; this can be changed with the option
 `--gridlength`/`gridlength`.
 
 For testing options of handling strings of multiple carried forward values,
-several options from 0 to 3 have been incorporated. 0 (no change) is the default
+several options from 0 to 4 have been incorporated. 0 (no change) is the default
 option, and can be changed `--exclude_opt`/`exclude_opt`. More information on each option can
 be found in the `adjustcarryforward()` documentation.
 

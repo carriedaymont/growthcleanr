@@ -186,7 +186,7 @@ parser <- add_argument(
   "--exclude_opt",
   default = 0,
   type = "integer",
-  help = "Type of exclusion method for carried forward strings, 0 to 3. See adjustcarryforward documentation for more information"
+  help = "Type of exclusion method for carried forward strings, 0 to 4. See adjustcarryforward documentation for more information"
 )
 parser <- add_argument(
   parser,
