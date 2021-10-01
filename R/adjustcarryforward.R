@@ -1746,7 +1746,7 @@ adjustcarryforward <- function(subjid,
                         first_incl <- res$first_incl
 
                         if (verdict == "Exclude"){
-                          # mark all the CFs after for exclusion
+                          # mark all the CFs after/including for exclusion
                           all_exclude[(cf_ind-1):(next_incl-1)] <- T
                           # also copy all the temp.excludes
                           eval_df$temp.exclude[(cf_ind-1):(next_incl-1)] <-
@@ -1754,10 +1754,14 @@ adjustcarryforward <- function(subjid,
 
                           # we also want to keep all the implicit excludes
                           # mark all the CFs after for "exclusion"
-                          all_exclude[(first_incl+1):(cf_ind)] <- T
-                          # also copy all the temp.excludes
-                          eval_df$temp.exclude[(first_incl+1):(cf_ind)] <-
-                            "Include"
+                          # if this is a string at all, otherwise it's already
+                          # included
+                          if ((cf_ind-2) >= (first_incl+1)){
+                            all_exclude[(first_incl+1):(cf_ind-2)] <- T
+                            # also copy all the temp.excludes
+                            eval_df$temp.exclude[(first_incl+1):(cf_ind-2)] <-
+                              "Include"
+                          }
                         } else {
                           # if the verdict is include, we need to mark them all for
                           # "exclusion" to remove -- otherwise we end up in a loop
@@ -1806,10 +1810,14 @@ adjustcarryforward <- function(subjid,
 
                           # we also want to keep all the implicit excludes
                           # mark all the CFs after for "exclusion"
-                          worst.row <- c((first_incl+1):(cf_ind), worst.row)
-                          # also copy all the temp.excludes
-                          eval_df$temp.exclude[(first_incl+1):(cf_ind)] <-
-                            "Include"
+                          # if this is a string at all, otherwise it's already
+                          # included
+                          if ((cf_ind-2) >= (first_incl+1)){
+                            worst.row <- c((first_incl+1):(cf_ind-2), worst.row)
+                            # also copy all the temp.excludes
+                            eval_df$temp.exclude[(first_incl+1):(cf_ind-2)] <-
+                              "Include"
+                          }
                         } else {
                           # if the verdict is include, we need to mark them all for
                           # "exclusion" to remove -- otherwise we end up in a loop
