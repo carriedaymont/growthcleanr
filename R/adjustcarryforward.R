@@ -1913,8 +1913,16 @@ adjustcarryforward <- function(subjid,
             # if CF index is marked for exclusion, mark it so
             # we also want to mark everything else in its string for exclusion
             if (all_exclude[2]){
+              # if the last one is empty (no include after), we make it the last
+              # one plus one
+              last_incl <- if (is.na(subj.df$incl.aft[idx])){
+                subj.df$line[nrow(subj.df)]+1
+              } else {
+                subj.df$incl.aft[idx]
+              }
+
               excl_vect[ subj.df$line %in%
-                           c(subj.df$line[idx]:(subj.df$incl.aft[idx]-1))
+                           c(subj.df$line[idx]:(last_incl-1))
               ] <- as.character(eval_df$temp.exclude[2])
             }
           }
