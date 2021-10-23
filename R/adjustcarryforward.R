@@ -1043,7 +1043,7 @@ acf_answers <- function(subjid,
 #' @param measurement Numeric vector containing the actual measurement data.  Weight must be in
 #'   kilograms (kg), and linear measurements (height vs. length) in centimeters (cm).
 #' @param orig.exclude Vector of exclusion assessment results from cleangrowth()
-#' @param exclude_opt Number from 0 to 3 indicating which option to use to handle strings of carried-forwards:
+#' @param exclude_opt Number from 0 to 5 indicating which option to use to handle strings of carried-forwards:
 #'    0. no change.
 #'    1. when deciding to exclude values, if we have a string of carried forwards,
 #'    drop the most deviant value, and all CFs in the same string, and move on as
@@ -1065,6 +1065,7 @@ acf_answers <- function(subjid,
 #'    the CF at the current position has been marked for exclusion. Whittle down
 #'    the search space in this manner until either there are no more subjects to
 #'    evaluate or we have evaluated all subjects.
+#'    5. Use the philosophy of includes on acf-answers.
 #' @param sd.recenter Data frame or table with median SD-scores per day of life
 #' @param ewma.exp Exponent to use for weighting measurements in the exponentially weighted moving
 #'  average calculations. Defaults to -1.5. This exponent should be negative in order to weight growth
@@ -1145,8 +1146,8 @@ adjustcarryforward <- function(subjid,
   line <- incl.bef <- incl.aft <- str.position <- i.exclude <- NULL
 
   # check option is valid
-  if (!exclude_opt %in% 0:4){
-    stop("Invalid exclude_opt. Enter a number from 0 to 4.")
+  if (!exclude_opt %in% 0:5){
+    stop("Invalid exclude_opt. Enter a number from 0 to 5.")
   }
 
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
@@ -1233,9 +1234,9 @@ adjustcarryforward <- function(subjid,
     filter(subjid %in% data.all$subjid[data.all$orig.exclude == "Exclude-Carried-Forward"]) %>%
     as.data.table()
 
-  # IF OPTION 4: for each carried forward, we want to identify the include before
+  # IF OPTION 4/5: for each carried forward, we want to identify the include before
   # and after
-  if (exclude_opt == 4){
+  if (exclude_opt %in% c(4, 5)){
     # note: already ordered by subjid and days
     # initially: do an apply, figure out something more optimal
     nearest_incl <-
@@ -1337,6 +1338,65 @@ adjustcarryforward <- function(subjid,
   # keep track of column names in the who growth velocity data
   who.fields <- colnames(who.ht.vel)
   who.fields <- who.fields[!who.fields %in% c('sex', 'whoagegrp.ht')]
+
+  ## ADJUSTCF EDIT FOR OPTION 5 ##
+
+  # tanner/who 2 SD for option 5 ----
+
+  if (exclude_opt == 5){
+    # load tanner height velocity data. sex variable is defined such that 0=male and 1=female
+    # recode column names to match syntactic style ("." rather than "_" in variable names)
+    tanner_ht_vel_2sd_path <- ifelse(
+      ref.data.path == "",
+      system.file("extdata/tanner_ht_vel_with_2sd.csv", package = "growthcleanr"),
+      paste(ref.data.path, "tanner_ht_vel_with_2sd.csv", sep =
+              "")
+    )
+    tanner.ht.vel.2sd <- fread(tanner_ht_vel_2sd_path)
+
+    setnames(tanner.ht.vel.2sd,
+             colnames(tanner.ht.vel.2sd),
+             gsub('_', '.', colnames(tanner.ht.vel.2sd)))
+    setkey(tanner.ht.vel.2sd, sex, tanner.months)
+    # keep track of column names in the tanner data
+    tanner.fields.2sd <- colnames(tanner.ht.vel.2sd)
+    tanner.fields.2sd <-
+      tanner.fields.2sd[!tanner.fields.2sd %in% c('sex', 'tanner.months')]
+
+    who_max_ht_vel_2sd_path <- ifelse(
+      ref.data.path == "",
+      system.file("extdata/who_ht_maxvel_2sd.csv", package = "growthcleanr"),
+      paste(ref.data.path, "who_ht_maxvel_2sd.csv", sep =
+              "")
+    )
+
+    who_ht_vel_2sd_path <- ifelse(
+      ref.data.path == "",
+      system.file("extdata/who_ht_vel_2sd.csv", package = "growthcleanr"),
+      paste(ref.data.path, "who_ht_vel_2sd.csv", sep =
+              "")
+    )
+    who.max.ht.vel.2sd <- fread(who_max_ht_vel_2sd_path)
+    who.ht.vel.2sd <- fread(who_ht_vel_2sd_path)
+    setkey(who.max.ht.vel.2sd, sex, whoagegrp_ht)
+    setkey(who.ht.vel.2sd, sex, whoagegrp_ht)
+    who.ht.vel.2sd <-
+      as.data.table(dplyr::full_join(who.ht.vel.2sd, who.max.ht.vel.2sd, by =
+                                       c('sex', 'whoagegrp_ht')))
+
+    setnames(who.ht.vel.2sd,
+             colnames(who.ht.vel.2sd),
+             gsub(
+               ".2sd", "", # replace 2sd with nothing, for ease of use in calculations
+               gsub('_', '.', colnames(who.ht.vel.2sd))
+             ))
+    setkey(who.ht.vel.2sd, sex, whoagegrp.ht)
+    # keep track of column names in the who growth velocity data
+    who.fields.2sd <- colnames(who.ht.vel.2sd)
+    who.fields.2sd <- who.fields.2sd[!who.fields.2sd %in% c('sex', 'whoagegrp.ht')]
+  }
+
+  ### END ADJUSTCF EDIT ###
 
   # 1.  General principles
   # a.	All steps are done separately for each parameter unless otherwise noted
@@ -1500,7 +1560,7 @@ adjustcarryforward <- function(subjid,
   #    the CF at the current position has been marked for exclusion. Whittle down
   #    the search space in this manner until either there are no more subjects to
   #    evaluate or we have evaluated all subjects.
-
+  # 5. same as 4, but use acf-answers
 
   # for (opt in all_opts){
   # OPTIONS 0 - 3 GO BY SUBJECT ----
@@ -1854,7 +1914,7 @@ adjustcarryforward <- function(subjid,
       setkey(subj.df, index)
       return(subj.df$exclude)
     })(copy(.SD)), by = .(subjid), .SDcols = c('sex', 'agedays', 'v', 'tbc.sd', 'exclude', 'orig.exclude')]
-  } else {
+  } else if (exclude_opt == 4) {
     # OPTION 4 USES A SWEEP STRATEGY ----
 
     data.all[param == 'HEIGHTCM', exclude := (function(all_df) {
@@ -1954,6 +2014,100 @@ adjustcarryforward <- function(subjid,
       return(orig.all_df$exclude)
     })(copy(.SD)),.SDcols = c("subjid", 'sex', 'agedays', 'v', 'tbc.sd', 'exclude',"line", 'orig.exclude', "incl.bef", "incl.aft", "str.position")]
 
+  } else if (exclude_opt == 5){
+    # OPTION 5 (acf_answers) USES A SWEEP STRATEGY ----
+    # NOTE: am using the same philosphy as 4 (with copied code) in order to
+    # not have to extricate this later on
+
+    data.all[param == 'HEIGHTCM', exclude := (function(all_df) {
+      # assign some book keeping variables
+      #subj.df[, `:=`(subjid = subjid, param='HEIGHTCM',index=1:.N)]
+      all_df[, index := 1:.N]
+
+      # find out what the last possible index in a CF string is
+      fin_pos <- max(all_df$str.position, na.rm = T)
+
+      # save the original to store information
+      orig.all_df <- copy(all_df)
+      orig.all_df[, exclude := NA]
+
+      # keep track of which CF position we're on
+      cf_pos <- 1
+      while (cf_pos <= fin_pos & nrow(all_df) > 0) {
+        # go through all remaining subjects and evaluate them at the position
+        all_df[, exclude := (function(subj.df){
+          # preallocate exclusion value
+          excl_vect <- rep("", nrow(subj.df))
+          # NOTE: BETTER WAY TO PREALLOCATE THIS
+
+          # find all carried forwards at specified position
+          all_idx <- which(subj.df$str.position == cf_pos)
+          # go through each of them
+          for (idx in all_idx){
+            # subset to the carried forward at that position, and the include
+            # before and after
+            df <- subj.df[c(
+              which(line == incl.bef[idx]), idx,
+              # there may not be an after
+              if (!is.na(incl.aft[idx])){which(line == incl.aft[idx])} else {c()}
+            ),]
+
+            # calculate if the carried forward should definitely be included
+            def_incl <- calc_step_15_no_param(
+              copy(df),
+              eval_type = "include",
+              ewma.fields, tanner.ht.vel.2sd, who.ht.vel.2sd, exclude.levels,
+              ewma.exp)
+
+            # calculate which should definitely be included and excluded
+            verdict <- rep("Unknown", length(def_incl))
+            verdict[is.na(def_incl)] <- "Definitely Include"
+
+            # if CF index is not an include, it's an exclude and we need to
+            # mark it as such
+            # we also want to mark everything else in its string for exclusion
+            if (verdict[2] != "Definitely Include"){
+              # if the last one is empty (no include after), we make it the last
+              # one plus one
+              last_incl <- if (is.na(subj.df$incl.aft[idx])){
+                subj.df$line[nrow(subj.df)]+1
+              } else {
+                subj.df$incl.aft[idx]
+              }
+
+              excl_vect[ subj.df$line %in%
+                           c(subj.df$line[idx]:(last_incl-1))
+              ] <- as.character(def_incl[2])
+            }
+          }
+
+          return(excl_vect)
+        })(copy(.SD)), by = .(subjid), .SDcols = c("subjid", 'sex', 'agedays', 'v', 'tbc.sd', 'exclude',"line", 'orig.exclude',"index", "incl.bef", "incl.aft", "str.position")]
+
+        # save the results for the current subjects
+        # NOTE: probably a better way to join these
+        orig.all_df[all_df, on = "line", exclude := i.exclude]
+
+        # remove all subjects that don't have any at the next position with a
+        # nonexclusion code
+        all_df <-
+          all_df[
+            subjid %in% all_df$subjid[str.position > cf_pos & !exclude %in% c(
+              'Exclude-Min-Height-Change',
+              'Exclude-Max-Height-Change'
+            )],]
+
+        # update cf_pos and max possible position
+        cf_pos <- cf_pos + 1
+        if (nrow(all_df) > 0){
+          # only update if there are values remaining -- will fail break on the
+          # next iteration regardless
+          fin_pos <- max(all_df$str.position, na.rm = T)
+        }
+      }
+
+      return(orig.all_df$exclude)
+    })(copy(.SD)),.SDcols = c("subjid", 'sex', 'agedays', 'v', 'tbc.sd', 'exclude',"line", 'orig.exclude', "incl.bef", "incl.aft", "str.position")]
   }
 
 
