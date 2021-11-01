@@ -480,8 +480,7 @@ calc_step_15_no_param <- function(
     df[, minhtvel.exp := ifelse(delta.agedays.next < 365.25, 0, 1)]
     df[, `:=`(maxdiff.next.ht = as.double(NA),
               mindiff.next.ht = as.double(NaN))]
-    df[, mindiff.next.ht := min.ht.vel.2sd * (min.ht.vel) ^ minhtvel.exp *
-         (delta.agedays.next /365.25) ^ ht.exp]
+    df[, mindiff.next.ht := min.ht.vel.2sd * (delta.agedays.next /365.25)]
 
     # 15f.iii.	maxdiff_ht=2*max_ht_vel*(d_agedays/365.25)^1.5+5.5 if d_agedays>365.25
     #   iv.	replace maxdiff_ht=2*max_ht_vel*(d_agedays/365.25)^0.33+5.5 if d_agedays<365.25
