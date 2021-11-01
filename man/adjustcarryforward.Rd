@@ -47,7 +47,7 @@ kilograms (kg), and linear measurements (height vs. length) in centimeters (cm).
 
 \item{orig.exclude}{Vector of exclusion assessment results from cleangrowth()}
 
-\item{exclude_opt}{Number from 0 to 3 indicating which option to use to handle strings of carried-forwards:
+\item{exclude_opt}{Number from 0 to 5 indicating which option to use to handle strings of carried-forwards:
 0. no change.
 \enumerate{
 \item when deciding to exclude values, if we have a string of carried forwards,
@@ -70,6 +70,7 @@ for each subject's CF at position i, do not further evaluate strings where
 the CF at the current position has been marked for exclusion. Whittle down
 the search space in this manner until either there are no more subjects to
 evaluate or we have evaluated all subjects.
+\item Use the philosophy of includes on acf-answers.
 }}
 
 \item{sd.recenter}{Data frame or table with median SD-scores per day of life}
