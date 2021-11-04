@@ -853,8 +853,8 @@ acf_answers <- function(subjid,
   # recode column names to match syntactic style ("." rather than "_" in variable names)
   tanner_ht_vel_2sd_path <- ifelse(
     ref.data.path == "",
-    system.file("extdata/tanner_ht_vel_with_2sd.csv", package = "growthcleanr"),
-    paste(ref.data.path, "tanner_ht_vel_with_2sd.csv", sep =
+    system.file("extdata/tanner_ht_vel_int_2sd.csv", package = "growthcleanr"),
+    paste(ref.data.path, "tanner_ht_vel_int_2sd.csv", sep =
             "")
   )
   tanner.ht.vel.2sd <- fread(tanner_ht_vel_2sd_path)
@@ -1354,8 +1354,8 @@ adjustcarryforward <- function(subjid,
     # recode column names to match syntactic style ("." rather than "_" in variable names)
     tanner_ht_vel_2sd_path <- ifelse(
       ref.data.path == "",
-      system.file("extdata/tanner_ht_vel_with_2sd.csv", package = "growthcleanr"),
-      paste(ref.data.path, "tanner_ht_vel_with_2sd.csv", sep =
+      system.file("extdata/tanner_ht_vel_int_2sd.csv", package = "growthcleanr"),
+      paste(ref.data.path, "tanner_ht_vel_int_2sd.csv", sep =
               "")
     )
     tanner.ht.vel.2sd <- fread(tanner_ht_vel_2sd_path)
