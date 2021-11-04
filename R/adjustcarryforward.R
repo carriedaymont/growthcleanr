@@ -1166,10 +1166,13 @@ adjustcarryforward <- function(subjid,
   )
 
   ### ADJUSTCF EDIT
-  data.all <- data.all[, n := 1:.N]
+  data.all <- data.all[, orig.n := 1:.N]
 
   # also order by subject, then agedays
   data.all <- data.all[order(subjid, agedays),]
+
+  # add index for sorted order
+  data.all <- data.all[, n := 1:.N]
   ### ENDEDIT
 
   data.orig <- data.all
@@ -1253,16 +1256,16 @@ adjustcarryforward <- function(subjid,
           sub.df <- data.all[subjid == subjid[x],]
 
           # find the index corresponding to the given subject
-          idx <- which(sub.df$line == data.all$line[x])
+          idx <- which(sub.df$n == data.all$n[x])
 
           # now find the closest include before (there will always be one before)
           incl_bef <-
-            tail(sub.df[1:(idx-1),][orig.exclude == "Include", line], n = 1)
+            tail(sub.df[1:(idx-1),][orig.exclude == "Include", n], n = 1)
           # find the closest include after
           incl_aft <-
             if (idx+1 <= nrow(sub.df)){
               head(
-                sub.df[(idx+1):nrow(sub.df),][orig.exclude == "Include", line],
+                sub.df[(idx+1):nrow(sub.df),][orig.exclude == "Include", n],
                 n = 1
               )
             } else {
@@ -1276,7 +1279,7 @@ adjustcarryforward <- function(subjid,
           # if it's in a string, the one before it will be carried forward
           str.position <-
             if (sub.df[idx - 1, orig.exclude == "Exclude-Carried-Forward"]){
-              idx - which(sub.df$line == incl_bef)
+              idx - which(sub.df$n == incl_bef)
             } else {
               # otherwise it will be an include, so it's in the first position
               1
@@ -1951,9 +1954,9 @@ adjustcarryforward <- function(subjid,
             # subset to the carried forward at that position, and the include
             # before and after
             df <- subj.df[c(
-              which(line == incl.bef[idx]), idx,
+              which(n == incl.bef[idx]), idx,
               # there may not be an after
-              if (!is.na(incl.aft[idx])){which(line == incl.aft[idx])} else {c()}
+              if (!is.na(incl.aft[idx])){which(n == incl.aft[idx])} else {c()}
             ),]
 
             # get all the CFs at position one and evaluate them
@@ -1982,23 +1985,23 @@ adjustcarryforward <- function(subjid,
               # if the last one is empty (no include after), we make it the last
               # one plus one
               last_incl <- if (is.na(subj.df$incl.aft[idx])){
-                subj.df$line[nrow(subj.df)]+1
+                subj.df$n[nrow(subj.df)]+1
               } else {
                 subj.df$incl.aft[idx]
               }
 
-              excl_vect[ subj.df$line %in%
-                           c(subj.df$line[idx]:(last_incl-1))
+              excl_vect[ subj.df$n %in%
+                           c(subj.df$n[idx]:(last_incl-1))
               ] <- as.character(eval_df$temp.exclude[2])
             }
           }
 
           return(excl_vect)
-        })(copy(.SD)), by = .(subjid), .SDcols = c("subjid", 'sex', 'agedays', 'v', 'tbc.sd', 'exclude',"line", 'orig.exclude',"index", "incl.bef", "incl.aft", "str.position")]
+        })(copy(.SD)), by = .(subjid), .SDcols = c("subjid", 'sex', 'agedays', 'v', 'tbc.sd', 'exclude',"n", 'orig.exclude',"index", "incl.bef", "incl.aft", "str.position")]
 
         # save the results for the current subjects
         # NOTE: probably a better way to join these
-        orig.all_df[all_df, on = "line", exclude := i.exclude]
+        orig.all_df[all_df, on = "n", exclude := i.exclude]
 
         # remove all subjects that don't have any at the next position with a
         # nonexclusion code
@@ -2018,7 +2021,7 @@ adjustcarryforward <- function(subjid,
       }
 
       return(orig.all_df$exclude)
-    })(copy(.SD)),.SDcols = c("subjid", 'sex', 'agedays', 'v', 'tbc.sd', 'exclude',"line", 'orig.exclude', "incl.bef", "incl.aft", "str.position")]
+    })(copy(.SD)),.SDcols = c("subjid", 'sex', 'agedays', 'v', 'tbc.sd', 'exclude',"n", 'orig.exclude', "incl.bef", "incl.aft", "str.position")]
 
   } else if (exclude_opt == 5){
     # OPTION 5 (acf_answers) USES A SWEEP STRATEGY ----
@@ -2053,9 +2056,9 @@ adjustcarryforward <- function(subjid,
             # subset to the carried forward at that position, and the include
             # before and after
             df <- subj.df[c(
-              which(line == incl.bef[idx]), idx,
+              which(n == incl.bef[idx]), idx,
               # there may not be an after
-              if (!is.na(incl.aft[idx])){which(line == incl.aft[idx])} else {c()}
+              if (!is.na(incl.aft[idx])){which(n == incl.aft[idx])} else {c()}
             ),]
 
             # calculate if the carried forward should definitely be included
@@ -2076,23 +2079,23 @@ adjustcarryforward <- function(subjid,
               # if the last one is empty (no include after), we make it the last
               # one plus one
               last_incl <- if (is.na(subj.df$incl.aft[idx])){
-                subj.df$line[nrow(subj.df)]+1
+                subj.df$n[nrow(subj.df)]+1
               } else {
                 subj.df$incl.aft[idx]
               }
 
-              excl_vect[ subj.df$line %in%
-                           c(subj.df$line[idx]:(last_incl-1))
+              excl_vect[ subj.df$n %in%
+                           c(subj.df$n[idx]:(last_incl-1))
               ] <- as.character(def_incl[2])
             }
           }
 
           return(excl_vect)
-        })(copy(.SD)), by = .(subjid), .SDcols = c("subjid", 'sex', 'agedays', 'v', 'tbc.sd', 'exclude',"line", 'orig.exclude',"index", "incl.bef", "incl.aft", "str.position")]
+        })(copy(.SD)), by = .(subjid), .SDcols = c("subjid", 'sex', 'agedays', 'v', 'tbc.sd', 'exclude',"n", 'orig.exclude',"index", "incl.bef", "incl.aft", "str.position")]
 
         # save the results for the current subjects
         # NOTE: probably a better way to join these
-        orig.all_df[all_df, on = "line", exclude := i.exclude]
+        orig.all_df[all_df, on = "n", exclude := i.exclude]
 
         # remove all subjects that don't have any at the next position with a
         # nonexclusion code
@@ -2113,7 +2116,7 @@ adjustcarryforward <- function(subjid,
       }
 
       return(orig.all_df$exclude)
-    })(copy(.SD)),.SDcols = c("subjid", 'sex', 'agedays', 'v', 'tbc.sd', 'exclude',"line", 'orig.exclude', "incl.bef", "incl.aft", "str.position")]
+    })(copy(.SD)),.SDcols = c("subjid", 'sex', 'agedays', 'v', 'tbc.sd', 'exclude',"n", 'orig.exclude', "incl.bef", "incl.aft", "str.position")]
   }
 
 
@@ -2141,7 +2144,7 @@ adjustcarryforward <- function(subjid,
   # }
 
   # formulating results and options
-  acf_df <- data.frame(n = data.all$n)
+  acf_df <- data.frame(n = data.all$orig.n)
   acf_df <- cbind(acf_df,
                   data.all[, exclude])
   colnames(acf_df)[-1] <- "adjustcarryforward"
