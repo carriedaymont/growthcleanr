@@ -112,7 +112,7 @@
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Utilities for computing pediatric BMI percentiles, Z-scores, and related tools</h1>
             
-            <h4 class="date">2021-10-01</h4>
+            <h4 class="date">2021-11-09</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/utilities.Rmd"><code>vignettes/utilities.Rmd</code></a></small>
       <div class="hidden name"><code>utilities.Rmd</code></div>
@@ -258,7 +258,7 @@
 </tr>
 </tbody>
 </table>
-<p>For convenience, these labels are available on the output of <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, e.g., when viewed in RStudio with <code><a href="https://rdrr.io/r/utils/View.html">View(cleaned_data_bmi)</a></code>.</p>
+<p>For convenience, these labels are available on the output of <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, e.g., when viewed in RStudio with <code>View(cleaned_data_bmi)</code>.</p>
 <p>Like <code><a href="../reference/longwide.html">longwide()</a></code>, <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> also includes options for mapping alternate column names, for age, weight, height, and BMI. The default column names are the same as the output from <code><a href="../reference/longwide.html">longwide()</a></code> for convenience. If you have different column names, specify the column names without quotes. For example, for a dataset using “heightcm” and “weightkg” instead of “ht” and “wt”:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">my_cleaned_data_bmiz</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ext_bmiz.html">ext_bmiz</a></span><span class="op">(</span><span class="va">my_cleaned_data_wide_bmi</span>, ht <span class="op">=</span> <span class="va">heightcm</span>, wt <span class="op">=</span> <span class="va">weightkg</span><span class="op">)</span></code></pre></div>
