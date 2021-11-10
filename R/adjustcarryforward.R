@@ -676,49 +676,66 @@ calc_step_15_no_param <- function(
   #       the value of temp_diff using the formula given
   #   i.	d_prev_ht<mindiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
   #     a.  (temp_diff=|dewma_ht_bef|)
+  # df[, temp.diff := as.double(NaN)]
+  # df$temp.exclude <-
+  #   factor(NA, levels = exclude.levels, ordered = T)
+  # df[delta.prev.ht < mindiff.prev.ht & bef.g.aftm1,
+  #    `:=`(temp.diff = abs(dewma.before),
+  #         temp.exclude = 'Exclude-Min-Height-Change')]
+  #
+  # #   ii.	d_ht<mindiff_ht & aft_g_befp1_ht==1 & exc_ht==0 & mindiff_ht is not missing
+  # #     a.	(temp_diff=|dewma_ht_aft|)
+  # df[delta.next.ht < mindiff.next.ht & aft.g.befp1,
+  #    `:=`(temp.diff = abs(dewma.after),
+  #         temp.exclude = 'Exclude-Min-Height-Change')]
+  #
+  # #   iii.	d_prev_ht>maxdiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
+  # #     a.  (temp_diff=|dewma_ht_bef|)
+  # df[delta.prev.ht > maxdiff.prev.ht & bef.g.aftm1,
+  #    `:=`(temp.diff = abs(dewma.before),
+  #         temp.exclude = 'Exclude-Max-Height-Change')]
+  #
+  # #   iv.	d_ht>maxdiff_ht & aft_g_befp1_ht==1 & exc_ht==0 & mindiff_ht is not missing
+  # #     a.  (temp_diff=|dewma_ht_aft|)
+  # df[delta.next.ht > maxdiff.next.ht & aft.g.befp1,
+  #    `:=`(temp.diff = abs(dewma.after),
+  #         temp.exclude = 'Exclude-Max-Height-Change')]
+  #
+  # #   v.	d_prev_ht<mindiff_prev_ht & tot_ht==2 & |tbchtsd|>|prev_tbchtsd|
+  # #     a. for v-viii temp_diff is kept as missing
+  # #   vi. d_ht<mindiff_ht & tot_ht==2 & |tbchtsd|>|next_tbchtsd|
+  # df[delta.prev.ht < mindiff.prev.ht &
+  #      num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev
+  #    |
+  #      delta.next.ht < mindiff.next.ht &
+  #      num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
+  #    temp.exclude := 'Exclude-Min-Height-Change']
+  #
+  # #   vii.	d_prev_ht>maxdiff_prev_ht & tot_ht==2 & |tbchtsd|>|prev_tbchtsd|
+  # #   viii. d_ht>maxdiff_ht & tot_ht==2 & |tbchtsd|>|next_tbchtsd|
+  # df[delta.prev.ht > maxdiff.prev.ht &
+  #      num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev
+  #    |
+  #      delta.next.ht > maxdiff.next.ht &
+  #      num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
+  #    temp.exclude := 'Exclude-Max-Height-Change']
+
+  # UPDATED CRITERIA FOR ABSOLUTE INCLUSION
   df[, temp.diff := as.double(NaN)]
   df$temp.exclude <-
     factor(NA, levels = exclude.levels, ordered = T)
-  df[delta.prev.ht < mindiff.prev.ht & bef.g.aftm1,
+  df[delta.prev.ht < mindiff.prev.ht,
      `:=`(temp.diff = abs(dewma.before),
           temp.exclude = 'Exclude-Min-Height-Change')]
 
-  #   ii.	d_ht<mindiff_ht & aft_g_befp1_ht==1 & exc_ht==0 & mindiff_ht is not missing
-  #     a.	(temp_diff=|dewma_ht_aft|)
-  df[delta.next.ht < mindiff.next.ht & aft.g.befp1,
-     `:=`(temp.diff = abs(dewma.after),
-          temp.exclude = 'Exclude-Min-Height-Change')]
-
-  #   iii.	d_prev_ht>maxdiff_prev_ht & bef_g_aftm1_ht==1 & exc_ht==0 & mindiff_prev_ht is not missing
-  #     a.  (temp_diff=|dewma_ht_bef|)
-  df[delta.prev.ht > maxdiff.prev.ht & bef.g.aftm1,
+  df[delta.prev.ht > maxdiff.prev.ht,
      `:=`(temp.diff = abs(dewma.before),
           temp.exclude = 'Exclude-Max-Height-Change')]
 
-  #   iv.	d_ht>maxdiff_ht & aft_g_befp1_ht==1 & exc_ht==0 & mindiff_ht is not missing
-  #     a.  (temp_diff=|dewma_ht_aft|)
-  df[delta.next.ht > maxdiff.next.ht & aft.g.befp1,
-     `:=`(temp.diff = abs(dewma.after),
-          temp.exclude = 'Exclude-Max-Height-Change')]
 
-  #   v.	d_prev_ht<mindiff_prev_ht & tot_ht==2 & |tbchtsd|>|prev_tbchtsd|
-  #     a. for v-viii temp_diff is kept as missing
-  #   vi. d_ht<mindiff_ht & tot_ht==2 & |tbchtsd|>|next_tbchtsd|
-  df[delta.prev.ht < mindiff.prev.ht &
-       num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev
-     |
-       delta.next.ht < mindiff.next.ht &
-       num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
-     temp.exclude := 'Exclude-Min-Height-Change']
-
-  #   vii.	d_prev_ht>maxdiff_prev_ht & tot_ht==2 & |tbchtsd|>|prev_tbchtsd|
-  #   viii. d_ht>maxdiff_ht & tot_ht==2 & |tbchtsd|>|next_tbchtsd|
-  df[delta.prev.ht > maxdiff.prev.ht &
-       num.valid == 2 & abs.tbc.sd > abs.tbc.sd.prev
-     |
-       delta.next.ht > maxdiff.next.ht &
-       num.valid == 2 & abs.tbc.sd > abs.tbc.sd.next,
-     temp.exclude := 'Exclude-Max-Height-Change']
+  df[mindiff.prev.ht > 0,
+     `:=`(temp.diff = abs(dewma.before),
+          temp.exclude = 'Exclude-Min-Height-Change')]
 
   return(df$temp.exclude)
 }
