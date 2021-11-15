@@ -23,6 +23,7 @@ cleanbatch <- function(data.df,
                        measurement.to.z,
                        ewma.fields,
                        ewma.exp,
+                       ref.data.path,
                        recover.unit.error,
                        include.carryforward,
                        sd.extreme,
@@ -55,6 +56,8 @@ cleanbatch <- function(data.df,
   valid.interior.measurement <- who.maxdiff.next.ht <- who.mindiff.next.ht <- NULL
   whoagegrp.ht <- whoinc.1.ht <- whoinc.2.ht <- whoinc.3.ht <- whoinc.4.ht <- NULL
   whoinc.6.ht <- whoinc.age.ht <- z.orig <- NULL
+  incl.bef <- incl.aft <- str.position <- i.acf.exclude <- orig.n <- orig.exclude <-
+    whoagegrp_ht <- acf.exclude <- tmp.exclude <- NULL
 
   data.df <- data.table(data.df, key = c('subjid', 'param', 'agedays', 'index'))
 
