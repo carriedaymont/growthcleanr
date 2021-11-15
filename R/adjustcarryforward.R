@@ -1162,7 +1162,7 @@ adjustcarryforward <- function(subjid,
   pair.prev <- dewma.before.next <- pair.next <- bef.g.aftm1 <- aft.g.befp1 <- NULL
   abs.tbc.sd.prev <- abs.tbc.sd.next <- exclude <- n <- dewma.before <- NULL
   tanner.months <- whoagegrp_ht <- whoagegrp.ht <- z.orig <- index <- temp.diff <- NULL
-  line <- incl.bef <- incl.aft <- str.position <- i.exclude <- NULL
+  line <- incl.bef <- incl.aft <- str.position <- i.exclude <- orig.n <- NULL
 
   # check option is valid
   if (!exclude_opt %in% 0:5){

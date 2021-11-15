@@ -29,7 +29,8 @@ cleangrowth(
   quietly = T,
   adult_cutpoint = 20,
   weight_cap = Inf,
-  adult_columns_filename = ""
+  adult_columns_filename = "",
+  reinclude.ht.cf = FALSE
 )
 }
 \arguments{
@@ -137,6 +138,8 @@ to Inf. Defaults to Inf.}
 \item{adult_columns_filename}{Name of file to save original adult data, with additional output columns to
 as CSV. Defaults to "", for which this data will not be saved. Useful
 for post-analysis. For more information on this output, please see README.}
+
+\item{reinclude.ht.cf}{Logical (TRUE/FALSE) on whether or not to run step 18 (adjustcarryfoward). This will reconsider height carried forward values for inclusions. If reincluded, marked with "Include-Carried-Forward." Defaults to FALSE.}
 }
 \value{
 Vector of exclusion codes for each of the input measurements.
