@@ -32,7 +32,8 @@ cleanbatch <- function(data.df,
                        who.ht.vel,
                        lt3.exclude.mode,
                        error.load.threshold,
-                       error.load.mincount) {
+                       error.load.mincount,
+                       reinclude.ht.cf) {
   # avoid "no visible binding" warnings
   abs.2ndlast.sd <- abs.tbc.sd <- abs.tbc.sd.next <- abs.tbc.sd.prev <- abssum2 <- NULL
   aft.g.befp1 <- agedays <- agedays.other <- bef.g.aftm1 <- delta <- NULL
@@ -1462,6 +1463,350 @@ cleanbatch <- function(data.df,
     return(factor(subj.df$exclude, levels = exclude.levels, ordered =
                     T))
   })(copy(.SD)), by = subjid, .SDcols = c('param', 'exclude')]
+
+  # 18: adjustcarryforward, if specified
+  if (reinclude.ht.cf){
+    if (!quietly){
+      cat(
+        sprintf(
+          "[%s] Re-evaluating carried forward values...\n",
+          Sys.time()
+        )
+      )
+    }
+
+    # add original index
+    data.df <- data.df[, orig.n := 1:.N]
+
+    # also order by subject, then agedays
+    data.df <- data.df[order(subjid, agedays),]
+
+    # copy data.df in order to filter accordingly
+    data.all <- copy(data.df)
+
+    # create "orig-exclude" category
+    data.all[, orig.exclude := exclude]
+
+    # add index for sorted order
+    data.all <- data.all[, n := 1:.N]
+
+    setkey(data.all, subjid)
+
+    subjid.unique <- unique(data.all$subjid)
+
+    # for this purpose, want to subset dataset down to just "Exclude-Carried-Forward" and "Include" - assume all other measurements are invalid
+    # want to remove any carried forward values whose non-carried forward is also excluded
+    # data.all <- data.all %>%
+    #   mutate(orig.exclude.lag = lag(orig.exclude, n = 1)) %>%
+    #   filter(!(
+    #     orig.exclude == "Exclude-Carried-Forward" &
+    #       grepl("exclude", orig.exclude.lag, ignore.case = T)
+    #   )) %>%
+    #   filter(orig.exclude %in% c("Exclude-Carried-Forward", "Include")) %>%
+    #   select(-orig.exclude.lag)
+
+    # NEW EDIT --
+    # remove all the weight measurements
+    data.all <- data.all %>%
+      filter(param %in% c("HEIGHTCM", "LENGTHCM"))
+
+    # filter out observations of ages < 2 years old
+    data.all <- data.all %>%
+      filter(agedays >= 2*365.25)
+
+    # filter to only subjects with possible carried forwards - n is here to merge back
+    # if they have all includes, filter them out
+    data.all <- data.all %>%
+      filter(subjid %in% data.all$subjid[data.all$orig.exclude == "Exclude-Carried-Forward"]) %>%
+      as.data.table()
+
+    # here's what we want to filter out -- anything that's not carried forward/include
+    # we're also going to include strings of carried forward
+    # but we also need to make sure they're not coming from an excluded value
+
+    # start of string to remove: everything that isn't include/excl-cf
+    st <- which(!data.all$orig.exclude %in% c("Exclude-Carried-Forward", "Include"))
+    # end of string: include or the end of a subject
+    subj_end <- length(data.all$subjid)-match(unique(data.all$subjid),rev(data.all$subjid))+1
+    end <- c(which(data.all$orig.exclude == "Include"),subj_end)
+    end <- unique(sort(end))
+
+    # remove anything between start and ends (including start, not including end)
+    to_rem <- unlist(
+      lapply(st, function(x){
+        to_rem <- c(x:(end[end >= x][1]))
+        if (to_rem[length(to_rem)] %in% subj_end){
+          # if it's the last value, we want to get rid of that end
+          return(to_rem)
+        } else {
+          # if it's an include, we want to keep it (don't remove)
+          return(to_rem[-length(to_rem)])
+        }
+      })
+    )
+    to_rem <- unique(to_rem)
+
+    if (length(to_rem) > 0){
+      data.all <- data.all[-to_rem,]
+    }
+
+    # filter to only subjects with possible carried forwards again
+    data.all <- data.all %>%
+      filter(subjid %in% data.all$subjid[data.all$orig.exclude == "Exclude-Carried-Forward"]) %>%
+      as.data.table()
+
+    # for each carried forward, we want to identify the include before
+    # and after
+    # note: already ordered by subjid and days
+    # initially: do an apply, figure out something more optimal
+    nearest_incl <-
+      lapply(
+        which(data.all$orig.exclude == "Exclude-Carried-Forward"),
+        function(x){
+          # subset to only the given subject
+          sub.df <- data.all[subjid == subjid[x],]
+
+          # find the index corresponding to the given subject
+          idx <- which(sub.df$n == data.all$n[x])
+
+          # now find the closest include before (there will always be one before)
+          incl_bef <-
+            tail(sub.df[1:(idx-1),][orig.exclude == "Include", n], n = 1)
+          # find the closest include after
+          incl_aft <-
+            if (idx+1 <= nrow(sub.df)){
+              head(
+                sub.df[(idx+1):nrow(sub.df),][orig.exclude == "Include", n],
+                n = 1
+              )
+            } else {
+              NA
+            }
+          # if there's no include after
+          if (length(incl_aft) == 0){
+            incl_aft <- NA
+          }
+          # we also want to know which carried forward in the string it is
+          # if it's in a string, the one before it will be carried forward
+          str.position <-
+            if (sub.df[idx - 1, orig.exclude == "Exclude-Carried-Forward"]){
+              idx - which(sub.df$n == incl_bef)
+            } else {
+              # otherwise it will be an include, so it's in the first position
+              1
+            }
+
+          return(c(incl_bef, incl_aft, str.position))
+        })
+    # combine into a data.frame
+    nearest_incl <-
+      setNames(do.call(rbind.data.frame, nearest_incl),
+               c("incl.bef", "incl.aft", "str.position"))
+
+    # add to main dataframe
+    data.all[orig.exclude == "Exclude-Carried-Forward",
+            incl.bef := nearest_incl$incl.bef]
+    data.all[orig.exclude == "Exclude-Carried-Forward",
+            incl.aft := nearest_incl$incl.aft]
+    data.all[orig.exclude == "Exclude-Carried-Forward",
+            str.position := nearest_incl$str.position]
+
+    # load tanner height velocity data. sex variable is defined such that 0=male and 1=female
+    # recode column names to match syntactic style ("." rather than "_" in variable names)
+    tanner_ht_vel_2sd_path <- ifelse(
+      ref.data.path == "",
+      system.file("extdata/tanner_ht_vel_int_2sd.csv", package = "growthcleanr"),
+      paste(ref.data.path, "tanner_ht_vel_int_2sd.csv", sep =
+              "")
+    )
+    tanner.ht.vel.2sd <- fread(tanner_ht_vel_2sd_path)
+
+    setnames(tanner.ht.vel.2sd,
+             colnames(tanner.ht.vel.2sd),
+             gsub('_', '.', colnames(tanner.ht.vel.2sd)))
+    setkey(tanner.ht.vel.2sd, sex, tanner.months)
+    # keep track of column names in the tanner data
+    tanner.fields.2sd <- colnames(tanner.ht.vel.2sd)
+    tanner.fields.2sd <-
+      tanner.fields.2sd[!tanner.fields.2sd %in% c('sex', 'tanner.months')]
+
+    who_max_ht_vel_2sd_path <- ifelse(
+      ref.data.path == "",
+      system.file("extdata/who_ht_maxvel_2sd.csv", package = "growthcleanr"),
+      paste(ref.data.path, "who_ht_maxvel_2sd.csv", sep =
+              "")
+    )
+
+    who_ht_vel_2sd_path <- ifelse(
+      ref.data.path == "",
+      system.file("extdata/who_ht_vel_2sd.csv", package = "growthcleanr"),
+      paste(ref.data.path, "who_ht_vel_2sd.csv", sep =
+              "")
+    )
+    who.max.ht.vel.2sd <- fread(who_max_ht_vel_2sd_path)
+    who.ht.vel.2sd <- fread(who_ht_vel_2sd_path)
+    setkey(who.max.ht.vel.2sd, sex, whoagegrp_ht)
+    setkey(who.ht.vel.2sd, sex, whoagegrp_ht)
+    who.ht.vel.2sd <-
+      as.data.table(dplyr::full_join(who.ht.vel.2sd, who.max.ht.vel.2sd, by =
+                                       c('sex', 'whoagegrp_ht')))
+
+    setnames(who.ht.vel.2sd,
+             colnames(who.ht.vel.2sd),
+             gsub(
+               ".2sd", "", # replace 2sd with nothing, for ease of use in calculations
+               gsub('_', '.', colnames(who.ht.vel.2sd))
+             ))
+    setkey(who.ht.vel.2sd, sex, whoagegrp.ht)
+    # keep track of column names in the who growth velocity data
+    who.fields.2sd <- colnames(who.ht.vel.2sd)
+    who.fields.2sd <- who.fields.2sd[!who.fields.2sd %in% c('sex', 'whoagegrp.ht')]
+
+    # add a new convenience index for bookkeeping
+    data.all[, index := 1:.N]
+
+    # enumerate the different exclusion levels
+    exclude.levels <- c(
+      'Missing',
+      'No Change',
+      'Include',
+      'Exclude-Min-Height-Change',
+      'Exclude-Max-Height-Change'
+    )
+
+    # Mark missing values for exclusion
+    data.all[, acf.exclude := factor(with(data.all, ifelse(
+      is.na(v) |
+        agedays < 0, 'Missing', 'No Change'
+    )),
+    levels = exclude.levels,
+    ordered = T)] # why is this ordered??
+
+    # define field names needed by helper functions
+    ewma.fields <- c('ewma.all', 'ewma.before', 'ewma.after')
+
+    # OPTION 5 (acf_answers) USES A SWEEP STRATEGY
+    # Evaluate all carried-forwards based on position in string from i=1:n
+    # (n = the maximum length of a CF-string). Evaluate each CF using "definitely include" strategy based on the
+    # include before and after (if available). At the end of each evaluation
+    # for each subject's CF at position i, do not further evaluate strings where
+    # the CF at the current position has been marked to not be included. Whittle down
+    # the search space in this manner until either there are no more subjects to
+    # evaluate or we have evaluated all subjects.
+    data.all[param == 'HEIGHTCM', acf.exclude := (function(all_df) {
+      # assign some book keeping variables
+      #subj.df[, `:=`(subjid = subjid, param='HEIGHTCM',index=1:.N)]
+      all_df[, index := 1:.N]
+
+      # find out what the last possible index in a CF string is
+      fin_pos <- max(all_df$str.position, na.rm = T)
+
+      # save the original to store information
+      orig.all_df <- copy(all_df)
+      orig.all_df[, exclude := NA]
+
+      # keep track of which CF position we're on
+      cf_pos <- 1
+      while (cf_pos <= fin_pos & nrow(all_df) > 0) {
+        # go through all remaining subjects and evaluate them at the position
+        all_df[, acf.exclude := (function(subj.df){
+          # preallocate exclusion value
+          excl_vect <- rep("", nrow(subj.df))
+          # NOTE: BETTER WAY TO PREALLOCATE THIS
+
+          # find all carried forwards at specified position
+          all_idx <- which(subj.df$str.position == cf_pos)
+          # go through each of them
+          for (idx in all_idx){
+            # subset to the carried forward at that position, and the include
+            # before and after
+            df <- subj.df[c(
+              which(n == incl.bef[idx]), idx,
+              # there may not be an after
+              if (!is.na(incl.aft[idx])){which(n == incl.aft[idx])} else {c()}
+            ),]
+
+            # calculate if the carried forward should definitely be included
+            def_incl <- calc_step_15_no_param(
+              copy(df),
+              eval_type = "include",
+              ewma.fields, tanner.ht.vel.2sd, who.ht.vel.2sd, exclude.levels,
+              ewma.exp)
+
+            # calculate which should definitely be included and excluded
+            verdict <- rep("Unknown", length(def_incl))
+            verdict[is.na(def_incl)] <- "Definitely Include"
+
+            # if CF index is not an include, it's an exclude and we need to
+            # mark it as such
+            # we also want to mark everything else in its string for exclusion
+            if (verdict[2] != "Definitely Include"){
+              # if the last one is empty (no include after), we make it the last
+              # one plus one
+              last_incl <- if (is.na(subj.df$incl.aft[idx])){
+                subj.df$n[nrow(subj.df)]+1
+              } else {
+                subj.df$incl.aft[idx]
+              }
+
+              excl_vect[ subj.df$n %in%
+                           c(subj.df$n[idx]:(last_incl-1))
+              ] <- as.character(def_incl[2])
+            }
+          }
+
+          return(excl_vect)
+        })(copy(.SD)), by = .(subjid), .SDcols = c("subjid", 'sex', 'agedays', 'v', 'tbc.sd', 'exclude',"n", 'orig.exclude',"index", "incl.bef", "incl.aft", "str.position")]
+
+        # save the results for the current subjects
+        # NOTE: probably a better way to join these
+        orig.all_df[all_df, on = "n", acf.exclude := i.acf.exclude]
+
+        # remove all subjects that don't have any at the next position with a
+        # nonexclusion code
+        all_df <-
+          all_df[
+            subjid %in% all_df$subjid[str.position > cf_pos & !acf.exclude %in% c(
+              'Exclude-Min-Height-Change',
+              'Exclude-Max-Height-Change'
+            )],]
+
+        # update cf_pos and max possible position
+        cf_pos <- cf_pos + 1
+        if (nrow(all_df) > 0){
+          # only update if there are values remaining -- will fail break on the
+          # next iteration regardless
+          fin_pos <- max(all_df$str.position, na.rm = T)
+        }
+      }
+
+      return(orig.all_df$acf.exclude)
+    })(copy(.SD)),.SDcols = c("subjid", 'sex', 'agedays', 'v', 'tbc.sd', 'exclude',"n", 'orig.exclude', "incl.bef", "incl.aft", "str.position")]
+
+    # process what came from acf reevalutaion
+    # if you're outside of the bands OR if you are not a carry forward then you have no change
+    data.all[
+      !(
+        data.all[, acf.exclude] %in% c(
+          'Exclude-Min-Height-Change',
+          'Exclude-Max-Height-Change'
+        )
+      ) &
+        (data.all$orig.exclude == "Exclude-Carried-Forward"), tmp.exclude := "Include"]
+    # everything with exclude should not be changed
+    data.all[
+      data.all[, exclude] %in% c('Exclude-Min-Height-Change','Exclude-Max-Height-Change'),
+      tmp.exclude := "No Change"]
+    # all original includes should not be changed
+    data.all[
+      data.all$orig.exclude != "Exclude-Carried-Forward",
+      tmp.exclude := "No Change"
+    ]
+
+    # update exclusion codes in the original datatable
+    data.df[line %in% data.all[data.all$tmp.exclude == "Include", line],
+            exclude := "Include-Carried-Forward"]
+  }
 
   if (!quietly)
     cat(sprintf("[%s] Completed Batch #%s...\n", Sys.time(), data.df$batch[1]))
