@@ -1496,6 +1496,7 @@ cleanbatch <- function(data.df,
     data.all <- data.all[, n := 1:.N]
 
     setkey(data.all, subjid)
+    data.all <- data.all[order(subjid, agedays),]
 
     subjid.unique <- unique(data.all$subjid)
 
@@ -1577,29 +1578,37 @@ cleanbatch <- function(data.df,
           # now find the closest include before (there will always be one before)
           incl_bef <-
             tail(sub.df[1:(idx-1),][orig.exclude == "Include", n], n = 1)
-          # find the closest include after
-          incl_aft <-
-            if (idx+1 <= nrow(sub.df)){
-              head(
-                sub.df[(idx+1):nrow(sub.df),][orig.exclude == "Include", n],
-                n = 1
-              )
-            } else {
-              NA
+
+          if (length(incl_bef) > 0) {
+            # it should be -- CFs for filtered less than 2 are not
+
+            # find the closest include after
+            incl_aft <-
+              if (idx+1 <= nrow(sub.df)){
+                head(
+                  sub.df[(idx+1):nrow(sub.df),][orig.exclude == "Include", n],
+                  n = 1
+                )
+              } else {
+                NA
+              }
+            # if there's no include after
+            if (length(incl_aft) == 0){
+              incl_aft <- NA
             }
-          # if there's no include after
-          if (length(incl_aft) == 0){
-            incl_aft <- NA
+            # we also want to know which carried forward in the string it is
+            # if it's in a string, the one before it will be carried forward
+            str.position <-
+              if (sub.df[idx - 1, orig.exclude == "Exclude-Carried-Forward"]){
+                idx - which(sub.df$n == incl_bef)
+              } else {
+                # otherwise it will be an include, so it's in the first position
+                1
+              }
+          } else {
+            # went through
+            incl_bef <- incl_aft <- str.position <- NA
           }
-          # we also want to know which carried forward in the string it is
-          # if it's in a string, the one before it will be carried forward
-          str.position <-
-            if (sub.df[idx - 1, orig.exclude == "Exclude-Carried-Forward"]){
-              idx - which(sub.df$n == incl_bef)
-            } else {
-              # otherwise it will be an include, so it's in the first position
-              1
-            }
 
           return(c(incl_bef, incl_aft, str.position))
         })
@@ -1615,6 +1624,15 @@ cleanbatch <- function(data.df,
             incl.aft := nearest_incl$incl.aft]
     data.all[orig.exclude == "Exclude-Carried-Forward",
             str.position := nearest_incl$str.position]
+    # filter out all CFs that don't have any position
+    data.all <- data.all[
+      !(orig.exclude == "Exclude-Carried-Forward" &
+          is.na(incl.bef) & is.na(incl.aft) & is.na(str.position)),
+    ]
+    # now again, get rid of subjects without carried forwards
+    data.all <- data.all %>%
+      filter(subjid %in% data.all$subjid[data.all$orig.exclude == "Exclude-Carried-Forward"]) %>%
+      as.data.table()
 
     # load tanner height velocity data. sex variable is defined such that 0=male and 1=female
     # recode column names to match syntactic style ("." rather than "_" in variable names)
