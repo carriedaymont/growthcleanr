@@ -85,6 +85,8 @@
 #' as CSV. Defaults to "", for which this data will not be saved. Useful
 #' for post-analysis. For more information on this output, please see README.
 #' @param reinclude.ht.cf Logical (TRUE/FALSE) on whether or not to run step 18 (adjustcarryfoward). This will reconsider height carried forward values for inclusions. If reincluded, marked with "Include-Carried-Forward." Defaults to FALSE.
+#' @param debug logical indicating debugging for adjustcarryforward step. Defaults to FALSE
+#' @param debug_filename adjustcarryforward debugging file name. will save each iteration as paste0(tolower(debug_filename), "_sweep_position_X") as output to CSV.
 #'
 #' @return Vector of exclusion codes for each of the input measurements.
 #'
@@ -154,7 +156,9 @@ cleangrowth <- function(subjid,
                         adult_cutpoint = 20,
                         weight_cap = Inf,
                         adult_columns_filename = "",
-                        reinclude.ht.cf = FALSE) {
+                        reinclude.ht.cf = FALSE,
+                        debug = FALSE,
+                        debug_filename = "") {
   # avoid "no visible binding" warnings
   N <- age_years <- batch <- exclude <- index <- line <- NULL
   newbatch <- sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
@@ -529,7 +533,9 @@ cleangrowth <- function(subjid,
                            lt3.exclude.mode = lt3.exclude.mode,
                            error.load.threshold = error.load.threshold,
                            error.load.mincount = error.load.mincount,
-                           reinclude.ht.cf = reinclude.ht.cf)
+                           reinclude.ht.cf = reinclude.ht.cf,
+                           debug = debug,
+                           debug_filename = debug_filename)
     } else {
       # create log directory if necessary
       if (!is.na(log.path)) {
@@ -561,7 +567,9 @@ cleangrowth <- function(subjid,
         lt3.exclude.mode = lt3.exclude.mode,
         error.load.threshold = error.load.threshold,
         error.load.mincount = error.load.mincount,
-        reinclude.ht.cf = reinclude.ht.cf
+        reinclude.ht.cf = reinclude.ht.cf,
+        debug = debug,
+        debug_filename = debug_filename
       )
       stopCluster(cl)
     }

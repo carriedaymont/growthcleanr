@@ -387,7 +387,8 @@ calc_step_15_no_param <- function(
   df,
   eval_type = "exclude",
   ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels,
-  ewma.exp){
+  ewma.exp,
+  debug = F){
 
   # avoid "no visible binding for global variable" warnings
   agedays <- tbc.sd <- ewma.all <- ewma.before <- ewma.after <- v <- dewma.before <- NULL
@@ -737,7 +738,12 @@ calc_step_15_no_param <- function(
      `:=`(temp.diff = abs(dewma.before),
           temp.exclude = 'Exclude-Min-Height-Change')]
 
-  return(df$temp.exclude)
+  if (!debug){
+    return(list("res" = df$temp.exclude))
+  } else {
+    return(
+      return(list("res" = df$temp.exclude, "df" = df)))
+  }
 }
 
 #' Answers for adjustcarryforward
@@ -1018,13 +1024,13 @@ acf_answers <- function(subjid,
           copy(df),
           eval_type = "exclude",
           ewma.fields, tanner.ht.vel, who.ht.vel, exclude.levels,
-          ewma.exp)
+          ewma.exp)$res
 
         def_incl <- calc_step_15_no_param(
           copy(df),
           eval_type = "include",
           ewma.fields, tanner.ht.vel.2sd, who.ht.vel.2sd, exclude.levels,
-          ewma.exp)
+          ewma.exp)$res
 
         # calculate which should definitely be included and excluded
         verdict <- rep("Unknown", length(def_incl))
@@ -2083,7 +2089,7 @@ adjustcarryforward <- function(subjid,
               copy(df),
               eval_type = "include",
               ewma.fields, tanner.ht.vel.2sd, who.ht.vel.2sd, exclude.levels,
-              ewma.exp)
+              ewma.exp)$res
 
             # calculate which should definitely be included and excluded
             verdict <- rep("Unknown", length(def_incl))

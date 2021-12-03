@@ -34,7 +34,9 @@ cleanbatch <- function(data.df,
                        lt3.exclude.mode,
                        error.load.threshold,
                        error.load.mincount,
-                       reinclude.ht.cf) {
+                       reinclude.ht.cf,
+                       debug,
+                       debug_filename) {
   # avoid "no visible binding" warnings
   abs.2ndlast.sd <- abs.tbc.sd <- abs.tbc.sd.next <- abs.tbc.sd.prev <- abssum2 <- NULL
   aft.g.befp1 <- agedays <- agedays.other <- bef.g.aftm1 <- delta <- NULL
@@ -1712,6 +1714,8 @@ cleanbatch <- function(data.df,
       cf_pos <- 1
       while (cf_pos <= fin_pos & nrow(all_df) > 0) {
         # go through all remaining subjects and evaluate them at the position
+        debug_df <- data.table()
+
         all_df[, acf.exclude := (function(subj.df){
           # preallocate exclusion value
           excl_vect <- rep("", nrow(subj.df))
@@ -1730,11 +1734,16 @@ cleanbatch <- function(data.df,
             ),]
 
             # calculate if the carried forward should definitely be included
-            def_incl <- calc_step_15_no_param(
+            step_list <- calc_step_15_no_param(
               copy(df),
               eval_type = "include",
               ewma.fields, tanner.ht.vel.2sd, who.ht.vel.2sd, exclude.levels,
-              ewma.exp)
+              ewma.exp,
+              debug = debug)
+            if (debug){
+              debug_df <- rbind(debug_df, step_list)
+            }
+            def_incl <- step_list$res
 
             # calculate which should definitely be included and excluded
             verdict <- rep("Unknown", length(def_incl))
@@ -1760,6 +1769,15 @@ cleanbatch <- function(data.df,
 
           return(excl_vect)
         })(copy(.SD)), by = .(subjid), .SDcols = c("subjid", 'sex', 'agedays', 'v', 'tbc.sd', 'exclude',"n", 'orig.exclude',"index", "incl.bef", "incl.aft", "str.position")]
+
+        # save the results if debugging -- write out to file
+        if (debug){
+          write.csv(
+            debug_df,
+            paste0(gsub(".csv", "", tolower(debug_filename)),
+                   "_sweep_position_", str.position, ".csv"),
+            row.names = F)
+        }
 
         # save the results for the current subjects
         # NOTE: probably a better way to join these
