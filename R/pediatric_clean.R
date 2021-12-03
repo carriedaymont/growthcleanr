@@ -1732,7 +1732,7 @@ cleanbatch <- function(data.df,
       cf_pos <- 1
       while (cf_pos <= fin_pos & nrow(all_df) > 0) {
         # go through all remaining subjects and evaluate them at the position
-        debug_df <- data.table()
+        debug_df <- data.frame()
 
         all_df[, acf.exclude := (function(subj.df){
           # preallocate exclusion value
@@ -1759,7 +1759,7 @@ cleanbatch <- function(data.df,
               ewma.exp,
               debug = debug)
             if (debug){
-              debug_df <- rbind(debug_df, step_list)
+              debug_df <<- rbind(debug_df, as.data.frame(step_list$df))
             }
             def_incl <- step_list$res
 
@@ -1793,8 +1793,9 @@ cleanbatch <- function(data.df,
           write.csv(
             debug_df,
             paste0(gsub(".csv", "", tolower(debug_filename)),
-                   "_sweep_position_", str.position, ".csv"),
-            row.names = F)
+                   "_sweep_position_", cf_pos, ".csv"),
+            row.names = F,
+            na = "")
         }
 
         # save the results for the current subjects
