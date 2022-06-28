@@ -484,6 +484,14 @@ calc_step_15_no_param <- function(
     df[, mindiff.next.ht := min.ht.vel.2sd * (delta.agedays.next /365.25)]
     # round height velocities down to 0
     df[mindiff.next.ht <= 0.5, mindiff.next.ht := 0]
+    # POSSIBLE CHANGE:
+    # update height velocities based on age differences and extremes
+    df[maxdiff.next.ht < (delta.agedays.next/365.25*2.54) &
+         delta.agedays.next > 365.25,
+       maxdiff.next.ht := (delta.agedays.next/365.25*2.54)]
+    df[maxdiff.next.ht < 3, maxdiff.next.ht := 3]
+
+
 
 
     # 15f.iii.	maxdiff_ht=2*max_ht_vel*(d_agedays/365.25)^1.5+5.5 if d_agedays>365.25
