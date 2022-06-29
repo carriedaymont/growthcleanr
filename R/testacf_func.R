@@ -134,7 +134,7 @@ exec_sweep <- function(grid_df,
 #' @param param "none", or data frame to specify which parameters to run full search on, and values to use if not, used only when performing full-grid search
 #' @param debug Produce extra data files for debugging
 #' @param maxrecs Limit to specified # subjects, default 0 (no limit)
-#' @param exclude_opt Type of exclusion method for carried forward strings, 0 to 3. See adjustcarryforward documentation for more information
+#' @param exclude_opt Type of exclusion method for carried forward strings, 0 to 4. See adjustcarryforward documentation for more information
 #' @param add_answers TRUE or FALSE, indicating whether or not to add answers (definely include/exclude) for the given dataset. Defaults to TRUE
 #'
 #' @return A list containing:

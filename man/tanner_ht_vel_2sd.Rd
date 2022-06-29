@@ -10,7 +10,7 @@ Part of default CDC-derived tables
 Contains velocities for growth pre-calculated by CDC, including those 2
 standard deviations away.
 }
-\section{tanner_ht_vel.csv}{
+\section{tanner_ht_vel_int_2sd.csv}{
 
 
 Used in function \code{acf_answers()}

@@ -42,7 +42,7 @@ full-grid}
 
 \item{maxrecs}{Limit to specified # subjects, default 0 (no limit)}
 
-\item{exclude_opt}{Type of exclusion method for carried forward strings, 0 to 3. See adjustcarryforward documentation for more information}
+\item{exclude_opt}{Type of exclusion method for carried forward strings, 0 to 4. See adjustcarryforward documentation for more information}
 
 \item{add_answers}{TRUE or FALSE, indicating whether or not to add answers (definely include/exclude) for the given dataset. Defaults to TRUE}
 }

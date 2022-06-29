@@ -84,6 +84,9 @@
 #' @param adult_columns_filename Name of file to save original adult data, with additional output columns to
 #' as CSV. Defaults to "", for which this data will not be saved. Useful
 #' for post-analysis. For more information on this output, please see README.
+#' @param reinclude.ht.cf Logical (TRUE/FALSE) on whether or not to run step 18 (adjustcarryfoward). This will reconsider height carried forward values for inclusions. If reincluded, marked with "Include-Carried-Forward." Defaults to FALSE.
+#' @param debug logical indicating debugging for adjustcarryforward step. Defaults to FALSE
+#' @param debug_filename adjustcarryforward debugging file name. will save each iteration as paste0(tolower(debug_filename), "_sweep_position_X") as output to CSV.
 #'
 #' @return Vector of exclusion codes for each of the input measurements.
 #'
@@ -152,7 +155,10 @@ cleangrowth <- function(subjid,
                         quietly = T,
                         adult_cutpoint = 20,
                         weight_cap = Inf,
-                        adult_columns_filename = "") {
+                        adult_columns_filename = "",
+                        reinclude.ht.cf = FALSE,
+                        debug = FALSE,
+                        debug_filename = "") {
   # avoid "no visible binding" warnings
   N <- age_years <- batch <- exclude <- index <- line <- NULL
   newbatch <- sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
@@ -203,6 +209,7 @@ cleangrowth <- function(subjid,
   # enumerate the different exclusion levels
   exclude.levels <- c(
     'Include',
+    'Include-Carried-Forward',
     'Unit-Error-High',
     'Unit-Error-Low',
     'Unit-Error-Possible',
@@ -515,6 +522,7 @@ cleangrowth <- function(subjid,
                            measurement.to.z = measurement.to.z,
                            ewma.fields = ewma.fields,
                            ewma.exp = ewma.exp,
+                           ref.data.path,
                            recover.unit.error = recover.unit.error,
                            include.carryforward = include.carryforward,
                            sd.extreme = sd.extreme,
@@ -524,7 +532,10 @@ cleangrowth <- function(subjid,
                            who.ht.vel = who.ht.vel,
                            lt3.exclude.mode = lt3.exclude.mode,
                            error.load.threshold = error.load.threshold,
-                           error.load.mincount = error.load.mincount)
+                           error.load.mincount = error.load.mincount,
+                           reinclude.ht.cf = reinclude.ht.cf,
+                           debug = debug,
+                           debug_filename = debug_filename)
     } else {
       # create log directory if necessary
       if (!is.na(log.path)) {
@@ -537,6 +548,7 @@ cleangrowth <- function(subjid,
         .(batch),
         cleanbatch,
         .parallel = parallel,
+        .progress = "text",
         .paropts = list(.packages = "data.table"),
         log.path = log.path,
         quietly = quietly,
@@ -544,6 +556,7 @@ cleangrowth <- function(subjid,
         measurement.to.z = measurement.to.z,
         ewma.fields = ewma.fields,
         ewma.exp = ewma.exp,
+        ref.data.path,
         recover.unit.error = recover.unit.error,
         include.carryforward = include.carryforward,
         sd.extreme = sd.extreme,
@@ -553,7 +566,10 @@ cleangrowth <- function(subjid,
         who.ht.vel = who.ht.vel,
         lt3.exclude.mode = lt3.exclude.mode,
         error.load.threshold = error.load.threshold,
-        error.load.mincount = error.load.mincount
+        error.load.mincount = error.load.mincount,
+        reinclude.ht.cf = reinclude.ht.cf,
+        debug = debug,
+        debug_filename = debug_filename
       )
       stopCluster(cl)
     }
@@ -623,6 +639,7 @@ cleangrowth <- function(subjid,
         .(newbatch),
         cleanadult,
         .parallel = parallel,
+        .progress = "text",
         .paropts = list(.packages = "data.table"),
         weight_cap = weight_cap
       )
