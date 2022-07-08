@@ -1221,7 +1221,7 @@ cleanadult <- function(df, weight_cap = Inf){
       step <- "Exclude-Adult-Extraneous-Same-Day"
       # now the rest!
 
-      # check if heights on duplicate days are trivially the same, keep both,
+      # check if weights on duplicate days are trivially the same, keep both,
       # use mean for all of those
       rem_ids <- c()
       for (dd in dup_days){
