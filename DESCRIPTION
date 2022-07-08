@@ -3,12 +3,12 @@ Type: Package
 Title: Growth Measurements Cleaner
 Version: 2.0.1
 Authors@R: c(
-    person("Daymont","Carrie",,"carriedaymont@gmail.com",c("aut","cre")),
+    person("Daymont","Carrie", email = "cdaymont@pennstatehealth.psu.edu", role = "aut"),
     person("Grundmeier","Robert", role = "aut"),
     person("Miller","Jeffrey", role = "aut"),
     person("Campos","Diego", role = "aut"),
     person("Chudnov","Dan", role = "ctb"),
-    person("De los Santos","Hannah", role = "ctb"),
+    person("De los Santos","Hannah", email = "hdelossantos@mitre.org", role = c("ctb","cre")),
     person("Cao","Lusha", role = "ctb"),
     person("Silva","Steffani", role = "ctb"),
     person("Zhang","Hanzhe", role = "ctb"),
