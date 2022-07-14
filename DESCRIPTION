@@ -1,7 +1,7 @@
 Package: growthcleanr
 Type: Package
 Title: Growth Measurements Cleaner
-Version: 2.0.0
+Version: 2.1.0
 Authors@R: c(
     person("Daymont","Carrie",,"carriedaymont@gmail.com",c("aut","cre")),
     person("Grundmeier","Robert",,"grundmeier@email.chop.edu","aut"),
