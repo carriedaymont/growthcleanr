@@ -389,14 +389,12 @@ measurements for the same subject on the same day) are evaluated. The criteria
 to keep a same day extraneous value are fairly strict. First, if all HTs on the
 same day are identical, one is set to be included and the rest are included.
 Then, it is determined if all HTs on the same day for a subject vary by a
-trivial amount (\<1 inch). If so, the recorded values are replaced with the mean
-of the same day extraneous values for that day. The original values are stored
+trivial amount (\<1 inch). If so, the observation with the lowest dEWMA is selected to represent the value on that day. The original values are stored
 in **orig_wt_sde**. Then, if more than 25% of days for a subject have same day
 extraneous values OR if there are adjacent days that have same day extraneous
 values, all remaining same day extraneous values for that subject are excluded.
 For remaining subjects with same day extraneous values, if there is 1 (and only
-
-1. HT that is within 1 cm of the HT before it, within 1 cm of the HT after it,
+1) HT that is within 1 cm of the HT before it, within 1 cm of the HT after it,
    and 1 cm of the median HT, that value is included and the rest of the same day
    extraneous values on that day are excluded. If no value meets that criteria on
    that day, all same day extraneous values for that day are excluded.
@@ -471,8 +469,7 @@ measurements for the same subject on the same day) are evaluated. AllRV are
 used. The criteria to keep a same day extraneous value are fairly strict. First,
 if all WTs on the same day are identical, one is set to be included and the rest
 are included. Then, it is determined if all WTs on the same day for a subject
-vary by a trivial amount (\<1 kg). If so, the recorded values are replaced with
-the mean of the same day extraneous values for that day. The original values are
+vary by a trivial amount (\<1 kg). If so, the observation with the lowest dEWMA is selected to represent the value on that day. The original values are
 stored in **orig_wt_sde**. Then, if more than 25% of days for a subject have
 same day extraneous values OR if there are adjacent days that have same day
 extraneous values, all remaining same day extraneous values for that subject are

@@ -664,22 +664,27 @@ cleanadult <- function(df, weight_cap = Inf){
 
       # check if heights on duplicate days are trivially the same, keep both,
       # use mean for all of those
+
+      # do not update the values -- keep the value with the lowest EWMA
+      # calculate ewma (using metric)
+      ewma_res <- ewma_dn(h_subj_df$age_days, h_subj_df$meas_m,
+                          ewma.adjacent = F)
+      # delta ewma
+      dewma <- (h_subj_df$meas_m- ewma_res)
+      colnames(dewma) <- paste0("d",colnames(ewma_res))
+
       rem_ids <- c()
       for (dd in dup_days){
         s_df <- copy(h_subj_df[h_subj_df$age_days == dd,])
         sde_range <- max(s_df$meas_m) - min(s_df$meas_m)
         if (sde_range < 2.541){ # 1 inch +eps
-          # update imperial
-          h_subj_df$meas_im[h_subj_df$age_days == dd] <-
-            mean(s_df$meas_m)/2.54
+          # keep the value with the lowest EWMA -- do not keep rest
+          keep_id <- h_subj_df$id[h_subj_df$id %in% s_df$id][
+            which.min(dewma[h_subj_df$id %in% s_df$id, "dewma.all"])
+          ]
 
-          h_subj_df$mean_sde[h_subj_df$age_days == dd] <-
-            h_subj_df$meas_m[h_subj_df$age_days == dd] <-
-            mean(s_df$meas_m)
-
-          # remove all except the first by id
-          rem_ids <- c(rem_ids, h_subj_df$id[h_subj_df$age_days == dd][
-            duplicated(h_subj_df$meas_m[h_subj_df$age_days == dd])])
+          # remove all except the lowest ewma by id
+          rem_ids <- c(rem_ids, s_df$id[s_df$id != keep_id])
         }
       }
       criteria <- h_subj_df$id %in% rem_ids
@@ -1221,24 +1226,28 @@ cleanadult <- function(df, weight_cap = Inf){
       step <- "Exclude-Adult-Extraneous-Same-Day"
       # now the rest!
 
-      # check if heights on duplicate days are trivially the same, keep both,
+      # check if weights on duplicate days are trivially the same, keep both,
       # use mean for all of those
+
+      # do not update the values -- keep the value with the lowest EWMA
+      # calculate ewma (using metric)
+      ewma_res <- ewma_dn(w_subj_df$age_days, w_subj_df$meas_m,
+                          ewma.adjacent = F)
+      # delta ewma
+      dewma <- (w_subj_df$meas_m- ewma_res)
+      colnames(dewma) <- paste0("d",colnames(ewma_res))
       rem_ids <- c()
       for (dd in dup_days){
         s_df <- copy(w_subj_df[w_subj_df$age_days == dd,])
         sde_range <- max(s_df$meas_m) - min(s_df$meas_m)
         if (sde_range < 1.001){ # 1 pound
-          # update imperial
-          w_subj_df$meas_im[w_subj_df$age_days == dd] <-
-            mean(s_df$meas_m)*2.2046226
+          # keep the value with the lowest EWMA -- do not keep rest
+          keep_id <- w_subj_df$id[w_subj_df$id %in% s_df$id][
+            which.min(dewma[w_subj_df$id %in% s_df$id, "dewma.all"])
+          ]
 
-          w_subj_df$mean_sde[w_subj_df$age_days == dd] <-
-            w_subj_df$meas_m[w_subj_df$age_days == dd] <-
-            mean(s_df$meas_m)
-
-          # remove all except the first by id
-          rem_ids <- c(rem_ids, w_subj_df$id[w_subj_df$age_days == dd][
-            duplicated(w_subj_df$meas_m[w_subj_df$age_days == dd])])
+          # remove all except the lowest ewma by id
+          rem_ids <- c(rem_ids, s_df$id[s_df$id != keep_id])
         }
       }
       criteria <- w_subj_df$id %in% rem_ids

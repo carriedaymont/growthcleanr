@@ -268,6 +268,7 @@ temp_sde <- function(subj_df, ptype = "height"){
   } else if (nrow(subj_df) > 0){
     # nothing is duplicate
     subj_df$extraneous <- F
+    subj_df$diff <- NA
   }
 
   return(subj_df)
