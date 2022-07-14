@@ -159,17 +159,17 @@ test_that("growthcleanr works as expected on adult synthetic data", {
 
   d500_exclusions <-
     cd500 %>% group_by(gcr_result) %>% tally(sort = TRUE)
-  expect_equal(9745, catcount(d500_exclusions, "Include"))
+  expect_equal(9748, catcount(d500_exclusions, "Include"))
   expect_equal(2090, catcount(d500_exclusions, "Exclude-Adult-Extraneous-Same-Day"))
-  expect_equal(59, catcount(d500_exclusions, "Exclude-Adult-Distinct-3-Or-More"))
+  expect_equal(48, catcount(d500_exclusions, "Exclude-Adult-Distinct-3-Or-More"))
   expect_equal(43, catcount(d500_exclusions, "Exclude-Carried-Forward"))
   expect_equal(2, catcount(d500_exclusions, "Exclude-Adult-Transpositions"))
 
   d500cp_exclusions <-
     cd500cp %>% group_by(gcr_result) %>% tally(sort = TRUE)
-  expect_equal(9774, catcount(d500cp_exclusions, "Include"))
-  expect_equal(2200, catcount(d500cp_exclusions, "Exclude-Adult-Extraneous-Same-Day"))
-  expect_equal(62, catcount(d500cp_exclusions, "Exclude-Adult-Distinct-3-Or-More"))
+  expect_equal(9778, catcount(d500cp_exclusions, "Include"))
+  expect_equal(2199, catcount(d500cp_exclusions, "Exclude-Adult-Extraneous-Same-Day"))
+  expect_equal(52, catcount(d500cp_exclusions, "Exclude-Adult-Distinct-3-Or-More"))
   expect_true(is.na(catcount(d500cp_exclusions, "Exclude-Carried-Forward")))
   expect_equal(2, catcount(d500cp_exclusions, "Exclude-Adult-Transpositions"))
 
