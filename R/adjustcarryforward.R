@@ -805,8 +805,8 @@ acf_answers <- function(subjid,
   # recode column names to match syntactic style ("." rather than "_" in variable names)
   tanner_ht_vel_path <- ifelse(
     ref.data.path == "",
-    system.file("extdata/tanner_ht_vel.csv", package = "growthcleanr"),
-    paste(ref.data.path, "tanner_ht_vel.csv", sep =
+    system.file("extdata/tanner_ht_vel.csv.gz", package = "growthcleanr"),
+    paste(ref.data.path, "tanner_ht_vel.csv.gz", sep =
             "")
   )
   tanner.ht.vel <- fread(tanner_ht_vel_path)
@@ -821,15 +821,15 @@ acf_answers <- function(subjid,
 
   who_max_ht_vel_path <- ifelse(
     ref.data.path == "",
-    system.file("extdata/who_ht_maxvel_3sd.csv", package = "growthcleanr"),
-    paste(ref.data.path, "who_ht_maxvel_3sd.csv", sep =
+    system.file("extdata/who_ht_maxvel_3sd.csv.gz", package = "growthcleanr"),
+    paste(ref.data.path, "who_ht_maxvel_3sd.csv.gz", sep =
             "")
   )
 
   who_ht_vel_3sd_path <- ifelse(
     ref.data.path == "",
-    system.file("extdata/who_ht_vel_3sd.csv", package = "growthcleanr"),
-    paste(ref.data.path, "who_ht_vel_3sd.csv", sep =
+    system.file("extdata/who_ht_vel_3sd.csv.gz", package = "growthcleanr"),
+    paste(ref.data.path, "who_ht_vel_3sd.csv.gz", sep =
             "")
   )
   who.max.ht.vel <- fread(who_max_ht_vel_path)
@@ -851,9 +851,8 @@ acf_answers <- function(subjid,
   # recode column names to match syntactic style ("." rather than "_" in variable names)
   tanner_ht_vel_2sd_path <- ifelse(
     ref.data.path == "",
-    system.file("extdata/tanner_ht_vel_with_2sd.csv", package = "growthcleanr"),
-    paste(ref.data.path, "tanner_ht_vel_with_2sd.csv", sep =
-            "")
+    system.file("extdata/tanner_ht_vel_with_2sd.csv.gz", package = "growthcleanr"),
+    paste(ref.data.path, "tanner_ht_vel_with_2sd.csv.gz", sep = "")
   )
   tanner.ht.vel.2sd <- fread(tanner_ht_vel_2sd_path)
 
@@ -868,15 +867,15 @@ acf_answers <- function(subjid,
 
   who_max_ht_vel_2sd_path <- ifelse(
     ref.data.path == "",
-    system.file("extdata/who_ht_maxvel_2sd.csv", package = "growthcleanr"),
-    paste(ref.data.path, "who_ht_maxvel_2sd.csv", sep =
+    system.file("extdata/who_ht_maxvel_2sd.csv.gz", package = "growthcleanr"),
+    paste(ref.data.path, "who_ht_maxvel_2sd.csv.gz", sep =
             "")
   )
 
   who_ht_vel_2sd_path <- ifelse(
     ref.data.path == "",
-    system.file("extdata/who_ht_vel_2sd.csv", package = "growthcleanr"),
-    paste(ref.data.path, "who_ht_vel_2sd.csv", sep =
+    system.file("extdata/who_ht_vel_2sd.csv.gz", package = "growthcleanr"),
+    paste(ref.data.path, "who_ht_vel_2sd.csv.gz", sep =
             "")
   )
   who.max.ht.vel.2sd <- fread(who_max_ht_vel_2sd_path)
@@ -1226,9 +1225,8 @@ adjustcarryforward <- function(subjid,
   # recode column names to match syntactic style ("." rather than "_" in variable names)
   tanner_ht_vel_path <- ifelse(
     ref.data.path == "",
-    system.file("extdata/tanner_ht_vel.csv", package = "growthcleanr"),
-    paste(ref.data.path, "tanner_ht_vel.csv", sep =
-            "")
+    system.file("extdata/tanner_ht_vel.csv.gz", package = "growthcleanr"),
+    paste(ref.data.path, "tanner_ht_vel.csv.gz", sep = "")
   )
 
   tanner.ht.vel <- fread(tanner_ht_vel_path)
@@ -1243,15 +1241,15 @@ adjustcarryforward <- function(subjid,
 
   who_max_ht_vel_path <- ifelse(
     ref.data.path == "",
-    system.file("extdata/who_ht_maxvel_3sd.csv", package = "growthcleanr"),
-    paste(ref.data.path, "who_ht_maxvel_3sd.csv", sep =
+    system.file("extdata/who_ht_maxvel_3sd.csv.gz", package = "growthcleanr"),
+    paste(ref.data.path, "who_ht_maxvel_3sd.csv.gz", sep =
             "")
   )
 
   who_ht_vel_3sd_path <- ifelse(
     ref.data.path == "",
-    system.file("extdata/who_ht_vel_3sd.csv", package = "growthcleanr"),
-    paste(ref.data.path, "who_ht_vel_3sd.csv", sep =
+    system.file("extdata/who_ht_vel_3sd.csv.gz", package = "growthcleanr"),
+    paste(ref.data.path, "who_ht_vel_3sd.csv.gz", sep =
             "")
   )
   who.max.ht.vel <- fread(who_max_ht_vel_path)

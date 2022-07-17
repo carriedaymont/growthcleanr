@@ -9,7 +9,7 @@ Part of default CDC-derived tables
 \details{
 Contains BMI data for calculating BMI
 }
-\section{bmianthro.txt}{
+\section{bmianthro.txt.gz}{
 
 
 Used in function \code{cleangrowth()}

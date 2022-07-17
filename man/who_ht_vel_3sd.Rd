@@ -10,7 +10,7 @@ Part of default WHO-derived tables
 Contains three standard deviations for the World Health Organization values of
 height velocities.
 }
-\section{who_ht_vel_3sd.csv}{
+\section{who_ht_vel_3sd.csv.gz}{
 
 
 Used in function \code{cleangrowth()}
