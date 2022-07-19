@@ -6,7 +6,7 @@
 #'
 #' @name bmianthro
 #'
-#' @section bmianthro.txt:
+#' @section bmianthro.txt.gz:
 #'
 #' Used in function `cleangrowth()`
 #'
@@ -21,7 +21,7 @@ NULL
 #'
 #' @name growth_cdc_ext
 #'
-#' @section growthfile_cdc_ext.csv:
+#' @section growthfile_cdc_ext.csv.gz:
 #'
 #' Used in function `cleangrowth()`
 #'
@@ -36,7 +36,7 @@ NULL
 #'
 #' @name lenanthro
 #'
-#' @section lenanthro.txt:
+#' @section lenanthro.txt.gz:
 #'
 #' Used in function `cleangrowth()`
 #'
@@ -50,7 +50,7 @@ NULL
 #'
 #' @name nhanes-reference-medians
 #'
-#' @section nhanes-reference-medians.csv:
+#' @section nhanes-reference-medians.csv.gz:
 #'
 #' Used in function `cleangrowth()`
 #'
@@ -65,7 +65,7 @@ NULL
 #'
 #' @name tanner_ht_vel
 #'
-#' @section tanner_ht_vel.csv:
+#' @section tanner_ht_vel.csv.gz:
 #'
 #' Used in function `cleangrowth()`
 #'
@@ -79,9 +79,9 @@ NULL
 #' Contains velocities for growth pre-calculated by CDC, including those 2
 #' standard deviations away.
 #'
-#' @name tanner_ht_vel_2sd
+#' @name tanner_ht_vel_with_2sd
 #'
-#' @section tanner_ht_vel.csv:
+#' @section tanner_ht_vel_with_2sd.csv.gz:
 #'
 #' Used in function `acf_answers()`
 #'
@@ -96,7 +96,7 @@ NULL
 #'
 #' @name weianthro
 #'
-#' @section weianthro.csv:
+#' @section weianthro.csv.gz:
 #'
 #' Used in function `cleangrowth()`
 #'
@@ -112,7 +112,7 @@ NULL
 #'
 #' @name who_ht_maxvel
 #'
-#' @section who_ht_maxvel_3sd.csv:
+#' @section who_ht_maxvel_3sd.csv.gz:
 #'
 #' Used in function `cleangrowth()`
 #'
@@ -128,7 +128,7 @@ NULL
 #'
 #' @name who_ht_maxvel_2sd
 #'
-#' @section who_ht_maxvel_2sd.csv:
+#' @section who_ht_maxvel_2sd.csv.gz:
 #'
 #' Used in function `acf_answers()`
 #'
@@ -144,7 +144,7 @@ NULL
 #'
 #' @name who_ht_vel_3sd
 #'
-#' @section who_ht_vel_3sd.csv:
+#' @section who_ht_vel_3sd.csv.gz:
 #'
 #' Used in function `cleangrowth()`
 #'
@@ -160,7 +160,7 @@ NULL
 #'
 #' @name who_ht_vel_2sd
 #'
-#' @section who_ht_vel_2sd.csv:
+#' @section who_ht_vel_2sd.csv.gz:
 #'
 #' Used in function `acf_answers()`
 #'
@@ -173,7 +173,7 @@ NULL
 #'
 #' @name test_syngrowth_wide
 #'
-#' @section test_syngrowth_wide.csv:
+#' @section test_syngrowth_wide.csv.gz:
 #'
 #' Used to test function `ext_bmiz()`
 #'
@@ -186,9 +186,22 @@ NULL
 #'
 #' @name test_syngrowth_sas_output_compare
 #'
-#' @section test_syngrowth_sas_output_compare.csv:
+#' @section test_syngrowth_sas_output_compare.csv.gz:
 #'
 #' Used to test function `ext_bmiz()`
+#'
+#'
+NULL
+
+#' CDC BMI reference data
+#'
+#' Used for extended BMIz computation
+#'
+#' @name CDCref_d
+#'
+#' @section CDCref_d.csv.gz:
+#'
+#' Used for extended BMI computation
 #'
 #'
 NULL

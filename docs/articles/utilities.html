@@ -19,6 +19,8 @@
 <![endif]-->
 </head>
 <body data-spy="scroll" data-target="#toc">
+    
+
     <div class="container template-article">
       <header><div class="navbar navbar-default navbar-fixed-top" role="navigation">
   <div class="container">
@@ -31,27 +33,22 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">growthcleanr</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="Released version">2.0.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.1</span>
       </span>
     </div>
 
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav">
-<li>
-  <a href="../index.html">
-    <span class="fas fa-home fa-lg"></span>
-     
-  </a>
-</li>
 <li class="dropdown">
-  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
     Articles
      
     <span class="caret"></span>
   </a>
   <ul class="dropdown-menu" role="menu">
 <li class="divider">
-    <li class="dropdown-header">Getting started</li>
+    </li>
+<li class="dropdown-header">Getting started</li>
     <li>
       <a href="../articles/quickstart.html">Quickstart</a>
     </li>
@@ -62,7 +59,8 @@
       <a href="../articles/usage.html">Usage</a>
     </li>
     <li class="divider">
-    <li class="dropdown-header">Advanced topics</li>
+    </li>
+<li class="dropdown-header">Advanced topics</li>
     <li>
       <a href="../articles/configuration.html">Configuration</a>
     </li>
@@ -92,7 +90,7 @@
       </ul>
 <ul class="nav navbar-nav navbar-right">
 <li>
-  <a href="https://github.com/carriedaymont/growthcleanr">
+  <a href="https://github.com/carriedaymont/growthcleanr" class="external-link">
     <span class="fab fa-github fa-lg"></span>
      
   </a>
@@ -107,41 +105,81 @@
 
       
 
-      </header><script src="utilities_files/header-attrs-2.9/header-attrs.js"></script><div class="row">
+      </header><div class="row">
   <div class="col-md-9 contents">
     <div class="page-header toc-ignore">
-      <h1 data-toc-skip>Utilities for computing pediatric BMI percentiles, Z-scores, and related tools</h1>
+      <h1 data-toc-skip>Utilities for computing pediatric BMI
+percentiles, Z-scores, and related tools</h1>
             
-            <h4 class="date">2021-07-06</h4>
+            <h4 data-toc-skip class="date">2022-07-17</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/utilities.Rmd"><code>vignettes/utilities.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/utilities.Rmd" class="external-link"><code>vignettes/utilities.Rmd</code></a></small>
       <div class="hidden name"><code>utilities.Rmd</code></div>
 
     </div>
 
     
     
-<p>The CDC provides a <a href="https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm">SAS macro for computing BMI percentiles and Z-scores</a>. The function <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, included in <code>growthcleanr</code>, provides an equivalent feature. <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> calculates the sigma (scale parameter for the half-normal distribution, extended BMI percentile), extended BMIz, and the CDC LMS z-scores for weight, height, and BMI. Note that for BMIs ≤ 95th percentile of the CDC growth charts, the extended values for BMI are equal to the LMS values. The extended values differ only for children who have a BMI &gt; 95th percentile.</p>
-<p>The function assumes a variable ‘sex’ (coded as 1=boys / 2=girls) and variables for age in months, weight (kg), height (cm), and BMI (weight/ht2). Please be careful with age - the units should be months and use the most accurate information available (e.g., 23.4928 months. The extended BMIz is the inverse cumulative distribution function (CDF) of the extended BMI percentile. If the extended percentile is very close to 100, the <code>qnorm</code> function in R produces an infinite value. The occurs only if the extended BMI percentile is &gt; 99.99999999999999. This occurs infrequently, such as a 48-month-old with a BMI &gt; 39, and it is likely that these BMIs represent data entry errors. For these cases, extended BMIz is set to 8.21, a value that is slightly greater than the largest value that can be calculated.</p>
-<div id="converting-long-growthcleanr-data-to-wide-format-wbmi" class="section level2">
-<h2 class="hasAnchor">
-<a href="#converting-long-growthcleanr-data-to-wide-format-wbmi" class="anchor"></a>Converting long growthcleanr data to wide format w/BMI</h2>
-<p>Because <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> performs cross-sectional analysis of BMI, observation data must be in a wide format, i.e. with height and weight information on the same row. This is distinct from <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>, which performs longitudinal analysis on all observations for each subject, presented in a long format with one observation per row. To facilitate use of both functions, <code>growthcleanr</code> includes utility functions to transform data used with <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> for use with <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>. They are optimized to move data directly from the output of <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> into input for <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, but have options to support independent use as well.</p>
-<p>Using the <code>syngrowth</code> example dataset, to convert the data after it has been cleaned by <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> for use with <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, use <code><a href="../reference/longwide.html">longwide()</a></code> and <code><a href="../reference/simple_bmi.html">simple_bmi()</a></code>:</p>
+<p>The CDC provides a <a href="https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm" class="external-link">SAS
+macro for computing BMI percentiles and Z-scores</a>. The function
+<code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, included in <code>growthcleanr</code>, provides
+an equivalent feature. <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> calculates the sigma
+(scale parameter for the half-normal distribution, extended BMI
+percentile), extended BMIz, and the CDC LMS z-scores for weight, height,
+and BMI. Note that for BMIs ≤ 95th percentile of the CDC growth charts,
+the extended values for BMI are equal to the LMS values. The extended
+values differ only for children who have a BMI &gt; 95th percentile.</p>
+<p>The function assumes a variable ‘sex’ (coded as 1=boys / 2=girls) and
+variables for age in months, weight (kg), height (cm), and BMI
+(weight/ht2). Please be careful with age - the units should be months
+and use the most accurate information available (e.g., 23.4928 months.
+The extended BMIz is the inverse cumulative distribution function (CDF)
+of the extended BMI percentile. If the extended percentile is very close
+to 100, the <code>qnorm</code> function in R produces an infinite value.
+The occurs only if the extended BMI percentile is &gt;
+99.99999999999999. This occurs infrequently, such as a 48-month-old with
+a BMI &gt; 39, and it is likely that these BMIs represent data entry
+errors. For these cases, extended BMIz is set to 8.21, a value that is
+slightly greater than the largest value that can be calculated.</p>
+<div class="section level2">
+<h2 id="converting-long-growthcleanr-data-to-wide-format-wbmi">Converting long growthcleanr data to wide format w/BMI<a class="anchor" aria-label="anchor" href="#converting-long-growthcleanr-data-to-wide-format-wbmi"></a>
+</h2>
+<p>Because <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> performs cross-sectional analysis of
+BMI, observation data must be in a wide format, i.e. with height and
+weight information on the same row. This is distinct from
+<code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>, which performs longitudinal analysis on all
+observations for each subject, presented in a long format with one
+observation per row. To facilitate use of both functions,
+<code>growthcleanr</code> includes utility functions to transform data
+used with <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> for use with
+<code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>. They are optimized to move data directly from
+the output of <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> into input for
+<code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, but have options to support independent use as
+well.</p>
+<p>Using the <code>syngrowth</code> example dataset, to convert the data
+after it has been cleaned by <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> for use with
+<code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, use <code><a href="../reference/longwide.html">longwide()</a></code> and
+<code><a href="../reference/simple_bmi.html">simple_bmi()</a></code>:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="co"># Use the built-in utility function to convert the input observations to wide</span>
-<span class="co"># format for BMI calculation</span>
-<span class="va">cleaned_data_wide</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/longwide.html">longwide</a></span><span class="op">(</span><span class="va">cleaned_data</span><span class="op">)</span>
-
-<span class="co"># Compute simple BMI values (adds column "bmi")</span>
-<span class="va">cleaned_data_bmi</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/simple_bmi.html">simple_bmi</a></span><span class="op">(</span><span class="va">cleaned_data_wide</span><span class="op">)</span>
-
-<span class="co"># Compute Z-scores and percentiles</span>
-<span class="va">cleaned_data_bmiz</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ext_bmiz.html">ext_bmiz</a></span><span class="op">(</span><span class="va">cleaned_data_bmi</span><span class="op">)</span></code></pre></div>
-<p>Note that this assumes that <code>cleaned_data</code> has the same structure as described in <a href="quickstart.html#data-preparation-1">Quickstart - Data preparation</a>:</p>
+<code class="sourceCode R"><span><span class="co"># Use the built-in utility function to convert the input observations to wide</span></span>
+<span><span class="co"># format for BMI calculation</span></span>
+<span><span class="va">cleaned_data_wide</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/longwide.html">longwide</a></span><span class="op">(</span><span class="va">cleaned_data</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Compute simple BMI values (adds column "bmi")</span></span>
+<span><span class="va">cleaned_data_bmi</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/simple_bmi.html">simple_bmi</a></span><span class="op">(</span><span class="va">cleaned_data_wide</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Compute Z-scores and percentiles</span></span>
+<span><span class="va">cleaned_data_bmiz</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ext_bmiz.html">ext_bmiz</a></span><span class="op">(</span><span class="va">cleaned_data_bmi</span><span class="op">)</span></span></code></pre></div>
+<p>Note that this assumes that <code>cleaned_data</code> has the same
+structure as described in <a href="quickstart.html#data-preparation-1">Quickstart - Data
+preparation</a>:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(cleaned_data)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>[<span class="dv">1</span>] <span class="st">"id"</span>          <span class="st">"subjid"</span>      <span class="st">"sex"</span>         <span class="st">"agedays"</span>     <span class="st">"param"</span>       <span class="st">"measurement"</span> <span class="st">"gcr_result"</span></span></code></pre></div>
-<p>The wide dataset <code>cleaned_data_wide</code> will include rows with aligned height and weight measurements drawn from the observations in <code>cleaned_data</code> marked by <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> for inclusion. As such, it will be a shorter dataset (fewer rows) based on fewer observations.</p>
+<p>The wide dataset <code>cleaned_data_wide</code> will include rows
+with aligned height and weight measurements drawn from the observations
+in <code>cleaned_data</code> marked by <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> for
+inclusion. As such, it will be a shorter dataset (fewer rows) based on
+fewer observations.</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dim</span>(cleaned_data)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>[<span class="dv">1</span>] <span class="dv">85728</span>     <span class="dv">7</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -156,8 +194,13 @@
 <span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="dv">4</span> 002986c5<span class="sc">-</span>354d<span class="sc">-</span>bb9d<span class="sc">-</span>c180<span class="sc">-</span>4ce26813ca28 <span class="fl">59.1437</span> <span class="fl">709.7244</span>   <span class="dv">2</span> <span class="fl">72.8</span> <span class="dv">83338</span> <span class="fl">151.1</span> <span class="dv">83337</span> <span class="fl">21602.22</span></span>
 <span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="dv">5</span> 002986c5<span class="sc">-</span>354d<span class="sc">-</span>bb9d<span class="sc">-</span>c180<span class="sc">-</span>4ce26813ca28 <span class="fl">59.2012</span> <span class="fl">710.4144</span>   <span class="dv">2</span> <span class="fl">72.4</span> <span class="dv">83340</span> <span class="fl">151.1</span> <span class="dv">83339</span> <span class="fl">21623.22</span></span>
 <span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="dv">6</span> 002986c5<span class="sc">-</span>354d<span class="sc">-</span>bb9d<span class="sc">-</span>c180<span class="sc">-</span>4ce26813ca28 <span class="fl">60.1594</span> <span class="fl">721.9128</span>   <span class="dv">2</span> <span class="fl">69.4</span> <span class="dv">83343</span> <span class="fl">151.1</span> <span class="dv">83342</span> <span class="fl">21973.22</span></span></code></pre></div>
-<p>In this example, the subject identifiers previously marked as <code>subjid</code> are now in the <code>id</code> column; individual identifiers for observations of a single parameter are not present.</p>
-<p><code><a href="../reference/longwide.html">longwide()</a></code> can be called with name mapping parameters if your input set uses different column names. For example, if <code>my_cleaned_data</code> specifies age in days as <code>aged</code> and parameter type as <code>type</code>, specify each, with quotes:</p>
+<p>In this example, the subject identifiers previously marked as
+<code>subjid</code> are now in the <code>id</code> column; individual
+identifiers for observations of a single parameter are not present.</p>
+<p><code><a href="../reference/longwide.html">longwide()</a></code> can be called with name mapping parameters if
+your input set uses different column names. For example, if
+<code>my_cleaned_data</code> specifies age in days as <code>aged</code>
+and parameter type as <code>type</code>, specify each, with quotes:</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(my_cleaned_data)</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>     id subjid sex    aged     type measurement                  gcr_result</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span><span class="sc">:</span> <span class="dv">1510</span> <span class="dv">775155</span>   <span class="dv">0</span>     <span class="dv">889</span> HEIGHTCM       <span class="fl">84.90</span> Exclude<span class="sc">-</span>Extraneous<span class="sc">-</span>Same<span class="sc">-</span>Day</span>
@@ -167,36 +210,62 @@
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="dv">5</span><span class="sc">:</span> <span class="dv">1519</span> <span class="dv">775155</span>   <span class="dv">0</span>    <span class="dv">1071</span> WEIGHTKG       <span class="fl">14.70</span>                     Include</span>
 <span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="dv">6</span><span class="sc">:</span> <span class="dv">1513</span> <span class="dv">775155</span>   <span class="dv">0</span>    <span class="dv">1253</span> HEIGHTCM       <span class="fl">96.20</span>                     Include</span>
 <span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="fu">longwide</span>(my_cleaned_data, <span class="at">agedays =</span> <span class="st">"aged"</span>, <span class="at">param =</span> <span class="st">"type"</span>)</span></code></pre></div>
-<p>By default, <code><a href="../reference/longwide.html">longwide()</a></code> will only transform records flagged by <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> for inclusion. To include more categories assigned by <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>, use the <code>inclusion_types</code> option. For example, to include carried forward values along with included records for the BMI calculation:</p>
+<p>By default, <code><a href="../reference/longwide.html">longwide()</a></code> will only transform records
+flagged by <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> for inclusion. To include more
+categories assigned by <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>, use the
+<code>inclusion_types</code> option. For example, to include carried
+forward values along with included records for the BMI calculation:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="va">cleaned_data_wide_cf</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/longwide.html">longwide</a></span><span class="op">(</span>
-  long_df <span class="op">=</span> <span class="va">cleaned_data</span>,
-  inclusion_types<span class="op">=</span><span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"Include"</span>, <span class="st">"Exclude-Carried-Forward"</span><span class="op">)</span>
-<span class="op">)</span></code></pre></div>
-<p>An additional option, <code>include_all</code>, set to <code>FALSE</code> by default, will include all observations for transformation.</p>
+<code class="sourceCode R"><span><span class="va">cleaned_data_wide_cf</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/longwide.html">longwide</a></span><span class="op">(</span></span>
+<span>  long_df <span class="op">=</span> <span class="va">cleaned_data</span>,</span>
+<span>  inclusion_types<span class="op">=</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Include"</span>, <span class="st">"Exclude-Carried-Forward"</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>An additional option, <code>include_all</code>, set to
+<code>FALSE</code> by default, will include all observations for
+transformation.</p>
 <p>See <code><a href="../reference/longwide.html">longwide()</a></code> for full details.</p>
-<p>With wide data in hand, output taken directly from <code><a href="../reference/longwide.html">longwide()</a></code> can have BMI added with <code><a href="../reference/simple_bmi.html">simple_bmi()</a></code>, and then the output can be passed to <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, as shown in the simple example above. Alternatively, you can provide a similarly formatted data frame directly to <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>.</p>
+<p>With wide data in hand, output taken directly from
+<code><a href="../reference/longwide.html">longwide()</a></code> can have BMI added with
+<code><a href="../reference/simple_bmi.html">simple_bmi()</a></code>, and then the output can be passed to
+<code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, as shown in the simple example above.
+Alternatively, you can provide a similarly formatted data frame directly
+to <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>.</p>
 </div>
-<div id="recoding-sex-values" class="section level2">
-<h2 class="hasAnchor">
-<a href="#recoding-sex-values" class="anchor"></a>Recoding sex values</h2>
-<p>Note that <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> expects the <code>sex</code> variable to be coded as a numeric value of <code>1</code> (male) or <code>2</code> (female). This difference from the <code>growthcleanr</code> <a href="quickstart.html#data-preparation-1.">data preparation specification</a> sustains compatibility with the CDC SAS macro. The <code><a href="../reference/longwide.html">longwide()</a></code> function will handle this conversion given the expected input values of <code>0</code> (male) or <code>1</code> (female).</p>
-<p>If you are using different input data for <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, ensure the <code>sex</code> variable in your data set is properly coded. To do so, use <code><a href="../reference/recode_sex.html">recode_sex()</a></code>. For example, if you have data in the PCORnet CDM format, and want to prepare it for <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>:</p>
+<div class="section level2">
+<h2 id="recoding-sex-values">Recoding sex values<a class="anchor" aria-label="anchor" href="#recoding-sex-values"></a>
+</h2>
+<p>Note that <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> expects the <code>sex</code>
+variable to be coded as a numeric value of <code>1</code> (male) or
+<code>2</code> (female). This difference from the
+<code>growthcleanr</code> <a href="quickstart.html#data-preparation-1.">data preparation
+specification</a> sustains compatibility with the CDC SAS macro. The
+<code><a href="../reference/longwide.html">longwide()</a></code> function will handle this conversion given the
+expected input values of <code>0</code> (male) or <code>1</code>
+(female).</p>
+<p>If you are using different input data for <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>,
+ensure the <code>sex</code> variable in your data set is properly coded.
+To do so, use <code><a href="../reference/recode_sex.html">recode_sex()</a></code>. For example, if you have data
+in the PCORnet CDM format, and want to prepare it for
+<code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="fu"><a href="../reference/recode_sex.html">recode_sex</a></span><span class="op">(</span>
-  input_data <span class="op">=</span> <span class="va">cdm_formatted</span>,
-  sourcecol <span class="op">=</span> <span class="st">"sex"</span>,
-  sourcem <span class="op">=</span> <span class="st">"M"</span>,
-  sourcef <span class="op">=</span> <span class="st">"F"</span>,
-  targetm <span class="op">=</span> <span class="fl">1L</span>,
-  targetf <span class="op">=</span> <span class="fl">2L</span>
-<span class="op">)</span></code></pre></div>
-<p><code><a href="../reference/recode_sex.html">recode_sex()</a></code> can also be used for other purposes, such as recoding values in preparation for cleaning with <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>, or transforming <code>growthcleanr</code> output to match external specifications.</p>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/recode_sex.html">recode_sex</a></span><span class="op">(</span></span>
+<span>  input_data <span class="op">=</span> <span class="va">cdm_formatted</span>,</span>
+<span>  sourcecol <span class="op">=</span> <span class="st">"sex"</span>,</span>
+<span>  sourcem <span class="op">=</span> <span class="st">"M"</span>,</span>
+<span>  sourcef <span class="op">=</span> <span class="st">"F"</span>,</span>
+<span>  targetm <span class="op">=</span> <span class="fl">1L</span>,</span>
+<span>  targetf <span class="op">=</span> <span class="fl">2L</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="../reference/recode_sex.html">recode_sex()</a></code> can also be used for other purposes, such
+as recoding values in preparation for cleaning with
+<code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>, or transforming <code>growthcleanr</code>
+output to match external specifications.</p>
 </div>
-<div id="computing-bmi-percentiles-and-z-scores" class="section level2">
-<h2 class="hasAnchor">
-<a href="#computing-bmi-percentiles-and-z-scores" class="anchor"></a>Computing BMI percentiles and Z-scores</h2>
-<p>With data in wide format with BMI, and with sex variables properly coded, <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> can be called:</p>
+<div class="section level2">
+<h2 id="computing-bmi-percentiles-and-z-scores">Computing BMI percentiles and Z-scores<a class="anchor" aria-label="anchor" href="#computing-bmi-percentiles-and-z-scores"></a>
+</h2>
+<p>With data in wide format with BMI, and with sex variables properly
+coded, <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> can be called:</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>cleaned_data_bmiz <span class="ot">&lt;-</span> <span class="fu">ext_bmiz</span>(cleaned_data_bmi)</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(cleaned_data_bmiz)</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>           id    agey     agem      bmi sex   wt     ht agedays      age     bmi_l    bmi_m      bmi_s         waz    mod_waz        haz    mod_haz     bmiz  mod_bmiz</span>
@@ -238,11 +307,14 @@
 </tr>
 <tr class="even">
 <td>mod_waz, mod_haz, mod_bmi</td>
-<td>Modified z-scores for identifying outliers (see the information in the <a href="https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm">CDC SAS growth charts program website</a>)</td>
+<td>Modified z-scores for identifying outliers (see the information in
+the <a href="https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm" class="external-link">CDC
+SAS growth charts program website</a>)</td>
 </tr>
 <tr class="odd">
 <td>bmip95</td>
-<td>BMI expressed as a percentage of the 95th percentile. A value ≥ 120 is widely used as the cut point for severe obesity.</td>
+<td>BMI expressed as a percentage of the 95th percentile. A value ≥ 120
+is widely used as the cut point for severe obesity.</td>
 </tr>
 <tr class="even">
 <td>sigma</td>
@@ -258,20 +330,47 @@
 </tr>
 </tbody>
 </table>
-<p>For convenience, these labels are available on the output of <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, e.g., when viewed in RStudio with <code><a href="https://rdrr.io/r/utils/View.html">View(cleaned_data_bmi)</a></code>.</p>
-<p>Like <code><a href="../reference/longwide.html">longwide()</a></code>, <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> also includes options for mapping alternate column names, for age, weight, height, and BMI. The default column names are the same as the output from <code><a href="../reference/longwide.html">longwide()</a></code> for convenience. If you have different column names, specify the column names without quotes. For example, for a dataset using “heightcm” and “weightkg” instead of “ht” and “wt”:</p>
+<p>For convenience, these labels are available on the output of
+<code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, e.g., when viewed in RStudio with
+<code>View(cleaned_data_bmi)</code>.</p>
+<p>Like <code><a href="../reference/longwide.html">longwide()</a></code>, <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> also includes
+options for mapping alternate column names, for age, weight, height, and
+BMI. The default column names are the same as the output from
+<code><a href="../reference/longwide.html">longwide()</a></code> for convenience. If you have different column
+names, specify the column names without quotes. For example, for a
+dataset using “heightcm” and “weightkg” instead of “ht” and “wt”:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="va">my_cleaned_data_bmiz</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ext_bmiz.html">ext_bmiz</a></span><span class="op">(</span><span class="va">my_cleaned_data_wide_bmi</span>, ht <span class="op">=</span> <span class="va">heightcm</span>, wt <span class="op">=</span> <span class="va">weightkg</span><span class="op">)</span></code></pre></div>
-<p>For <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, use the most precise age in months available. If an input dataset only has age in months as integer values, by default <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> will automatically convert these to double values and add <code>0.5</code> to account for the distribution of actual ages over the range of days within a month. This is enabled with the option <code>adjust.integer.age</code>, set to <code>TRUE</code> by default. Specify <code>FALSE</code> to disable.</p>
+<code class="sourceCode R"><span><span class="va">my_cleaned_data_bmiz</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ext_bmiz.html">ext_bmiz</a></span><span class="op">(</span><span class="va">my_cleaned_data_wide_bmi</span>, ht <span class="op">=</span> <span class="va">heightcm</span>, wt <span class="op">=</span> <span class="va">weightkg</span><span class="op">)</span></span></code></pre></div>
+<p>For <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, use the most precise age in months
+available. If an input dataset only has age in months as integer values,
+by default <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> will automatically convert these to
+double values and add <code>0.5</code> to account for the distribution
+of actual ages over the range of days within a month. This is enabled
+with the option <code>adjust.integer.age</code>, set to
+<code>TRUE</code> by default. Specify <code>FALSE</code> to disable.</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="va">my_cleaned_data_bmi</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ext_bmiz.html">ext_bmiz</a></span><span class="op">(</span><span class="va">my_cleaned_data_wide</span>, adjust.integer.age <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></code></pre></div>
-<p><code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> uses reference data provided by the CDC, included in the <code>growthcleanr</code> package as <code>inst/extdata/CDCref_d.csv</code>. This file is automatically loaded and used by default. If you are working with a different reference dataset or developing the <code>growthcleanr</code> package, specify an alternate path to this file with <code>ref.data.path</code>, as for <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>.</p>
+<code class="sourceCode R"><span><span class="va">my_cleaned_data_bmi</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ext_bmiz.html">ext_bmiz</a></span><span class="op">(</span><span class="va">my_cleaned_data_wide</span>, adjust.integer.age <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> uses reference data provided by the CDC,
+included in the <code>growthcleanr</code> package as
+<code>inst/extdata/CDCref_d.csv</code>. This file is automatically
+loaded and used by default. If you are working with a different
+reference dataset or developing the <code>growthcleanr</code> package,
+specify an alternate path to this file with <code>ref.data.path</code>,
+as for <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>.</p>
 </div>
-<div id="related-tools" class="section level2">
-<h2 class="hasAnchor">
-<a href="#related-tools" class="anchor"></a>Related tools</h2>
-<p>The CDC provides a <a href="https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm">SAS Program for the 2000 CDC Growth Charts</a> which can also be used to identify biologically implausible values using a different approach, as also implemented for <code>growthcleanr</code> in the function <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, described above.</p>
-<p><a href="https://github.com/mitre/GrowthViz">GrowthViz</a> provides insights into how <code>growthcleanr</code> assesses data, packaged in a Jupyter notebook. It ships with the same <code>syngrowth</code> synthetic example dataset as <code>growthcleanr</code>, with cleaning results included.</p>
+<div class="section level2">
+<h2 id="related-tools">Related tools<a class="anchor" aria-label="anchor" href="#related-tools"></a>
+</h2>
+<p>The CDC provides a <a href="https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm" class="external-link">SAS
+Program for the 2000 CDC Growth Charts</a> which can also be used to
+identify biologically implausible values using a different approach, as
+also implemented for <code>growthcleanr</code> in the function
+<code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, described above.</p>
+<p><a href="https://github.com/mitre/GrowthViz" class="external-link">GrowthViz</a> provides
+insights into how <code>growthcleanr</code> assesses data, packaged in a
+Jupyter notebook. It ships with the same <code>syngrowth</code>
+synthetic example dataset as <code>growthcleanr</code>, with cleaning
+results included.</p>
 </div>
   </div>
 
@@ -286,11 +385,13 @@
 
 
       <footer><div class="copyright">
-  <p>Developed by Daymont Carrie, Grundmeier Robert, Miller Jeffrey, Campos Diego.</p>
+  <p></p>
+<p>Developed by Daymont Carrie, Grundmeier Robert, Miller Jeffrey, Campos Diego.</p>
 </div>
 
 <div class="pkgdown">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/">pkgdown</a> 1.6.1.</p>
+  <p></p>
+<p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.6.</p>
 </div>
 
       </footer>
@@ -298,6 +399,8 @@
 
   
 
+
+  
 
   </body>
 </html>

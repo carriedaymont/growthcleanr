@@ -9,7 +9,7 @@ Part of default CDC-derived tables
 \details{
 Contains median and standard deviation for weight by age and gender
 }
-\section{weianthro.csv}{
+\section{weianthro.csv.gz}{
 
 
 Used in function \code{cleangrowth()}

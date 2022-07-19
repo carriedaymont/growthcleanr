@@ -6,7 +6,7 @@
 \description{
 Contains results of CDC SAS macro for calculating BMI values.
 }
-\section{test_syngrowth_sas_output_compare.csv}{
+\section{test_syngrowth_sas_output_compare.csv.gz}{
 
 
 Used to test function \code{ext_bmiz()}

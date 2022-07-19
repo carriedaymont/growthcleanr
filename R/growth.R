@@ -278,8 +278,8 @@ cleangrowth <- function(subjid,
     # recode column names to match syntactic style ("." rather than "_" in variable names)
     tanner_ht_vel_path <- ifelse(
       ref.data.path == "",
-      system.file(file.path("extdata", "tanner_ht_vel.csv"), package = "growthcleanr"),
-      file.path(ref.data.path, "tanner_ht_vel.csv")
+      system.file(file.path("extdata", "tanner_ht_vel.csv.gz"), package = "growthcleanr"),
+      file.path(ref.data.path, "tanner_ht_vel.csv.gz")
     )
 
     tanner.ht.vel <- fread(tanner_ht_vel_path)
@@ -294,14 +294,14 @@ cleangrowth <- function(subjid,
 
     who_max_ht_vel_path <- ifelse(
       ref.data.path == "",
-      system.file(file.path("extdata", "who_ht_maxvel_3sd.csv"), package = "growthcleanr"),
-      file.path(ref.data.path, "who_ht_maxvel_3sd.csv")
+      system.file(file.path("extdata", "who_ht_maxvel_3sd.csv.gz"), package = "growthcleanr"),
+      file.path(ref.data.path, "who_ht_maxvel_3sd.csv.gz")
     )
 
     who_ht_vel_3sd_path <- ifelse(
       ref.data.path == "",
-      system.file(file.path("extdata", "who_ht_vel_3sd.csv"), package = "growthcleanr"),
-      file.path(ref.data.path, "who_ht_vel_3sd.csv")
+      system.file(file.path("extdata", "who_ht_vel_3sd.csv.gz"), package = "growthcleanr"),
+      file.path(ref.data.path, "who_ht_vel_3sd.csv.gz")
     )
     who.max.ht.vel <- fread(who_max_ht_vel_path)
     who.ht.vel <- fread(who_ht_vel_3sd_path)
@@ -415,8 +415,8 @@ cleangrowth <- function(subjid,
           (!(is.character(sd.recenter) & tolower(sd.recenter) == "derive") & (data.all[, .N] < 5000))) {
         nhanes_reference_medians_path <- ifelse(
           ref.data.path == "",
-          system.file(file.path("extdata", "nhanes-reference-medians.csv"), package = "growthcleanr"),
-          file.path(ref.data.path, "nhanes-reference-medians.csv")
+          system.file(file.path("extdata", "nhanes-reference-medians.csv.gz"), package = "growthcleanr"),
+          file.path(ref.data.path, "nhanes-reference-medians.csv.gz")
         )
         sd.recenter <- fread(nhanes_reference_medians_path)
         if (!quietly)
@@ -699,31 +699,31 @@ read_anthro <- function(path = "", cdc.only = F) {
   # set correct path based on input reference table path (if any)
   weianthro_path <- ifelse(
     path == "",
-    system.file(file.path("extdata", "weianthro.txt"), package = "growthcleanr"),
-    file.path(path, "weianthro.txt")
+    system.file(file.path("extdata", "weianthro.txt.gz"), package = "growthcleanr"),
+    file.path(path, "weianthro.txt.gz")
   )
   lenanthro_path <- ifelse(
     path == "",
-    system.file(file.path("extdata", "lenanthro.txt"), package = "growthcleanr"),
-    file.path(path, "lenanthro.txt")
+    system.file(file.path("extdata", "lenanthro.txt.gz"), package = "growthcleanr"),
+    file.path(path, "lenanthro.txt.gz")
   )
   bmianthro_path <- ifelse(
     path == "",
-    system.file(file.path("extdata", "bmianthro.txt"), package = "growthcleanr"),
-    file.path(path, "bmianthro.txt")
+    system.file(file.path("extdata", "bmianthro.txt.gz"), package = "growthcleanr"),
+    file.path(path, "bmianthro.txt.gz")
   )
   growth_cdc_ext_path <- ifelse(
     path == "",
-    system.file(file.path("extdata", "growthfile_cdc_ext.csv"), package = "growthcleanr"),
-    file.path(path, "growthfile_cdc_ext.csv")
+    system.file(file.path("extdata", "growthfile_cdc_ext.csv.gz"), package = "growthcleanr"),
+    file.path(path, "growthfile_cdc_ext.csv.gz")
   )
 
 
-  growth_cdc_ext <- read.csv(growth_cdc_ext_path)
+  growth_cdc_ext <- read.csv(gzfile(growth_cdc_ext_path))
 
   l <- list(
     with(
-      read.table(weianthro_path, header = T),
+      read.table(gzfile(weianthro_path), header = T),
       data.frame(
         src = 'WHO',
         param = 'WEIGHTKG',
@@ -737,7 +737,7 @@ read_anthro <- function(path = "", cdc.only = F) {
       )
     ),
     with(
-      read.table(lenanthro_path, header = T),
+      read.table(gzfile(lenanthro_path), header = T),
       data.frame(
         src = 'WHO',
         param = 'HEIGHTCM',
@@ -751,7 +751,7 @@ read_anthro <- function(path = "", cdc.only = F) {
       )
     ),
     with(
-      read.table(bmianthro_path, header = T),
+      read.table(gzfile(bmianthro_path), header = T),
       data.frame(
         src = 'WHO',
         param = 'BMI',

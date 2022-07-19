@@ -9,7 +9,7 @@ Part of default CDC-derived tables
 \details{
 Contains percentiles for various ages, gender, and weights, pre-calculated by CDC
 }
-\section{growthfile_cdc_ext.csv}{
+\section{growthfile_cdc_ext.csv.gz}{
 
 
 Used in function \code{cleangrowth()}

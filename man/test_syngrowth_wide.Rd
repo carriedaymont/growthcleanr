@@ -6,7 +6,7 @@
 \description{
 Contains input data for CDC SAS macro for calculating BMI values.
 }
-\section{test_syngrowth_wide.csv}{
+\section{test_syngrowth_wide.csv.gz}{
 
 
 Used to test function \code{ext_bmiz()}
