@@ -105,6 +105,7 @@
 #' @import doParallel
 #' @import parallel
 #' @importFrom utils write.csv
+#' @rawNamespace import(R.utils, except = c(extract))
 #' @examples
 #' # Run calculation using a small subset of given data
 #' df_stats <- as.data.frame(syngrowth)

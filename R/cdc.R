@@ -101,6 +101,7 @@ set_cols_first <- function(DT, cols, intersection = TRUE)
 #' @import labelled
 #' @import magrittr
 #' @importFrom stats approx pnorm qnorm
+#' @rawNamespace import(R.utils, except = c(extract))
 #' @examples
 #' # Run on a small subset of given data
 #' df <- as.data.frame(syngrowth)

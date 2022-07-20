@@ -759,6 +759,7 @@ calc_step_15_no_param <- function(
 #' @rawNamespace import(plyr, except = c(failwith, id, summarize, count, desc, mutate, arrange, rename, is.discrete, summarise, summarize))
 #' @rawNamespace import(dplyr, except = c(last, first, summarize, src, between))
 #' @import data.table
+#' @rawNamespace import(R.utils, except = c(extract))
 # NOTE: no examples, since this is a temporary function
 acf_answers <- function(subjid,
                         param,
