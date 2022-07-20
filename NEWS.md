@@ -1,3 +1,12 @@
+# growthcleanr 2.0.1 - 2021-07-21
+
+## Changed
+
+- Updated DESCRIPTION, including authors, URLS, title, description, and imports
+- Compressed files in `inst/extdata` for size requirements; added `R.utils` as
+  import to support `fread()` for `.gz` files
+- Updated license year
+
 # growthcleanr 2.0.0 - 2021-06-30
 
 ## Added
