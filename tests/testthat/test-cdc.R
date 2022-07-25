@@ -1,8 +1,8 @@
 test_that("ext_bmiz produces comparable output to CDC SAS implementation", {
   # run ext_bmiz on input data
   mydatapath <-
-    system.file(file.path("extdata", "test_syngrowth_wide.csv"), package = "growthcleanr")
-  mydata <- read.csv(mydatapath)
+    system.file(file.path("extdata", "test_syngrowth_wide.csv.gz"), package = "growthcleanr")
+  mydata <- read.csv(gzfile(mydatapath))
 
   # mydata hasn't changed in dimension
   expect_equal(nrow(mydata), 17191)
@@ -20,9 +20,9 @@ test_that("ext_bmiz produces comparable output to CDC SAS implementation", {
 
   # load the SAS output
   cdcdatapath <-
-    system.file(file.path("extdata", "test_syngrowth_sas_output_compare.csv"),
+    system.file(file.path("extdata", "test_syngrowth_sas_output_compare.csv.gz"),
                 package = "growthcleanr")
-  cdcdata <- read.csv(cdcdatapath)
+  cdcdata <- read.csv(gzfile(cdcdatapath))
 
   # compare dimensions to the output of ext_bmiz
   expect_equal(nrow(myd_bmi), nrow(cdcdata))

@@ -9,7 +9,7 @@ Part of default CDC-derived tables
 \details{
 Contains velocities for growth pre-calculated by CDC
 }
-\section{tanner_ht_vel.csv}{
+\section{tanner_ht_vel.csv.gz}{
 
 
 Used in function \code{cleangrowth()}

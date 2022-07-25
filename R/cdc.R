@@ -33,7 +33,7 @@ set_cols_first <- function(DT, cols, intersection = TRUE)
   }
 }
 
-#' Calculate extended BMI measures 
+#' Calculate extended BMI measures
 #'
 #' \code{ext_bmiz} Calculates the sigma (scale parameter for the half-normal
 #' distribution), extended BMI percentile, extended BMIz, and the CDC LMS
@@ -101,6 +101,7 @@ set_cols_first <- function(DT, cols, intersection = TRUE)
 #' @import labelled
 #' @import magrittr
 #' @importFrom stats approx pnorm qnorm
+#' @rawNamespace import(R.utils, except = c(extract))
 #' @examples
 #' # Run on a small subset of given data
 #' df <- as.data.frame(syngrowth)
@@ -166,8 +167,8 @@ ext_bmiz <- function(data,
 
   dref_path <- ifelse(
     ref.data.path == "",
-    system.file("extdata/CDCref_d.csv", package = "growthcleanr"),
-    paste(ref.data.path, "CDCref_d.csv", sep = "")
+    system.file("extdata/CDCref_d.csv.gz", package = "growthcleanr"),
+    paste(ref.data.path, "CDCref_d.csv.gz", sep = "")
   )
   # Note: referring to underscore-leading column as `_AGEMOS1`, i.e. with
   # backticks, results in a no visible binding warning, but vars can't start

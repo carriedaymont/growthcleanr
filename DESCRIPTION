@@ -1,16 +1,30 @@
 Package: growthcleanr
 Type: Package
-Title: Growth Measurements Cleaner
-Version: 2.0.0
+Title: Data Cleaner for Anthropometric Measurements
+Version: 2.0.1
 Authors@R: c(
-    person("Daymont","Carrie",,"carriedaymont@gmail.com",c("aut","cre")),
-    person("Grundmeier","Robert",,"grundmeier@email.chop.edu","aut"),
-    person("Miller","Jeffrey",,"millerjm1@email.chop.edu","aut"),
-    person("Campos","Diego",,"camposd@email.chop.edu","aut")
+    person("Daymont","Carrie", email = "cdaymont@pennstatehealth.psu.edu", role = "aut"),
+    person("Grundmeier","Robert", role = "aut"),
+    person("Miller","Jeffrey", role = "aut"),
+    person("Campos","Diego", role = "aut"),
+    person("Chudnov","Dan", role = "ctb"),
+    person("De los Santos","Hannah", email = "hdelossantos@mitre.org", role = c("ctb","cre")),
+    person("Cao","Lusha", role = "ctb"),
+    person("Silva","Steffani", role = "ctb"),
+    person("Zhang","Hanzhe", role = "ctb"),
+    person("Boyas","Matt", role = "ctb"),
+    person("Freedman","David", role = "ctb"),
+    person("Achilleos","Andreas", role = "ctb"),
+    person("Butts","Jessica", role = "ctb"),
+    person("Nguyen","Sheila", role = "ctb"),
+    person("Soleymani","Taraneh", role = "ctb")
   )
-Maintainer: Robert Grundmeier <grundmeier@email.chop.edu>
-Description: growthcleanr cleans growth data that may contain implausible data based on unit or data range.
+Description: ‘growthcleanr’ identifies implausible anthropometric (e.g., height,
+    weight) measurements in irregularly spaced longitudinal datasets, such as those from electronic health records.
+URL: https://carriedaymont.github.io/growthcleanr/index.html, https://github.com/carriedaymont/growthcleanr
+BugReports: https://github.com/carriedaymont/growthcleanr/issues
 Imports:
+    R.utils (>= 2.11.0),
     data.table (>= 1.13.0),
     tidyr (>= 1.1.0),
     plyr (>= 1.8.6),
@@ -24,7 +38,6 @@ Depends:
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.1.2
 Roxygen: list(markdown = TRUE)
 Suggests:
     argparser (>= 0.6),
@@ -33,3 +46,4 @@ Suggests:
     rmarkdown (>= 2.3),
     testthat (>= 2.3.2)
 VignetteBuilder: knitr
+RoxygenNote: 7.2.0
