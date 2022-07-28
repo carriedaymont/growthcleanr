@@ -662,48 +662,6 @@ cleanadult <- function(df, weight_cap = Inf){
       step <- "Exclude-Adult-Extraneous-Same-Day"
       # now the rest!
 
-      # check if heights on duplicate days are trivially the same, keep both,
-      # use mean for all of those
-
-      # do not update the values -- keep the value with the lowest EWMA
-      # calculate ewma (using metric)
-      ewma_res <- ewma_dn(h_subj_df$age_days, h_subj_df$meas_m,
-                          ewma.adjacent = F)
-      # delta ewma
-      dewma <- (h_subj_df$meas_m- ewma_res)
-      colnames(dewma) <- paste0("d",colnames(ewma_res))
-
-      rem_ids <- c()
-      for (dd in dup_days){
-        s_df <- copy(h_subj_df[h_subj_df$age_days == dd,])
-        sde_range <- max(s_df$meas_m) - min(s_df$meas_m)
-        if (sde_range < 2.541){ # 1 inch +eps
-          # keep the value with the lowest EWMA -- do not keep rest
-          keep_id <- h_subj_df$id[h_subj_df$id %in% s_df$id][
-            which.min(dewma[h_subj_df$id %in% s_df$id, "dewma.all"])
-          ]
-
-          # remove all except the lowest ewma by id
-          rem_ids <- c(rem_ids, s_df$id[s_df$id != keep_id])
-        }
-      }
-      criteria <- h_subj_df$id %in% rem_ids
-
-      # we're going to update h_subj_df before moving on to the rest of this
-      # subject
-      h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
-      # also update mean sde
-      h_subj_mean_sde[as.character(h_subj_df$id)] <- h_subj_df$mean_sde
-
-      h_subj_df <- h_subj_df[!criteria,]
-
-      if (any(criteria)){
-        # reevaluate temp same day
-        h_subj_df <- temp_sde(h_subj_df)
-        # identify duplicate days
-        dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
-      }
-
       # next, calculate the duplicate ratio -- what proportion of days are
       # duplicated
       dup_ratio <- mean(!is.na(h_subj_df$diff))
@@ -727,54 +685,46 @@ cleanadult <- function(df, weight_cap = Inf){
           rep(F, nrow(h_subj_df))
         }
 
-      # if criteria didn't catch it, we now compare with medians
-      if (!any(criteria) & any(h_subj_df$extraneous)){
-        med <- median(h_subj_df$meas_m[
-          !h_subj_df$age_days %in% dup_days
-        ])
-        h_subj_df$absdiff <- NA
-        h_subj_df$absdiff[h_subj_df$age_days %in% dup_days] <-
-          abs(med - h_subj_df$meas_m[h_subj_df$age_days %in% dup_days])
+      # we're going to update h_subj_df before moving on to the rest of this
+      # subject
+      h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
+      # also update mean sde
+      h_subj_mean_sde[as.character(h_subj_df$id)] <- h_subj_df$mean_sde
 
-        # go through each duplicate day and figure out criteria
-        # keep the first one that satisfies this criteria
-        mm <- h_subj_df$meas_m # shorthand
-        rem_ids <- c()
-        for (dd in dup_days){
-          # find prior and next index
-          curr_ind <- which(h_subj_df$age_days == dd)[1]
-          p_ind <- which(h_subj_df$age_days == dd)[1] - 1
-          n_ind <- which(h_subj_df$age_days == dd)[
-            sum(h_subj_df$age_days == dd)] + 1
-          # modify for first and last
-          if (p_ind < 0){
-            p_ind <- 1
-          }
-          if (n_ind > nrow(h_subj_df)){
-            n_ind <- nrow(h_subj_df)
-          }
+      h_subj_df <- h_subj_df[!criteria,]
 
-          # are before, after, median close enough? 1 inch
-          compare <-
-            abs(mm[curr_ind] - mm[p_ind]) < 2.541 &
-            abs(mm[curr_ind] - mm[n_ind]) < 2.541 &
-            h_subj_df$absdiff[h_subj_df$age_days == dd] < 2.541
-
-          comp_id <-
-            if (sum(compare) == 1){
-              h_subj_df$id[which(compare)]
-            } else {
-              ""
-            }
-          # the rest are to be excluded
-          rem_ids <- c(rem_ids,
-                       h_subj_df$id[h_subj_df$age_days == dd &
-                                      h_subj_df$id != comp_id]
-          )
-        }
-        # update criteria
-        criteria <- h_subj_df$id %in% rem_ids
+      if (any(criteria)){
+        # reevaluate temp same day
+        h_subj_df <- temp_sde(h_subj_df)
+        # identify duplicate days
+        dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
       }
+
+      # check if heights fall within ewma cutoffs
+      # keep the value with the lowest EWMA
+      # calculate ewma (using metric)
+      ewma_res <- ewma_dn(h_subj_df$age_days, h_subj_df$meas_m,
+                          ewma.adjacent = F)
+      # delta ewma
+      dewma <- (h_subj_df$meas_m- ewma_res)
+      colnames(dewma) <- paste0("d",colnames(ewma_res))
+
+      rem_ids <- c()
+      for (dd in dup_days){
+        s_df <- copy(h_subj_df[h_subj_df$age_days == dd,])
+        de_val <- min(abs(dewma$dewma.all[h_subj_df$age_days == dd]))
+        de_day <- which.min(abs(dewma$dewma.all[h_subj_df$age_days == dd]))
+        if (de_val >= 2.541){ # 1 inch +eps
+          # if the smallest dewma is above the cutoff, exclude all SDEs on the
+          # day
+          rem_ids <- c(rem_ids, s_df$id)
+        } else {
+          # otherwise keep the value with the lowest EWMA -- do not keep rest
+          keep_id <- h_subj_df$id[h_subj_df$age_days == dd][de_day]
+          rem_ids <- c(rem_ids, s_df$id[s_df$id != keep_id])
+        }
+      }
+      criteria <- h_subj_df$id %in% rem_ids
 
       h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
 
@@ -1226,47 +1176,6 @@ cleanadult <- function(df, weight_cap = Inf){
       step <- "Exclude-Adult-Extraneous-Same-Day"
       # now the rest!
 
-      # check if weights on duplicate days are trivially the same, keep both,
-      # use mean for all of those
-
-      # do not update the values -- keep the value with the lowest EWMA
-      # calculate ewma (using metric)
-      ewma_res <- ewma_dn(w_subj_df$age_days, w_subj_df$meas_m,
-                          ewma.adjacent = F)
-      # delta ewma
-      dewma <- (w_subj_df$meas_m- ewma_res)
-      colnames(dewma) <- paste0("d",colnames(ewma_res))
-      rem_ids <- c()
-      for (dd in dup_days){
-        s_df <- copy(w_subj_df[w_subj_df$age_days == dd,])
-        sde_range <- max(s_df$meas_m) - min(s_df$meas_m)
-        if (sde_range < 1.001){ # 1 pound
-          # keep the value with the lowest EWMA -- do not keep rest
-          keep_id <- w_subj_df$id[w_subj_df$id %in% s_df$id][
-            which.min(dewma[w_subj_df$id %in% s_df$id, "dewma.all"])
-          ]
-
-          # remove all except the lowest ewma by id
-          rem_ids <- c(rem_ids, s_df$id[s_df$id != keep_id])
-        }
-      }
-      criteria <- w_subj_df$id %in% rem_ids
-
-      # we're going to update w_subj_df before moving on to the rest of this
-      # subject
-      w_subj_keep[as.character(w_subj_df$id)][criteria] <- step
-      # also update mean sde
-      w_subj_mean_sde[as.character(w_subj_df$id)] <- w_subj_df$mean_sde
-
-      w_subj_df <- w_subj_df[!criteria,]
-
-      if (any(criteria)){
-        # reevaluate temp same day
-        w_subj_df <- temp_sde(w_subj_df)
-        # identify duplicate days
-        dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
-      }
-
       # next, calculate the duplicate ratio -- what proportion of days are
       # duplicated
       dup_ratio <- mean(!is.na(w_subj_df$diff))
@@ -1290,38 +1199,77 @@ cleanadult <- function(df, weight_cap = Inf){
           rep(F, nrow(w_subj_df))
         }
 
-      # if criteria didn't catch it, we now compare with medians
-      if (!any(criteria) & any(w_subj_df$extraneous)){
-        # calculate ewma
-        # calculate ewma (using metric)
-        ewma_res <- ewma_dn(w_subj_df$age_days, w_subj_df$meas_m,
-                            ewma.adjacent = F)
-        # delta ewma
-        dewma <- (w_subj_df$meas_m- ewma_res)
-        colnames(dewma) <- paste0("d",colnames(ewma_res))
+      # we're going to update w_subj_df before moving on to the rest of this
+      # subject
+      w_subj_keep[as.character(w_subj_df$id)][criteria] <- step
+      # also update mean sde
+      w_subj_mean_sde[as.character(w_subj_df$id)] <- w_subj_df$mean_sde
 
-        # go through each duplicate day and figure out criteria
-        # keep the first one that satisfies this criteria
-        rem_ids <- c()
-        for (dd in dup_days){
-          compare <- abs(dewma$dewma.all[w_subj_df$age_days == dd]) <= 2.001
-          less_5 <- abs(dewma$dewma.all[w_subj_df$age_days == dd]) < 5
+      w_subj_df <- w_subj_df[!criteria,]
 
-          comp_id <-
-            if (sum(compare & less_5) == 1){
-              w_subj_df$id[which(compare)]
-            } else {
-              ""
-            }
-          # the rest are to be excluded
-          rem_ids <- c(rem_ids,
-                       w_subj_df$id[w_subj_df$age_days == dd &
-                                      w_subj_df$id != comp_id]
-          )
-        }
-        # update criteria
-        criteria <- w_subj_df$id %in% rem_ids
+      if (any(criteria)){
+        # reevaluate temp same day
+        w_subj_df <- temp_sde(w_subj_df)
+        # identify duplicate days
+        dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
       }
+
+      # check if weights on duplicate days are trivially the same, keep both,
+      # use mean for all of those
+
+      # do not update the values -- keep the value with the lowest EWMA
+      # calculate ewma (using metric)
+      ewma_res <- ewma_dn(w_subj_df$age_days, w_subj_df$meas_m,
+                          ewma.adjacent = F)
+      # delta ewma
+      dewma <- (w_subj_df$meas_m- ewma_res)
+      colnames(dewma) <- paste0("d",colnames(ewma_res))
+
+      rem_ids <- c()
+      for (dd in dup_days){
+        s_df <- copy(w_subj_df[w_subj_df$age_days == dd,])
+        de_val <- min(abs(dewma$dewma.all[w_subj_df$age_days == dd]))
+        de_day <- which.min(abs(dewma$dewma.all[w_subj_df$age_days == dd]))
+
+        # find next day and previous day
+        w_ind <- which(w_subj_df$age_days == dd)
+        prev_day <-
+          if (w_ind[1] != 1){
+            w_subj_df$age_years[w_ind[1]-1]
+          } else {
+            NA
+          }
+        next_day <-
+          if (w_ind[length(w_ind)] != nrow(w_subj_df)){
+            w_subj_df$age_years[w_ind[length(w_ind)]+1]
+          } else {
+            NA
+          }
+
+        # get age difference, in years
+        ageyears_diff_prev <- s_df$age_years[1] - prev_day
+        ageyears_diff_next <- next_day - s_df$age_years[1]
+
+        # compute "weight allow" how much change is allowed over time
+        wta_prev <- 4 + 18*log(1 + (ageyears_diff_prev*12))
+        wta_next <- 4 + 18*log(1 + (ageyears_diff_next*12))
+        # cap at 60
+        wta_prev[wta_prev > 60] <- 60
+        wta_next[wta_next > 60] <- 60
+
+        # FIND WTALLOW
+        if ((!is.na(wta_prev) & de_val > .5*wta_prev) |
+            (!is.na(wta_next) & de_val > .5*wta_next)){ # 1 pound
+          # if the smallest dewma is above the cutoff, exclude all SDEs on the
+          # day
+          rem_ids <- c(rem_ids, s_df$id)
+        } else {
+          # otherwise keep the value with the lowest EWMA -- do not keep rest
+          keep_id <- w_subj_df$id[w_subj_df$age_days == dd][de_day]
+          rem_ids <- c(rem_ids, s_df$id[s_df$id != keep_id])
+        }
+      }
+      criteria <- w_subj_df$id %in% rem_ids
 
       w_subj_keep[as.character(w_subj_df$id)][criteria] <- step
 
