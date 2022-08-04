@@ -97,7 +97,7 @@ ewma_dn <- function(agedays, meas, ewma.exp = -5, ewma.adjacent = T) {
       warning("EWMA ordering is not sorted; double check") #add in a check to make sure the inputs are already sorted (they should be)
     index <- order(agedays)
 
-    # calculate matrix of differences in age, and add 5 to each delta per Daymont algorithm
+    # calculate matrix of differences in age
     delta <- as.matrix.delta_dn(agedays)
     delta <- ifelse(delta == 0, 0, (delta) ^ ewma.exp)
 

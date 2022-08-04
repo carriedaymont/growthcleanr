@@ -700,30 +700,37 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
       }
 
-      # do not update the values -- keep the value with the lowest EWMA
-      # calculate ewma (using metric), without extraneous values
-      sub_h <- h_subj_df[!h_subj_df$extraneous,]
-      ewma_res <- ewma_dn(sub_h$age_days,
-                          sub_h$meas_m,
-                          ewma.adjacent = F)
-      # delta ewma
-      dewma <- (h_subj_df$meas_m- ewma_res)
-      colnames(dewma) <- paste0("d",colnames(ewma_res))
+      # check for SDEs by EWMA -- alternate calculate excluding other SDEs
+      all_sdes <- duplicated(h_subj_df$age_days) |
+        duplicated(h_subj_df$age_days, fromLast = T)
+
+      # calculate the time difference for all values, as well as exponential
+      delta <- as.matrix.delta_dn(h_subj_df$age_days)
+      delta <- ifelse(delta == 0, 0, (delta) ^ ewma.exp)
 
       rem_ids <- c()
       for (dd in dup_days){
         s_df <- copy(h_subj_df[h_subj_df$age_days == dd,])
-        de_val <- min(abs(dewma$dewma.all[sub_h$age_days == dd]))
-        de_day <- which.min(abs(dewma$dewma.all[sub_h$age_days == dd]))
+        # calculate dewma for each SDE on this day
+        dewma <- sapply(1:nrow(s_df), function(x){
+          ind <- h_subj_df$id == s_df[[x, "id"]]
+
+          ewma_res <- sum(h_subj_df$meas_m[!all_sdes]*delta[ind,!all_sdes])/
+            sum(delta[ind, !all_sdes])
+
+          # delta ewma
+          return(s_df$meas_m[x] - ewma_res)
+        })
+
+        de_val <- min(abs(dewma))
+        de_day <- which.min(abs(dewma))
         if (de_val >= 2.541){ # 1 inch +eps
           # if the smallest dewma is above the cutoff, exclude all SDEs on the
           # day
           rem_ids <- c(rem_ids, s_df$id)
         } else {
           # otherwise keep the value with the lowest EWMA -- do not keep rest
-          # HOW TO KEEP VALUE WITH LOWEST EWMA
-          keep_id <- h_subj_df$id[h_subj_df$age_days == dd][de_day]
-          rem_ids <- c(rem_ids, s_df$id[s_df$id != keep_id])
+          rem_ids <- c(rem_ids, s_df$id[-de_day])
         }
       }
       criteria <- h_subj_df$id %in% rem_ids
@@ -1216,24 +1223,31 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
       }
 
-      # check if weights on duplicate days are trivially the same, keep both,
-      # use mean for all of those
+      # check for SDEs by EWMA -- alternate calculate excluding other SDEs
+      all_sdes <- duplicated(w_subj_df$age_days) |
+        duplicated(w_subj_df$age_days, fromLast = T)
 
-      # do not update the values -- keep the value with the lowest EWMA
-      # calculate ewma (using metric), without extraneous values
-      sub_w <- w_subj_df[!w_subj_df$extraneous,]
-      ewma_res <- ewma_dn(sub_w$age_days,
-                          sub_w$meas_m,
-                          ewma.adjacent = F)
-      # delta ewma
-      dewma <- (w_subj_df$meas_m- ewma_res)
-      colnames(dewma) <- paste0("d",colnames(ewma_res))
+      # calculate the time difference for all values, as well as exponential
+      delta <- as.matrix.delta_dn(w_subj_df$age_days)
+      delta <- ifelse(delta == 0, 0, (delta) ^ ewma.exp)
 
       rem_ids <- c()
       for (dd in dup_days){
         s_df <- copy(w_subj_df[w_subj_df$age_days == dd,])
-        de_val <- min(abs(dewma$dewma.all[sub_w$age_days == dd]))
-        de_day <- which.min(abs(dewma$dewma.all[sub_w$age_days == dd]))
+
+        # calculate dewma for each SDE on this day
+        dewma <- sapply(1:nrow(s_df), function(x){
+          ind <- w_subj_df$id == s_df[[x, "id"]]
+
+          ewma_res <- sum(w_subj_df$meas_m[!all_sdes]*delta[ind,!all_sdes])/
+            sum(delta[ind, !all_sdes])
+
+          # delta ewma
+          return(s_df$meas_m[x] - ewma_res)
+        })
+
+        de_val <- min(abs(dewma))
+        de_day <- which.min(abs(dewma))
 
         # find next day and previous day
         w_ind <- which(w_subj_df$age_days == dd)
@@ -1264,9 +1278,7 @@ cleanadult <- function(df, weight_cap = Inf){
           rem_ids <- c(rem_ids, s_df$id)
         } else {
           # otherwise keep the value with the lowest EWMA -- do not keep rest
-          # HOW TO KEEP VALUE WITH LOWEST EWMA
-          keep_id <- w_subj_df$id[w_subj_df$age_days == dd][de_day]
-          rem_ids <- c(rem_ids, s_df$id[s_df$id != keep_id])
+          rem_ids <- c(rem_ids, s_df$id[-de_day])
         }
       }
       criteria <- w_subj_df$id %in% rem_ids
