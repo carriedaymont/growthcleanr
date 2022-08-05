@@ -147,10 +147,10 @@ test_that("growthcleanr works as expected on adult synthetic data", {
   expect_equal("Exclude-Adult-Extraneous-Same-Day", gcr_result(cd500cp, 38722))
 
   expect_equal("Exclude-Carried-Forward", gcr_result(cd500, 12923))
-  expect_equal("Include", gcr_result(cd500cp, 12923))
+  expect_equal("Exclude-Adult-Extraneous-Same-Day", gcr_result(cd500cp, 12923))
 
   expect_equal("Exclude-Extraneous-Same-Day", gcr_result(cd500, 25259))
-  expect_equal("Exclude-Adult-Distinct-3-Or-More", gcr_result(cd500cp, 25259))
+  expect_equal("Exclude-Adult-Distinct-Pairs", gcr_result(cd500cp, 25259))
 
   # Check counts of exclusions by category
   catcount <- function (df, category) {
@@ -159,17 +159,17 @@ test_that("growthcleanr works as expected on adult synthetic data", {
 
   d500_exclusions <-
     cd500 %>% group_by(gcr_result) %>% tally(sort = TRUE)
-  expect_equal(9748, catcount(d500_exclusions, "Include"))
-  expect_equal(2090, catcount(d500_exclusions, "Exclude-Adult-Extraneous-Same-Day"))
+  expect_equal(8098, catcount(d500_exclusions, "Include"))
+  expect_equal(3754, catcount(d500_exclusions, "Exclude-Adult-Extraneous-Same-Day"))
   expect_equal(48, catcount(d500_exclusions, "Exclude-Adult-Distinct-3-Or-More"))
   expect_equal(43, catcount(d500_exclusions, "Exclude-Carried-Forward"))
   expect_equal(2, catcount(d500_exclusions, "Exclude-Adult-Transpositions"))
 
   d500cp_exclusions <-
     cd500cp %>% group_by(gcr_result) %>% tally(sort = TRUE)
-  expect_equal(9778, catcount(d500cp_exclusions, "Include"))
-  expect_equal(2199, catcount(d500cp_exclusions, "Exclude-Adult-Extraneous-Same-Day"))
-  expect_equal(52, catcount(d500cp_exclusions, "Exclude-Adult-Distinct-3-Or-More"))
+  expect_equal(8045, catcount(d500cp_exclusions, "Include"))
+  expect_equal(3943, catcount(d500cp_exclusions, "Exclude-Adult-Extraneous-Same-Day"))
+  expect_equal(33, catcount(d500cp_exclusions, "Exclude-Adult-Distinct-3-Or-More"))
   expect_true(is.na(catcount(d500cp_exclusions, "Exclude-Carried-Forward")))
   expect_equal(2, catcount(d500cp_exclusions, "Exclude-Adult-Transpositions"))
 
