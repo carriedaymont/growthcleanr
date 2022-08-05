@@ -1265,14 +1265,15 @@ cleanadult <- function(df, weight_cap = Inf){
           }
 
         # get age difference, in years, using the smaller time difference
-        ageyears_diff <- s_df$age_years[1] - min(prev_day, next_day, na.rm = T)
+        ageyears_diff <- abs(s_df$age_years[1] -
+                               min(prev_day, next_day, na.rm = T))
 
         # compute "weight allow" how much change is allowed over time
         wta <- 4 + 18*log(1 + (ageyears_diff*12))
         # cap at 60
         wta[wta > 60] <- 60
 
-        if (de_val > .5*wta_prev){ # greater than half allowed weight change
+        if (de_val > .5*wta){ # greater than half allowed weight change
           # if the smallest dewma is above the cutoff, exclude all SDEs on the
           # day
           rem_ids <- c(rem_ids, s_df$id)
