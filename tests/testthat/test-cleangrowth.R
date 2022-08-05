@@ -161,7 +161,7 @@ test_that("growthcleanr works as expected on adult synthetic data", {
     cd500 %>% group_by(gcr_result) %>% tally(sort = TRUE)
   expect_equal(8098, catcount(d500_exclusions, "Include"))
   expect_equal(3754, catcount(d500_exclusions, "Exclude-Adult-Extraneous-Same-Day"))
-  expect_equal(48, catcount(d500_exclusions, "Exclude-Adult-Distinct-3-Or-More"))
+  expect_equal(30, catcount(d500_exclusions, "Exclude-Adult-Distinct-3-Or-More"))
   expect_equal(43, catcount(d500_exclusions, "Exclude-Carried-Forward"))
   expect_equal(2, catcount(d500_exclusions, "Exclude-Adult-Transpositions"))
 
