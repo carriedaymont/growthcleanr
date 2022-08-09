@@ -14,22 +14,16 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - {os: windows-latest, r: 'oldrel'}
-          - {os: windows-latest, r: 'release'}
+          - { os: windows-latest, r: "oldrel" }
+          - { os: windows-latest, r: "release" }
 
-          # As of Nov 2021, "macOS-latest" hasn't shifted to 11, so make explicit  
-          - {os: macOS-10.15, r: 'oldrel'}
-          - {os: macOS-10.15, r: 'release'}
-          - {os: macOS-11, r: 'release'}
+          - { os: macOS-11, r: "release" }
+          - { os: macOS-12, r: "release" }
 
-          - {os: ubuntu-18.04, r: 'oldrel', rspm: "https://packagemanager.rstudio.com/cran/__linux__/bionic/latest"}
-          - {os: ubuntu-18.04, r: 'release', rspm: "https://packagemanager.rstudio.com/cran/__linux__/bionic/latest"}
-
-          - {os: ubuntu-20.04, r: 'oldrel', rspm: "https://packagemanager.rstudio.com/cran/__linux__/focal/latest"}
-          - {os: ubuntu-20.04, r: 'release', rspm: "https://packagemanager.rstudio.com/cran/__linux__/focal/latest"}
-          # Disable as of Nov 2021; failing in GitHub action with rcmdcheck
-          # unavailable, but this is not critical for testing.
-          # - {os: ubuntu-20.04, r: 'devel', rspm: "https://packagemanager.rstudio.com/cran/__linux__/focal/latest"}
+          - { os: ubuntu-18.04, r: "release" }
+          - { os: ubuntu-20.04, r: "oldrel" }
+          - { os: ubuntu-20.04, r: "release" }
+          - { os: ubuntu-22.04, r: "release" }
 
     env:
       R_REMOTES_NO_ERRORS_FROM_WARNINGS: true
@@ -37,12 +31,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-
-      - uses: r-lib/actions/setup-r@v1
+      - uses: r-lib/actions/setup-r@v2
         with:
           r-version: ${{ matrix.config.r }}
 
-      - uses: r-lib/actions/setup-pandoc@v1
+      - uses: r-lib/actions/setup-pandoc@v2
 
       - name: Query dependencies
         run: |
@@ -56,8 +49,11 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ${{ env.R_LIBS_USER }}
-          key: ${{ matrix.config.os }}-${{ hashFiles('.github/R-version') }}-1-${{ hashFiles('.github/depends.Rds') }}
-          restore-keys: ${{ matrix.config.os }}-${{ hashFiles('.github/R-version') }}-1-
+          key:
+            ${{ matrix.config.os }}-${{ hashFiles('.github/R-version') }}-1-${{
+            hashFiles('.github/depends.Rds') }}
+          restore-keys:
+            ${{ matrix.config.os }}-${{ hashFiles('.github/R-version') }}-1-
 
       - name: Install system dependencies
         if: runner.os == 'Linux'
@@ -75,7 +71,9 @@ jobs:
       - name: Check
         env:
           _R_CHECK_CRAN_INCOMING_REMOTE_: false
-        run: rcmdcheck::rcmdcheck(args = c("--no-manual", "--as-cran"), error_on = "warning", check_dir = "check")
+        run:
+          rcmdcheck::rcmdcheck(args = c("--no-manual", "--as-cran"), error_on =
+          "warning", check_dir = "check")
         shell: Rscript {0}
 
       - name: Upload check results
