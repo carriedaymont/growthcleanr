@@ -700,44 +700,47 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
       }
 
-      # check for SDEs by EWMA -- alternate calculate excluding other SDEs
-      all_sdes <- duplicated(h_subj_df$age_days) |
-        duplicated(h_subj_df$age_days, fromLast = T)
+      # if there are any left, we move to checking by EWMA
+      if (any(h_subj_df$extraneous)){
+        # check for SDEs by EWMA -- alternate calculate excluding other SDEs
+        all_sdes <- duplicated(h_subj_df$age_days) |
+          duplicated(h_subj_df$age_days, fromLast = T)
 
-      # calculate the time difference for all values, as well as exponential
-      delta <- as.matrix.delta_dn(h_subj_df$age_days)
-      delta <- ifelse(delta == 0, 0, (delta) ^ ewma.exp)
+        # calculate the time difference for all values, as well as exponential
+        delta <- as.matrix.delta_dn(h_subj_df$age_days)
+        delta <- ifelse(delta == 0, 0, (delta) ^ -5)
 
-      rem_ids <- c()
-      for (dd in dup_days){
-        s_df <- copy(h_subj_df[h_subj_df$age_days == dd,])
-        # calculate dewma for each SDE on this day
-        dewma <- sapply(1:nrow(s_df), function(x){
-          ind <- h_subj_df$id == s_df[[x, "id"]]
+        rem_ids <- c()
+        for (dd in dup_days){
+          s_df <- copy(h_subj_df[h_subj_df$age_days == dd,])
+          # calculate dewma for each SDE on this day
+          dewma <- sapply(1:nrow(s_df), function(x){
+            ind <- h_subj_df$id == s_df[[x, "id"]]
 
-          ewma_res <- sum(h_subj_df$meas_m[!all_sdes]*delta[ind,!all_sdes])/
-            sum(delta[ind, !all_sdes])
+            ewma_res <- sum(h_subj_df$meas_m[!all_sdes]*delta[ind,!all_sdes])/
+              sum(delta[ind, !all_sdes])
 
-          # delta ewma
-          return(s_df$meas_m[x] - ewma_res)
-        })
+            # delta ewma
+            return(s_df$meas_m[x] - ewma_res)
+          })
 
-        de_val <- min(abs(dewma))
-        de_day <- which.min(abs(dewma))
-        if (de_val >= 2.541){ # 1 inch +eps
-          # if the smallest dewma is above the cutoff, exclude all SDEs on the
-          # day
-          rem_ids <- c(rem_ids, s_df$id)
-        } else {
-          # otherwise keep the value with the lowest EWMA -- do not keep rest
-          rem_ids <- c(rem_ids, s_df$id[-de_day])
+          de_val <- min(abs(dewma))
+          de_day <- which.min(abs(dewma))
+          if (de_val >= 2.541){ # 1 inch +eps
+            # if the smallest dewma is above the cutoff, exclude all SDEs on the
+            # day
+            rem_ids <- c(rem_ids, s_df$id)
+          } else {
+            # otherwise keep the value with the lowest EWMA -- do not keep rest
+            rem_ids <- c(rem_ids, s_df$id[-de_day])
+          }
         }
+        criteria <- h_subj_df$id %in% rem_ids
+
+        h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
+
+        h_subj_df <- h_subj_df[!criteria,]
       }
-      criteria <- h_subj_df$id %in% rem_ids
-
-      h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
-
-      h_subj_df <- h_subj_df[!criteria,]
     }
 
     # 10hab, H distinct values ----
@@ -1223,70 +1226,73 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
       }
 
-      # check for SDEs by EWMA -- alternate calculate excluding other SDEs
-      all_sdes <- duplicated(w_subj_df$age_days) |
-        duplicated(w_subj_df$age_days, fromLast = T)
+      # if there are any extraneous left after other steps
+      if (any(w_subj_df$extraneous)){
+        # check for SDEs by EWMA -- alternate calculate excluding other SDEs
+        all_sdes <- duplicated(w_subj_df$age_days) |
+          duplicated(w_subj_df$age_days, fromLast = T)
 
-      # calculate the time difference for all values, as well as exponential
-      delta <- as.matrix.delta_dn(w_subj_df$age_days)
-      delta <- ifelse(delta == 0, 0, (delta) ^ ewma.exp)
+        # calculate the time difference for all values, as well as exponential
+        delta <- as.matrix.delta_dn(w_subj_df$age_days)
+        delta <- ifelse(delta == 0, 0, (delta) ^ -5)
 
-      rem_ids <- c()
-      for (dd in dup_days){
-        s_df <- copy(w_subj_df[w_subj_df$age_days == dd,])
+        rem_ids <- c()
+        for (dd in dup_days){
+          s_df <- copy(w_subj_df[w_subj_df$age_days == dd,])
 
-        # calculate dewma for each SDE on this day
-        dewma <- sapply(1:nrow(s_df), function(x){
-          ind <- w_subj_df$id == s_df[[x, "id"]]
+          # calculate dewma for each SDE on this day
+          dewma <- sapply(1:nrow(s_df), function(x){
+            ind <- w_subj_df$id == s_df[[x, "id"]]
 
-          ewma_res <- sum(w_subj_df$meas_m[!all_sdes]*delta[ind,!all_sdes])/
-            sum(delta[ind, !all_sdes])
+            ewma_res <- sum(w_subj_df$meas_m[!all_sdes]*delta[ind,!all_sdes])/
+              sum(delta[ind, !all_sdes])
 
-          # delta ewma
-          return(s_df$meas_m[x] - ewma_res)
-        })
+            # delta ewma
+            return(s_df$meas_m[x] - ewma_res)
+          })
 
-        de_val <- min(abs(dewma))
-        de_day <- which.min(abs(dewma))
+          de_val <- min(abs(dewma))
+          de_day <- which.min(abs(dewma))
 
-        # find next day and previous day
-        w_ind <- which(w_subj_df$age_days == dd)
-        prev_day <-
-          if (w_ind[1] != 1){
-            w_subj_df$age_years[w_ind[1]-1]
+          # find next day and previous day
+          w_ind <- which(w_subj_df$age_days == dd)
+          prev_day <-
+            if (w_ind[1] != 1){
+              w_subj_df$age_years[w_ind[1]-1]
+            } else {
+              NA
+            }
+          next_day <-
+            if (w_ind[length(w_ind)] != nrow(w_subj_df)){
+              w_subj_df$age_years[w_ind[length(w_ind)]+1]
+            } else {
+              NA
+            }
+
+          # get age difference, in years, using the smaller time difference
+          ageyears_diff <- abs(s_df$age_years[1] -
+                                 min(prev_day, next_day, na.rm = T))
+
+          # compute "weight allow" how much change is allowed over time
+          wta <- 4 + 18*log(1 + (ageyears_diff*12))
+          # cap at 60
+          wta[wta > 60] <- 60
+
+          if (de_val > .5*wta){ # greater than half allowed weight change
+            # if the smallest dewma is above the cutoff, exclude all SDEs on the
+            # day
+            rem_ids <- c(rem_ids, s_df$id)
           } else {
-            NA
+            # otherwise keep the value with the lowest EWMA -- do not keep rest
+            rem_ids <- c(rem_ids, s_df$id[-de_day])
           }
-        next_day <-
-          if (w_ind[length(w_ind)] != nrow(w_subj_df)){
-            w_subj_df$age_years[w_ind[length(w_ind)]+1]
-          } else {
-            NA
-          }
-
-        # get age difference, in years, using the smaller time difference
-        ageyears_diff <- abs(s_df$age_years[1] -
-                               min(prev_day, next_day, na.rm = T))
-
-        # compute "weight allow" how much change is allowed over time
-        wta <- 4 + 18*log(1 + (ageyears_diff*12))
-        # cap at 60
-        wta[wta > 60] <- 60
-
-        if (de_val > .5*wta){ # greater than half allowed weight change
-          # if the smallest dewma is above the cutoff, exclude all SDEs on the
-          # day
-          rem_ids <- c(rem_ids, s_df$id)
-        } else {
-          # otherwise keep the value with the lowest EWMA -- do not keep rest
-          rem_ids <- c(rem_ids, s_df$id[-de_day])
         }
+        criteria <- w_subj_df$id %in% rem_ids
+
+        w_subj_keep[as.character(w_subj_df$id)][criteria] <- step
+
+        w_subj_df <- w_subj_df[!criteria,]
       }
-      criteria <- w_subj_df$id %in% rem_ids
-
-      w_subj_keep[as.character(w_subj_df$id)][criteria] <- step
-
-      w_subj_df <- w_subj_df[!criteria,]
 
       # redo RVs just if any first RVs became extraneous
       w_subj_df <- identify_rv(w_subj_df)
