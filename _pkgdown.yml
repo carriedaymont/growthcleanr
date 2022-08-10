@@ -28,10 +28,17 @@ reference:
       - ewma
       - read_anthro
       - sd_median
+  - title: "Pediatric carried forward adjustment"
+    desc:
+      Temporary functions for testing pending enhancements; will be integrated
+  - contents:
+      - acf_answers
+      - adjustcarryforward
+      - testacf
   - title: "Extended measures for pediatric BMI"
     desc: >
-      Compute Z-scores and percentiles for pediatric subjects,
-      based on CDC SAS program at
+      Compute Z-scores and percentiles for pediatric subjects, based on CDC SAS
+      program at
       https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm
   - contents:
       - ext_bmiz
@@ -42,6 +49,24 @@ reference:
       - recode_sex
       - simple_bmi
       - splitinput
+  - title: "Datasets"
+    desc: Reference data and additional sources
+  - contents:
+      - bmianthro
+      - CDCref_d
+      - growth_cdc_ext
+      - lenanthro
+      - nhanes-reference-medians
+      - syngrowth
+      - tanner_ht_vel
+      - tanner_ht_vel_with_2sd
+      - test_syngrowth_sas_output_compare
+      - test_syngrowth_wide
+      - weianthro
+      - who_ht_maxvel
+      - who_ht_maxvel_2sd
+      - who_ht_vel_2sd
+      - who_ht_vel_3sd
 
 repo:
   url:
