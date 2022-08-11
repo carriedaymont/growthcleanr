@@ -19,6 +19,8 @@
 <![endif]-->
 </head>
 <body data-spy="scroll" data-target="#toc">
+    
+
     <div class="container template-article">
       <header><div class="navbar navbar-default navbar-fixed-top" role="navigation">
   <div class="container">
@@ -31,27 +33,22 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">growthcleanr</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="Released version">2.0.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.1</span>
       </span>
     </div>
 
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav">
-<li>
-  <a href="../index.html">
-    <span class="fas fa-home fa-lg"></span>
-     
-  </a>
-</li>
 <li class="dropdown">
-  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
     Articles
      
     <span class="caret"></span>
   </a>
   <ul class="dropdown-menu" role="menu">
 <li class="divider">
-    <li class="dropdown-header">Getting started</li>
+    </li>
+<li class="dropdown-header">Getting started</li>
     <li>
       <a href="../articles/quickstart.html">Quickstart</a>
     </li>
@@ -62,7 +59,8 @@
       <a href="../articles/usage.html">Usage</a>
     </li>
     <li class="divider">
-    <li class="dropdown-header">Advanced topics</li>
+    </li>
+<li class="dropdown-header">Advanced topics</li>
     <li>
       <a href="../articles/configuration.html">Configuration</a>
     </li>
@@ -92,7 +90,7 @@
       </ul>
 <ul class="nav navbar-nav navbar-right">
 <li>
-  <a href="https://github.com/carriedaymont/growthcleanr">
+  <a href="https://github.com/carriedaymont/growthcleanr" class="external-link">
     <span class="fab fa-github fa-lg"></span>
      
   </a>
@@ -112,9 +110,9 @@
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Configuration</h1>
             
-            <h4 class="date">2021-11-09</h4>
+            <h4 data-toc-skip class="date">2022-08-11</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/configuration.Rmd"><code>vignettes/configuration.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/configuration.Rmd" class="external-link"><code>vignettes/configuration.Rmd</code></a></small>
       <div class="hidden name"><code>configuration.Rmd</code></div>
 
     </div>
@@ -123,9 +121,9 @@
     
 <p><code>growthcleanr</code> offers several options for configuration, with default values set to address common cases. You may wish to experiment with the settings to discover which work best for your research and your dataset.</p>
 <p>All of the following options may be set as additional parameters in the call to <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>.</p>
-<div id="algorithm-related-options" class="section level2">
-<h2 class="hasAnchor">
-<a href="#algorithm-related-options" class="anchor"></a>Algorithm-related options</h2>
+<div class="section level2">
+<h2 id="algorithm-related-options">Algorithm-related options<a class="anchor" aria-label="anchor" href="#algorithm-related-options"></a>
+</h2>
 <p>The following options change the behavior of the growthcleanr algorithm.</p>
 <ul>
 <li><p><code>recover.unit.error</code> - default <code>FALSE</code>; when <code>FALSE</code>, measurements identified as unit errors (e.g., apparent height values in inches instead of centimeters) will be flagged but not corrected, when <code>TRUE</code> these values will be corrected and included as valid measurements for cleaning.</p></li>
@@ -136,7 +134,7 @@
 <ul>
 <li><p><code>include.carryforward</code> - default <code>FALSE</code>; if set to <code>TRUE</code>, <code>growthcleanr</code> will skip algorithm step 9, which identifies carried forward measurements, and will not flag these values for exclusion.</p></li>
 <li><p><code>ewma.exp</code> - default <code>-1.5</code>; the exponent used for weighting measurements when calculating exponentially weighted moving average (EWMA). This exponent should be negative to weight growth measurements closer to the measurement being evaluated more strongly. Exponents that are further from zero (e.g., <code>-3</code>) will increase the relative influence of measurements close in time to the measurement being evaluated compared to using the default exponent.</p></li>
-<li><p><code>ref.data.path</code> - defaults to using CDC reference data from year 2000; supply a file path to use alternate reference data. Note that when running from an installed <code>growthcleanr</code> package (e.g. having called <code><a href="https://rdrr.io/r/base/library.html">library(growthcleanr)</a></code>), this path does not need to be specified. Developers testing the source code directly from the source directory will need to specify this as well.</p></li>
+<li><p><code>ref.data.path</code> - defaults to using CDC reference data from year 2000; supply a file path to use alternate reference data. Note that when running from an installed <code>growthcleanr</code> package (e.g. having called <code><a href="https://carriedaymont.github.io/growthcleanr/index.html" class="external-link">library(growthcleanr)</a></code>), this path does not need to be specified. Developers testing the source code directly from the source directory will need to specify this as well.</p></li>
 <li><p><code>error.load.mincount</code> - default <code>2</code>; minimum count of exclusions on parameter for one subject before considering excluding all measurements.</p></li>
 <li><p><code>error.load.threshold</code> - default <code>0.5</code>; threshold to exceed for percentage of excluded measurement count relative to count of included other measurement (e.g., if 3 of 5 WTs are excluded, and 5 corresponding HTs are included, this exceeds the 0.5 threshold and the other two WTs will be excluded).</p></li>
 <li>
@@ -167,9 +165,9 @@
 <li><p><code>weight_cap</code> - default <code>Inf</code>; weight_cap Positive number, describing a weight cap in kg (rounded to the nearest .1, +/- .1) within an adult dataset. This may be used when a dataset shared for research is known to clamp values for privacy reasons. If there is no weight cap, set to Inf (default). This option is not used with pediatric subjects.</p></li>
 </ul>
 </div>
-<div id="operational-options" class="section level2">
-<h2 class="hasAnchor">
-<a href="#operational-options" class="anchor"></a>Operational options</h2>
+<div class="section level2">
+<h2 id="operational-options">Operational options<a class="anchor" aria-label="anchor" href="#operational-options"></a>
+</h2>
 <p>The following options change the execution of the program overall, with no effect on the algorithm itself.</p>
 <ul>
 <li><p><code>parallel</code> - default <code>FALSE</code>; set to <code>TRUE</code> to run <code>growthcleanr</code> in parallel. Running in parallel will split the input data into batches (while keeping all records for each subject together) and process each batch on a different processor/core to maximize throughput. Recommended for large datasets with more than 100K rows.</p></li>
@@ -181,10 +179,10 @@
 <li><p><code>log.path</code> - default <code>"."</code>; sets directory for batch log file output when processing with <code>parallel = TRUE</code>. A new directory will be created if necessary.</p></li>
 </ul>
 </div>
-<div id="nhanes-reference-medians" class="section level2">
-<h2 class="hasAnchor">
-<a href="#nhanes-reference-medians" class="anchor"></a>NHANES reference medians</h2>
-<p><code>growthcleanr</code> <a href="https://github.com/carriedaymont/growthcleanr/releases">releases</a> up to 1.2.4 offered two options for recentering medians, either the default of deriving medians from the input set, or supplying an externally-defined set of medians. These left out an option for researchers working with either small datasets or with data which might otherwise not be representative of the population, as deriving medians from the input set in those cases might be problematic. To provide a standard default reference to address these latter cases, a set of medians were derived from the <a href="https://wwwn.cdc.gov/nchs/nhanes/Default.aspx">National Health and Nutrition Examination Survey</a> (NHANES). A summary of that process is below. As of release 1.2.5, the default behavior is:</p>
+<div class="section level2">
+<h2 id="nhanes-reference-medians">NHANES reference medians<a class="anchor" aria-label="anchor" href="#nhanes-reference-medians"></a>
+</h2>
+<p><code>growthcleanr</code> <a href="https://github.com/carriedaymont/growthcleanr/releases" class="external-link">releases</a> up to 1.2.4 offered two options for recentering medians, either the default of deriving medians from the input set, or supplying an externally-defined set of medians. These left out an option for researchers working with either small datasets or with data which might otherwise not be representative of the population, as deriving medians from the input set in those cases might be problematic. To provide a standard default reference to address these latter cases, a set of medians were derived from the <a href="https://wwwn.cdc.gov/nchs/nhanes/Default.aspx" class="external-link">National Health and Nutrition Examination Survey</a> (NHANES). A summary of that process is below. As of release 1.2.5, the default behavior is:</p>
 <ul>
 <li>If <code>sd.recenter</code> is specified as a data set, use the data set</li>
 <li>If <code>sd.recenter</code> is specified as <code>nhanes</code>, use NHANES</li>
@@ -197,11 +195,11 @@
 </li>
 </ul>
 <p>With the verbose <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> option <code>quietly = FALSE</code>, the recentering medians approach used will be noted in the output. If the input set has fewer than 100 observations for any age-year, this will also be noted in the output.</p>
-<div id="derivation-process" class="section level3">
-<h3 class="hasAnchor">
-<a href="#derivation-process" class="anchor"></a>Derivation process</h3>
-<p>The NHANES reference medians are based primarily on data from NHANES 2009-2010 through 2017-2018, including approximately 39,000 heights/lengths and weights from children and adolescents between the ages of 0 months and &lt;240 months. Weight and height SD scores were calculated from the <a href="https://www.cdc.gov/growthcharts/percentile_data_files.htm">L, M, and S parameters</a> for the <a href="https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm">CDC growth charts</a> were used as the reference to calculate weight and height SD scores for the NHANES 2009-2010 through 2017-2018 samples. Based on the distributions of age-days in children at 0 months, an age adjustment was made based on the median number of days among these infants. This adjustment was made after consultation with the National Center for Health Statistics confirmed that a general assumption of ages occurring at the midpoint of the indicated integer month of age did not apply to children recorded as 0 months, and uses 0.75 months instead.</p>
-<p>Weights were supplemented with a random sample of birthweights from NCHS’s <a href="https://www.nber.org/research/data/vital-statistics-natality-birth-data">Vital Statistics Natality Birth Data</a> for 2018. These had sample weights assigned so that the sum of the sample weights for the sample equalled the sum of the sample weights for each month for infants in NHANES, as NHANES is a multi-stage complex survey. The reference data was then smoothed using the <code>svysmooth()</code> function in the R <a href="https://cran.r-project.org/web/packages/survey/index.html"><code>survey</code></a> package to estimate the weight and height SD scores for each day up to 7,305 days, with a bandwidth chosen to balance between over- and under-fitting, and interpolation between the estimates from this function was used to obtain an estimate for each day of age. Predictions from a regression model fit to smoothed height SDs between 23 and 365 days (the youngest child in NHANES had an estimated age in days of 23) were used to extend smoothed height SD scores to children between 1 and 22 days of age.</p>
+<div class="section level3">
+<h3 id="derivation-process">Derivation process<a class="anchor" aria-label="anchor" href="#derivation-process"></a>
+</h3>
+<p>The NHANES reference medians are based primarily on data from NHANES 2009-2010 through 2017-2018, including approximately 39,000 heights/lengths and weights from children and adolescents between the ages of 0 months and &lt;240 months. Weight and height SD scores were calculated from the <a href="https://www.cdc.gov/growthcharts/percentile_data_files.htm" class="external-link">L, M, and S parameters</a> for the <a href="https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm" class="external-link">CDC growth charts</a> were used as the reference to calculate weight and height SD scores for the NHANES 2009-2010 through 2017-2018 samples. Based on the distributions of age-days in children at 0 months, an age adjustment was made based on the median number of days among these infants. This adjustment was made after consultation with the National Center for Health Statistics confirmed that a general assumption of ages occurring at the midpoint of the indicated integer month of age did not apply to children recorded as 0 months, and uses 0.75 months instead.</p>
+<p>Weights were supplemented with a random sample of birthweights from NCHS’s <a href="https://www.nber.org/research/data/vital-statistics-natality-birth-data" class="external-link">Vital Statistics Natality Birth Data</a> for 2018. These had sample weights assigned so that the sum of the sample weights for the sample equalled the sum of the sample weights for each month for infants in NHANES, as NHANES is a multi-stage complex survey. The reference data was then smoothed using the <code>svysmooth()</code> function in the R <a href="https://cran.r-project.org/web/packages/survey/index.html" class="external-link"><code>survey</code></a> package to estimate the weight and height SD scores for each day up to 7,305 days, with a bandwidth chosen to balance between over- and under-fitting, and interpolation between the estimates from this function was used to obtain an estimate for each day of age. Predictions from a regression model fit to smoothed height SDs between 23 and 365 days (the youngest child in NHANES had an estimated age in days of 23) were used to extend smoothed height SD scores to children between 1 and 22 days of age.</p>
 </div>
 </div>
   </div>
@@ -217,11 +215,13 @@
 
 
       <footer><div class="copyright">
-  <p>Developed by Daymont Carrie, Grundmeier Robert, Miller Jeffrey, Campos Diego.</p>
+  <p></p>
+<p>Developed by Daymont Carrie, Grundmeier Robert, Miller Jeffrey, Campos Diego, De los Santos Hannah.</p>
 </div>
 
 <div class="pkgdown">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/">pkgdown</a> 1.6.1.</p>
+  <p></p>
+<p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.6.</p>
 </div>
 
       </footer>
@@ -229,6 +229,8 @@
 
   
 
+
+  
 
   </body>
 </html>
