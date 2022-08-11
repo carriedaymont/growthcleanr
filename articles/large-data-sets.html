@@ -19,6 +19,8 @@
 <![endif]-->
 </head>
 <body data-spy="scroll" data-target="#toc">
+    
+
     <div class="container template-article">
       <header><div class="navbar navbar-default navbar-fixed-top" role="navigation">
   <div class="container">
@@ -31,27 +33,22 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">growthcleanr</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="Released version">2.0.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.1</span>
       </span>
     </div>
 
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav">
-<li>
-  <a href="../index.html">
-    <span class="fas fa-home fa-lg"></span>
-     
-  </a>
-</li>
 <li class="dropdown">
-  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
     Articles
      
     <span class="caret"></span>
   </a>
   <ul class="dropdown-menu" role="menu">
 <li class="divider">
-    <li class="dropdown-header">Getting started</li>
+    </li>
+<li class="dropdown-header">Getting started</li>
     <li>
       <a href="../articles/quickstart.html">Quickstart</a>
     </li>
@@ -62,7 +59,8 @@
       <a href="../articles/usage.html">Usage</a>
     </li>
     <li class="divider">
-    <li class="dropdown-header">Advanced topics</li>
+    </li>
+<li class="dropdown-header">Advanced topics</li>
     <li>
       <a href="../articles/configuration.html">Configuration</a>
     </li>
@@ -92,7 +90,7 @@
       </ul>
 <ul class="nav navbar-nav navbar-right">
 <li>
-  <a href="https://github.com/carriedaymont/growthcleanr">
+  <a href="https://github.com/carriedaymont/growthcleanr" class="external-link">
     <span class="fab fa-github fa-lg"></span>
      
   </a>
@@ -112,9 +110,9 @@
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Working with large data sets</h1>
             
-            <h4 class="date">2021-11-09</h4>
+            <h4 data-toc-skip class="date">2022-08-11</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/large-data-sets.Rmd"><code>vignettes/large-data-sets.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/large-data-sets.Rmd" class="external-link"><code>vignettes/large-data-sets.Rmd</code></a></small>
       <div class="hidden name"><code>large-data-sets.Rmd</code></div>
 
     </div>
@@ -131,9 +129,9 @@
 <li>If you are cleaning adult data, an in-memory data-splitting technique is implemented in the <code>gcdriver.R</code> script described below.</li>
 <li>Anecdotally, Windows users have sometimes seen slower performance when compared with similarly-appointed hardware running Linux or macOS.</li>
 </ul>
-<div id="splitting-input-datasets" class="section level2">
-<h2 class="hasAnchor">
-<a href="#splitting-input-datasets" class="anchor"></a>Splitting input datasets</h2>
+<div class="section level2">
+<h2 id="splitting-input-datasets">Splitting input datasets<a class="anchor" aria-label="anchor" href="#splitting-input-datasets"></a>
+</h2>
 <p>For very large datasets, on the order of millions of records or more, cleaning data can take several hours or more. When running this kind of job, the risk of failures due to external factors such as power outages increases. The current structure of <code>growthcleanr</code> does not checkpoint results as progress is made, so if a job has to run overnight and fails in the middle, a researcher would likely need to start over from scratch.</p>
 <p>Because <code>growthcleanr</code> operates for the most part on individual subjects one at a time, however, this issue might be mitigated by splitting the input data into many small files, then running <code>growthcleanr</code> separately on each file, with results re-combined at the end. The primary benefit of this strategy would be the saving of the results of each file as it completes, allowing a researcher whose job fails overnight to resume processing on only the as yet incomplete input files. A secondary benefit might be a slight improvement of use of available RAM.</p>
 <p>Adopting this approach might require some custom code, and there are few pitfalls to avoid. The following lays out a rough approach:</p>
@@ -142,17 +140,17 @@
 <li>Split the data into many small files, but keep each individual subject’s measurements together in one file. If, for example, a subject has 12 measurements, all 12 should be in one and only one of the smaller files to maximize the longitudinal analysis of their values. The <code><a href="../reference/splitinput.html">splitinput()</a></code> function will perform this split safely, e.g.:</li>
 </ul>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va">growthcleanr</span><span class="op">)</span>
-<span class="va">count</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/splitinput.html">splitinput</a></span><span class="op">(</span><span class="va">syngrowth</span>, fname <span class="op">=</span> <span class="st">"mydata"</span>, fdir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html">tempdir</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>
-<span class="va">count</span></code></pre></div>
-<pre><code>## [1] 7</code></pre>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://carriedaymont.github.io/growthcleanr/index.html" class="external-link">growthcleanr</a></span><span class="op">)</span></span>
+<span><span class="va">count</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/splitinput.html">splitinput</a></span><span class="op">(</span><span class="va">syngrowth</span>, fname <span class="op">=</span> <span class="st">"mydata"</span>, fdir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">count</span></span></code></pre></div>
+<pre><code><span><span class="co">## [1] 7</span></span></code></pre>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="fu"><a href="https://rdrr.io/r/base/list.files.html">list.files</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html">tempdir</a></span><span class="op">(</span><span class="op">)</span>, pattern <span class="op">=</span> <span class="st">"mydata.*"</span><span class="op">)</span></code></pre></div>
-<pre><code>## [1] "mydata.00000.csv" "mydata.00001.csv" "mydata.00002.csv" "mydata.00003.csv"
-## [5] "mydata.00004.csv" "mydata.00005.csv" "mydata.00006.csv" "mydata.00007.csv"</code></pre>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/list.files.html" class="external-link">list.files</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, pattern <span class="op">=</span> <span class="st">"mydata.*"</span><span class="op">)</span></span></code></pre></div>
+<pre><code><span><span class="co">## [1] "mydata.00000.csv" "mydata.00001.csv" "mydata.00002.csv" "mydata.00003.csv"</span></span>
+<span><span class="co">## [5] "mydata.00004.csv" "mydata.00005.csv" "mydata.00006.csv" "mydata.00007.csv"</span></span></code></pre>
 <ul>
 <li>Use the standalone driver script <code>exec/gcdriver.R</code> to execute growthcleanr` on each separate file, then write out its results when complete. An example is below.</li>
-<li>Invoke the job using a tool like <a href="https://www.gnu.org/software/parallel/">GNU Parallel</a>, which can be run on all major platforms. An example invocation is below as well.</li>
+<li>Invoke the job using a tool like <a href="https://www.gnu.org/software/parallel/" class="external-link">GNU Parallel</a>, which can be run on all major platforms. An example invocation is below as well.</li>
 <li>If a failure occurs, set aside both the completed inputs and their results. Then re-run the job on only the remaining input data.</li>
 <li>When complete, re-combine the data into one file or as otherwise appropriate.</li>
 </ul>
@@ -172,9 +170,9 @@
 </ul>
 <p>If your data to be cleaned is very large, it might help to store it compressed, for example with <code>gzip</code> and its corresponding <code>.gz</code> filename extension. <code>growthcleanr</code> can read in <code>.gz</code> input, but you might need to install the <code>R.utils</code> package first. <code>R</code> will provide a message if this is required.</p>
 </div>
-<div id="batch-splitting-for-adult-data" class="section level2">
-<h2 class="hasAnchor">
-<a href="#batch-splitting-for-adult-data" class="anchor"></a>Batch splitting for adult data</h2>
+<div class="section level2">
+<h2 id="batch-splitting-for-adult-data">Batch splitting for adult data<a class="anchor" aria-label="anchor" href="#batch-splitting-for-adult-data"></a>
+</h2>
 <p>The <a href="adult-algorithm.html">adult algorithm</a> is new as of release 2.0.0 and may require further optimization to improve speed performance. Testing discovered that performing an inline data split (as opposed to physically splitting the data into many small input sets and processing each separately, as described above) can gain substantial performance on a single machine with many cores available. Two options to the <code>exec/gcdriver.R</code> script take advantage of this performance improvement.</p>
 <p>The following example may be used on a large dataset of adult data.</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1"></a><span class="ex">Rscript</span> exec/gcdriver.R --numbatches 4 --adult_split 50 my-large-input.csv my-large-input-cleaned.csv</span></code></pre></div>
@@ -186,9 +184,8 @@
 </ul>
 <p>You may find that adjusting these numbers to take advantage of your available hardware can make a difference in overall run time.</p>
 </div>
-<div id="reference-for-gcdriver-r" class="section level2">
-<h2 class="hasAnchor">
-<a href="#reference-for-gcdriver-r" class="anchor"></a>Reference for <code>gcdriver.R</code>
+<div class="section level2">
+<h2 id="reference-for-gcdriver-r">Reference for <code>gcdriver.R</code><a class="anchor" aria-label="anchor" href="#reference-for-gcdriver-r"></a>
 </h2>
 <p>All available options for <code>gcdriver.R</code> are described below.</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1"></a><span class="ex">Rscript</span> exec/gcdriver.R --help</span>
@@ -228,11 +225,13 @@
 
 
       <footer><div class="copyright">
-  <p>Developed by Daymont Carrie, Grundmeier Robert, Miller Jeffrey, Campos Diego.</p>
+  <p></p>
+<p>Developed by Daymont Carrie, Grundmeier Robert, Miller Jeffrey, Campos Diego, De los Santos Hannah.</p>
 </div>
 
 <div class="pkgdown">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/">pkgdown</a> 1.6.1.</p>
+  <p></p>
+<p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.6.</p>
 </div>
 
       </footer>
@@ -240,6 +239,8 @@
 
   
 
+
+  
 
   </body>
 </html>

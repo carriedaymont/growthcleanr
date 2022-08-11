@@ -19,6 +19,8 @@
 <![endif]-->
 </head>
 <body data-spy="scroll" data-target="#toc">
+    
+
     <div class="container template-article">
       <header><div class="navbar navbar-default navbar-fixed-top" role="navigation">
   <div class="container">
@@ -31,27 +33,22 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">growthcleanr</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="Released version">2.0.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.1</span>
       </span>
     </div>
 
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav">
-<li>
-  <a href="../index.html">
-    <span class="fas fa-home fa-lg"></span>
-     
-  </a>
-</li>
 <li class="dropdown">
-  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
     Articles
      
     <span class="caret"></span>
   </a>
   <ul class="dropdown-menu" role="menu">
 <li class="divider">
-    <li class="dropdown-header">Getting started</li>
+    </li>
+<li class="dropdown-header">Getting started</li>
     <li>
       <a href="../articles/quickstart.html">Quickstart</a>
     </li>
@@ -62,7 +59,8 @@
       <a href="../articles/usage.html">Usage</a>
     </li>
     <li class="divider">
-    <li class="dropdown-header">Advanced topics</li>
+    </li>
+<li class="dropdown-header">Advanced topics</li>
     <li>
       <a href="../articles/configuration.html">Configuration</a>
     </li>
@@ -92,7 +90,7 @@
       </ul>
 <ul class="nav navbar-nav navbar-right">
 <li>
-  <a href="https://github.com/carriedaymont/growthcleanr">
+  <a href="https://github.com/carriedaymont/growthcleanr" class="external-link">
     <span class="fab fa-github fa-lg"></span>
      
   </a>
@@ -112,9 +110,9 @@
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Next steps</h1>
             
-            <h4 class="date">2021-11-09</h4>
+            <h4 data-toc-skip class="date">2022-08-11</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/next-steps.Rmd"><code>vignettes/next-steps.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/next-steps.Rmd" class="external-link"><code>vignettes/next-steps.Rmd</code></a></small>
       <div class="hidden name"><code>next-steps.Rmd</code></div>
 
     </div>
@@ -122,14 +120,14 @@
     
     
 <p>While both the pediatric and adult algorithms are considered complete, we have identified several areas for additional research and potential enhancement.</p>
-<div id="pediatric-algorithm---carried-forward-adjustments" class="section level1">
-<h1 class="hasAnchor">
-<a href="#pediatric-algorithm---carried-forward-adjustments" class="anchor"></a>Pediatric algorithm - carried forward adjustments</h1>
+<div class="section level2">
+<h2 id="pediatric-algorithm---carried-forward-adjustments">Pediatric algorithm - carried forward adjustments<a class="anchor" aria-label="anchor" href="#pediatric-algorithm---carried-forward-adjustments"></a>
+</h2>
 <p>An experiment in re-assessing pediatric height measurements initially marked as <code>Exclude-Carried-Forward</code> based on growth velocity is included in the current version of this package.</p>
 <p>Because of the complexity involved in this approach, this is implemented as an independent function with its own driver script for further study. Our hope is to revise this strategy, and, if feasible, incorporate it into the main <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> algorithm.</p>
-<div id="running-the-experiment" class="section level2">
-<h2 class="hasAnchor">
-<a href="#running-the-experiment" class="anchor"></a>Running the experiment</h2>
+<div class="section level3">
+<h3 id="running-the-experiment">Running the experiment<a class="anchor" aria-label="anchor" href="#running-the-experiment"></a>
+</h3>
 <p>The primary function is called <code><a href="../reference/adjustcarryforward.html">adjustcarryforward()</a></code>, and is implemented in the file <code>R/adjustcarryforward.R</code>. It is separate from the main <code>R/growth.R</code> file as it is set up to be run separately, using the output from <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>. The <code><a href="../reference/adjustcarryforward.html">adjustcarryforward()</a></code> function is available in the main package namespace.</p>
 <p>The primary tools for running this function are the script <code>exec/testadjustcf.R</code> and the function <code><a href="../reference/testacf.html">testacf()</a></code>. These will run the experimental function on an existing dataset (specified as a CSV file or data frame) and pass it a sweep of parameter values for testing the new strategy. This tool will produce a combined output file or list that includes the original result alongside the resulting re-inclusion determination for each measurement for each parameter value run.</p>
 <p>For example, if you have run <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> on the <code>syngrowth</code> synthetic data set provided with <code>growthcleanr</code> as described in the main <code>README.md</code> file, save it to a CSV file for <code>exec/testadjustcf.R</code>:</p>
@@ -139,7 +137,7 @@
 <div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1"></a><span class="ex">%</span> Rscript exec/testadjustcf.R cleaned.csv</span></code></pre></div>
 <p>To use <code><a href="../reference/testacf.html">testacf()</a></code>, run the following in the console (with <code>cleaned_data</code> in the environment):</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="va">result_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/testacf.html">testacf</a></span><span class="op">(</span><span class="va">cleaned_data</span><span class="op">)</span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">result_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/testacf.html">testacf</a></span><span class="op">(</span><span class="va">cleaned_data</span><span class="op">)</span></span></code></pre></div>
 <p>This <code>result_list</code> will contain 2 or 3 objects; - <code>testacf_res</code>: a data frame with adjustcarryforward results for each run - <code>params</code>: a data frame containing the parameters for each run - <code>debug_filtered_data</code>: data frame with original data, returned if debug is <code>TRUE</code></p>
 <p>By default, the script/function will generate a range of values with nine steps for the following parameters, where the min and max surround the default value:</p>
 <table class="table">
@@ -313,11 +311,11 @@
 <div class="sourceCode" id="cb7"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1"></a><span class="ex">%</span> Rscript exec/textadjustcf.R --gridlength 5 --searchtype line-grid cleaned.csv</span></code></pre></div>
 <p>or with this function execution:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="va">result_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/testacf.html">testacf</a></span><span class="op">(</span>
-  <span class="va">cleaned_data</span>,
-  grid.length <span class="op">=</span> <span class="fl">5</span>,
-  searchtype <span class="op">=</span> <span class="st">"line-grid"</span>
-<span class="op">)</span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">result_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/testacf.html">testacf</a></span><span class="op">(</span></span>
+<span>  <span class="va">cleaned_data</span>,</span>
+<span>  grid.length <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>  searchtype <span class="op">=</span> <span class="st">"line-grid"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p>The parameter set for the sweep in file <code>test_adjustcarrforward_DATE_TIME_parameters.csv</code> (script)/<code>params</code> data frame of <code>result_list</code> (function) would be:</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1"></a>run  minfactor  maxfactor  banddiff  banddiff_plus  min_ht.exp_under  min_ht.exp_over  max_ht.exp_under  max_ht.exp_over</span>
 <span id="cb9-2"><a href="#cb9-2"></a><span class="dv">1</span>    <span class="dv">0</span>          <span class="dv">0</span>          <span class="dv">0</span>         <span class="dv">0</span>              <span class="dv">0</span>                 <span class="dv">-1</span>               <span class="dv">0</span>                 <span class="dv">0</span></span>
@@ -351,35 +349,35 @@
 <p>Some of these values are not adjusted at all; one is from run 1 on, a few are from run 2 on, and one is from run 3 on.</p>
 </div>
 </div>
-<div id="adult-algorithm---potential-enhancements" class="section level1">
-<h1 class="hasAnchor">
-<a href="#adult-algorithm---potential-enhancements" class="anchor"></a>Adult algorithm - potential enhancements</h1>
+<div class="section level2">
+<h2 id="adult-algorithm---potential-enhancements">Adult algorithm - potential enhancements<a class="anchor" aria-label="anchor" href="#adult-algorithm---potential-enhancements"></a>
+</h2>
 <p>The <a href="adult-algorithm.html">adult algorithm</a> added in release 2.0 is complete, but has some known limitations that present areas for future research and enhancement. These areas are enumerated below.</p>
 <p>We welcome your ideas on these or any additional enhancements via email, tickets, or pull requests.</p>
 <p>Any active work on these areas will be ticketed and managed through GitHub.</p>
-<div id="evil-twins" class="section level2">
-<h2 class="hasAnchor">
-<a href="#evil-twins" class="anchor"></a>“Evil twins”</h2>
+<div class="section level3">
+<h3 id="evil-twins">“Evil twins”<a class="anchor" aria-label="anchor" href="#evil-twins"></a>
+</h3>
 <p>In some cases, runs of two or three similar - but not necessarily identical - deviant weights can occur, which are difficult to detect. One approach to address these could involve modifying the moderate EWMA step, but capturing these reliably may be a very challenging task.</p>
 </div>
-<div id="moderate-ewma-adjustments" class="section level2">
-<h2 class="hasAnchor">
-<a href="#moderate-ewma-adjustments" class="anchor"></a>Moderate EWMA adjustments</h2>
+<div class="section level3">
+<h3 id="moderate-ewma-adjustments">Moderate EWMA adjustments<a class="anchor" aria-label="anchor" href="#moderate-ewma-adjustments"></a>
+</h3>
 <p>A number of adjustments are possible to improve this step, such as tweaks to the weight change allowance, polation, and prioritization. This might require fewer changes to code but more extensive testing to ensure confidence in new threshold numbers/details.</p>
 </div>
-<div id="loosen-criteria-on-hundreds-unit-errors-etc-" class="section level2">
-<h2 class="hasAnchor">
-<a href="#loosen-criteria-on-hundreds-unit-errors-etc-" class="anchor"></a>Loosen criteria on hundreds, unit errors, etc.</h2>
+<div class="section level3">
+<h3 id="loosen-criteria-on-hundreds-unit-errors-etc-">Loosen criteria on hundreds, unit errors, etc.<a class="anchor" aria-label="anchor" href="#loosen-criteria-on-hundreds-unit-errors-etc-"></a>
+</h3>
 <p>The criteria for some of these steps may be loosened to catch more implausible values. For unit error correction, we could consider having two levels: one suitable for correction, the other not.</p>
 </div>
-<div id="number-of-height-loss-events" class="section level2">
-<h2 class="hasAnchor">
-<a href="#number-of-height-loss-events" class="anchor"></a>Number of height loss events</h2>
+<div class="section level3">
+<h3 id="number-of-height-loss-events">Number of height loss events<a class="anchor" aria-label="anchor" href="#number-of-height-loss-events"></a>
+</h3>
 <p>While maintaining overall height loss limits, we could allow for the possibility of more height loss events rather than assuming height loss will occur in no more than two big jumps.</p>
 </div>
-<div id="error-load" class="section level2">
-<h2 class="hasAnchor">
-<a href="#error-load" class="anchor"></a>Error load</h2>
+<div class="section level3">
+<h3 id="error-load">Error load<a class="anchor" aria-label="anchor" href="#error-load"></a>
+</h3>
 <p>We could consider a change so that error load is not triggered if the only exclusions are for heights 3+D outside of w2.</p>
 </div>
 </div>
@@ -396,11 +394,13 @@
 
 
       <footer><div class="copyright">
-  <p>Developed by Daymont Carrie, Grundmeier Robert, Miller Jeffrey, Campos Diego.</p>
+  <p></p>
+<p>Developed by Daymont Carrie, Grundmeier Robert, Miller Jeffrey, Campos Diego, De los Santos Hannah.</p>
 </div>
 
 <div class="pkgdown">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/">pkgdown</a> 1.6.1.</p>
+  <p></p>
+<p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.6.</p>
 </div>
 
       </footer>
@@ -408,6 +408,8 @@
 
   
 
+
+  
 
   </body>
 </html>
