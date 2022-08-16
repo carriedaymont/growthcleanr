@@ -19,7 +19,7 @@ Authors@R: c(
     person("Nguyen","Sheila", role = "ctb"),
     person("Soleymani","Taraneh", role = "ctb")
   )
-Description: ‘growthcleanr’ identifies implausible anthropometric (e.g., height,
+Description: Identifies implausible anthropometric (e.g., height,
     weight) measurements in irregularly spaced longitudinal datasets, such as those from electronic health records.
 URL: https://carriedaymont.github.io/growthcleanr/index.html, https://github.com/carriedaymont/growthcleanr
 BugReports: https://github.com/carriedaymont/growthcleanr/issues

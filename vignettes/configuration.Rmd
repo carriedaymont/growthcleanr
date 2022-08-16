@@ -189,7 +189,7 @@ for 2018. These had sample weights assigned so that the sum of the sample
 weights for the sample equalled the sum of the sample weights for each month for
 infants in NHANES, as NHANES is a multi-stage complex survey. The reference data
 was then smoothed using the `svysmooth()` function in the R
-[`survey`](https://cran.r-project.org/web/packages/survey/index.html) package to
+[`survey`](https://cran.r-project.org/package=survey) package to
 estimate the weight and height SD scores for each day up to 7,305 days, with a
 bandwidth chosen to balance between over- and under-fitting, and interpolation
 between the estimates from this function was used to obtain an estimate for each
