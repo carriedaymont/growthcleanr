@@ -156,9 +156,10 @@ Possible values for each code are:
 Clean growth measurements
 }
 \examples{
+\donttest{
 # Run calculation using a small subset of given data
 df_stats <- as.data.frame(syngrowth)
-df_stats <- df_stats[df_stats$subjid \%in\% unique(df_stats[, "subjid"])[1:2], ]
+df_stats <- df_stats[df_stats$subjid \%in\% unique(df_stats[, "subjid"])[1:5], ]
 
 clean_stats <-cleangrowth(subjid = df_stats$subjid,
                          param = df_stats$param,
@@ -178,4 +179,5 @@ clean_stats <- cleangrowth(subjid = df_stats$subjid,
                            measurement = df_stats$measurement,
                            parallel = TRUE,
                            num.batches = 2)
+}
 }
