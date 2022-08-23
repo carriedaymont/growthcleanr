@@ -16,4 +16,4 @@ Dockerfile
 ^pkgdown$
 cran-comments.md
 ^LICENSE\.md$
-^vignettes/.*.Rmd$
+^vignettes/.*\.Rmd$
