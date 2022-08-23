@@ -45,5 +45,4 @@ Suggests:
     knitr (>= 1.29),
     rmarkdown (>= 2.3),
     testthat (>= 2.3.2)
-VignetteBuilder: knitr
 RoxygenNote: 7.2.1
