@@ -664,7 +664,9 @@ cleanadult <- function(df, weight_cap = Inf){
 
       # next, calculate the duplicate ratio -- what proportion of days are
       # duplicated
-      dup_ratio <- mean(!is.na(h_subj_df$diff))
+      dup_ratio <-
+        length(unique(h_subj_df$age_days[duplicated(h_subj_df$age_days)]))/
+        length(unique(h_subj_df$age_days))
       # also check whether or not any same-days are adjacent -- need 4 at least
       # rolling windows of day differences -- we are looking for 0,x,0
       if (nrow(h_subj_df) > 3){
@@ -1190,7 +1192,9 @@ cleanadult <- function(df, weight_cap = Inf){
 
       # next, calculate the duplicate ratio -- what proportion of days are
       # duplicated
-      dup_ratio <- mean(!is.na(w_subj_df$diff))
+      dup_ratio <-
+        length(unique(w_subj_df$age_days[duplicated(w_subj_df$age_days)]))/
+        length(unique(w_subj_df$age_days))
       # also check whether or not any same-days are adjacent -- need 4 at least
       # rolling windows of day differences -- we are looking for 0,x,0
       if (nrow(w_subj_df) > 3){
