@@ -46,6 +46,6 @@ splitinput(df, fname = "syngrowth", fdir = tempdir(), min_nrow = 5000)
 
 # Specifying a different subject ID column
 colnames(df)[colnames(df) == "subjid"] <- "sub_id"
-splitinput(df, keepcol = "sub_id")
+splitinput(df, fdir = tempdir(), keepcol = "sub_id")
 }
 }
