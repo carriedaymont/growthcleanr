@@ -8,7 +8,7 @@
 #'
 #' @param df data frame to split
 #' @param fname new name for each of the split files to start with
-#' @param fdir directory to put each of the split files (default working directory)
+#' @param fdir directory to put each of the split files (use "." for  working directory). Must be changed from default (NA), which will trigger error.
 #' @param min_nrow minimum number of rows for each split file (default 10000)
 #' @param keepcol the column name (default "subjid") to use to keep records with the same values together in the same single split file
 #'
@@ -21,8 +21,8 @@
 #' # Run on given data
 #' df <- as.data.frame(syngrowth)
 #'
-#' # Run with all defaults
-#' splitinput(df)
+#' # Run with all defaults (specifying directory)
+#' splitinput(df, fdir = tempdir())
 #'
 #' # Specifying the name, directory and minimum row size
 #' splitinput(df, fname = "syngrowth", fdir = tempdir(), min_nrow = 5000)
@@ -34,11 +34,11 @@
 splitinput <-
   function(df,
            fname = deparse(substitute(df)),
-           fdir = ".",
+           fdir = NA,
            min_nrow = 10000,
            keepcol = 'subjid') {
     # first, check if the given directory exists
-    if (fdir != "." & is.character(fdir) & !dir.exists(fdir)){
+    if (!is.na(fdir) & fdir != "." & is.character(fdir) & !dir.exists(fdir)){
       stop("invalid directory")
     }
 
