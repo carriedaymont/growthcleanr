@@ -34,7 +34,7 @@ in one file. Pads split filenames with zeros out to five digits for consistency,
 result.
 }
 \examples{
-\dontrun{
+\donttest{
 # Run on given data
 df <- as.data.frame(syngrowth)
 
