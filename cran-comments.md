@@ -1,3 +1,35 @@
+# CRAN submission growthcleanr 2.0.1 (6)
+
+## R CMD check results
+There were no ERRORs, WARNINGs, or NOTEs.
+
+## CRAN manual test
+
+We have addressed each of the notes in the manual test as below:
+
+* Possibly misspelled words in DESCRIPTION:
+    Anthropometric (3:25)
+    anthropometric (22:56)
+
+These are not misspelled.
+
+* Please write TRUE and FALSE instead of T and F. (Please don't use 'T' or 'F' as vector names.), e.g.:
+
+This has been corrected throughout functions in package.
+
+* Please replace \dontrun with \donttest. Please unwrap the examples if they are executable in < 5 sec, or replace \dontrun{} with \donttest{}.
+
+\dontrun has been replaced with \donttest.
+
+* Please ensure that your functions do not write by default or in your examples/vignettes/tests in the user's home filespace (including the package directory and getwd()). This is not allowed by CRAN policies. Please omit any default path in writing functions. In your examples/vignettes/tests you can write to tempdir().
+
+I have gone through all functions in package and affected functions have been adjusted/confirmed to not write by default to user directory. All examples with directory output have been adjusted to use tempdir().
+
+## Downstream dependencies
+There are currently no downstream dependencies for this package.
+
+# Previous Submissions
+
 # CRAN submission growthcleanr 2.0.1 (5)
 
 ## R CMD check results
@@ -51,8 +83,6 @@ Vignette files are now added to Rbuildignore.
 ## Downstream dependencies
 There are currently no downstream dependencies for this package.
 
-
-# Previous Submissions
 
 # CRAN submission growthcleanr 2.0.1 (4)
 
