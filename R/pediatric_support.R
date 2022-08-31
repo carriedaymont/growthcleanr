@@ -6,9 +6,9 @@
 #' @keywords internal
 #' @noRd
 valid <- function(df,
-                  include.temporary.extraneous = F,
-                  include.extraneous = F,
-                  include.carryforward = F) {
+                  include.temporary.extraneous = FALSE,
+                  include.extraneous = FALSE,
+                  include.carryforward = FALSE) {
   exclude <- if (is.data.frame(df))
     df$exclude
   else
@@ -30,7 +30,7 @@ valid <- function(df,
 #' @keywords internal
 #' @noRd
 na_as_false <- function(v) {
-  v[is.na(v)] <- F
+  v[is.na(v)] <- FALSE
   v
 }
 
@@ -62,15 +62,15 @@ temporary_extraneous <- function(df) {
   if (is.null(df$param))
     df[, param := NA]
   # only operate on valid rows (but include rows that may have previously been flagged as a "temporary extraneous")
-  valid.rows <- valid(df, include.temporary.extraneous = T)
+  valid.rows <- valid(df, include.temporary.extraneous = TRUE)
   # make a small copy of df with only the fields we need for efficiency
   df <- df[j = .(tbc.sd), keyby = .(subjid, param, agedays, index)]
   # initialize some useful fields
   df[, `:=`(
     median.sd = as.double(NA),
     delta.median.sd = as.double(NA),
-    extraneous.this.day = F,
-    extraneous = F
+    extraneous.this.day = FALSE,
+    extraneous = FALSE
   )]
   # determine on which days there are extraneous measurements (more than 1 valid measurement on that age day)
   df[valid.rows, extraneous.this.day := (.N > 1), by = .(subjid, param, agedays)]
@@ -129,7 +129,7 @@ swap_parameters <- function(param.1 = 'WEIGHTKG',
 
   valid.rows <- valid(df)
   # copy swap field to a new value for convenience in the code below
-  df$swap <- df[, field.name, with = F]
+  df$swap <- df[, field.name, with = FALSE]
   # construct an indexed table with valid parameters for speed in swapping
   valid.other <- df[valid.rows, list(
     subjid.other = subjid,
@@ -155,7 +155,7 @@ swap_parameters <- function(param.1 = 'WEIGHTKG',
 #' @noRd
 as_matrix_delta <- function(agedays) {
   n <- length(agedays)
-  delta <- abs(matrix(rep(agedays, n), n, byrow = T) - agedays)
+  delta <- abs(matrix(rep(agedays, n), n, byrow = TRUE) - agedays)
 
   return(delta)
 }

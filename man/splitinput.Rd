@@ -7,7 +7,7 @@
 splitinput(
   df,
   fname = deparse(substitute(df)),
-  fdir = ".",
+  fdir = NA,
   min_nrow = 10000,
   keepcol = "subjid"
 )
@@ -17,7 +17,7 @@ splitinput(
 
 \item{fname}{new name for each of the split files to start with}
 
-\item{fdir}{directory to put each of the split files (default working directory)}
+\item{fdir}{directory to put each of the split files (use "." for  working directory). Must be changed from default (NA), which will trigger error.}
 
 \item{min_nrow}{minimum number of rows for each split file (default 10000)}
 
@@ -34,18 +34,18 @@ in one file. Pads split filenames with zeros out to five digits for consistency,
 result.
 }
 \examples{
-\dontrun{
+\donttest{
 # Run on given data
 df <- as.data.frame(syngrowth)
 
-# Run with all defaults
-splitinput(df)
+# Run with all defaults (specifying directory)
+splitinput(df, fdir = tempdir())
 
 # Specifying the name, directory and minimum row size
 splitinput(df, fname = "syngrowth", fdir = tempdir(), min_nrow = 5000)
 
 # Specifying a different subject ID column
 colnames(df)[colnames(df) == "subjid"] <- "sub_id"
-splitinput(df, keepcol = "sub_id")
+splitinput(df, fdir = tempdir(), keepcol = "sub_id")
 }
 }

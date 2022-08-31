@@ -5,7 +5,7 @@
 
 # helper function to treat NA values as FALSE
 na.as.false = function(v) {
-  v[is.na(v)] = F
+  v[is.na(v)] = FALSE
   v
 }
 
@@ -45,12 +45,12 @@ calc_temp_exclusion_15 <- function(
     mindiff.next.ht = as.double(NaN),
     maxdiff.prev.ht = as.double(NaN),
     maxdiff.next.ht = as.double(NaN),
-    pair.prev = F,
-    pair.next = F
+    pair.prev = FALSE,
+    pair.next = FALSE
   )]
 
   # ewma fields are needed later -- calculate now for efficiency
-  df[, (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, T)]
+  df[, (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE)]
 
   # calculate some useful values (e.g. dewma values and tbc.sd) for use in later steps
   df[, `:=`(
@@ -249,8 +249,8 @@ calc_temp_exclusion_15 <- function(
   # for efficiency, bring get.prev and get.next inline here (working on valid rows within a single parameter for a single subject)
   # structure c(NA, field.name[-.N]) == get.prev
   # structure c(field.name[-1], NA) == get.next
-  df[, `:=`(pair.prev = c(F, pair[-.N]),
-            pair.next = c(pair[-1], F))]
+  df[, `:=`(pair.prev = c(FALSE, pair[-.N]),
+            pair.next = c(pair[-1], FALSE))]
 
   #  ii.	Generate bef_g_aftm1=1 if |Δewma_htbef| for the value of interest is greater than |Δewma_htaft| for the previous value
   #       AND the value of interest is not the first height value for that subject AND pair==1 AND pair for the previous value==1
@@ -280,7 +280,7 @@ calc_temp_exclusion_15 <- function(
   #     a.  (temp_diff=|dewma_ht_bef|)
   df[, temp.diff := as.double(NaN)]
   df[, temp.exclude := factor(NA, levels = exclude.levels, ordered =
-                                T)]
+                                TRUE)]
   df[delta.prev.ht < mindiff.prev.ht & bef.g.aftm1,
      `:=`(temp.diff = abs(dewma.before),
           temp.exclude = 'Exclude-Min-Height-Change')]
@@ -416,12 +416,12 @@ calc_step_15_no_param <- function(
     mindiff.next.ht = as.double(NaN),
     maxdiff.prev.ht = as.double(NaN),
     maxdiff.next.ht = as.double(NaN),
-    pair.prev = F,
-    pair.next = F
+    pair.prev = FALSE,
+    pair.next = FALSE
   )]
 
   # ewma fields are needed later -- calculate now for efficiency
-  df[, (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, T)]
+  df[, (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE)]
 
   # calculate some usefule values (e.g. dewma values and tbc.sd) for use in later steps
   df[, `:=`(
@@ -645,8 +645,8 @@ calc_step_15_no_param <- function(
   # for efficiency, bring get.prev and get.next inline here (working on valid rows within a single parameter for a single subject)
   # structure c(NA, field.name[-.N]) == get.prev
   # structure c(field.name[-1], NA) == get.next
-  df[, `:=`(pair.prev = c(F, pair[-.N]),
-            pair.next = c(pair[-1], F))]
+  df[, `:=`(pair.prev = c(FALSE, pair[-.N]),
+            pair.next = c(pair[-1], FALSE))]
 
   #  ii.	Generate bef_g_aftm1=1 if |Δewma_htbef| for the value of interest is greater than |Δewma_htaft| for the previous value
   #       AND the value of interest is not the first height value for that subject AND pair==1 AND pair for the previous value==1
@@ -676,7 +676,7 @@ calc_step_15_no_param <- function(
   #     a.  (temp_diff=|dewma_ht_bef|)
   df[, temp.diff := as.double(NaN)]
   df$temp.exclude <-
-    factor(NA, levels = exclude.levels, ordered = T)
+    factor(NA, levels = exclude.levels, ordered = TRUE)
   df[delta.prev.ht < mindiff.prev.ht & bef.g.aftm1,
      `:=`(temp.diff = abs(dewma.before),
           temp.exclude = 'Exclude-Min-Height-Change')]
@@ -770,7 +770,7 @@ acf_answers <- function(subjid,
                         sd.recenter = NA,
                         ewma.exp = -1.5,
                         ref.data.path = "",
-                        quietly = T){
+                        quietly = TRUE){
 
   # avoid "no visible binding for global variable" warnings
   tanner.months <- whoagegrp_ht <- whoagegrp.ht <- z.orig <- z.orig <- v <- sd.orig <- NULL
@@ -907,13 +907,13 @@ acf_answers <- function(subjid,
   # calculate z scores
   if (!quietly)
     cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
-  measurement.to.z <- read_anthro(ref.data.path, cdc.only = T)
+  measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE)
   data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
 
   # calculate "standard deviation" scores
   if (!quietly)
     cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
-  data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, T)]
+  data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, TRUE)]
 
   # sort by subjid, param, agedays
   setkey(data.all, subjid, param, agedays)
@@ -936,7 +936,7 @@ acf_answers <- function(subjid,
       agedays < 0, 'Missing', 'No Change'
   )),
   levels = exclude.levels,
-  ordered = T)] # why is this ordered??
+  ordered = TRUE)] # why is this ordered??
 
   # define field names needed by helper functions
   ewma.fields <- c('ewma.all', 'ewma.before', 'ewma.after')
@@ -1111,7 +1111,7 @@ adjustcarryforward <- function(subjid,
                                sd.recenter = NA,
                                ewma.exp = -1.5,
                                ref.data.path = "",
-                               quietly = T,
+                               quietly = TRUE,
                                minfactor = 0.5,
                                maxfactor = 2,
                                banddiff = 3,
@@ -1169,7 +1169,7 @@ adjustcarryforward <- function(subjid,
   #   mutate(orig.exclude.lag = lag(orig.exclude, n = 1)) %>%
   #   filter(!(
   #     orig.exclude == "Exclude-Carried-Forward" &
-  #       grepl("exclude", orig.exclude.lag, ignore.case = T)
+  #       grepl("exclude", orig.exclude.lag, ignore.case = TRUE)
   #   )) %>%
   #   filter(orig.exclude %in% c("Exclude-Carried-Forward", "Include")) %>%
   #   select(-orig.exclude.lag)
@@ -1314,13 +1314,13 @@ adjustcarryforward <- function(subjid,
   # calculate z scores
   if (!quietly)
     cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
-  measurement.to.z <- read_anthro(ref.data.path, cdc.only = T)
+  measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE)
   data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
 
   # calculate "standard deviation" scores
   if (!quietly)
     cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
-  data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, T)]
+  data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, TRUE)]
 
   # sort by subjid, param, agedays
   setkey(data.all, subjid, param, agedays)
@@ -1343,7 +1343,7 @@ adjustcarryforward <- function(subjid,
       agedays < 0, 'Missing', 'No Change'
   )),
   levels = exclude.levels,
-  ordered = T)] # why is this ordered??
+  ordered = TRUE)] # why is this ordered??
 
   # define field names needed by helper functions
   ewma.fields <- c('ewma.all', 'ewma.before', 'ewma.after')
@@ -1433,7 +1433,7 @@ adjustcarryforward <- function(subjid,
     # includes to compare to
     subj.df_orig <- copy(subj.df)
     num.height.excluded = 0
-    while (T) {
+    while (TRUE) {
       # use a closure to discard all the extra fields added to df with each iteration
       # "include" protects subsets (used in option 3)
       subj.df[!grepl("Exclude", exclude) & !grepl("Include", exclude),
@@ -1475,8 +1475,8 @@ adjustcarryforward <- function(subjid,
                   if (num.exclude == 1){
                     eval_df[all_exclude, exclude := temp.exclude]
                   } else if (num.exclude > 1) {
-                    # first order by decreasing temp.diff (where rep=T)
-                    worst.row = order(all_exclude, eval_df$temp.diff, decreasing = T)[1]
+                    # first order by decreasing temp.diff (where rep=TRUE)
+                    worst.row = order(all_exclude, eval_df$temp.diff, decreasing = TRUE)[1]
                     eval_df[worst.row, exclude := temp.exclude]
                   }
                 } else if (exclude_opt == 1){
@@ -1500,7 +1500,7 @@ adjustcarryforward <- function(subjid,
 
 
                       # mark all the CFs after for exclusion
-                      all_exclude[wh_exclude:(next_incl-1)] <- T
+                      all_exclude[wh_exclude:(next_incl-1)] <- TRUE
                       # also copy all the temp.excludes
                       eval_df$temp.exclude[(wh_exclude+1):(next_incl-1)] <-
                         eval_df$temp.exclude[wh_exclude]
@@ -1509,8 +1509,8 @@ adjustcarryforward <- function(subjid,
                     # exclude all the carried forwards before the next include
                     eval_df[all_exclude, exclude := temp.exclude]
                   } else if (num.exclude > 1) {
-                    # first order by decreasing temp.diff (where rep=T)
-                    worst.row = order(all_exclude, eval_df$temp.diff, decreasing = T)[1]
+                    # first order by decreasing temp.diff (where rep=TRUE)
+                    worst.row = order(all_exclude, eval_df$temp.diff, decreasing = TRUE)[1]
 
                     # option 1: if there's a carried forward after, we want to exclude that too, until the next include
                     wh_exclude <- worst.row
@@ -1571,14 +1571,14 @@ adjustcarryforward <- function(subjid,
 
                       if (verdict == "Exclude"){
                         # mark all the CFs after for exclusion
-                        all_exclude[(cf_ind-1):(next_incl-1)] <- T
+                        all_exclude[(cf_ind-1):(next_incl-1)] <- TRUE
                         # also copy all the temp.excludes
                         eval_df$temp.exclude[(cf_ind-1):(next_incl-1)] <-
                           eval_df$temp.exclude[(cf_ind-1)]
                       } else {
                         # if the verdict is include, we need to mark them all for
                         # "exclusion" to remove -- otherwise we end up in a loop
-                        all_exclude[(first_incl+1):(next_incl-1)] <- T
+                        all_exclude[(first_incl+1):(next_incl-1)] <- TRUE
                         # also copy all the temp.excludes
                         eval_df$temp.exclude[(first_incl+1):(next_incl-1)] <-
                           "Include"
@@ -1588,8 +1588,8 @@ adjustcarryforward <- function(subjid,
                     # exclude all the carried forwards before the next include
                     eval_df[all_exclude, exclude := temp.exclude]
                   } else if (num.exclude > 1) {
-                    # first order by decreasing temp.diff (where rep=T)
-                    worst.row = order(all_exclude, eval_df$temp.diff, decreasing = T)[1]
+                    # first order by decreasing temp.diff (where rep=TRUE)
+                    worst.row = order(all_exclude, eval_df$temp.diff, decreasing = TRUE)[1]
 
                     wh_exclude <- worst.row
                     if (
@@ -1666,21 +1666,21 @@ adjustcarryforward <- function(subjid,
 
                       if (verdict == "Exclude"){
                         # mark all the CFs after for exclusion
-                        all_exclude[(cf_ind-1):(next_incl-1)] <- T
+                        all_exclude[(cf_ind-1):(next_incl-1)] <- TRUE
                         # also copy all the temp.excludes
                         eval_df$temp.exclude[(cf_ind-1):(next_incl-1)] <-
                           eval_df$temp.exclude[(cf_ind-1)]
 
                         # we also want to keep all the implicit excludes
                         # mark all the CFs after for "exclusion"
-                        all_exclude[(first_incl+1):(cf_ind)] <- T
+                        all_exclude[(first_incl+1):(cf_ind)] <- TRUE
                         # also copy all the temp.excludes
                         eval_df$temp.exclude[(first_incl+1):(cf_ind)] <-
                           "Include"
                       } else {
                         # if the verdict is include, we need to mark them all for
                         # "exclusion" to remove -- otherwise we end up in a loop
-                        all_exclude[(first_incl+1):(next_incl-1)] <- T
+                        all_exclude[(first_incl+1):(next_incl-1)] <- TRUE
                         # also copy all the temp.excludes
                         eval_df$temp.exclude[(first_incl+1):(next_incl-1)] <-
                           "Include"
@@ -1690,8 +1690,8 @@ adjustcarryforward <- function(subjid,
                     # exclude all the carried forwards before the next include
                     eval_df[all_exclude, exclude := temp.exclude]
                   } else if (num.exclude > 1) {
-                    # first order by decreasing temp.diff (where rep=T)
-                    worst.row = order(all_exclude, eval_df$temp.diff, decreasing = T)[1]
+                    # first order by decreasing temp.diff (where rep=TRUE)
+                    worst.row = order(all_exclude, eval_df$temp.diff, decreasing = TRUE)[1]
 
                     wh_exclude <- worst.row
                     if (

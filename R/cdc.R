@@ -132,7 +132,7 @@ ext_bmiz <- function(data,
                      wt = "wt",
                      ht = "ht",
                      bmi = "bmi",
-                     adjust.integer.age = T,
+                     adjust.integer.age = TRUE,
                      ref.data.path = "") {
   # avoid "no visible binding" warnings
   agemos <- agemos1 <- agemos2 <- agey <- NULL

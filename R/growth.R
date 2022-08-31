@@ -66,7 +66,7 @@
 #' using the default exponent.
 #' @param ref.data.path Path to reference data. If not supplied, the year 2000
 #' Centers for Disease Control (CDC) reference data will be used.
-#' @param log.path Path to log file output when running in parallel (non-quiet mode). Default is ".". A new
+#' @param log.path Path to log file output when running in parallel (non-quiet mode). Default is NA. A new
 #' directory will be created if necessary. Set to NA to disable log files.
 #' @param parallel Determines if function runs in parallel.  Defaults to FALSE.
 #' @param num.batches Specify the number of batches to run in parallel. Only
@@ -136,7 +136,7 @@ cleangrowth <- function(subjid,
                         agedays,
                         sex,
                         measurement,
-                        recover.unit.error = F,
+                        recover.unit.error = FALSE,
                         sd.extreme = 25,
                         z.extreme = 25,
                         lt3.exclude.mode = "default",
@@ -146,13 +146,13 @@ cleangrowth <- function(subjid,
                         sd.recenter = NA,
                         sdmedian.filename = "",
                         sdrecentered.filename = "",
-                        include.carryforward = F,
+                        include.carryforward = FALSE,
                         ewma.exp = -1.5,
                         ref.data.path = "",
-                        log.path = ".",
-                        parallel = F,
+                        log.path = NA,
+                        parallel = FALSE,
                         num.batches = NA,
-                        quietly = T,
+                        quietly = TRUE,
                         adult_cutpoint = 20,
                         weight_cap = Inf,
                         adult_columns_filename = "") {
@@ -268,7 +268,7 @@ cleangrowth <- function(subjid,
     subjid.unique <- data.all[j = unique(subjid)]
     batches.all <- data.table(
       subjid = subjid.unique,
-      batch = sample(num.batches, length(subjid.unique), replace = T),
+      batch = sample(num.batches, length(subjid.unique), replace = TRUE),
       key = 'subjid'
     )
     data.all <- batches.all[data.all]
@@ -367,13 +367,13 @@ cleangrowth <- function(subjid,
     # calculate z scores
     if (!quietly)
       cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
-    measurement.to.z <- read_anthro(ref.data.path, cdc.only = T)
+    measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE)
     data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
 
     # calculate "standard deviation" scores
     if (!quietly)
       cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
-    data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, T)]
+    data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, TRUE)]
 
     # sort by subjid, param, agedays
     setkey(data.all, subjid, param, agedays)
@@ -387,7 +387,7 @@ cleangrowth <- function(subjid,
         agedays < 0, 'Missing', 'Include'
     )),
     levels = exclude.levels,
-    ordered = T)]
+    ordered = TRUE)]
 
     # define field names needed by helper functions
     ewma.fields <- c('ewma.all', 'ewma.before', 'ewma.after')
@@ -440,7 +440,7 @@ cleangrowth <- function(subjid,
             )
           )
         if (sdmedian.filename != "") {
-          write.csv(sd.recenter, sdmedian.filename, row.names = F)
+          write.csv(sd.recenter, sdmedian.filename, row.names = FALSE)
           if (!quietly)
             cat(
               sprintf(
@@ -472,7 +472,7 @@ cleangrowth <- function(subjid,
     data.all[, tbc.sd := sd.orig - sd.median]
 
     if (sdrecentered.filename != "") {
-      write.csv(data.all, sdrecentered.filename, row.names = F)
+      write.csv(data.all, sdrecentered.filename, row.names = FALSE)
       if (!quietly)
         cat(
           sprintf(
@@ -607,7 +607,7 @@ cleangrowth <- function(subjid,
     subjid.unique <- data.adult[j = unique(subjid)]
     batches.adult <- data.table(
       subjid = subjid.unique,
-      newbatch = sample(num.batches, length(subjid.unique), replace = T)
+      newbatch = sample(num.batches, length(subjid.unique), replace = TRUE)
     )
     data.adult <- merge(data.adult, batches.adult, by = "subjid")
 
@@ -636,7 +636,7 @@ cleangrowth <- function(subjid,
     }
 
     if (adult_columns_filename != "") {
-      write.csv(res, adult_columns_filename, row.names = F, na = "")
+      write.csv(res, adult_columns_filename, row.names = FALSE, na = "")
       if (!quietly){
         cat(
           sprintf(
@@ -694,7 +694,7 @@ cleangrowth <- function(subjid,
 #' # Return calculating function while specifying a path and using only CDC data
 #' afunc <- read_anthro(path = system.file("extdata", package = "growthcleanr"),
 #'                      cdc.only = TRUE)
-read_anthro <- function(path = "", cdc.only = F) {
+read_anthro <- function(path = "", cdc.only = FALSE) {
   # avoid "no visible bindings" warning
   src <- param <- sex <- age <- ret <- m <- NULL
   csdneg <- csdpos <- s <- NULL
@@ -726,7 +726,7 @@ read_anthro <- function(path = "", cdc.only = F) {
 
   l <- list(
     with(
-      read.table(gzfile(weianthro_path), header = T),
+      read.table(gzfile(weianthro_path), header = TRUE),
       data.frame(
         src = 'WHO',
         param = 'WEIGHTKG',
@@ -740,7 +740,7 @@ read_anthro <- function(path = "", cdc.only = F) {
       )
     ),
     with(
-      read.table(gzfile(lenanthro_path), header = T),
+      read.table(gzfile(lenanthro_path), header = TRUE),
       data.frame(
         src = 'WHO',
         param = 'HEIGHTCM',
@@ -754,7 +754,7 @@ read_anthro <- function(path = "", cdc.only = F) {
       )
     ),
     with(
-      read.table(gzfile(bmianthro_path), header = T),
+      read.table(gzfile(bmianthro_path), header = TRUE),
       data.frame(
         src = 'WHO',
         param = 'BMI',
@@ -816,7 +816,7 @@ read_anthro <- function(path = "", cdc.only = F) {
 
   setkey(anthro, src, param, sex, age)
 
-  return(function(param, agedays, sex, measurement, csd = F) {
+  return(function(param, agedays, sex, measurement, csd = FALSE) {
     # For now, we will only use CDC growth reference data, note that the cubically interpolated file
     # we are using has linear measurments derived from length data for children < 731 days, and height thereafter
     src <- ifelse(agedays < 731 & !cdc.only, 'WHO', 'CDC')
@@ -876,7 +876,7 @@ read_anthro <- function(path = "", cdc.only = F) {
 #'
 #' # Calculate exponentially weighted moving average
 #' e_df <- ewma(df_stats$agedays, sd, ewma.exp = -1.5)
-ewma <- function(agedays, z, ewma.exp, ewma.adjacent = T) {
+ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE) {
   # 6.  EWMA calculation description: Most of the next steps will involve calculating the exponentially weighted moving average for each subject and parameter. I will
   #     describe how to calculate EWMASDs, and will describe how it needs to be varied in subsequent steps.
   # a.	The overall goal of the EWMASD calculation is to identify the difference between the SD-score and what we might predict that DS-score should be, in order to
