@@ -17,7 +17,7 @@ adjustcarryforward(
   sd.recenter = NA,
   ewma.exp = -1.5,
   ref.data.path = "",
-  quietly = T,
+  quietly = TRUE,
   minfactor = 0.5,
   maxfactor = 2,
   banddiff = 3,

@@ -4,7 +4,7 @@
 \alias{read_anthro}
 \title{Function to calculate z-scores and csd-scores based on anthro tables.}
 \usage{
-read_anthro(path = "", cdc.only = F)
+read_anthro(path = "", cdc.only = FALSE)
 }
 \arguments{
 \item{path}{Path to supplied reference anthro data. Defaults to package anthro tables.}

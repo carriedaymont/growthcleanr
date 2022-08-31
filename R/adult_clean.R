@@ -52,7 +52,7 @@ cleanadult <- function(df, weight_cap = Inf){
   df[, mean_ht := as.numeric(NA)]
   df[, loss_groups := as.numeric(NA)]
   df[, gain_groups := as.numeric(NA)]
-  df[, all_exc_weight_cap := F]
+  df[, all_exc_weight_cap := FALSE]
   # rownames(df) <- df$id # NO ROWNAMES IN DATA.TABLE
   # go through each subject
   for (i in unique(df$subjid)){
@@ -289,9 +289,9 @@ cleanadult <- function(df, weight_cap = Inf){
       # if all are weight cap, implausible
       is_wc <- check_between(inc_df$meas_m, wc_low, wc_high)
       criteria <- if (all(is_wc)){
-        rep(T, nrow(inc_df))
+        rep(TRUE, nrow(inc_df))
       } else {
-        rep(F, nrow(inc_df))
+        rep(FALSE, nrow(inc_df))
       }
 
       # if we have somewhere between 1 and < all weight caps, we can evaluate
@@ -318,7 +318,7 @@ cleanadult <- function(df, weight_cap = Inf){
              (wt_prev < -50 & wt_next < -50))
 
         criteria <- exc_wc
-        criteria[is.na(criteria)] <- F
+        criteria[is.na(criteria)] <- FALSE
       }
 
       # implausible ids from the step
@@ -363,7 +363,7 @@ cleanadult <- function(df, weight_cap = Inf){
       dewma <- (inc_df$meas_m- ewma_res)
       colnames(dewma) <- paste0("d",colnames(ewma_res))
 
-      criteria <- rep(F, nrow(inc_df))
+      criteria <- rep(FALSE, nrow(inc_df))
       for (mtype in c("m", "im")){
         # only test certain 100s for metric v imperial
         test_hundreds <- if(mtype == "m"){
@@ -496,7 +496,7 @@ cleanadult <- function(df, weight_cap = Inf){
       # possible removal of height/weights by bmi
       # h = height, w = weight
       comb_df <- comb_df_orig <-
-        merge(h_inc_df, w_inc_df, by = "age_days", all = T,
+        merge(h_inc_df, w_inc_df, by = "age_days", all = TRUE,
               suffixes = c(".h", ".w"))
       # remove ones that don't match
       comb_df <- comb_df[!(is.na(comb_df$id.h) | (is.na(comb_df$id.w))),]
@@ -524,30 +524,30 @@ cleanadult <- function(df, weight_cap = Inf){
         for (typ in c("h", "w")){
           # create "swaps"
           comb_df[,paste0("swap_",typ)] <-
-            comb_df[, paste0("meas_m.", opposite_map[typ]), with = F]
+            comb_df[, paste0("meas_m.", opposite_map[typ]), with = FALSE]
 
           # calculate difference between values -- DOING ABS HERE
           comb_df[,paste0("swap_prev_",typ)] <-
             c(NA, abs(unlist(
-              comb_df[, paste0("swap_",typ), with = F][2:nrow(comb_df)] -
-                comb_df[, paste0("meas_m.",typ), with = F][1:(nrow(comb_df)-1)]
+              comb_df[, paste0("swap_",typ), with = FALSE][2:nrow(comb_df)] -
+                comb_df[, paste0("meas_m.",typ), with = FALSE][1:(nrow(comb_df)-1)]
             )))
           comb_df[,paste0("swap_next_",typ)] <-
             c(abs(unlist(
-              comb_df[, paste0("swap_",typ), with = F][1:(nrow(comb_df)-1)] -
-                comb_df[, paste0("meas_m.",typ), with = F][2:nrow(comb_df)]
+              comb_df[, paste0("swap_",typ), with = FALSE][1:(nrow(comb_df)-1)] -
+                comb_df[, paste0("meas_m.",typ), with = FALSE][2:nrow(comb_df)]
               )), NA)
 
           # create dewmas
           for (dtyp in c("all", "before", "after")){
             comb_df[,paste0("dewma.",dtyp,".", typ)] <-
-              comb_df[, paste0("meas_m.",typ), with = F] -
-              comb_df[,paste0("ewma.",dtyp,".", typ), with = F]
+              comb_df[, paste0("meas_m.",typ), with = FALSE] -
+              comb_df[,paste0("ewma.",dtyp,".", typ), with = FALSE]
 
             # dewma for swaps
             comb_df[,paste0("dewma.",dtyp,".swap_", typ)] <-
-              comb_df[, paste0("swap_",typ), with = F] -
-              comb_df[,paste0("ewma.",dtyp,".", typ), with = F]
+              comb_df[, paste0("swap_",typ), with = FALSE] -
+              comb_df[,paste0("ewma.",dtyp,".", typ), with = FALSE]
           }
         }
 
@@ -580,9 +580,9 @@ cleanadult <- function(df, weight_cap = Inf){
 
         exc_swap <- wt_far & ht_far & swap_wt_close & swap_ht_close
         # replace noswaps
-        exc_swap[noswap] <- F
+        exc_swap[noswap] <- FALSE
         criteria <- exc_swap
-        criteria[is.na(criteria)] <- F
+        criteria[is.na(criteria)] <- FALSE
 
         # implausible ids from the step
         impl_ids <- as.character(comb_df$id.w)[criteria]
@@ -710,7 +710,7 @@ cleanadult <- function(df, weight_cap = Inf){
           all(c(roll[x,1] == 0, roll[x,2] != 0, roll[x,3] == 0))
         }))
       } else {
-        adjacent <- F
+        adjacent <- FALSE
       }
 
       # if dup ratio is too high, or any adjacent same days, we exclude all
@@ -719,7 +719,7 @@ cleanadult <- function(df, weight_cap = Inf){
         if ((dup_ratio > .25) | adjacent){
           !is.na(h_subj_df$diff)
         } else {
-          rep(F, nrow(h_subj_df))
+          rep(FALSE, nrow(h_subj_df))
         }
 
       # if criteria didn't catch it, we now compare with medians
@@ -784,14 +784,14 @@ cleanadult <- function(df, weight_cap = Inf){
     num_distinct <- length(unique(h_subj_df$meas_m))
 
     # preallocate criteria
-    criteria <- rep(F, nrow(h_subj_df))
+    criteria <- rep(FALSE, nrow(h_subj_df))
 
     # preallocate values used for mean ht later
     # pairs
-    pairhtloss <- pairhtgain <- F
+    pairhtloss <- pairhtgain <- FALSE
     # 3d gain/loss
     glist_loss <- glist_gain <- list()
-    origexc <- g3_g2_check <- g3_g1_check <- g2_g1_check <- T
+    origexc <- g3_g2_check <- g3_g1_check <- g2_g1_check <- TRUE
 
     # go through each type of exclusion
     if (num_distinct == 2){
@@ -839,7 +839,7 @@ cleanadult <- function(df, weight_cap = Inf){
             min(ht_2_ageyears) > max(ht_1_ageyears)
         } else {
           # this is not a check to apply if they're outside the age range
-          pairhtgain <- F
+          pairhtgain <- FALSE
         }
 
         # potential reallow: falls are <= 3 (+2) in or <= 5 (+2) for ageyears > 50
@@ -852,7 +852,7 @@ cleanadult <- function(df, weight_cap = Inf){
         # exclude if there are no reallow for loss and gain
         exc_pairs <- !(pairhtloss | pairhtgain)
         if (exc_pairs){
-          criteria <- rep(T, nrow(h_subj_df))
+          criteria <- rep(TRUE, nrow(h_subj_df))
         }
 
         # generate keep ratios for height 1 and 2
@@ -861,10 +861,10 @@ cleanadult <- function(df, weight_cap = Inf){
 
         # reallow if the ratios are satisfied
         if (keepht1){
-          criteria[ht_1_log] <- F
+          criteria[ht_1_log] <- FALSE
         }
         if (keepht2){
-          criteria[ht_2_log] <- F
+          criteria[ht_2_log] <- FALSE
         }
       }
 
@@ -925,9 +925,9 @@ cleanadult <- function(df, weight_cap = Inf){
       }
 
       if (best_w2 != "none"){ # one of the w2s was selected -- o2s are out
-        criteria[!h_subj_df$meas_m %in% w2_groups[[as.character(best_w2)]]] <- T
+        criteria[!h_subj_df$meas_m %in% w2_groups[[as.character(best_w2)]]] <- TRUE
       } else { # none -- all are false
-        criteria <- rep(T, nrow(h_subj_df))
+        criteria <- rep(TRUE, nrow(h_subj_df))
       }
 
       # 3D loss ----
@@ -965,7 +965,7 @@ cleanadult <- function(df, weight_cap = Inf){
                    (min_age[2] >= 50 &
                       (mean_ht[2] - mean_ht[1]) > ((-7 * 2.54) +.001)))
             } else {
-              F
+              FALSE
             })
 
           # check g3 v g2 -- true indicates use the original exclusions
@@ -977,7 +977,7 @@ cleanadult <- function(df, weight_cap = Inf){
                 (min_age[3] >= 50 &
                    (mean_ht[3] - mean_ht[2]) < ((-7 * 2.54) +.001))
             } else {
-              F
+              FALSE
             }
 
           # check g3 v g1 -- true indicates use the original exclusions
@@ -990,12 +990,12 @@ cleanadult <- function(df, weight_cap = Inf){
                 (min_age[2] >= 50 &
                    (mean_ht[3] - mean_ht[1]) < ((-9 * 2.54) +.001))
             } else {
-              F
+              FALSE
             }
 
           # if all are false, reinclude all?
           if (all(!c(g3_g2_check, g3_g1_check, g2_g1_check))){
-            criteria <- rep(F, nrow(h_subj_df))
+            criteria <- rep(FALSE, nrow(h_subj_df))
           }
         }
 
@@ -1026,7 +1026,7 @@ cleanadult <- function(df, weight_cap = Inf){
           })
 
           # preallocating on whether or not we want to go by original exclusion
-          origexc <- F
+          origexc <- FALSE
           # first, compare to the age before
           origexc <- origexc |
             ht_3d_growth_compare(mean_ht, min_age, glist, compare = "before")
@@ -1036,7 +1036,7 @@ cleanadult <- function(df, weight_cap = Inf){
 
           # if all are false, reinclude all?
           if (!origexc){
-            criteria <- rep(F, nrow(h_subj_df))
+            criteria <- rep(FALSE, nrow(h_subj_df))
           }
         }
       }
@@ -1125,7 +1125,7 @@ cleanadult <- function(df, weight_cap = Inf){
         if (nrow(inc_df_first) > 1){
           remove_ewma_wt(inc_df_first)
         } else {
-          rep(F, nrow(inc_df_first))
+          rep(FALSE, nrow(inc_df_first))
         }
 
       # then, remove ewma just without temp extraneous
@@ -1137,7 +1137,7 @@ cleanadult <- function(df, weight_cap = Inf){
         if (length(unique(inc_df_rv)) > 1){
           remove_ewma_wt(inc_df_rv)
         } else {
-          rep(F, nrow(inc_df_rv))
+          rep(FALSE, nrow(inc_df_rv))
         }
 
       # implausible ids from the step
@@ -1269,7 +1269,7 @@ cleanadult <- function(df, weight_cap = Inf){
           all(c(roll[x,1] == 0, roll[x,2] != 0, roll[x,3] == 0))
         }))
       } else {
-        adjacent <- F
+        adjacent <- FALSE
       }
 
       # if dup ratio is too high, or any adjacent same days, we exclude all
@@ -1278,7 +1278,7 @@ cleanadult <- function(df, weight_cap = Inf){
         if ((dup_ratio > .25) | adjacent){
           !is.na(w_subj_df$diff)
         } else {
-          rep(F, nrow(w_subj_df))
+          rep(FALSE, nrow(w_subj_df))
         }
 
       # if criteria didn't catch it, we now compare with medians
@@ -1286,7 +1286,7 @@ cleanadult <- function(df, weight_cap = Inf){
         # calculate ewma
         # calculate ewma (using metric)
         ewma_res <- ewma_dn(w_subj_df$age_days, w_subj_df$meas_m,
-                            ewma.adjacent = F)
+                            ewma.adjacent = FALSE)
         # delta ewma
         dewma <- (w_subj_df$meas_m- ewma_res)
         colnames(dewma) <- paste0("d",colnames(ewma_res))
@@ -1332,12 +1332,12 @@ cleanadult <- function(df, weight_cap = Inf){
         max(w_subj_df$age_years[w_subj_df$meas_m == unique(w_subj_df$meas_m)[1]]) <
         min(w_subj_df$age_years[w_subj_df$meas_m == unique(w_subj_df$meas_m)[2]])
       ){
-        T
+        TRUE
       } else {
-        F
+        FALSE
       }
     } else {
-      F
+      FALSE
     }
 
     # for pairs: use all RV
@@ -1477,7 +1477,7 @@ cleanadult <- function(df, weight_cap = Inf){
         # possible removal of height/weights by bmi
         # h = height, w = weight
         comb_df <- comb_df_orig <-
-          merge(h_subj_df, w_subj_df, by = "age_days", all = T,
+          merge(h_subj_df, w_subj_df, by = "age_days", all = TRUE,
                 suffixes = c(".h", ".w"))
         # remove ones that don't match
         comb_df <- comb_df[!(is.na(comb_df$id.h) | (is.na(comb_df$id.w))),]
@@ -1530,7 +1530,7 @@ cleanadult <- function(df, weight_cap = Inf){
       if (nrow(h_subj_df) > 0 & nrow(w_subj_df) > 0){
         # h = height, w = weight
         comb_df <- comb_df_orig <-
-          merge(h_subj_df, w_subj_df, by = "age_days", all = T,
+          merge(h_subj_df, w_subj_df, by = "age_days", all = TRUE,
                 suffixes = c(".h", ".w"))
         # remove ones that don't match
         comb_df <- comb_df[!(is.na(comb_df$id.h) | (is.na(comb_df$id.w))),]
@@ -1627,10 +1627,10 @@ cleanadult <- function(df, weight_cap = Inf){
 
     # first, let's deal with the weight cap
     # preallocate the all exc weight cap variable (for additional output)
-    all_exc_weight_cap <- rep(F, length(w_subj_keep))
+    all_exc_weight_cap <- rep(FALSE, length(w_subj_keep))
     names(all_exc_weight_cap) <- names(w_subj_keep)
     all_exc_weight_cap[names(w_subj_keep)[grepl("Weight-Cap", w_subj_keep)]] <-
-      T
+      TRUE
 
     # add to output ----
 

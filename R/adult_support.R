@@ -8,7 +8,7 @@
 #' returns boolean vector
 #' @keywords internal
 #' @noRd
-check_between <- function(vect, num_low, num_high, incl = T){
+check_between <- function(vect, num_low, num_high, incl = TRUE){
   return(
     if (incl){
       vect <= num_high & vect >= num_low
@@ -39,7 +39,7 @@ get_float_rem <- function(a, b){
 #' @noRd
 as.matrix.delta_dn <- function(agedays) {
   n <- length(agedays)
-  delta <- abs(matrix(rep(agedays, n), n, byrow = T) - agedays)
+  delta <- abs(matrix(rep(agedays, n), n, byrow = TRUE) - agedays)
 
   return(delta)
 }
@@ -65,7 +65,7 @@ as.matrix.delta_dn <- function(agedays) {
 #'   and the subsequent observation.
 #' @keywords internal
 #' @noRd
-ewma_dn <- function(agedays, meas, ewma.exp = -5, ewma.adjacent = T) {
+ewma_dn <- function(agedays, meas, ewma.exp = -5, ewma.adjacent = TRUE) {
   # 6.  EWMA calculation description: Most of the next steps will involve calculating the exponentially weighted moving average for each subject and parameter. I will
   #     describe how to calculate EWMASDs, and will describe how it needs to be varied in subsequent steps.
   # a.	The overall goal of the EWMASD calculation is to identify the difference between the SD-score and what we might predict that DS-score should be, in order to
@@ -131,12 +131,12 @@ ewma_dn <- function(agedays, meas, ewma.exp = -5, ewma.adjacent = T) {
 #'   subj_df: data frame with measurements of a given type
 #'   type: height, weight, or bmi
 #'   biv_df: data frame with BIV cutoffs for the given type
-#'   include: default F, whether or not to include the endpoints
+#'   include: default FALSE, whether or not to include the endpoints
 #' outputs:
 #'   logical, true if the given record should be removed due to being a BIV
 #' @keywords internal
 #' @noRd
-remove_biv <- function(subj_df, type, biv_df, include = F){
+remove_biv <- function(subj_df, type, biv_df, include = FALSE){
   too_low <- remove_biv_low(subj_df, type, biv_df, include)
   too_high <- remove_biv_high(subj_df, type, biv_df, include)
 
@@ -149,12 +149,12 @@ remove_biv <- function(subj_df, type, biv_df, include = F){
 #'   subj_df: data frame with measurements of a given type
 #'   type: height, weight, or bmi
 #'   biv_df: data frame with BIV cutoffs for the given type
-#'   include: default F, whether or not to include the endpoints
+#'   include: default FALSE, whether or not to include the endpoints
 #' outputs:
 #'   logical, true if the given record should be removed due to being a BIV
 #' @keywords internal
 #' @noRd
-remove_biv_low <- function(subj_df, type, biv_df, include = F){
+remove_biv_low <- function(subj_df, type, biv_df, include = FALSE){
   if (!include){
     too_low <- subj_df$measurement < biv_df[type, "low"]
   } else {
@@ -170,12 +170,12 @@ remove_biv_low <- function(subj_df, type, biv_df, include = F){
 #'   subj_df: data frame with measurements of a given type
 #'   type: height, weight, or bmi
 #'   biv_df: data frame with BIV cutoffs for the given type
-#'   include: default F, whether or not to include the endpoints
+#'   include: default FALSE, whether or not to include the endpoints
 #' outputs:
 #'   logical, true if the given record should be removed due to being a BIV
 #' @keywords internal
 #' @noRd
-remove_biv_high <- function(subj_df, type, biv_df, include = F){
+remove_biv_high <- function(subj_df, type, biv_df, include = FALSE){
   if (!include){
     too_high <- subj_df$measurement > biv_df[type, "high"]
   } else {
@@ -203,15 +203,15 @@ identify_rv <- function(w_subj_df){
     # if there are any duplicate days, we want to identify the first
     if (length(dup_vals) > 0){
       # flag repeated values, as well as if it's a first value
-      w_subj_df$is_first_rv <- w_subj_df$is_rv <- F
+      w_subj_df$is_first_rv <- w_subj_df$is_rv <- FALSE
       for (dv in dup_vals){
         first_rv <- which(as.character(w_subj_df$meas_m) == dv)[1]
-        w_subj_df$is_first_rv[first_rv] <- T
-        w_subj_df$is_rv[which(as.character(w_subj_df$meas_m) == dv)[-1]] <- T
+        w_subj_df$is_first_rv[first_rv] <- TRUE
+        w_subj_df$is_rv[which(as.character(w_subj_df$meas_m) == dv)[-1]] <- TRUE
       }
     } else {
       # no repeated values
-      w_subj_df$is_first_rv <- w_subj_df$is_rv <- F
+      w_subj_df$is_first_rv <- w_subj_df$is_rv <- FALSE
     }
   }
 
@@ -240,7 +240,7 @@ temp_sde <- function(subj_df, ptype = "height"){
             if (ptype == "weight"){
               !subj_df$is_rv
             } else {
-              rep(T, nrow(subj_df))
+              rep(TRUE, nrow(subj_df))
             }
         ])
         # if it's weight, we also don't want to include RV in median calculation
@@ -258,16 +258,16 @@ temp_sde <- function(subj_df, ptype = "height"){
 
     # flag extraneous values on the same day that is not the minimum distance
     # from the median sd score
-    subj_df$extraneous <- F
+    subj_df$extraneous <- FALSE
     for (dd in dup_days){
       minz <-which.min(subj_df$diff[as.character(subj_df$age_days) == dd])
       subj_df$extraneous[as.character(subj_df$age_days) == dd][-minz] <-
-        T
+        TRUE
     }
 
   } else if (nrow(subj_df) > 0){
     # nothing is duplicate
-    subj_df$extraneous <- F
+    subj_df$extraneous <- FALSE
   }
 
   return(subj_df)
@@ -284,7 +284,7 @@ redo_identify_rv <- function(w_subj_df){
     inc_df <- identify_rv(inc_df)
 
     # reassign new rvs to weight df -- ordered the same way
-    w_subj_df$is_first_rv <- w_subj_df$is_rv <- F
+    w_subj_df$is_first_rv <- w_subj_df$is_rv <- FALSE
     w_subj_df$is_rv[w_subj_df$id %in% inc_df$id] <- inc_df$is_rv
     w_subj_df$is_first_rv[w_subj_df$id %in% inc_df$id] <- inc_df$is_first_rv
   }
@@ -368,7 +368,7 @@ rem_hundreds <- function(inc_df, dewma, meas_col, hundreds, ptype = "weight"){
           inc_df$meas_m < 40 | inc_df$meas_m > 182
         }
     }
-  criteria[is.na(criteria)] <- F
+  criteria[is.na(criteria)] <- FALSE
 
   return(criteria)
 }
@@ -427,7 +427,7 @@ rem_unit_errors <- function(inc_df, ptype = "height"){
           inc_df$meas_m > 182
         }
     }
-  criteria[is.na(criteria)] <- F
+  criteria[is.na(criteria)] <- FALSE
 
   return(criteria)
 }
@@ -500,10 +500,10 @@ rem_transpositions <- function(inc_df, ptype = "height"){
   dewma <- (inc_df$meas_m- ewma_res)
   colnames(dewma) <- paste0("d",colnames(ewma_res))
 
-  criteria <- rep(F, nrow(inc_df))
+  criteria <- rep(FALSE, nrow(inc_df))
   for (mtype in c("m", "im")){
     inc_df$transpo <- switch_tens_ones(
-      unlist(inc_df[, paste0("meas_", mtype), with = F])
+      unlist(inc_df[, paste0("meas_", mtype), with = FALSE])
       )
 
     # if imperial, we want to convert to metric
@@ -513,10 +513,10 @@ rem_transpositions <- function(inc_df, ptype = "height"){
     }
 
     inc_df$ones <- get_num_places(
-      unlist(inc_df[, paste0("meas_", mtype), with = F]), "ones"
+      unlist(inc_df[, paste0("meas_", mtype), with = FALSE]), "ones"
     )
     inc_df$tens <- get_num_places(
-      unlist(inc_df[, paste0("meas_", mtype), with = F]), "tens"
+      unlist(inc_df[, paste0("meas_", mtype), with = FALSE]), "tens"
     )
 
     absdewma_transpo <- abs(inc_df$transpo - ewma_res)
@@ -547,7 +547,7 @@ rem_transpositions <- function(inc_df, ptype = "height"){
       abs(inc_df$tens - inc_df$ones) >= 3
 
     criteria <- criteria | exc_transpo
-    criteria[is.na(criteria)] <- F
+    criteria[is.na(criteria)] <- FALSE
   }
 
   return(criteria)
@@ -632,7 +632,7 @@ ht_change_groups <- function(h_subj_df, cutoff, type = "loss"){
 ht_3d_growth_compare <- function(mean_ht, min_age, glist,
                                  compare = "before"){
   # preallocating on whether or not we want to go by original exclusion
-  origexc <- F
+  origexc <- FALSE
   for (i in 2:6){
     # if there are no members of the group, we want to skip
     if (i > length(glist)){
@@ -686,7 +686,7 @@ remove_ewma_wt <- function(subj_df, ewma_cutoff_low = 60,
   # all three need to be beyond a cutoff for exclusion
   # exclude the most extreme, then recalculate again and again
   rem_ids <- c()
-  change <- T
+  change <- TRUE
   iter <- 1
   while (change){
     # figure out time difference between points
@@ -718,11 +718,11 @@ remove_ewma_wt <- function(subj_df, ewma_cutoff_low = 60,
             dewma$dewma.before < -.9*dewma$dewma.all &
             dewma$dewma.after < -.9*dewma$dewma.all))
     criteria_new <- criteria_low | criteria_high
-    criteria_new[is.na(criteria_new)] <- F
+    criteria_new[is.na(criteria_new)] <- FALSE
 
     if (all(!criteria_new)){
       # if none of them are to be removed
-      change <- F
+      change <- FALSE
       # if using intermediate values, we want to keep some
     } else {
       # figure out the most extreme value and remove it and rerun
@@ -737,14 +737,14 @@ remove_ewma_wt <- function(subj_df, ewma_cutoff_low = 60,
       # check if this is viable -- you need at least three points, otherwise
       # we're done
       if (nrow(subj_df) < 3){
-        change <- F
+        change <- FALSE
       }
     }
   }
 
   # form results into a logical vector
-  criteria <- rep(F, nrow(orig_subj_df))
-  criteria[orig_subj_df$id %in% rem_ids] <- T
+  criteria <- rep(FALSE, nrow(orig_subj_df))
+  criteria[orig_subj_df$id %in% rem_ids] <- TRUE
 
   return(criteria)
 }
@@ -764,7 +764,7 @@ remove_mod_ewma_wt <- function(full_inc_df){
 
   # exclude the most extreme, then recalculate again and again
   rem_ids <- c()
-  change <- T
+  change <- TRUE
   iter <- 1
   while (change){
     # set a limit for wts to be percent of other wts, focused on lower wts
@@ -883,14 +883,14 @@ remove_mod_ewma_wt <- function(full_inc_df){
             dewma$dewma.before > (.75*wta)) |
          (dewma$dewma.all < -1*wta &
             dewma$dewma.before < (-1*.75*wta)))
-    exc_mod_ewma[is.na(exc_mod_ewma)] <- F
-    alt_ewma_exc[is.na(alt_ewma_exc)] <- F
+    exc_mod_ewma[is.na(exc_mod_ewma)] <- FALSE
+    alt_ewma_exc[is.na(alt_ewma_exc)] <- FALSE
     exc_mod_ewma <- exc_mod_ewma | alt_ewma_exc
 
     # identify binerr criteria -- edge ones are marked as true
-    binerr_lepolate_n[is.na(binerr_lepolate_n)] <- F
-    binerr_lepolate_p[is.na(binerr_lepolate_p)] <- F
-    binerr_interpol[is.na(binerr_interpol)] <- F
+    binerr_lepolate_n[is.na(binerr_lepolate_n)] <- FALSE
+    binerr_lepolate_p[is.na(binerr_lepolate_p)] <- FALSE
+    binerr_interpol[is.na(binerr_interpol)] <- FALSE
     exc_binerr <- !binerr_lepolate_p & !binerr_lepolate_n & !binerr_interpol
     # alternate binerr crtieria -- if difference with adjacent within wta and
     # difference in agedays <= 14
@@ -903,19 +903,19 @@ remove_mod_ewma_wt <- function(full_inc_df){
          abs(wt_aft) > wta &
          !binerr_lepolate_p)
     exc_binerr <- exc_binerr | alt_exc_binerr
-    exc_binerr[is.na(exc_binerr)] <- F
+    exc_binerr[is.na(exc_binerr)] <- FALSE
 
     # ratio to ewma can also lead to exclusion
     percewma <- inc_df$meas_m/ewma_res
     exc_perc <- percewma$ewma.all < perc_limit &
       percewma$ewma.before < perc_limit &
       percewma$ewma.after < perc_limit
-    exc_perc[is.na(exc_perc)] <- F
+    exc_perc[is.na(exc_perc)] <- FALSE
 
     criteria_new <- (exc_mod_ewma & exc_binerr) | exc_perc
 
     if (all(!criteria_new)){
-      change <- F
+      change <- FALSE
     } else {
       # ewma ratio determines which to exclude -- highest ewmaratio
       ewmaratio <- abs(dewma$dewma.all)/wta
@@ -933,7 +933,7 @@ remove_mod_ewma_wt <- function(full_inc_df){
       # check if this is viable -- you need at least three points, otherwise
       # we're done
       if (nrow(inc_df) < 3){
-        change <- F
+        change <- FALSE
       }
       # update iteration
       iter <- iter + 1
@@ -941,8 +941,8 @@ remove_mod_ewma_wt <- function(full_inc_df){
   }
 
   # form results into a logical vector
-  criteria <- rep(F, nrow(full_inc_df))
-  criteria[full_inc_df$id %in% rem_ids] <- T
+  criteria <- rep(FALSE, nrow(full_inc_df))
+  criteria[full_inc_df$id %in% rem_ids] <- TRUE
 
   return(criteria)
 }

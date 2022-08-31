@@ -4,7 +4,7 @@
 \alias{ewma}
 \title{Exponentially Weighted Moving Average (EWMA)}
 \usage{
-ewma(agedays, z, ewma.exp, ewma.adjacent = T)
+ewma(agedays, z, ewma.exp, ewma.adjacent = TRUE)
 }
 \arguments{
 \item{agedays}{Vector of age in days for each z score (potentially transformed to adjust weighting).}

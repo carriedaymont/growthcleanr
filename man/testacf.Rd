@@ -9,15 +9,15 @@ testacf(
   seed = 7,
   searchtype = "random",
   grid.length = 9,
-  writeout = F,
+  writeout = FALSE,
   outfile = paste0("test_adjustcarryforward_", format(Sys.time(),
     "\%m-\%d-\%Y_\%H-\%M-\%S")),
-  quietly = F,
+  quietly = FALSE,
   param = "none",
-  debug = F,
+  debug = FALSE,
   maxrecs = 0,
   exclude_opt = 0,
-  add_answers = T
+  add_answers = TRUE
 )
 }
 \arguments{

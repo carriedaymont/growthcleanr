@@ -17,7 +17,7 @@ make_grid_vect <- function(low,
                            high,
                            grid.length,
                            searchtype,
-                           is_included = T,
+                           is_included = TRUE,
                            fg_val = (low + high) / 2) {
   if (searchtype == "random") {
     # random parameter sweep
@@ -65,7 +65,7 @@ exec_sweep <- function(grid_df,
                        measurement,
                        orig.exclude,
                        dm_filt,
-                       quietly = F) {
+                       quietly = FALSE) {
   for (index in 1:nrow(grid_df)) {
     if (!quietly) {
       cat(
@@ -102,14 +102,14 @@ exec_sweep <- function(grid_df,
       merge(as.data.frame(dm_filt),
             out,
             by = "n",
-            all = T
+            all = TRUE
       )
 
     # Combine into one wide set for simplicity
     if (index == 1) {
       combo <- export
     } else {
-      combo <- merge(combo, out, by = "n", all = T) # %>% select(-n)
+      combo <- merge(combo, out, by = "n", all = TRUE) # %>% select(-n)
     }
   }
 
@@ -150,17 +150,17 @@ testacf <- function(
   seed = 7,
   searchtype = "random",
   grid.length = 9,
-  writeout = F,
+  writeout = FALSE,
   outfile = paste0(
     "test_adjustcarryforward_",
     format(Sys.time(), "%m-%d-%Y_%H-%M-%S")
   ),
-  quietly = F,
+  quietly = FALSE,
   param = "none",
-  debug = F,
+  debug = FALSE,
   maxrecs = 0,
   exclude_opt = 0,
-  add_answers = T
+  add_answers = TRUE
 ){
 
   # Parse arguments for ease ----
@@ -227,7 +227,7 @@ testacf <- function(
     dm_filt <- merge(as.data.frame(dm_filt),
                      acf_answer_df,
                      by = "n",
-                     all = T
+                     all = TRUE
     )
   }
 
@@ -275,7 +275,7 @@ testacf <- function(
     } else {
       param_df <- data.frame(
         "param" = param_n,
-        "include" = T,
+        "include" = TRUE,
         "value" = NA
       )
     }
@@ -340,11 +340,11 @@ testacf <- function(
 
   if (writeout){
     # Combined adjusted set
-    fwrite(combo %>% select(-n), paste0(outfile, ".csv"), row.names = F)
+    fwrite(combo %>% select(-n), paste0(outfile, ".csv"), row.names = FALSE)
 
     # Record the sweep parameters for review
     grid <- cbind("run" = 1:nrow(grid_df), grid_df)
-    fwrite(grid, paste0(outfile, "_parameters.csv"), row.names = F)
+    fwrite(grid, paste0(outfile, "_parameters.csv"), row.names = FALSE)
 
     # Any additional debugging output
     if (debug) {
@@ -352,7 +352,7 @@ testacf <- function(
         cat(sprintf("[%s] Writing debugging output files\n", Sys.time()))
       }
       # Filtered data
-      fwrite(dm_filt, paste0(outfile, "_debug_filtered_data.csv"), row.names = F)
+      fwrite(dm_filt, paste0(outfile, "_debug_filtered_data.csv"), row.names = FALSE)
     }
   }
 
