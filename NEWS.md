@@ -10,7 +10,7 @@
   corrections (#82); switched examples to use `donttest`, added CRAN comments
   file, updated `.Rbuildignore` (#84)
 - Documentation updated with CRAN install (#86), fixed links (#85)
-- Updated GitHub check workflow (#80)
+- Updated GitHub check workflow (#80) and pkgdown workflow
 
 # growthcleanr 2.0.1 - 2022-08-29
 
