@@ -1,4 +1,18 @@
-# growthcleanr 2.0.1 - 2021-07-21
+# growthcleanr 2.0.2 - 2022-09-15
+
+## Added
+
+- Package now available on CRAN at https://cran.r-project.org/package=growthcleanr
+
+## Changed
+
+- Several updates for CRAN deployment: improved example/test runtimes, text
+  corrections (#82); switched examples to use `donttest`, added CRAN comments
+  file, updated `.Rbuildignore` (#84)
+- Documentation updated with CRAN install (#86), fixed links (#85)
+- Updated GitHub check workflow (#80)
+
+# growthcleanr 2.0.1 - 2022-08-29
 
 ## Changed
 
