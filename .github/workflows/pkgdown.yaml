@@ -3,13 +3,12 @@
 # updated 2022-09
 on:
   push:
-    branches:
-      branches: [main]
-    pull_request:
-      branches: [main]
-    release:
-      types: [published]
-    workflow_displatch:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_displatch:
 
 name: pkgdown
 
