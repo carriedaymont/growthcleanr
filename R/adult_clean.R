@@ -681,7 +681,7 @@ cleanadult <- function(df, weight_cap = Inf){
       # if dup ratio is too high, or any adjacent same days, we exclude all
       # same day extraneous
       criteria <-
-        if ((dup_ratio > .25) | adjacent){
+        if ((dup_ratio >= .25) | adjacent){
           !is.na(h_subj_df$diff)
         } else {
           rep(F, nrow(h_subj_df))
@@ -1209,7 +1209,7 @@ cleanadult <- function(df, weight_cap = Inf){
       # if dup ratio is too high, or any adjacent same days, we exclude all
       # same day extraneous
       criteria <-
-        if ((dup_ratio > .25) | adjacent){
+        if ((dup_ratio >= .25) | adjacent){
           !is.na(w_subj_df$diff)
         } else {
           rep(F, nrow(w_subj_df))
