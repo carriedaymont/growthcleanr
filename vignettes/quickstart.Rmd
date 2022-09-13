@@ -2,36 +2,26 @@
 title: "Quickstart"
 date: "`r Sys.Date()`"
 vignette: >
-  %\VignetteIndexEntry{Quickstart}
-  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{Quickstart} %\VignetteEngine{knitr::rmarkdown}
   %\usepackage[utf8]{inputenc}
 ---
 
 ## R setup
 
 To get started with `growthcleanr`, the `growthcleanr` package must be
-installed. Installing `growthcleanr` will in turn install several additional
-packages. `growthcleanr` is not currently on CRAN.
-
-One option for installation is using the `devtools` package. Install `devtools`
-and `growthcleanr` with the following commands:
+installed. To install the latest `growthcleanr` release from CRAN:
 
 ```{r, eval = FALSE}
-install.packages("devtools")
+install.packages("growthcleanr")
+```
+
+To install the latest development version from GitHub using `devtools`:
+
+```{r, eval = FALSE}
 devtools::install_github("carriedaymont/growthcleanr", ref="main")
 ```
 
-If you are unable to install `devtools`, a similar function is available in the
-`remotes` package:
-
-```{r, eval = FALSE}
-install.packages("remotes")
-remotes::install_github("carriedaymont/growthcleanr", ref="main")
-```
-
-Note that `ref="main"` is required whether you use `devtools` or `remotes`. The
-default `growthcleanr` code branch is "main", and this must be referred to
-explicitly.
+Installing `growthcleanr` will install several additional packages in turn.
 
 Further installation details and notes can be found under
 [Installation](installation.html).
@@ -139,8 +129,7 @@ which exclusions to accept directly or investigate further.
 
 This example uses the default configuration options for `cleangrowth()`. Longer
 examples demonstrating some common options are in [Usage](usage.html), and full
-details about all options are documented in
-[Configuration](configuration.html).
+details about all options are documented in [Configuration](configuration.html).
 
 To compute percentiles and Z-scores using the included CDC macro, continue with
 these next steps:

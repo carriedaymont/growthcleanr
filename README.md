@@ -5,6 +5,8 @@
 
 <!-- badges: start -->
 
+[![CRAN
+status](https://www.r-pkg.org/badges/version/growthcleanr)](https://cran.r-project.org/package=growthcleanr)
 [![R build
 status](https://github.com/carriedaymont/growthcleanr/workflows/R-CMD-check/badge.svg)](https://github.com/carriedaymont/growthcleanr/actions)
 
@@ -36,6 +38,14 @@ up to age 65. The adult algorithm has not yet been published in a
 peer-reviewed publication, but is described in detail at [Adult
 algorithm](https://carriedaymont.github.io/growthcleanr/articles/adult-algorithm.html).
 
+## Installation
+
+To install the stable version from CRAN:
+
+``` r
+install.packages("growthcleanr")
+```
+
 ## Summary
 
 The `growthcleanr` package processes data prepared in a specific format
@@ -62,38 +72,37 @@ The rest of this documentation includes:
 
 ### Getting started:
 
--   [Quickstart](https://carriedaymont.github.io/growthcleanr/articles/quickstart.html),
-    a brief tour of using growthcleanr, including data preparation
--   [Installation](https://carriedaymont.github.io/growthcleanr/articles/installation.html),
-    options for installing growthcleanr, with notes on specific platforms and source-level
-    installation for developers
--   [Usage](https://carriedaymont.github.io/growthcleanr/articles/usage.html),
-    examples of cleaning data, multiple options, example data
+- [Quickstart](https://carriedaymont.github.io/growthcleanr/articles/quickstart.html),
+  a brief tour of using growthcleanr, including data preparation
+- [Installation](https://carriedaymont.github.io/growthcleanr/articles/usage.html),
+  options for installing growthcleanr, with notes on specific platforms
+  and source-level installation for developers
+- [Usage](https://carriedaymont.github.io/growthcleanr/articles/usage.html),
+  examples of cleaning data, multiple options, example data
 
 ### Advanced topics:
 
--   [Configuration
-    options](https://carriedaymont.github.io/growthcleanr/articles/configuration.html),
-    changing growthcleanr operational settings
--   [Understanding growthcleanr
-    output](https://carriedaymont.github.io/growthcleanr/articles/output.html),
-    the exclusion types growthcleanr identifies
--   [Adult
-    algorithm](https://carriedaymont.github.io/growthcleanr/articles/adult-algorithm.html),
-    a detailed description of how growthcleanr assesses observations
-    from adult subjects
--   [Computing BMI percentiles and
-    Z-scores](https://carriedaymont.github.io/growthcleanr/articles/utilities.html),
-    additional functions for common data transforms and determining
-    percentiles and Z-scores using the CDC method
--   [Working with large
-    datasets](https://carriedaymont.github.io/growthcleanr/articles/large-data-sets.html),
-    notes and suggestions for running `growthcleanr` with large data
-    sources
--   [Next
-    steps](https://carriedaymont.github.io/growthcleanr/articles/next-steps.html),
-    notes on potential enhancements to the pediatric and adult
-    algorithms
+- [Configuration
+  options](https://carriedaymont.github.io/growthcleanr/articles/configuration.html),
+  changing growthcleanr operational settings
+- [Understanding growthcleanr
+  output](https://carriedaymont.github.io/growthcleanr/articles/output.html),
+  the exclusion types growthcleanr identifies
+- [Adult
+  algorithm](https://carriedaymont.github.io/growthcleanr/articles/adult-algorithm.html),
+  a detailed description of how growthcleanr assesses observations from
+  adult subjects
+- [Computing BMI percentiles and
+  Z-scores](https://carriedaymont.github.io/growthcleanr/articles/utilities.html),
+  additional functions for common data transforms and determining
+  percentiles and Z-scores using the CDC method
+- [Working with large
+  datasets](https://carriedaymont.github.io/growthcleanr/articles/large-data-sets.html),
+  notes and suggestions for running `growthcleanr` with large data
+  sources
+- [Next
+  steps](https://carriedaymont.github.io/growthcleanr/articles/next-steps.html),
+  notes on potential enhancements to the pediatric and adult algorithms
 
 ## Changes
 
