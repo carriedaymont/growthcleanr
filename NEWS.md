@@ -1,8 +1,8 @@
-# growthcleanr 2.0.2 - 2022-09-15
+# growthcleanr 2.0.2 - 2022-09-13
 
 ## Added
 
-- Package now available on CRAN at https://cran.r-project.org/package=growthcleanr
+- Package now available on CRAN: https://cran.r-project.org/package=growthcleanr
 
 ## Changed
 
@@ -98,8 +98,8 @@
 
 ## Changed
 
-- Improved experimental carry forward adjustment handling of strings of
-  CF values, output handling, and documentation; renamed "Missing" values
+- Improved experimental carry forward adjustment handling of strings of CF
+  values, output handling, and documentation; renamed "Missing" values
 - Updated DESCRIPTION, imports, documentation to address testing issue (#12)
 - Switched to R-native argparser library to support script options
 - Switched to GitHub Actions for continuous integration / testing (thanks
@@ -132,8 +132,8 @@
 
 ## Added
 
-- New tests in `tests/testthat/test-utils.R` and `tests/testthat/test-cdc.R`
-  to support newly added functions
+- New tests in `tests/testthat/test-utils.R` and `tests/testthat/test-cdc.R` to
+  support newly added functions
 
 ## Changed
 
@@ -183,8 +183,8 @@
 - Several updates to improve performance, including eliminating use of
   data.table in ewma function.
 - Updated README with link to paper, detailed introduction, more installation
-  details, examples, notes on handling large datasets, lists of parameters
-  and exclusions.
+  details, examples, notes on handling large datasets, lists of parameters and
+  exclusions.
 
 # growthcleanr 1.0.0 - 2018-09-11
 
