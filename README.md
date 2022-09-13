@@ -38,6 +38,14 @@ up to age 65. The adult algorithm has not yet been published in a
 peer-reviewed publication, but is described in detail at [Adult
 algorithm](https://carriedaymont.github.io/growthcleanr/articles/adult-algorithm.html).
 
+## Installation
+
+To install the stable version from CRAN:
+
+``` r
+install.packages("growthcleanr")
+```
+
 ## Summary
 
 The `growthcleanr` package processes data prepared in a specific format
@@ -67,6 +75,9 @@ The rest of this documentation includes:
 - [Quickstart](https://carriedaymont.github.io/growthcleanr/articles/quickstart.html),
   a brief tour of using growthcleanr, including data preparation
 - [Installation](https://carriedaymont.github.io/growthcleanr/articles/usage.html),
+  options for installing growthcleanr, with notes on specific platforms
+  and source-level installation for developers
+- [Usage](https://carriedaymont.github.io/growthcleanr/articles/usage.html),
   examples of cleaning data, multiple options, example data
 
 ### Advanced topics:
