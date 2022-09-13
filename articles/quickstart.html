@@ -33,7 +33,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">growthcleanr</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.2</span>
       </span>
     </div>
 
@@ -105,12 +105,12 @@
 
       
 
-      </header><script src="quickstart_files/accessible-code-block-0.0.1/empty-anchor.js"></script><div class="row">
+      </header><div class="row">
   <div class="col-md-9 contents">
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Quickstart</h1>
             
-            <h4 data-toc-skip class="date">2022-08-31</h4>
+            <h4 data-toc-skip class="date">2022-09-13</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/quickstart.Rmd" class="external-link"><code>vignettes/quickstart.Rmd</code></a></small>
       <div class="hidden name"><code>quickstart.Rmd</code></div>
@@ -122,16 +122,13 @@
 <div class="section level2">
 <h2 id="r-setup">R setup<a class="anchor" aria-label="anchor" href="#r-setup"></a>
 </h2>
-<p>To get started with <code>growthcleanr</code>, the <code>growthcleanr</code> package must be installed. Installing <code>growthcleanr</code> will in turn install several additional packages. <code>growthcleanr</code> is not currently on CRAN.</p>
-<p>One option for installation is using the <code>devtools</code> package. Install <code>devtools</code> and <code>growthcleanr</code> with the following commands:</p>
+<p>To get started with <code>growthcleanr</code>, the <code>growthcleanr</code> package must be installed. To install the latest <code>growthcleanr</code> release from CRAN:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"devtools"</span><span class="op">)</span></span>
-<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"carriedaymont/growthcleanr"</span>, ref<span class="op">=</span><span class="st">"main"</span><span class="op">)</span></span></code></pre></div>
-<p>If you are unable to install <code>devtools</code>, a similar function is available in the <code>remotes</code> package:</p>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"growthcleanr"</span><span class="op">)</span></span></code></pre></div>
+<p>To install the latest development version from GitHub using <code>devtools</code>:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span></span>
-<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"carriedaymont/growthcleanr"</span>, ref<span class="op">=</span><span class="st">"main"</span><span class="op">)</span></span></code></pre></div>
-<p>Note that <code>ref="main"</code> is required whether you use <code>devtools</code> or <code>remotes</code>. The default <code>growthcleanr</code> code branch is “main”, and this must be referred to explicitly.</p>
+<code class="sourceCode R"><span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"carriedaymont/growthcleanr"</span>, ref<span class="op">=</span><span class="st">"main"</span><span class="op">)</span></span></code></pre></div>
+<p>Installing <code>growthcleanr</code> will install several additional packages in turn.</p>
 <p>Further installation details and notes can be found under <a href="installation.html">Installation</a>.</p>
 </div>
 <div class="section level2">

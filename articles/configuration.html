@@ -33,7 +33,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">growthcleanr</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.2</span>
       </span>
     </div>
 
@@ -105,12 +105,12 @@
 
       
 
-      </header><script src="configuration_files/accessible-code-block-0.0.1/empty-anchor.js"></script><div class="row">
+      </header><div class="row">
   <div class="col-md-9 contents">
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Configuration</h1>
             
-            <h4 data-toc-skip class="date">2022-08-31</h4>
+            <h4 data-toc-skip class="date">2022-09-13</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/configuration.Rmd" class="external-link"><code>vignettes/configuration.Rmd</code></a></small>
       <div class="hidden name"><code>configuration.Rmd</code></div>
@@ -173,8 +173,8 @@
 <li><p><code>parallel</code> - default <code>FALSE</code>; set to <code>TRUE</code> to run <code>growthcleanr</code> in parallel. Running in parallel will split the input data into batches (while keeping all records for each subject together) and process each batch on a different processor/core to maximize throughput. Recommended for large datasets with more than 100K rows.</p></li>
 <li><p><code>num.batches</code> - specifies the number of batches to run in parallel; only applies if <code>parallel</code> is set to <code>TRUE</code>. Defaults to the number of workers returned by the <code>getDoParWorkers()</code> function in the <code>foreach</code> package. Note that processing in parallel may affect overall system performance.</p></li>
 <li><p><code>sdmedian.filename</code> - filename for optionally saving sd.median data calculated on the input dataset to as CSV. Defaults to <code>""</code>, for which this data will not be saved. Use for extracting medians for parallel processing scenarios other than the built-in parallel option. See notes on <a href="#largedata">large data sets</a> for details.</p></li>
-<li><p><code>sdrecentered.filename</code> - filename to save re-centered data to as CSV. Defaults to "", for which this data will not be saved. Useful for post-processing and debugging.</p></li>
-<li><p><code>adult_columns_filename</code> - default <code>""</code>; Name of file to save original adult data, with additional output columns to as CSV. Defaults to "", for which this data will not be saved. Useful for post-analysis. For more information on this output, please see README.</p></li>
+<li><p><code>sdrecentered.filename</code> - filename to save re-centered data to as CSV. Defaults to ““, for which this data will not be saved. Useful for post-processing and debugging.</p></li>
+<li><p><code>adult_columns_filename</code> - default <code>""</code>; Name of file to save original adult data, with additional output columns to as CSV. Defaults to ““, for which this data will not be saved. Useful for post-analysis. For more information on this output, please see README.</p></li>
 <li><p><code>quietly</code> - default <code>TRUE</code>; when <code>TRUE</code>, displays function messages and will output log files when <code>parallel</code> is <code>TRUE</code>.</p></li>
 <li><p><code>log.path</code> - default <code>"."</code>; sets directory for batch log file output when processing with <code>parallel = TRUE</code>. A new directory will be created if necessary.</p></li>
 </ul>
