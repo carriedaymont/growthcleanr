@@ -74,7 +74,7 @@ The rest of this documentation includes:
 
 - [Quickstart](https://carriedaymont.github.io/growthcleanr/articles/quickstart.html),
   a brief tour of using growthcleanr, including data preparation
-- [Installation](https://carriedaymont.github.io/growthcleanr/articles/usage.html),
+- [Installation](https://carriedaymont.github.io/growthcleanr/articles/installation.html),
   options for installing growthcleanr, with notes on specific platforms
   and source-level installation for developers
 - [Usage](https://carriedaymont.github.io/growthcleanr/articles/usage.html),
