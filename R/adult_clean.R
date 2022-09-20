@@ -659,61 +659,8 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
       }
 
-      step <- "Exclude-Adult-Extraneous-Same-Day"
+      step <- "Exclude-Adult-DUPLICATE-ADJACENT-Same-Day"
       # now the rest!
-
-      # next, check for trivial differences for SDEs on the same day
-      # this only works if there are non-sde days
-
-      # check for SDEs by EWMA -- alternate calculate excluding other SDEs
-      all_sdes <- duplicated(h_subj_df$age_days) |
-        duplicated(h_subj_df$age_days, fromLast = T)
-
-      if (sum(all_sdes) != nrow(h_subj_df)){
-        # calculate the time difference for all values, as well as exponential
-        delta <- as.matrix.delta_dn(h_subj_df$age_days)
-        delta <- ifelse(delta == 0, 0, (delta) ^ -5)
-
-        rem_ids <- c()
-        for (dd in dup_days){
-          # first, calculate if all SDEs on a single day vary by tolerance plus
-          # epsilon
-          s_df <- copy(h_subj_df[h_subj_df$age_days == dd,])
-
-          if ((max(s_df$meas_m) - min(s_df$meas_m)) <= 2.541){
-            # calculate dewma for each SDE on this day
-            dewma <- sapply(1:nrow(s_df), function(x){
-              ind <- h_subj_df$id == s_df[[x, "id"]]
-
-              ewma_res <- sum(h_subj_df$meas_m[!all_sdes]*delta[ind,!all_sdes])/
-                sum(delta[ind, !all_sdes])
-
-              # delta ewma
-              return(s_df$meas_m[x] - ewma_res)
-            })
-
-            de_day <- which.min(abs(dewma))
-
-            # keep the value with the lowest EWMA -- do not keep rest
-            rem_ids <- c(rem_ids, s_df$id[-de_day])
-          }
-        }
-      }
-
-      criteria <- h_subj_df$id %in% ide_ids
-
-      # we're going to update h_subj_df before moving on to the rest of this
-      # subject
-      h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
-
-      h_subj_df <- h_subj_df[!criteria,]
-
-      if (any(criteria)){
-        # reevaluate temp same day
-        h_subj_df <- temp_sde(h_subj_df)
-        # identify duplicate days
-        dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
-      }
 
       # next, calculate the duplicate ratio -- what proportion of days are
       # duplicated
@@ -755,6 +702,81 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
       }
 
+      step <- "Exclude-Adult-SIMILAR-Same-Day"
+      # next, check for trivial differences for SDEs on the same day
+      # this only works if there are non-sde days
+
+      if (any(h_subj_df$extraneous)){
+        # check for SDEs by EWMA -- alternate calculate excluding other SDEs
+        all_sdes <- duplicated(h_subj_df$age_days) |
+          duplicated(h_subj_df$age_days, fromLast = T)
+
+        # calculate the time difference for all values, as well as exponential
+        delta <- as.matrix.delta_dn(h_subj_df$age_days)
+        delta <- ifelse(delta == 0, 0, (delta) ^ -5)
+
+        rem_ids <- c()
+        for (dd in dup_days){
+          # first, calculate if all SDEs on a single day vary by tolerance plus
+          # epsilon
+          s_df <- copy(h_subj_df[h_subj_df$age_days == dd,])
+
+          if ((max(s_df$meas_m) - min(s_df$meas_m)) <= 2.541){
+
+            # if there are some non-sdes to compare to
+            if (sum(all_sdes) != nrow(h_subj_df)){
+              # calculate dewma for each SDE on this day
+              dewma <- sapply(1:nrow(s_df), function(x){
+                ind <- h_subj_df$id == s_df[[x, "id"]]
+
+                ewma_res <- sum(h_subj_df$meas_m[!all_sdes]*delta[ind,!all_sdes])/
+                  sum(delta[ind, !all_sdes])
+
+                # delta ewma
+                return(s_df$meas_m[x] - ewma_res)
+              })
+
+              de_day <- which.min(abs(dewma))
+
+              # keep the value with the lowest EWMA -- do not keep rest
+              rem_ids <- c(rem_ids, s_df$id[-de_day])
+            } else {
+              # it's only SDEs
+              keep_id <-
+                if (nrow(s_df) >= 3){
+                  # if there are at least 3 one the same day, choose the one
+                  # closest to the median
+                  which.min(abs(s_df$meas_m - median(s_df$meas_m)))
+                } else {
+                  # if there are only 2, choose the one closest to the median
+                  # across all days
+                  which.min(abs(s_df$meas_m - median(h_subj_df$meas_m)))
+                }
+
+              # keep the value with the lowest EWMA -- do not keep rest
+              rem_ids <- c(rem_ids, s_df$id[-keep_id])
+            }
+          }
+
+        }
+
+        criteria <- h_subj_df$id %in% rem_ids
+
+        # we're going to update h_subj_df before moving on to the rest of this
+        # subject
+        h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
+
+        h_subj_df <- h_subj_df[!criteria,]
+
+        if (any(criteria)){
+          # reevaluate temp same day
+          h_subj_df <- temp_sde(h_subj_df)
+          # identify duplicate days
+          dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
+        }
+      }
+
+      step <- "Exclude-Adult-Extraneous-Same-Day"
       # if there are any left, we move to checking by EWMA
       if (any(h_subj_df$extraneous)){
         # check for SDEs by EWMA -- alternate calculate excluding other SDEs
@@ -1240,61 +1262,8 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
       }
 
-      step <- "Exclude-Adult-Extraneous-Same-Day"
+      step <- "Exclude-Adult-DUPLICATE-ADJACENT-Same-Day"
       # now the rest!
-
-      # next, check for trivial differences for SDEs on the same day
-      # this only works if there are non-sde days
-
-      # check for SDEs by EWMA -- alternate calculate excluding other SDEs
-      all_sdes <- duplicated(w_subj_df$age_days) |
-        duplicated(w_subj_df$age_days, fromLast = T)
-
-      if (sum(all_sdes) != nrow(w_subj_df)){
-        # calculate the time difference for all values, as well as exponential
-        delta <- as.matrix.delta_dn(w_subj_df$age_days)
-        delta <- ifelse(delta == 0, 0, (delta) ^ -5)
-
-        rem_ids <- c()
-        for (dd in dup_days){
-          # first, calculate if all SDEs on a single day vary by tolerance plus
-          # epsilon
-          s_df <- copy(w_subj_df[w_subj_df$age_days == dd,])
-
-          if ((max(s_df$meas_m) - min(s_df$meas_m)) <= 1.001){
-            # calculate dewma for each SDE on this day
-            dewma <- sapply(1:nrow(s_df), function(x){
-              ind <- w_subj_df$id == s_df[[x, "id"]]
-
-              ewma_res <- sum(w_subj_df$meas_m[!all_sdes]*delta[ind,!all_sdes])/
-                sum(delta[ind, !all_sdes])
-
-              # delta ewma
-              return(s_df$meas_m[x] - ewma_res)
-            })
-
-            de_day <- which.min(abs(dewma))
-
-            # keep the value with the lowest EWMA -- do not keep rest
-            rem_ids <- c(rem_ids, s_df$id[-de_day])
-          }
-        }
-      }
-
-      criteria <- w_subj_df$id %in% ide_ids
-
-      # we're going to update w_subj_df before moving on to the rest of this
-      # subject
-      w_subj_keep[as.character(w_subj_df$id)][criteria] <- step
-
-      w_subj_df <- w_subj_df[!criteria,]
-
-      if (any(criteria)){
-        # reevaluate temp same day
-        w_subj_df <- temp_sde(w_subj_df)
-        # identify duplicate days
-        dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
-      }
 
       # next, calculate the duplicate ratio -- what proportion of days are
       # duplicated
@@ -1336,6 +1305,83 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
       }
 
+
+      step <- "Exclude-Adult-SIMILAR-Same-Day"
+      # next, check for trivial differences for SDEs on the same day
+      # this only works if there are non-sde days
+
+      if (any(w_subj_df$extraneous)){
+        # check for SDEs by EWMA -- alternate calculate excluding other SDEs
+        all_sdes <- duplicated(w_subj_df$age_days) |
+          duplicated(w_subj_df$age_days, fromLast = T)
+
+        # calculate the time difference for all values, as well as exponential
+        delta <- as.matrix.delta_dn(w_subj_df$age_days)
+        delta <- ifelse(delta == 0, 0, (delta) ^ -5)
+
+        rem_ids <- c()
+        for (dd in dup_days){
+          # first, calculate if all SDEs on a single day vary by tolerance plus
+          # epsilon
+          s_df <- copy(w_subj_df[w_subj_df$age_days == dd,])
+
+          if ((max(s_df$meas_m) - min(s_df$meas_m)) <= 1.001){
+
+            # if there are some non-sdes to compare to
+            if (sum(all_sdes) != nrow(w_subj_df)){
+              # calculate dewma for each SDE on this day
+              dewma <- sapply(1:nrow(s_df), function(x){
+                ind <- w_subj_df$id == s_df[[x, "id"]]
+
+                ewma_res <- sum(w_subj_df$meas_m[!all_sdes]*delta[ind,!all_sdes])/
+                  sum(delta[ind, !all_sdes])
+
+                # delta ewma
+                return(s_df$meas_m[x] - ewma_res)
+              })
+
+              de_day <- which.min(abs(dewma))
+
+              # keep the value with the lowest EWMA -- do not keep rest
+              rem_ids <- c(rem_ids, s_df$id[-de_day])
+            } else {
+              # it's only SDEs
+              keep_id <-
+                if (nrow(s_df) >= 3){
+                  # if there are at least 3 one the same day, choose the one
+                  # closest to the median
+                  which.min(abs(s_df$meas_m - median(s_df$meas_m)))
+                } else {
+                  # if there are only 2, choose the one closest to the median
+                  # across all days
+                  which.min(abs(s_df$meas_m - median(w_subj_df$meas_m)))
+                }
+
+              # keep the value with the lowest EWMA -- do not keep rest
+              rem_ids <- c(rem_ids, s_df$id[-keep_id])
+            }
+          }
+
+        }
+
+        criteria <- w_subj_df$id %in% rem_ids
+
+        # we're going to update w_subj_df before moving on to the rest of this
+        # subject
+        w_subj_keep[as.character(w_subj_df$id)][criteria] <- step
+
+        w_subj_df <- w_subj_df[!criteria,]
+
+        if (any(criteria)){
+          # reevaluate temp same day
+          w_subj_df <- temp_sde(w_subj_df)
+          # identify duplicate days
+          dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
+        }
+      }
+
+
+      step <- "Exclude-Adult-Extraneous-Same-Day"
       # if there are any extraneous left after other steps
       if (any(w_subj_df$extraneous)){
         # check for SDEs by EWMA -- alternate calculate excluding other SDEs
