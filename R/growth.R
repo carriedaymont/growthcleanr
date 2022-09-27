@@ -204,7 +204,7 @@ cleangrowth <- function(subjid,
 
   # constants for pediatric
   # enumerate the different exclusion levels
-  exclude.levels <- c(
+  exclude.levels.peds <- c(
     'Include',
     'Unit-Error-High',
     'Unit-Error-Low',
@@ -234,6 +234,29 @@ cleangrowth <- function(subjid,
     'Exclude-Too-Many-Errors',
     'Exclude-Too-Many-Errors-Other-Parameter'
   )
+
+  exclude.levels.adult <- c(
+    "Include",
+    "Exclude-Adult-BIV",
+    "Exclude-Adult-Hundreds",
+    "Exclude-Adult-Unit-Errors",
+    "Exclude-Adult-Transpositions",
+    "Exclude-Adult-Weight-Cap-Identical",
+    "Exclude-Adult-Weight-Cap",
+    "Exclude-Adult-Swapped-Measurements",
+    "Exclude-Adult-Identical-Same-Day",
+    "Exclude-Adult-Extraneous-Same-Day",
+    "Exclude-Adult-Distinct-Pairs",
+    "Exclude-Adult-Distinct-3-Or-More",
+    "Exclude-Adult-EWMA-Extreme",
+    "Exclude-Adult-Distinct-Ordered-Pairs",
+    "Exclude-Adult-EWMA-Moderate",
+    "Exclude-Adult-Possibly-Impacted-By-Weight-Cap",
+    "Exclude-Adult-Distinct-Single",
+    "Exclude-Adult-Too-Many-Errors"
+  )
+
+  exclude.levels <- base::union(exclude.levels.peds, exclude.levels.adult)
 
   # if there's no pediatric data, no need to go through this rigamarole
   if (nrow(data.all) > 0){
@@ -665,8 +688,7 @@ cleangrowth <- function(subjid,
       exclude = c(as.character(ret.df$exclude), res$result),
       mean_sde = c(rep(NA, nrow(ret.df)), res$mean_sde)
     )
-    full_out[, exclude := factor(exclude, levels = unique(c(exclude.levels,
-                                                            unique(exclude))))]
+    full_out[, exclude := factor(exclude, levels = exclude.levels)]
     full_out <- full_out[order(line),]
     # remove column added for keeping track
     full_out[, line := NULL]
