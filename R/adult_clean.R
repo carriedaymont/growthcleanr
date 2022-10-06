@@ -54,6 +54,13 @@ cleanadult <- function(df, weight_cap = Inf){
   df[, gain_groups := as.numeric(NA)]
   df[, all_exc_weight_cap := F]
   # rownames(df) <- df$id # NO ROWNAMES IN DATA.TABLE
+
+  # dup_ratio_out <- data.frame(
+  #   "subjid" = unique(df$subjid),
+  #   "h_dup_ratio" = NA,
+  #   "w_dup_ratio" = NA
+  # )
+  # rownames(dup_ratio_out) <- dup_ratio_out$subjid
   # go through each subject
   for (i in unique(df$subjid)){
     slog <- df$subjid == i
@@ -678,10 +685,13 @@ cleanadult <- function(df, weight_cap = Inf){
         adjacent <- F
       }
 
+      # dup_ratio_out[as.character(i), "h_dup_ratio"] <-
+      #   dup_ratio
+
       # if dup ratio is too high, or any adjacent same days, we exclude all
       # same day extraneous
       criteria <-
-        if ((dup_ratio >= .25) | adjacent){
+        if ((dup_ratio > .25) | adjacent){
           !is.na(h_subj_df$diff)
         } else {
           rep(F, nrow(h_subj_df))
@@ -1281,10 +1291,13 @@ cleanadult <- function(df, weight_cap = Inf){
         adjacent <- F
       }
 
+      # dup_ratio_out[as.character(i), "w_dup_ratio"] <-
+      #   dup_ratio
+
       # if dup ratio is too high, or any adjacent same days, we exclude all
       # same day extraneous
       criteria <-
-        if ((dup_ratio >= .25) | adjacent){
+        if ((dup_ratio > .25) | adjacent){
           !is.na(w_subj_df$diff)
         } else {
           rep(F, nrow(w_subj_df))
@@ -1803,6 +1816,8 @@ cleanadult <- function(df, weight_cap = Inf){
     }
 
     # complete ----
+
+    # dup_ratio_out <<- dup_ratio_out
 
   }
 
