@@ -211,7 +211,20 @@ ext_bmiz <- function(data,
     dref[agemos == 240, .(sex, mbmi, sbmi)] %>% setnames(., c("sex", "mref", "sref"))
 
   dref <- dref[adj_bmi_met, on = 'sex']
-  v <- c("sex", "age", "wl", "wm", "ws", "bl", "bm", "bs", "hl", "hm", "hs", "mref", "sref")
+  v <-
+    c("sex",
+      "age",
+      "wl",
+      "wm",
+      "ws",
+      "bl",
+      "bm",
+      "bs",
+      "hl",
+      "hm",
+      "hs",
+      "mref",
+      "sref")
   setnames(dref, v)
 
   # interpolate reference data to match each agemos in input data
@@ -280,7 +293,20 @@ ext_bmiz <- function(data,
   dt[, (x) := NULL]
   setnames(
     dt,
-    c("adist1", "aperc1", "bp", "bz", "mbz", "mwaz", "mhaz", "ebp", "ebz", "l", "m", "s"),
+    c(
+      "adist1",
+      "aperc1",
+      "bp",
+      "bz",
+      "mbz",
+      "mwaz",
+      "mhaz",
+      "ebp",
+      "ebz",
+      "l",
+      "m",
+      "s"
+    ),
     c(
       "adj_dist1",
       "adj_perc1",
