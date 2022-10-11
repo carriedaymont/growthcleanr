@@ -666,52 +666,6 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
       }
 
-      step <- "Exclude-Adult-DUPLICATE-ADJACENT-Same-Day"
-      # now the rest!
-
-      # next, calculate the duplicate ratio -- what proportion of days are
-      # duplicated
-      dup_ratio <-
-        length(unique(h_subj_df$age_days[duplicated(h_subj_df$age_days)]))/
-        length(unique(h_subj_df$age_days))
-      # also check whether or not any same-days are adjacent -- need 4 at least
-      # rolling windows of day differences -- we are looking for 0,x,0
-      if (nrow(h_subj_df) > 3){
-        roll <- embed(diff(h_subj_df$age_days), 3)
-        adjacent <- any(sapply(1:nrow(roll), function(x){
-          all(c(roll[x,1] == 0, roll[x,2] != 0, roll[x,3] == 0))
-        }))
-      } else {
-        adjacent <- F
-      }
-
-      # dup_ratio_out[as.character(i), "h_dup_ratio"] <-
-      #   dup_ratio
-
-      # if dup ratio is too high, or any adjacent same days, we exclude all
-      # same day extraneous
-      criteria <-
-        if ((dup_ratio > .25) | adjacent){
-          !is.na(h_subj_df$diff)
-        } else {
-          rep(F, nrow(h_subj_df))
-        }
-
-      # we're going to update h_subj_df before moving on to the rest of this
-      # subject
-      h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
-      # also update mean sde
-      h_subj_mean_sde[as.character(h_subj_df$id)] <- h_subj_df$mean_sde
-
-      h_subj_df <- h_subj_df[!criteria,]
-
-      if (any(criteria)){
-        # reevaluate temp same day
-        h_subj_df <- temp_sde(h_subj_df)
-        # identify duplicate days
-        dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
-      }
-
       step <- "Exclude-Adult-SIMILAR-Same-Day"
       # next, check for trivial differences for SDEs on the same day
       # this only works if there are non-sde days
@@ -784,6 +738,52 @@ cleanadult <- function(df, weight_cap = Inf){
           # identify duplicate days
           dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
         }
+      }
+
+      step <- "Exclude-Adult-DUPLICATE-ADJACENT-Same-Day"
+      # now the rest!
+
+      # next, calculate the duplicate ratio -- what proportion of days are
+      # duplicated
+      dup_ratio <-
+        length(unique(h_subj_df$age_days[duplicated(h_subj_df$age_days)]))/
+        length(unique(h_subj_df$age_days))
+      # also check whether or not any same-days are adjacent -- need 4 at least
+      # rolling windows of day differences -- we are looking for 0,x,0
+      if (nrow(h_subj_df) > 3){
+        roll <- embed(diff(h_subj_df$age_days), 3)
+        adjacent <- any(sapply(1:nrow(roll), function(x){
+          all(c(roll[x,1] == 0, roll[x,2] != 0, roll[x,3] == 0))
+        }))
+      } else {
+        adjacent <- F
+      }
+
+      # dup_ratio_out[as.character(i), "h_dup_ratio"] <-
+      #   dup_ratio
+
+      # if dup ratio is too high, or any adjacent same days, we exclude all
+      # same day extraneous
+      criteria <-
+        if ((dup_ratio > .25) | adjacent){
+          !is.na(h_subj_df$diff)
+        } else {
+          rep(F, nrow(h_subj_df))
+        }
+
+      # we're going to update h_subj_df before moving on to the rest of this
+      # subject
+      h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
+      # also update mean sde
+      h_subj_mean_sde[as.character(h_subj_df$id)] <- h_subj_df$mean_sde
+
+      h_subj_df <- h_subj_df[!criteria,]
+
+      if (any(criteria)){
+        # reevaluate temp same day
+        h_subj_df <- temp_sde(h_subj_df)
+        # identify duplicate days
+        dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
       }
 
       step <- "Exclude-Adult-Extraneous-Same-Day"
@@ -1272,53 +1272,6 @@ cleanadult <- function(df, weight_cap = Inf){
         dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
       }
 
-      step <- "Exclude-Adult-DUPLICATE-ADJACENT-Same-Day"
-      # now the rest!
-
-      # next, calculate the duplicate ratio -- what proportion of days are
-      # duplicated
-      dup_ratio <-
-        length(unique(w_subj_df$age_days[duplicated(w_subj_df$age_days)]))/
-        length(unique(w_subj_df$age_days))
-      # also check whether or not any same-days are adjacent -- need 4 at least
-      # rolling windows of day differences -- we are looking for 0,x,0
-      if (nrow(w_subj_df) > 3){
-        roll <- embed(diff(w_subj_df$age_days), 3)
-        adjacent <- any(sapply(1:nrow(roll), function(x){
-          all(c(roll[x,1] == 0, roll[x,2] != 0, roll[x,3] == 0))
-        }))
-      } else {
-        adjacent <- F
-      }
-
-      # dup_ratio_out[as.character(i), "w_dup_ratio"] <-
-      #   dup_ratio
-
-      # if dup ratio is too high, or any adjacent same days, we exclude all
-      # same day extraneous
-      criteria <-
-        if ((dup_ratio > .25) | adjacent){
-          !is.na(w_subj_df$diff)
-        } else {
-          rep(F, nrow(w_subj_df))
-        }
-
-      # we're going to update w_subj_df before moving on to the rest of this
-      # subject
-      w_subj_keep[as.character(w_subj_df$id)][criteria] <- step
-      # also update mean sde
-      w_subj_mean_sde[as.character(w_subj_df$id)] <- w_subj_df$mean_sde
-
-      w_subj_df <- w_subj_df[!criteria,]
-
-      if (any(criteria)){
-        # reevaluate temp same day
-        w_subj_df <- temp_sde(w_subj_df)
-        # identify duplicate days
-        dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
-      }
-
-
       step <- "Exclude-Adult-SIMILAR-Same-Day"
       # next, check for trivial differences for SDEs on the same day
       # this only works if there are non-sde days
@@ -1393,6 +1346,51 @@ cleanadult <- function(df, weight_cap = Inf){
         }
       }
 
+      step <- "Exclude-Adult-DUPLICATE-ADJACENT-Same-Day"
+      # now the rest!
+
+      # next, calculate the duplicate ratio -- what proportion of days are
+      # duplicated
+      dup_ratio <-
+        length(unique(w_subj_df$age_days[duplicated(w_subj_df$age_days)]))/
+        length(unique(w_subj_df$age_days))
+      # also check whether or not any same-days are adjacent -- need 4 at least
+      # rolling windows of day differences -- we are looking for 0,x,0
+      if (nrow(w_subj_df) > 3){
+        roll <- embed(diff(w_subj_df$age_days), 3)
+        adjacent <- any(sapply(1:nrow(roll), function(x){
+          all(c(roll[x,1] == 0, roll[x,2] != 0, roll[x,3] == 0))
+        }))
+      } else {
+        adjacent <- F
+      }
+
+      # dup_ratio_out[as.character(i), "w_dup_ratio"] <-
+      #   dup_ratio
+
+      # if dup ratio is too high, or any adjacent same days, we exclude all
+      # same day extraneous
+      criteria <-
+        if ((dup_ratio > .25) | adjacent){
+          !is.na(w_subj_df$diff)
+        } else {
+          rep(F, nrow(w_subj_df))
+        }
+
+      # we're going to update w_subj_df before moving on to the rest of this
+      # subject
+      w_subj_keep[as.character(w_subj_df$id)][criteria] <- step
+      # also update mean sde
+      w_subj_mean_sde[as.character(w_subj_df$id)] <- w_subj_df$mean_sde
+
+      w_subj_df <- w_subj_df[!criteria,]
+
+      if (any(criteria)){
+        # reevaluate temp same day
+        w_subj_df <- temp_sde(w_subj_df)
+        # identify duplicate days
+        dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
+      }
 
       step <- "Exclude-Adult-Extraneous-Same-Day"
       # if there are any extraneous left after other steps
