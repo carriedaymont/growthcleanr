@@ -9,7 +9,7 @@ on:
   schedule:
     - cron: '36 4 * * *'
   push:
-    branches: [ "main" ]
+    branches: [ "main", "t101-update-container-builds" ]
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
   pull_request:
