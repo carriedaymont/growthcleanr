@@ -1437,8 +1437,8 @@ cleanadult <- function(df, weight_cap = Inf){
             }
 
           # get age difference, in years, using the smaller time difference
-          ageyears_diff <- abs(s_df$age_years[1] -
-                                 min(prev_day, next_day, na.rm = T))
+          ageyears_diff <- min(abs(s_df$age_years[1] -
+                                     c(prev_day, next_day)), na.rm = T)
 
           # compute "weight allow" how much change is allowed over time
           wta <- 4 + 18*log(1 + (ageyears_diff*12))
