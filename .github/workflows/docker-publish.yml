@@ -7,7 +7,7 @@ name: image-build-and-push
 
 on:
   schedule:
-    - cron: $cron-daily
+    - cron: '56 4 * * *'
   push:
     branches: [ $default-branch ]
     # Publish semver tags as releases.
