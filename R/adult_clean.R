@@ -20,7 +20,7 @@
 #' @keywords internal
 #' @importFrom stats setNames
 #' @noRd
-cleanadult <- function(df, weight_cap = Inf){
+cleanadult <- function(df, weight_cap = Inf, esd_strict = TRUE){
 
   # avoid "no visible binding" warnings
   age_years <- embed <- i.all_exc_weight_cap <- i.gain_groups <- i.keep <- NULL
@@ -752,9 +752,9 @@ cleanadult <- function(df, weight_cap = Inf){
       # rolling windows of day differences -- we are looking for 0,x,0
       if (nrow(h_subj_df) > 3){
         roll <- embed(diff(h_subj_df$age_days), 3)
-        adjacent <- any(sapply(1:nrow(roll), function(x){
+        adjacent <- sapply(1:nrow(roll), function(x){
           all(c(roll[x,1] == 0, roll[x,2] != 0, roll[x,3] == 0))
-        }))
+        })
       } else {
         adjacent <- F
       }
@@ -763,12 +763,25 @@ cleanadult <- function(df, weight_cap = Inf){
       #   dup_ratio
 
       # if dup ratio is too high, or any adjacent same days, we exclude all
-      # same day extraneous
+      # same day extraneous -- for strict (default)
       criteria <-
-        if ((dup_ratio > .25) | adjacent){
-          !is.na(h_subj_df$diff)
+        if (esd_strict){
+          if ((dup_ratio > .25) | any(adjacent)){
+            !is.na(h_subj_df$diff)
+          } else {
+            rep(F, nrow(h_subj_df))
+          }
         } else {
-          rep(F, nrow(h_subj_df))
+          if ((dup_ratio > (1/3)) |
+              (sum(adjacent) >= 2 & dup_ratio > (1/5) &
+               !any(!is.na(h_subj_df$diff)[
+                 c(1:2, nrow(h_subj_df)-1, nrow(h_subj_df))]) &
+               sum(adjacent) >= 3
+              )){
+            !is.na(h_subj_df$diff)
+          } else {
+            rep(F, nrow(h_subj_df))
+          }
         }
 
       # we're going to update h_subj_df before moving on to the rest of this
@@ -1358,9 +1371,9 @@ cleanadult <- function(df, weight_cap = Inf){
       # rolling windows of day differences -- we are looking for 0,x,0
       if (nrow(w_subj_df) > 3){
         roll <- embed(diff(w_subj_df$age_days), 3)
-        adjacent <- any(sapply(1:nrow(roll), function(x){
+        adjacent <- sapply(1:nrow(roll), function(x){
           all(c(roll[x,1] == 0, roll[x,2] != 0, roll[x,3] == 0))
-        }))
+        })
       } else {
         adjacent <- F
       }
@@ -1369,12 +1382,25 @@ cleanadult <- function(df, weight_cap = Inf){
       #   dup_ratio
 
       # if dup ratio is too high, or any adjacent same days, we exclude all
-      # same day extraneous
+      # same day extraneous -- for strict (default)
       criteria <-
-        if ((dup_ratio > .25) | adjacent){
-          !is.na(w_subj_df$diff)
+        if (esd_strict){
+          if ((dup_ratio > .25) | any(adjacent)){
+            !is.na(w_subj_df$diff)
+          } else {
+            rep(F, nrow(w_subj_df))
+          }
         } else {
-          rep(F, nrow(w_subj_df))
+          if ((dup_ratio > (1/3)) |
+              (sum(adjacent) >= 2 & dup_ratio > (1/5) &
+               !any(!is.na(w_subj_df$diff)[
+                 c(1:2, nrow(w_subj_df)-1, nrow(w_subj_df))]) &
+               sum(adjacent) >= 3
+               )){
+            !is.na(w_subj_df$diff)
+          } else {
+            rep(F, nrow(w_subj_df))
+          }
         }
 
       # we're going to update w_subj_df before moving on to the rest of this

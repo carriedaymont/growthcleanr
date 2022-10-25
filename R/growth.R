@@ -84,6 +84,7 @@
 #' @param adult_columns_filename Name of file to save original adult data, with additional output columns to
 #' as CSV. Defaults to "", for which this data will not be saved. Useful
 #' for post-analysis. For more information on this output, please see README.
+#' @param esd_strict TRUE/FALSE, indicating whether or not to use strict criteria for the "Adult-Extraneous-Same-Day" step in the adult algorithm. See adult algorithm documentation for more information. Default TRUE.
 #'
 #' @return Vector of exclusion codes for each of the input measurements.
 #'
@@ -152,7 +153,8 @@ cleangrowth <- function(subjid,
                         quietly = T,
                         adult_cutpoint = 20,
                         weight_cap = Inf,
-                        adult_columns_filename = "") {
+                        adult_columns_filename = "",
+                        esd_strict = TRUE) {
   # avoid "no visible binding" warnings
   N <- age_years <- batch <- exclude <- index <- line <- NULL
   newbatch <- sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
@@ -616,7 +618,11 @@ cleangrowth <- function(subjid,
 
     if (num.batches == 1) {
       # do the cleaning
-      res <- cleanadult(data.adult, weight_cap = weight_cap)
+      res <- cleanadult(
+        data.adult,
+        weight_cap = weight_cap,
+        esd_strict = esd_strict
+      )
     } else {
       res <- ddply(
         data.adult,
@@ -624,7 +630,8 @@ cleangrowth <- function(subjid,
         cleanadult,
         .parallel = parallel,
         .paropts = list(.packages = "data.table"),
-        weight_cap = weight_cap
+        weight_cap = weight_cap,
+        esd_strict = esd_strict
       )
     }
 
