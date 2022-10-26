@@ -755,34 +755,59 @@ cleanadult <- function(df, weight_cap = Inf, esd_strict = TRUE){
         adjacent <- sapply(1:nrow(roll), function(x){
           all(c(roll[x,1] == 0, roll[x,2] != 0, roll[x,3] == 0))
         })
+
+        # get age days & rows that had adjacent
+        idx_roll <- c(embed(1:nrow(h_subj_df),4)[adjacent,, drop = F])
+        idx_adj <- which(h_subj_df$age_days %in% h_subj_df$age_days[idx_roll])
       } else {
         adjacent <- F
+        idx_adj <- idx_roll <- c()
       }
 
       # dup_ratio_out[as.character(i), "h_dup_ratio"] <-
       #   dup_ratio
 
-      # if dup ratio is too high, or any adjacent same days, we exclude all
+      # dup_ratio_out[as.character(i), "h_dup_ratio"] <-
+      #   dup_ratio
+
+      # if dup ratio is too high, we exclude all
+      # if adjacent, we exclude only those relevant sdes
       # same day extraneous -- for strict (default)
       criteria <-
         if (esd_strict){
-          if ((dup_ratio > .25) | any(adjacent)){
+          if (dup_ratio > .25){
             !is.na(h_subj_df$diff)
+          } else if (any(adjacent)) {
+            h_subj_df$age_days %in% h_subj_df$age_days[idx_roll]
           } else {
             rep(F, nrow(h_subj_df))
           }
         } else {
-          if ((dup_ratio > (1/3)) |
-              (sum(adjacent) >= 2 & dup_ratio > (1/5) &
-               !any(!is.na(h_subj_df$diff)[
-                 c(1:2, nrow(h_subj_df)-1, nrow(h_subj_df))]) &
-               sum(adjacent) >= 3
-              )){
+          # looser criteria:
+          # 1.	Exclude for ratio if ratio >1/3
+          # 2.	Exclude for adjacent if 2 are adjacent AND ratio >1/4
+          # 3.	Exclude for adjacent if 2 are adjacent AND those 2 are the first 2 or last 2 measurements for the subject/parameter
+          #   note: if the first or last is sde and it's adjacent, by default
+          #   that means it's the first or last two that are adjacent
+          # 4.	Exclude for adjacent if 3 or more are adjacent
+
+          if (dup_ratio > (1/3)){
             !is.na(h_subj_df$diff)
+          } else if (
+            (sum(adjacent) == 1 & dup_ratio > (1/4)) |
+            (sum(adjacent) == 1 & c(1) %in% idx_adj) |
+            (sum(adjacent) == 1 &
+             c(nrow(h_subj_df)) %in% idx_adj) |
+            (sum(adjacent) >= 2)
+          ){
+            # adjacent sum == 1 means 2 are adjacent
+            # only exclude sdes that are adjacent
+            h_subj_df$age_days %in% h_subj_df$age_days[idx_roll]
           } else {
             rep(F, nrow(h_subj_df))
           }
         }
+
 
       # we're going to update h_subj_df before moving on to the rest of this
       # subject
@@ -1374,30 +1399,52 @@ cleanadult <- function(df, weight_cap = Inf, esd_strict = TRUE){
         adjacent <- sapply(1:nrow(roll), function(x){
           all(c(roll[x,1] == 0, roll[x,2] != 0, roll[x,3] == 0))
         })
+
+        # get age days & rows that had adjacent
+        idx_roll <- c(embed(1:nrow(w_subj_df),4)[adjacent,, drop = F])
+        idx_adj <- which(w_subj_df$age_days %in% w_subj_df$age_days[idx_roll])
       } else {
         adjacent <- F
+        idx_adj <- idx_roll <- c()
       }
+
 
       # dup_ratio_out[as.character(i), "w_dup_ratio"] <-
       #   dup_ratio
 
-      # if dup ratio is too high, or any adjacent same days, we exclude all
+      # if dup ratio is too high, we exclude all
+      # if adjacent, we exclude only those relevant sdes
       # same day extraneous -- for strict (default)
       criteria <-
         if (esd_strict){
-          if ((dup_ratio > .25) | any(adjacent)){
+          if (dup_ratio > .25){
             !is.na(w_subj_df$diff)
+          } else if (any(adjacent)) {
+            w_subj_df$age_days %in% w_subj_df$age_days[idx_roll]
           } else {
             rep(F, nrow(w_subj_df))
           }
         } else {
-          if ((dup_ratio > (1/3)) |
-              (sum(adjacent) >= 2 & dup_ratio > (1/5) &
-               !any(!is.na(w_subj_df$diff)[
-                 c(1:2, nrow(w_subj_df)-1, nrow(w_subj_df))]) &
-               sum(adjacent) >= 3
-               )){
+          # looser criteria:
+          # 1.	Exclude for ratio if ratio >1/3
+          # 2.	Exclude for adjacent if 2 are adjacent AND ratio >1/4
+          # 3.	Exclude for adjacent if 2 are adjacent AND those 2 are the first 2 or last 2 measurements for the subject/parameter
+          #   note: if the first or last is sde and it's adjacent, by default
+          #   that means it's the first or last two that are adjacent
+          # 4.	Exclude for adjacent if 3 or more are adjacent
+
+          if (dup_ratio > (1/3)){
             !is.na(w_subj_df$diff)
+          } else if (
+            (sum(adjacent) == 1 & dup_ratio > (1/4)) |
+            (sum(adjacent) == 1 & c(1) %in% idx_adj) |
+            (sum(adjacent) == 1 &
+             c(nrow(w_subj_df)) %in% idx_adj) |
+            (sum(adjacent) >= 2)
+          ){
+            # adjacent sum == 1 means 2 are adjacent
+            # only exclude sdes that are adjacent
+            w_subj_df$age_days %in% w_subj_df$age_days[idx_roll]
           } else {
             rep(F, nrow(w_subj_df))
           }
