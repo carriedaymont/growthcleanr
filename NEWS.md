@@ -1,3 +1,14 @@
+# growthcleanr 2.0.3 - 2022-11-01
+
+## Added
+
+- CRAN release checklist now added under Developer Guidelines vignette
+
+## Changed
+
+- All possible levels for `cleangrowth()` output factor now enumerated
+- Updated maintainer to Carrie Daymont
+
 # growthcleanr 2.0.2 - 2022-09-13
 
 ## Added
