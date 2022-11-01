@@ -18,3 +18,4 @@ When deploying updates to CRAN, here a few updates that you need to check off be
 - Update NEWS.md with version updates
 - Update cran-comments.md in format
 - After the branch is merged, create a GitHub release
+- After the branch is merged, submit to CRAN with previously written comments!
