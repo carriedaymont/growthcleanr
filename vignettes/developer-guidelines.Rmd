@@ -1,0 +1,20 @@
+---
+title: "Developer Guidelines"
+date: "`r Sys.Date()`"
+vignette: >
+  %\VignetteIndexEntry{Developer Guidelines} %\VignetteEngine{knitr::rmarkdown}
+  %\usepackage[utf8]{inputenc}
+---
+
+## CRAN Release Checklist
+
+When deploying updates to CRAN, here a few updates that you need to check off before doing so:
+
+- Update version number in DESCRIPTION in format major.minor.patch (e.g. 1.2.1)
+- Update documentation with `devtools::document()`
+- Run `devtools::check()`:
+  - If any problems come up that have not previously been documented in `cran-comments.md` and cannot be fixed, fix them. There should be no ERRORs or WARNINGs before submitting to CRAN.
+  - Look through past CRAN submissions to make sure you haven't reintroduced a bug/note that has been addressed in a previous version
+- Update NEWS.md with version updates
+- Update cran-comments.md in format
+- After the branch is merged, create a GitHub release
