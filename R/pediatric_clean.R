@@ -333,11 +333,38 @@ cleanbatch <- function(data.df,
       "[%s] Exclude extreme measurements based on SD...\n",
       Sys.time()
     ))
+
+  # for pediatric subjects > 2 years old
   data.df[na_as_false(
-    valid(data.df, include.temporary.extraneous = TRUE) & abs(tbc.sd) > sd.extreme
+    valid(data.df, include.temporary.extraneous = TRUE) &
+      abs(tbc.sd) > sd.extreme
     |
       exclude %in% c('Include', 'Exclude-Temporary-Extraneous-Same-Day') &
+      agedays >= 365.25*2 &
       abs(z.orig) > z.extreme
+  ),
+  exclude := 'Exclude-SD-Cutoff']
+
+  # for pediatric subjects 0 - 1 years old
+  data.df[na_as_false(
+    valid(data.df, include.temporary.extraneous = TRUE) &
+      abs(tbc.sd) > sd.extreme
+    |
+      exclude %in% c('Include', 'Exclude-Temporary-Extraneous-Same-Day') &
+      agedays < 365.25 &
+      (z.orig < -25 | z.orig > 15)
+  ),
+  exclude := 'Exclude-SD-Cutoff']
+
+  # for pediatric subjects 1 - 2 years old
+  data.df[na_as_false(
+    valid(data.df, include.temporary.extraneous = TRUE) &
+      abs(tbc.sd) > sd.extreme
+    |
+      exclude %in% c('Include', 'Exclude-Temporary-Extraneous-Same-Day') &
+      agedays >= 365.25*1 &
+      agedays < 365.25*2 &
+      abs(z.orig) > 15
   ),
   exclude := 'Exclude-SD-Cutoff']
 
