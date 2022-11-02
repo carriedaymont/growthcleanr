@@ -104,7 +104,7 @@ The rest of this documentation includes:
   steps](https://carriedaymont.github.io/growthcleanr/articles/next-steps.html),
   notes on potential enhancements to the pediatric and adult algorithms
 - [Developer
-  Guidelines](https://carriedaymont.github.io/growthcleanr/articles/developer-guidelines.html),
+  guidelines](https://carriedaymont.github.io/growthcleanr/articles/developer-guidelines.html),
   advice for contributors to this package, including a CRAN release
   checklist
 
