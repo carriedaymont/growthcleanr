@@ -2,7 +2,7 @@
 
 ## Added
 
-- CRAN release checklist now added under Developer Guidelines vignette
+- CRAN release checklist now added under Developer Guidelines vignette (#99)
 
 ## Changed
 
