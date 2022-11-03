@@ -336,34 +336,34 @@ cleanbatch <- function(data.df,
 
   # for pediatric subjects > 2 years old
   data.df[na_as_false(
+    agedays >= 365.25*2 &
     valid(data.df, include.temporary.extraneous = TRUE) &
       abs(tbc.sd) > sd.extreme
     |
       exclude %in% c('Include', 'Exclude-Temporary-Extraneous-Same-Day') &
-      agedays >= 365.25*2 &
       abs(z.orig) > z.extreme
   ),
   exclude := 'Exclude-SD-Cutoff']
 
   # for pediatric subjects 0 - 1 years old
   data.df[na_as_false(
+    agedays < 365.25 &
     valid(data.df, include.temporary.extraneous = TRUE) &
-      abs(tbc.sd) > sd.extreme
+      (tbc.sd < -25 | tbd.sd > 15)
     |
       exclude %in% c('Include', 'Exclude-Temporary-Extraneous-Same-Day') &
-      agedays < 365.25 &
       (z.orig < -25 | z.orig > 15)
   ),
   exclude := 'Exclude-SD-Cutoff']
 
   # for pediatric subjects 1 - 2 years old
   data.df[na_as_false(
+    agedays >= 365.25*1 &
+      agedays < 365.25*2 &
     valid(data.df, include.temporary.extraneous = TRUE) &
-      abs(tbc.sd) > sd.extreme
+      abs(tbc.sd) > 15
     |
       exclude %in% c('Include', 'Exclude-Temporary-Extraneous-Same-Day') &
-      agedays >= 365.25*1 &
-      agedays < 365.25*2 &
       abs(z.orig) > 15
   ),
   exclude := 'Exclude-SD-Cutoff']
