@@ -33,7 +33,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">growthcleanr</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.2</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.3</span>
       </span>
     </div>
 
@@ -79,6 +79,9 @@
     <li>
       <a href="../articles/next-steps.html">Next steps</a>
     </li>
+    <li>
+      <a href="../articles/developer-guidelines.html">Developer guidelines</a>
+    </li>
   </ul>
 </li>
 <li>
@@ -110,7 +113,7 @@
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Usage</h1>
             
-            <h4 data-toc-skip class="date">2022-09-15</h4>
+            <h4 data-toc-skip class="date">2022-11-03</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/usage.Rmd" class="external-link"><code>vignettes/usage.Rmd</code></a></small>
       <div class="hidden name"><code>usage.Rmd</code></div>
@@ -119,13 +122,21 @@
 
     
     
-<p>With the <code>growthcleanr</code> package installed as described in <a href="installation.html">Installation</a>, it can be loaded as a package:</p>
+<p>With the <code>growthcleanr</code> package installed as described in
+<a href="installation.html">Installation</a>, it can be loaded as a
+package:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://carriedaymont.github.io/growthcleanr/index.html" class="external-link">growthcleanr</a></span><span class="op">)</span></span></code></pre></div>
 <div class="section level2">
 <h2 id="basic-operations-using-example-synthetic-data">Basic operations using example synthetic data<a class="anchor" aria-label="anchor" href="#basic-operations-using-example-synthetic-data"></a>
 </h2>
-<p>For convenience, <code>growthcleanr</code> ships with an example synthetic dataset created using <a href="https://synthetichealth.github.io/synthea/" class="external-link">Synthea</a>, with support for simulated growth measurement errors based on the protocol included as supplementary material to the <a href="#cite">Daymont et al. paper</a>. This dataset is automatically loaded with the <code>growthcleanr</code> library, and is called <code>syngrowth</code>.</p>
+<p>For convenience, <code>growthcleanr</code> ships with an example
+synthetic dataset created using <a href="https://synthetichealth.github.io/synthea/" class="external-link">Synthea</a>, with
+support for simulated growth measurement errors based on the protocol
+included as supplementary material to the <a href="#cite">Daymont et
+al. paper</a>. This dataset is automatically loaded with the
+<code>growthcleanr</code> library, and is called
+<code>syngrowth</code>.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">syngrowth</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## [1] 77721     6</span></span></code></pre>
@@ -138,7 +149,9 @@
 <span><span class="co">## 4  4 001aa16d-bf0e-a077-3b3d-5ab8b58545ad WEIGHTKG    1806   1        16.6</span></span>
 <span><span class="co">## 5  5 001aa16d-bf0e-a077-3b3d-5ab8b58545ad WEIGHTKG    1806   1        19.6</span></span>
 <span><span class="co">## 6  6 001aa16d-bf0e-a077-3b3d-5ab8b58545ad HEIGHTCM    2177   1       117.0</span></span></code></pre>
-<p>It can be used as in the following example. Note that processing the example data with <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> will likely take a few minutes to complete.</p>
+<p>It can be used as in the following example. Note that processing the
+example data with <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> will likely take a few
+minutes to complete.</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(data.table)</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -178,12 +191,17 @@
 <span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a> <span class="dv">9</span> Exclude<span class="sc">-</span>BIV                   <span class="dv">108</span></span>
 <span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a><span class="dv">10</span> Exclude<span class="sc">-</span>EWMA<span class="sc">-</span>Extreme           <span class="dv">99</span></span>
 <span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a><span class="co"># … with 16 more rows</span></span></code></pre></div>
-<p>If you are able to run these steps and see a similar result, you have the <code>growthcleanr</code> package installed correctly. The resulting <code>cleaned_data</code> can be reviewed, subsetted, and compared in more detail using all the tools R provides.</p>
+<p>If you are able to run these steps and see a similar result, you have
+the <code>growthcleanr</code> package installed correctly. The resulting
+<code>cleaned_data</code> can be reviewed, subsetted, and compared in
+more detail using all the tools R provides.</p>
 </div>
 <div class="section level2">
 <h2 id="basic-configuration-options">Basic configuration options<a class="anchor" aria-label="anchor" href="#basic-configuration-options"></a>
 </h2>
-<p>For complete information about the options that can be set on the <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> function, see <a href="#configuration">Configuration</a>. Below are a few additional examples:</p>
+<p>For complete information about the options that can be set on the
+<code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> function, see <a href="#configuration">Configuration</a>. Below are a few additional
+examples:</p>
 <p>This example shows three configuration options in use:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">cleaned_data</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">[</span>,</span>
@@ -195,11 +213,21 @@
 <span>  <span class="op">)</span></span>
 <span><span class="op">]</span></span></code></pre></div>
 <ul>
-<li><p><code>lt3.exclude.mode = "flag.both"</code> will exclude both measurements for a subject if they only have two unexcluded measurements of one parameter type with at least one implausible value and no same age-day measurements of the other parameter.</p></li>
-<li><p><code>ref.data.path = "inst/extdata"</code> shouldn’t be necessary if you have the <code>growthcleanr</code> package installed, but if you are running it from its source directly you may need to specify its full path.</p></li>
-<li><p><code>quietly = F</code> enables verbose output, marking the progress of the algorithm through its many processing steps. This can be very helpful while testing.</p></li>
+<li><p><code>lt3.exclude.mode = "flag.both"</code> will exclude both
+measurements for a subject if they only have two unexcluded measurements
+of one parameter type with at least one implausible value and no same
+age-day measurements of the other parameter.</p></li>
+<li><p><code>ref.data.path = "inst/extdata"</code> shouldn’t be
+necessary if you have the <code>growthcleanr</code> package installed,
+but if you are running it from its source directly you may need to
+specify its full path.</p></li>
+<li><p><code>quietly = F</code> enables verbose output, marking the
+progress of the algorithm through its many processing steps. This can be
+very helpful while testing.</p></li>
 </ul>
-<p>This example shows built-in options for processing data in parallel batches, which can speed the process while working with large data sets:</p>
+<p>This example shows built-in options for processing data in parallel
+batches, which can speed the process while working with large data
+sets:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">cleaned_data</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">[</span>,</span>
 <span>  <span class="va">gcr_result_both</span> <span class="op">:=</span> <span class="fu"><a href="../reference/cleangrowth.html">cleangrowth</a></span><span class="op">(</span></span>
@@ -210,17 +238,33 @@
 <span>  <span class="op">)</span></span>
 <span><span class="op">]</span></span></code></pre></div>
 <ul>
-<li><p><code>parallel</code> tells <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> to run in parallel; the default is <code>FALSE</code></p></li>
-<li><p><code>num.batches</code> specifies how many batches to process in parallel</p></li>
+<li><p><code>parallel</code> tells <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> to run in
+parallel; the default is <code>FALSE</code></p></li>
+<li><p><code>num.batches</code> specifies how many batches to process in
+parallel</p></li>
 </ul>
-<p>The best <code>num.batches</code> value for your environment may vary depending on the computing resources you have available. If you do not specify <code>num.batches</code>, <code>growthcleanr</code> will estimate a batch count based on R functions for checking the system hardware. If you are working with large datasets, you may need to experiment with these options to determine the best settings for your needs. You may also find it helpful to review the additional notes on <a href="large-data-sets.html">Working with large datasets</a>.</p>
-<p>The default value of <code>log.path</code> is <code>"."</code>, the current working directory. <code>growthcleanr</code> will write batch-specific log files to the <code>log.path</code> directory, and will create the directory if necessary.</p>
-<p>Note that if you run <code>growthcleanr</code> in parallel with multiple batches and see warning errors such as the following, they can be ignored.</p>
+<p>The best <code>num.batches</code> value for your environment may vary
+depending on the computing resources you have available. If you do not
+specify <code>num.batches</code>, <code>growthcleanr</code> will
+estimate a batch count based on R functions for checking the system
+hardware. If you are working with large datasets, you may need to
+experiment with these options to determine the best settings for your
+needs. You may also find it helpful to review the additional notes on <a href="large-data-sets.html">Working with large datasets</a>.</p>
+<p>The default value of <code>log.path</code> is <code>"."</code>, the
+current working directory. <code>growthcleanr</code> will write
+batch-specific log files to the <code>log.path</code> directory, and
+will create the directory if necessary.</p>
+<p>Note that if you run <code>growthcleanr</code> in parallel with
+multiple batches and see warning errors such as the following, they can
+be ignored.</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>Warning messages<span class="sc">:</span></span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span><span class="sc">:</span> <span class="er">&lt;</span>anonymous<span class="sc">&gt;</span><span class="er">:</span> ... may be used <span class="cf">in</span> an incorrect context<span class="sc">:</span> ‘<span class="fu">.fun</span>(piece, ...)’</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="dv">2</span><span class="sc">:</span> <span class="er">&lt;</span>anonymous<span class="sc">&gt;</span><span class="er">:</span> ... may be used <span class="cf">in</span> an incorrect context<span class="sc">:</span> ‘<span class="fu">.fun</span>(piece, ...)’</span></code></pre></div>
-<p>This set of warnings is coming from one of <code>growthcleanr</code>’s dependencies, and does not indicate either failure or improper execution.</p>
-<p>This final example demonstrates using two option specific to adult subjects, <code>adult_cutpoint</code> and <code>weight_cap</code>.</p>
+<p>This set of warnings is coming from one of
+<code>growthcleanr</code>’s dependencies, and does not indicate either
+failure or improper execution.</p>
+<p>This final example demonstrates using two option specific to adult
+subjects, <code>adult_cutpoint</code> and <code>weight_cap</code>.</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">cleaned_data</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">[</span>,</span>
 <span>  <span class="va">gcr_result_both</span> <span class="op">:=</span> <span class="fu"><a href="../reference/cleangrowth.html">cleangrowth</a></span><span class="op">(</span></span>
@@ -230,10 +274,18 @@
 <span>  <span class="op">)</span></span>
 <span><span class="op">]</span></span></code></pre></div>
 <ul>
-<li><p><code>adult_cutpoint</code> defines a subject age in years at which to cut <code>growthcleanr</code> analysis into separate sets for pediatric and adult subjects. The default is 20 years, and this may be lowered to 18, as shown above.</p></li>
-<li><p><code>weight_cap</code> specifies a known hard limit clamp for weight values. sometimes data shared for research may have measurement values clamped to hard limits for privacy protection. The growthcleanr adult algorithm can be configured to watch for a known weight cap and adjust its assessment accordingly.</p></li>
+<li><p><code>adult_cutpoint</code> defines a subject age in years at
+which to cut <code>growthcleanr</code> analysis into separate sets for
+pediatric and adult subjects. The default is 20 years, and this may be
+lowered to 18, as shown above.</p></li>
+<li><p><code>weight_cap</code> specifies a known hard limit clamp for
+weight values. sometimes data shared for research may have measurement
+values clamped to hard limits for privacy protection. The growthcleanr
+adult algorithm can be configured to watch for a known weight cap and
+adjust its assessment accordingly.</p></li>
 </ul>
-<p>The full algorithm for assessing adult measurements is described in detail in <a href="adult-algorithm.html">Adult algorithm</a>.</p>
+<p>The full algorithm for assessing adult measurements is described in
+detail in <a href="adult-algorithm.html">Adult algorithm</a>.</p>
 </div>
   </div>
 
@@ -249,7 +301,7 @@
 
       <footer><div class="copyright">
   <p></p>
-<p>Developed by Daymont Carrie, Grundmeier Robert, Miller Jeffrey, Campos Diego, De los Santos Hannah.</p>
+<p>Developed by Daymont Carrie, Grundmeier Robert, Miller Jeffrey, Campos Diego.</p>
 </div>
 
 <div class="pkgdown">

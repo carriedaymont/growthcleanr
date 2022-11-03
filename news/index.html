@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">growthcleanr</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.2</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.3</span>
       </span>
     </div>
 
@@ -59,6 +59,9 @@
     <li>
       <a href="../articles/next-steps.html">Next steps</a>
     </li>
+    <li>
+      <a href="../articles/developer-guidelines.html">Developer guidelines</a>
+    </li>
   </ul></li>
 <li>
   <a href="../reference/index.html">Reference</a>
@@ -86,11 +89,24 @@
     </div>
 
     <div class="section level2">
+<h2 class="page-header" data-toc-text="2.0.3" id="growthcleanr-203---2022-11-01">growthcleanr 2.0.3 - 2022-11-01<a class="anchor" aria-label="anchor" href="#growthcleanr-203---2022-11-01"></a></h2>
+<div class="section level3">
+<h3 id="added-2-0-3">Added<a class="anchor" aria-label="anchor" href="#added-2-0-3"></a></h3>
+<ul><li>CRAN release checklist now added under Developer Guidelines vignette (<a href="https://github.com/carriedaymont/growthcleanr/issues/99" class="external-link">#99</a>)</li>
+</ul></div>
+<div class="section level3">
+<h3 id="changed-2-0-3">Changed<a class="anchor" aria-label="anchor" href="#changed-2-0-3"></a></h3>
+<ul><li>All possible levels for <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> output factor now enumerated</li>
+<li>Updated maintainer to Carrie Daymont</li>
+</ul></div>
+</div>
+    <div class="section level2">
 <h2 class="page-header" data-toc-text="2.0.2" id="growthcleanr-202---2022-09-13">growthcleanr 2.0.2 - 2022-09-13<small>2022-09-13</small><a class="anchor" aria-label="anchor" href="#growthcleanr-202---2022-09-13"></a></h2>
 <div class="section level3">
 <h3 id="added-2-0-2">Added<a class="anchor" aria-label="anchor" href="#added-2-0-2"></a></h3>
 <ul><li>Package now available on CRAN: <a href="https://cran.r-project.org/package=growthcleanr" class="external-link uri">https://cran.r-project.org/package=growthcleanr</a>
-</li></ul></div>
+</li>
+</ul></div>
 <div class="section level3">
 <h3 id="changed-2-0-2">Changed<a class="anchor" aria-label="anchor" href="#changed-2-0-2"></a></h3>
 <ul><li>Several updates for CRAN deployment: improved example/test runtimes, text corrections (<a href="https://github.com/carriedaymont/growthcleanr/issues/82" class="external-link">#82</a>); switched examples to use <code>donttest</code>, added CRAN comments file, updated <code>.Rbuildignore</code> (<a href="https://github.com/carriedaymont/growthcleanr/issues/84" class="external-link">#84</a>)</li>
@@ -138,11 +154,14 @@
 <h2 class="page-header" data-toc-text="1.2.5" id="growthcleanr-125---2021-02-26">growthcleanr 1.2.5 - 2021-02-26<a class="anchor" aria-label="anchor" href="#growthcleanr-125---2021-02-26"></a></h2>
 <div class="section level3">
 <h3 id="added-1-2-5">Added<a class="anchor" aria-label="anchor" href="#added-1-2-5"></a></h3>
-<ul><li>Added <code>inst/extdata/nhanes-reference-medians.csv</code>, reference medians for recentering derived from NHANES (described in README)</li></ul></div>
+<ul><li>Added <code>inst/extdata/nhanes-reference-medians.csv</code>, reference medians for recentering derived from NHANES (described in README)</li>
+</ul></div>
 <div class="section level3">
 <h3 id="changed-1-2-5">Changed<a class="anchor" aria-label="anchor" href="#changed-1-2-5"></a></h3>
 <ul><li>Updated behavior of <code>sd.recenter</code> option to include new NHANES reference medians and explicit specification with “NHANES” or “derive” (<a href="https://github.com/mitre/growthcleanr/issues/9" class="external-link uri">https://github.com/mitre/growthcleanr/issues/9</a>)</li>
-<li>Switched <code>README.md</code> to be generated from <code>README.Rmd</code> w/knitr (thanks<ol class="example" style="list-style-type: decimal"><li>(<a href="https://github.com/carriedaymont/growthcleanr/issues/17" class="external-link">#17</a>)</li></ol></li>
+<li>Switched <code>README.md</code> to be generated from <code>README.Rmd</code> w/knitr (thanks
+<ol class="example" style="list-style-type: decimal"><li>(<a href="https://github.com/carriedaymont/growthcleanr/issues/17" class="external-link">#17</a>)</li>
+</ol></li>
 <li>Switched to use <code><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path()</a></code> more consistently in <code>R/growth.R</code>
 </li>
 </ul></div>
@@ -158,27 +177,34 @@
 </ul><p>Although these changes were very minor, it is possible that results on data cleaned after this change may vary from previous results. The prior version of these files may be obtained by visiting the tagged release version 1.2.3 at <a href="https://github.com/carriedaymont/growthcleanr/releases/tag/1.2.3" class="external-link uri">https://github.com/carriedaymont/growthcleanr/releases/tag/1.2.3</a>.</p>
 <p>The released version of <code>growthcleanr</code> available at that link contains the older version of both files; that older version may be used to verify reproducibility.</p>
 <p>Alternatively, a more recent version of <code>growthcleanr</code> may be used with only the affected files replaced with their older versions available at the 1.2.3 tag link above. This must be done manually.</p>
-</li></ul></div>
+</li>
+</ul></div>
 </div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="1.2.3" id="growthcleanr-123---2021-01-07">growthcleanr 1.2.3 - 2021-01-07<a class="anchor" aria-label="anchor" href="#growthcleanr-123---2021-01-07"></a></h2>
 <div class="section level3">
 <h3 id="added-1-2-3">Added<a class="anchor" aria-label="anchor" href="#added-1-2-3"></a></h3>
-<ul><li>New exclusion handling option on experimental carry forward adjustment</li></ul></div>
+<ul><li>New exclusion handling option on experimental carry forward adjustment</li>
+</ul></div>
 <div class="section level3">
 <h3 id="changed-1-2-3">Changed<a class="anchor" aria-label="anchor" href="#changed-1-2-3"></a></h3>
 <ul><li>Improved experimental carry forward adjustment handling of strings of CF values, output handling, and documentation; renamed “Missing” values</li>
 <li>Updated DESCRIPTION, imports, documentation to address testing issue (<a href="https://github.com/carriedaymont/growthcleanr/issues/12" class="external-link">#12</a>)</li>
 <li>Switched to R-native argparser library to support script options</li>
-<li>Switched to GitHub Actions for continuous integration / testing (thanks<ol start="2" class="example" style="list-style-type: decimal"><li></ol></li>
-<li>Improved Dockerfile to standardize user/path, simplify install (thanks<ol start="3" class="example" style="list-style-type: decimal"><li></ol></li>
+<li>Switched to GitHub Actions for continuous integration / testing (thanks
+<ol start="2" class="example" style="list-style-type: decimal"><li>
+</li></ol></li>
+<li>Improved Dockerfile to standardize user/path, simplify install (thanks
+<ol start="3" class="example" style="list-style-type: decimal"><li>
+</li></ol></li>
 </ul></div>
 </div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="1.2.2" id="growthcleanr-122---2020-09-29">growthcleanr 1.2.2 - 2020-09-29<a class="anchor" aria-label="anchor" href="#growthcleanr-122---2020-09-29"></a></h2>
 <div class="section level3">
 <h3 id="added-1-2-2">Added<a class="anchor" aria-label="anchor" href="#added-1-2-2"></a></h3>
-<ul><li>CITATION file, now <code>citation("growthcleanr")</code> works as expected</li></ul></div>
+<ul><li>CITATION file, now <code>citation("growthcleanr")</code> works as expected</li>
+</ul></div>
 <div class="section level3">
 <h3 id="changed-1-2-2">Changed<a class="anchor" aria-label="anchor" href="#changed-1-2-2"></a></h3>
 <ul><li>Standardized on arrow assignment</li>
@@ -198,10 +224,12 @@
 <h2 class="page-header" data-toc-text="1.2.1" id="growthcleanr-121---2020-08-14">growthcleanr 1.2.1 - 2020-08-14<a class="anchor" aria-label="anchor" href="#growthcleanr-121---2020-08-14"></a></h2>
 <div class="section level3">
 <h3 id="added-1-2-1">Added<a class="anchor" aria-label="anchor" href="#added-1-2-1"></a></h3>
-<ul><li>New tests in <code>tests/testthat/test-utils.R</code> and <code>tests/testthat/test-cdc.R</code> to support newly added functions</li></ul></div>
+<ul><li>New tests in <code>tests/testthat/test-utils.R</code> and <code>tests/testthat/test-cdc.R</code> to support newly added functions</li>
+</ul></div>
 <div class="section level3">
 <h3 id="changed-1-2-1">Changed<a class="anchor" aria-label="anchor" href="#changed-1-2-1"></a></h3>
-<ul><li>Improved error handling in <code><a href="../reference/longwide.html">longwide()</a></code>; fixed missing import in DESCRIPTION</li></ul></div>
+<ul><li>Improved error handling in <code><a href="../reference/longwide.html">longwide()</a></code>; fixed missing import in DESCRIPTION</li>
+</ul></div>
 </div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="1.2" id="growthcleanr-12---2020-07-24">growthcleanr 1.2 - 2020-07-24<a class="anchor" aria-label="anchor" href="#growthcleanr-12---2020-07-24"></a></h2>
@@ -232,7 +260,8 @@
 <h2 class="page-header" data-toc-text="1.1" id="growthcleanr-11---2020-02-07">growthcleanr 1.1 - 2020-02-07<a class="anchor" aria-label="anchor" href="#growthcleanr-11---2020-02-07"></a></h2>
 <div class="section level3">
 <h3 id="added-1-1">Added<a class="anchor" aria-label="anchor" href="#added-1-1"></a></h3>
-<ul><li>New options to add flexibility:<ul><li>
+<ul><li>New options to add flexibility:
+<ul><li>
 <code>error.load.mincount</code> and <code>error.load.threshold</code>
 </li>
 <li>
@@ -254,7 +283,8 @@
 <h2 class="page-header" data-toc-text="1.0.0" id="growthcleanr-100---2018-09-11">growthcleanr 1.0.0 - 2018-09-11<a class="anchor" aria-label="anchor" href="#growthcleanr-100---2018-09-11"></a></h2>
 <div class="section level3">
 <h3 id="added-1-0-0">Added<a class="anchor" aria-label="anchor" href="#added-1-0-0"></a></h3>
-<ul><li>Initial version posted to GitHub.</li></ul></div>
+<ul><li>Initial version posted to GitHub.</li>
+</ul></div>
 </div>
   </div>
 
@@ -266,7 +296,7 @@
 
 
       <footer><div class="copyright">
-  <p></p><p>Developed by Daymont Carrie, Grundmeier Robert, Miller Jeffrey, Campos Diego, De los Santos Hannah.</p>
+  <p></p><p>Developed by Daymont Carrie, Grundmeier Robert, Miller Jeffrey, Campos Diego.</p>
 </div>
 
 <div class="pkgdown">
