@@ -33,7 +33,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">growthcleanr</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.2</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.3</span>
       </span>
     </div>
 
@@ -79,6 +79,9 @@
     <li>
       <a href="../articles/next-steps.html">Next steps</a>
     </li>
+    <li>
+      <a href="../articles/developer-guidelines.html">Developer guidelines</a>
+    </li>
   </ul>
 </li>
 <li>
@@ -110,7 +113,7 @@
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Quickstart</h1>
             
-            <h4 data-toc-skip class="date">2022-09-15</h4>
+            <h4 data-toc-skip class="date">2022-11-03</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/quickstart.Rmd" class="external-link"><code>vignettes/quickstart.Rmd</code></a></small>
       <div class="hidden name"><code>quickstart.Rmd</code></div>
@@ -122,32 +125,51 @@
 <div class="section level2">
 <h2 id="r-setup">R setup<a class="anchor" aria-label="anchor" href="#r-setup"></a>
 </h2>
-<p>To get started with <code>growthcleanr</code>, the <code>growthcleanr</code> package must be installed. To install the latest <code>growthcleanr</code> release from CRAN:</p>
+<p>To get started with <code>growthcleanr</code>, the
+<code>growthcleanr</code> package must be installed. To install the
+latest <code>growthcleanr</code> release from CRAN:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"growthcleanr"</span><span class="op">)</span></span></code></pre></div>
-<p>To install the latest development version from GitHub using <code>devtools</code>:</p>
+<p>To install the latest development version from GitHub using
+<code>devtools</code>:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"carriedaymont/growthcleanr"</span>, ref<span class="op">=</span><span class="st">"main"</span><span class="op">)</span></span></code></pre></div>
-<p>Installing <code>growthcleanr</code> will install several additional packages in turn.</p>
+<p>Installing <code>growthcleanr</code> will install several additional
+packages in turn.</p>
 <p>Further installation details and notes can be found under <a href="installation.html">Installation</a>.</p>
 </div>
 <div class="section level2">
 <h2 id="data-preparation">Data preparation<a class="anchor" aria-label="anchor" href="#data-preparation"></a>
 </h2>
-<p>Once the <code>growthcleanr</code> package and its dependencies are installed, the minimal input data vectors needed for cleaning data are:</p>
+<p>Once the <code>growthcleanr</code> package and its dependencies are
+installed, the minimal input data vectors needed for cleaning data
+are:</p>
 <ol style="list-style-type: decimal">
 <li>
-<code>subjid</code> - a unique identifier for each subject; if you have long (64-bit) integer <code>subjid</code> values, add the <code>bit64</code> R package to your install list to ensure R will process these correctly</li>
+<code>subjid</code> - a unique identifier for each subject; if you
+have long (64-bit) integer <code>subjid</code> values, add the
+<code>bit64</code> R package to your install list to ensure R will
+process these correctly</li>
 <li>
-<code>param</code> - a string designating the measurement being ‘<code>HEIGHTCM</code>’, ‘<code>LENGTHCM</code>’, or ‘<code>WEIGHTKG</code>’</li>
+<code>param</code> - a string designating the measurement being
+‘<code>HEIGHTCM</code>’, ‘<code>LENGTHCM</code>’, or
+‘<code>WEIGHTKG</code>’</li>
 <li>
-<code>agedays</code> - a numeric value for age in days at time of measurement; will be rounded down (floor) to nearest integer if needed (note that there are 30.4375 days in one month; see also the additional <a href="https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm" class="external-link">notes on calculating <code>agemos</code></a> from whole numbers of months</li>
+<code>agedays</code> - a numeric value for age in days at time of
+measurement; will be rounded down (floor) to nearest integer if needed
+(note that there are 30.4375 days in one month; see also the additional
+<a href="https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm" class="external-link">notes
+on calculating <code>agemos</code></a> from whole numbers of months</li>
 <li>
-<code>sex</code> - a numeric value of <code>0</code> (male) or <code>1</code> (female)</li>
+<code>sex</code> - a numeric value of <code>0</code> (male) or
+<code>1</code> (female)</li>
 <li>
-<code>measurement</code> - numeric value of measurement in cm for height or kg for weight</li>
+<code>measurement</code> - numeric value of measurement in cm for
+height or kg for weight</li>
 </ol>
-<p><strong>Note</strong>: the dataset should be sorted by <code>subjid</code>, <code>param</code>, and <code>agedays</code>, as demonstrated in the Example below.</p>
+<p><strong>Note</strong>: the dataset should be sorted by
+<code>subjid</code>, <code>param</code>, and <code>agedays</code>, as
+demonstrated in the Example below.</p>
 </div>
 <div class="section level2">
 <h2 id="example">Example<a class="anchor" aria-label="anchor" href="#example"></a>
@@ -255,14 +277,27 @@
 </tr>
 </tbody>
 </table>
-<p>Note that in this example, we see data from two subjects, sorted as described above, with two pairs of height/weight measurements for the first patient and four pairs for the second. Most of these values pass the “eyeball test”, but the third weight measurement for <code>subjid</code> 2 looks like it might be a value that has been carried forward from the previous value, given that their same ageday height has changed by several centimeters but their third height value is exactly the same as their second. This is an example of an implausible value and exclusion type that <code>growthcleanr</code> might identify.</p>
-<p>The <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> function provided by <code>growthcleanr</code> will return a vector that specifies, for each measurement, whether to:</p>
+<p>Note that in this example, we see data from two subjects, sorted as
+described above, with two pairs of height/weight measurements for the
+first patient and four pairs for the second. Most of these values pass
+the “eyeball test”, but the third weight measurement for
+<code>subjid</code> 2 looks like it might be a value that has been
+carried forward from the previous value, given that their same ageday
+height has changed by several centimeters but their third height value
+is exactly the same as their second. This is an example of an
+implausible value and exclusion type that <code>growthcleanr</code>
+might identify.</p>
+<p>The <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> function provided by
+<code>growthcleanr</code> will return a vector that specifies, for each
+measurement, whether to:</p>
 <ul>
 <li>“<code>Include</code>” the measurement,</li>
 <li>Conclude that the measurement is “<code>Missing</code>”,</li>
-<li>Or to “<code>Exclude</code>” the measurement (numerous variations of <code>Exclude</code> exist, as specified in <a href="output.html">Understanding growthcleanr output</a>).</li>
+<li>Or to “<code>Exclude</code>” the measurement (numerous variations of
+<code>Exclude</code> exist, as specified in <a href="output.html">Understanding growthcleanr output</a>).</li>
 </ul>
-<p>For a data.frame object <code>source_data</code> containing growth data:</p>
+<p>For a data.frame object <code>source_data</code> containing growth
+data:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://carriedaymont.github.io/growthcleanr/index.html" class="external-link">growthcleanr</a></span><span class="op">)</span></span>
 <span></span>
@@ -277,8 +312,17 @@
 <span></span>
 <span><span class="co"># extract data limited only to values flagged for inclusion:</span></span>
 <span><span class="va">only_included_data</span> <span class="op">&lt;-</span> <span class="va">cleaned_data</span><span class="op">[</span><span class="va">gcr_result</span> <span class="op">==</span> <span class="st">"Include"</span><span class="op">]</span></span></code></pre></div>
-<p>If our example dataset above were named <code>source_data</code>, examining <code>cleaned_data</code> would show:</p>
+<p>If our example dataset above were named <code>source_data</code>,
+examining <code>cleaned_data</code> would show:</p>
 <table class="table">
+<colgroup>
+<col width="10%">
+<col width="13%">
+<col width="12%">
+<col width="5%">
+<col width="18%">
+<col width="39%">
+</colgroup>
 <thead><tr class="header">
 <th>subjid</th>
 <th>param</th>
@@ -394,9 +438,17 @@
 </tr>
 </tbody>
 </table>
-<p>In this sample output, we see that <code>growthcleanr</code> has indeed flagged the third weight measurement for <code>subjid 2</code> as an apparent carried forward value. The measurement remains in the dataset, and it is up to the researcher to determine which exclusions to accept directly or investigate further.</p>
-<p>This example uses the default configuration options for <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>. Longer examples demonstrating some common options are in <a href="usage.html">Usage</a>, and full details about all options are documented in <a href="configuration.html">Configuration</a>.</p>
-<p>To compute percentiles and Z-scores using the included CDC macro, continue with these next steps:</p>
+<p>In this sample output, we see that <code>growthcleanr</code> has
+indeed flagged the third weight measurement for <code>subjid 2</code> as
+an apparent carried forward value. The measurement remains in the
+dataset, and it is up to the researcher to determine which exclusions to
+accept directly or investigate further.</p>
+<p>This example uses the default configuration options for
+<code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>. Longer examples demonstrating some common
+options are in <a href="usage.html">Usage</a>, and full details about
+all options are documented in <a href="configuration.html">Configuration</a>.</p>
+<p>To compute percentiles and Z-scores using the included CDC macro,
+continue with these next steps:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Use the built-in utility function to convert the input observations to wide</span></span>
 <span><span class="co"># format for BMI calculation</span></span>
@@ -407,7 +459,12 @@
 <span></span>
 <span><span class="co"># Compute Z-scores and percentiles</span></span>
 <span><span class="va">cleaned_data_bmiz</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ext_bmiz.html">ext_bmiz</a></span><span class="op">(</span><span class="va">cleaned_data_bmi</span><span class="op">)</span></span></code></pre></div>
-<p>The <code><a href="../reference/longwide.html">longwide()</a></code> function defaults to converting only records included by <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>, with options to change this default, and <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> will return the wide version of the cleaned data with many metrics added. Both of these functions are described in <a href="utilities.html">Computing BMI percentiles and Z-scores</a>.</p>
+<p>The <code><a href="../reference/longwide.html">longwide()</a></code> function defaults to converting only
+records included by <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>, with options to change
+this default, and <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> will return the wide version
+of the cleaned data with many metrics added. Both of these functions are
+described in <a href="utilities.html">Computing BMI percentiles and
+Z-scores</a>.</p>
 </div>
   </div>
 
@@ -423,7 +480,7 @@
 
       <footer><div class="copyright">
   <p></p>
-<p>Developed by Daymont Carrie, Grundmeier Robert, Miller Jeffrey, Campos Diego, De los Santos Hannah.</p>
+<p>Developed by Daymont Carrie, Grundmeier Robert, Miller Jeffrey, Campos Diego.</p>
 </div>
 
 <div class="pkgdown">
