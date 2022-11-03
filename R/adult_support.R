@@ -237,6 +237,7 @@ temp_sde <- function(subj_df, ptype = "height"){
       if (sum(!as.character(subj_df$age_days) %in% dup_days) > 0){
         # get the median without duplicate days
         median(subj_df$measurement[
+          !as.character(subj_df$age_days) %in% dup_days &
             if (ptype == "weight"){
               !subj_df$is_rv
             } else {
@@ -250,6 +251,8 @@ temp_sde <- function(subj_df, ptype = "height"){
         # for those with other nonduplicate parameters, make the median 0
         0
       }
+    # if the result is null (for weight, no nonrepeated values, replace with 0)
+    med_wo[is.null(med_wo)] <- 0
 
     subj_df$diff <- NA
     subj_df$diff[as.character(subj_df$age_days) %in% dup_days] <-
