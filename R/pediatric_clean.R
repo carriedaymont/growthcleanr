@@ -406,6 +406,19 @@ cleanbatch <- function(data.df,
         dewma.after = tbc.sd - ewma.after
       )]
 
+      # also, for infants, we want to know the difference in sd for next and
+      # prior, as well as the time difference
+      df[, `:=`(
+        sd_prev = c(0, diff(tbc.sd)),
+        sd_next = c(diff(tbc.sd), 0),
+        time_prev = c(0, diff(agedays)), # pad with 0s for inclusive
+        time_next = c(diff(agedays), 0),
+        dewma.before_prev = c(0, diff(dewma.before)),
+        dewma.before_next = c(diff(dewma.before), 0),
+        dewma.after_prev = c(0, diff(dewma.after)),
+        dewma.after_next = c(diff(dewma.after), 0)
+      )]
+
       # 11c.  Identify all values that meet all of the following criteria as potential exclusions:
       #   i.	There are 3 or more measurements for that subject and parameter
       #   ii.	(dewma_*>3.5 & dewma_*_bef>3 & dewma_*_aft>3 & tbc*sd>3.5) OR (dewma_*<-3.5 & dewma_*_bef<-3 & d & dewma_*_aft<-3 & tbc*sd<-3.5)
@@ -414,15 +427,39 @@ cleanbatch <- function(data.df,
       num.valid <- sum(valid(df))
       rep <- na_as_false(with(
         df,
-        num.valid >= 3 & valid(df)
-        &
-          (
-            dewma.all > 3.5 & dewma.before > 3 & dewma.after > 3 & tbc.sd > 3.5
-            |
-              dewma.all < -3.5 &
-              dewma.before < -3 & dewma.after < -3 & tbc.sd < -3.5
-          )
+        num.valid >= 3 & valid(df) &
+        # for >=2 yo
+        (
+          agedays >= 365.25*2 &
+            (
+              dewma.all > 3.5 & dewma.before > 3 & dewma.after > 3 & tbc.sd > 3.5
+              |
+                dewma.all < -3.5 &
+                dewma.before < -3 & dewma.after < -3 & tbc.sd < -3.5
+            )
+        ) | (
+          # < 2yo
+          agedays < 365.25*2 &
+            (
+              abs(tbc.sd) > 3.5 &
+                ((sd_prev > 3.5 & time_prev < 365.25*2 &
+                    dewma.before_prev > 3 & dewma.before_next > 3 &
+                    dewma.after_prev > 3 & dewma.after_next > 3) |
+                   (sd_prev < 3.5 & time_prev < 365.25*2 &
+                      dewma.before_prev < 3 & dewma.before_next < 3 &
+                      dewma.after_prev < 3 & dewma.after_next < 3) |
+                   (sd_next > 3.5 & time_next < 365.25*2 &
+                      dewma.before_prev > 3 & dewma.before_next > 3 &
+                      dewma.after_prev > 3 & dewma.after_next > 3) |
+                   (sd_next < 3.5 & time_next < 365.25*2 &
+                      dewma.before_prev < 3 & dewma.before_next < 3 &
+                      dewma.after_prev < 3 & dewma.after_next < 3)
+                ) &
+                ((agedays < 181 & dewma.all < -3.5) | agedays >= 181)
+            )
+        )
       ))
+
       num.exclude <- sum(rep)
       # 11d.  If there is only one potential exclusion identified in step 11c for a subject and parameter, replace exc_*=5 for that value
       if (num.exclude == 1)
@@ -445,10 +482,17 @@ cleanbatch <- function(data.df,
       rep <- na_as_false(with(
         df,
         num.valid == 2 &
+          # for >=2 yo
           (
+            agedays >= 365.25*2 &
             tbc.sd - ewma.all > 3.5 &
               tbc.sd > 3.5 |
               tbc.sd - ewma.all < -3.5 & tbc.sd < -3.5
+          ) | (
+            agedays >= 365.25*2 &
+              abs(tbc.sd) > 3.5 &
+              sd_next > 3.5 & tbc.sd[valid(df)] > c(Inf, tbc.sd[valid(df)][-2]) |
+              sd_prev > 3.5 & tbc.sd[valid(df)] > c(tbc.sd[valid(df)][-1], Inf)
           )
       ))
       num.exclude <- sum(rep)
