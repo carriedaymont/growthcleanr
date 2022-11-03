@@ -349,7 +349,7 @@ cleanbatch <- function(data.df,
   data.df[na_as_false(
     agedays < 365.25 &
     valid(data.df, include.temporary.extraneous = TRUE) &
-      (tbc.sd < -25 | tbd.sd > 15)
+      (tbc.sd < -25 | tbc.sd > 15)
     |
       exclude %in% c('Include', 'Exclude-Temporary-Extraneous-Same-Day') &
       (z.orig < -25 | z.orig > 15)
@@ -491,8 +491,8 @@ cleanbatch <- function(data.df,
           ) | (
             agedays >= 365.25*2 &
               abs(tbc.sd) > 3.5 &
-              sd_next > 3.5 & tbc.sd[valid(df)] > c(Inf, tbc.sd[valid(df)][-2]) |
-              sd_prev > 3.5 & tbc.sd[valid(df)] > c(tbc.sd[valid(df)][-1], Inf)
+              sd_next > 3.5 & tbc.sd > c(Inf, tbc.sd[-nrow(df)]) |
+              sd_prev > 3.5 & tbc.sd > c(tbc.sd[-1], Inf)
           )
       ))
       num.exclude <- sum(rep)
