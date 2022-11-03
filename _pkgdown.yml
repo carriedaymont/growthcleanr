@@ -19,6 +19,7 @@ articles:
       - utilities
       - large-data-sets
       - next-steps
+      - developer-guidelines
 
 reference:
   - title: "Cleaning height and weight observations"
