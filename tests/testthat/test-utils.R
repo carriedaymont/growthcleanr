@@ -217,39 +217,65 @@ test_that("longwide works as expected with default values", {
   # check that it has the correct amount of columns
   expect_equal(ncol(wide_syn), 9)
 
-  # check that all but one subject are accounted for
+  # check that all subjects are accounted for
   ss <- unique(sub_syn$subjid)
   ws <- unique(wide_syn$subjid)
-  expect_false(all(ss %in% ws),
-               "not all subjects appear in wide format")
-  expect_equal(setdiff(ss, ws), c("542abc54-c79f-9895-0350-ded2bf04af6e"))
+
+  expect_equal(sort(ss), sort(ws))
 
   obs_ids <- c(wide_syn$wt_id, wide_syn$ht_id)
 
+
+
+
+
+  # ASK ABOUT THIS, just because there are two observations on a given ageday doesn't mean that there is a height and a weight
+  # Is the idea that after it has gone through clean growth there should only be 2 observations on each age day, one height and one weight?
+    # WHy not just check that wide_syn < sub_syn?
+
+  # WHAT TO DO ABOUT THE FACT THAT CLEANGROWTH CURRENTLY ONLY WORKS FOR AGEDAYS<=730
+
   # check that all subjects' measurements with at least two occurrences appear
   all_obs <- sapply(unique(sub_syn$subjid), function(i) {
-    sub_group <- sub_syn[sub_syn$gcr_result == "Include" &
-                           sub_syn$agedays >= 730, ]
+    sub_group <- sub_syn[sub_syn$gcr_result == "Include",]
     sum(table(sub_group$agedays[sub_group$subjid == i]) >= 2)
   })
   total_obs <- sum(all_obs)
+
+  # it should be that the number of occurrences for each subject in "all_obs" is
+  # the same as in "wide_syn", so check that but make sure sorted by subjid
+  ws_subj_counts <- table(wide_syn$subjid)
+  ws_subj_counts <- setNames(as.vector(ws_subj_counts), names(ws_subj_counts))
+
+  expect_equal(all_obs[sort(names(all_obs))],
+               ws_subj_counts[sort(names(ws_subj_counts))])
+
   expect(total_obs <= nrow(wide_syn),
          "observations are dropped in wide format")
 
+  Z <- sub_syn$gcr_result[sub_syn$id %in% obs_ids]
+
+  # here specified inclusion type is just "include"
   # check that it includes specified inclusion types
   expect(
     all(sub_syn$gcr_result[sub_syn$id %in% obs_ids] == "Include"),
     "longwide() includes inclusion values that were not specified"
   )
 
+  # This doesn't work, all are NA's
+
   # check that all sexes have been correctly recoded, using values from ws
   # because one will be missing in wide_syn otherwise
-  orig_sex <- sub_syn$sex[ws]
-  names(orig_sex) <- ws
-  aft_sex <- wide_syn$sex[ws]
-  names(aft_sex) <- ws
+  orig_sex <- sub_syn[!duplicated(sub_syn$subjid), c("subjid", "sex")]
+  orig_sex <- orig_sex[order(orig_sex$subjid),]
 
-  expect_equal(aft_sex[names(orig_sex)], orig_sex + 1)
+  aft_sex <- wide_syn[!duplicated(wide_syn$subjid), c("subjid", "sex")]
+  aft_sex <- aft_sex[order(aft_sex$subjid),]
+
+  expect_equal(orig_sex$sex+1, aft_sex$sex)
+
+
+  # Check agem and agy separately outside, should be fast since it is vectorized
 
   # spot check that data is correct
   set.seed(7)
@@ -289,6 +315,123 @@ test_that("longwide works as expected with default values", {
   }
 
 })
+
+test_that("longwide works as expected with extra columns", {
+  # use synthetic data, running cleaning on a subset
+  data("syngrowth")
+  sub_syn <-
+    syngrowth[syngrowth$subjid %in% unique(syngrowth$subjid)[1:100], ]
+  sub_syn <- cbind(
+    sub_syn,
+    "gcr_result" = cleangrowth(
+      subjid = sub_syn$subjid,
+      param = sub_syn$param,
+      agedays = sub_syn$agedays,
+      sex = sub_syn$sex,
+      measurement = sub_syn$measurement
+    )
+  )
+
+  # add extra columns to sub_syn; one where all values match, and one where they
+  # don't
+  sub_syn$r1 <- sample(c("A", "B", "C", "D"), size = nrow(sub_syn),
+                       replace = TRUE)
+  sub_syn$r2 <- "E"
+
+  # run longwide on changed data
+  wide_syn <- longwide(sub_syn, extra_cols = c("r1", "r2"))
+
+  # check that it has the correct amount of columns
+  expect_equal(ncol(wide_syn), ncol(sub_syn)+4)
+
+  # check that additional columns are correctly named
+  expect_equal(c("ht_r1", "wt_r1", "match_r1", "r2") %in%
+                    colnames(wide_syn), rep(TRUE, 4))
+
+  # check that all subjects are accounted for
+  ss <- unique(sub_syn$subjid)
+  ws <- unique(wide_syn$subjid)
+
+  # Is this valid??
+  expect_equal(sort(ss), sort(ws))
+
+  obs_ids <- c(wide_syn$wt_id, wide_syn$ht_id)
+
+  # check that all subjects' measurements with at least two occurrences appear
+  all_obs <- sapply(unique(sub_syn$subjid), function(i) {
+    sub_group <- sub_syn[sub_syn$gcr_result == "Include" &
+                           sub_syn$agedays >= 730, ]
+    sum(table(sub_group$agedays[sub_group$subjid == i]) >= 2)
+  })
+  total_obs <- sum(all_obs)
+  expect(total_obs <= nrow(wide_syn),
+         "observations are dropped in wide format")
+
+  # check that it includes specified inclusion types
+  expect(
+    all(sub_syn$gcr_result[sub_syn$id %in% obs_ids] == "Include"),
+    "longwide() includes inclusion values that were not specified"
+  )
+
+  # check that all sexes have been correctly recoded, using values from ws
+  # because one will be missing in wide_syn otherwise
+  orig_sex <- sub_syn$sex[ws]
+  names(orig_sex) <- ws
+  aft_sex <- wide_syn$sex[ws]
+  names(aft_sex) <- ws
+
+  expect_equal(aft_sex[names(orig_sex)], orig_sex + 1)
+
+  # ADD SPOT CHECK OF EXTRA COLUMNS
+
+  # spot check that data is correct
+  set.seed(7)
+  # check height ids
+  ht_sub <-
+    sub_syn[sub_syn$param == "HEIGHTCM" & sub_syn$id %in% obs_ids, ]
+
+  Z <- ht_sub$id[sample(1:nrow(ht_sub), 3)]
+
+  x <- Z[1]
+
+  for (x in ht_sub$id[sample(1:nrow(ht_sub), 3)]) {
+    w_idx <- wide_syn$ht_id == x
+    ht_idx <- ht_sub$id == x
+
+    z1 <- wide_syn$agey[w_idx]
+
+    # check ages
+    expect_equal(wide_syn$agey[w_idx], round(ht_sub$agedays[ht_idx] / 365.25), 4)
+    expect_equal(wide_syn$agem[w_idx],
+                 round(round(ht_sub$agedays[ht_idx] / 365.25), 4) * 12, 4)
+    expect_equal(wide_syn$agedays[w_idx], ht_sub$agedays[ht_idx])
+
+    # check height
+    expect_equal(wide_syn$ht[w_idx], ht_sub$measurement[ht_idx])
+
+  }
+
+  # check weight ids
+  wt_sub <-
+    sub_syn[sub_syn$param == "WEIGHTKG" & sub_syn$id %in% obs_ids, ]
+  for (x in wt_sub$id[sample(1:nrow(wt_sub), 3)]) {
+    w_idx <- wide_syn$wt_id == x
+    wt_idx <- wt_sub$id == x
+
+    # check ages
+    expect_equal(wide_syn$agey[w_idx], round(wt_sub$agedays[wt_idx] / 365.25), 4)
+    expect_equal(wide_syn$agem[w_idx],
+                 round(round(wt_sub$agedays[wt_idx] / 365.25), 4) * 12, 4)
+    expect_equal(wide_syn$agedays[w_idx], wt_sub$agedays[wt_idx])
+
+    # check height
+    expect_equal(wide_syn$wt[w_idx], wt_sub$measurement[wt_idx])
+  }
+
+})
+
+# Long wide works as expected with not dropping unmatched values
+
 
 test_that("longwide works as expected with custom values", {
   # just checking the custom-ness, so use a smaller subset for speed
