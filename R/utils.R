@@ -140,11 +140,6 @@ recode_sex <- function(input_data,
 #' transforming output from growthcleanr::cleangrowth() into a format suitable
 #' for growthcleanr::ext_bmiz().
 #'
-#'
-#' @param extra_cols vector of additional columns to include in the output
-#' @param keep_unmatched boolean to tell whether we shoudl keep observations that do not have a matching height/wieth on that day
-#' # now includes all observations including infants
-#'
 #' @param long_df A data frame to be transformed. Expects columns: id, subjid,
 #' sex, agedays, param, measurement, and gcr_result.
 #' @param id name of observation ID column
@@ -230,7 +225,7 @@ longwide <-
     if (include_all == TRUE) {
       obs_df <- obs_df
     } else if (include_all == FALSE) {
-      obs_df <- obs_df[obs_df$gcr_result %in% inclusion_types,]
+      obs_df <- obs_df[obs_df[,gcr_result] %in% inclusion_types,]
     } else{
       stop(paste0("include_all is not a logical of length 1. It is a ",
                   typeof(include_all), " of length ", length(include_all)))
