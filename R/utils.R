@@ -204,8 +204,8 @@ longwide <-
            gcr_result = "gcr_result",
            include_all = FALSE,
            inclusion_types = c("Include"),
-           keep_unmatched_data = FALSE,
-           extra_cols = NULL) {
+           extra_cols = NULL,
+           keep_unmatched_data = FALSE) {
     # avoid "no visible binding" warnings
     sex_recoded <- agey <- agem <- HEIGHTCM <- WEIGHTKG <- NULL
     wt <- wt_id <- ht <- ht_id <- NULL
