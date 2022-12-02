@@ -316,6 +316,7 @@ test_that("longwide works as expected with extra columns", {
 
   # add extra columns to sub_syn; one where all values match, and one where they
   # don't
+  set.seed(7)
   sub_syn$r1 <- sample(c("A", "B", "C", "D"), size = nrow(sub_syn),
                        replace = TRUE)
   sub_syn$r2 <- "E"

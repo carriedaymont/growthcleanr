@@ -162,7 +162,7 @@ recode_sex <- function(input_data,
 #' separate ht_C1 and wt_C1 columns as well as a match_C1 column that gives
 #' booleans indicating where ht_C1 and wt_C1 are the same. If the agedays
 #' matched height and weight columns are identical, then only include a single
-#' version of C1. Defaults to not keeping any extra columns.
+#' version of C1. Defaults to empty vector (not keeping any additional columns).
 #' @param keep_unmatched_data boolean indicating whether to keep height/weight
 #' observations that do not have a matching weight/height on that day
 #'
@@ -218,7 +218,7 @@ longwide <-
                all_of(extra_cols)) -> obs_df
     } else {
       # catch error if any variables were not found
-      stop("not all needed columns were present")
+      stop("not all specified columns were present")
     }
 
     # extract values flagged with indicated inclusion types:
@@ -287,21 +287,23 @@ longwide <-
       mutate(wt = WEIGHTKG, ht = HEIGHTCM)
 
 
-    for(c in extra_cols) {
-      ht_vals <- wide_df[,paste0(c, ".x")]
-      wt_vals <- wide_df[,paste0(c, ".y")]
+    for(col in extra_cols) {
+      ht_vals <- wide_df[,paste0(col, ".x")]
+      wt_vals <- wide_df[,paste0(col, ".y")]
       match_vals <- ht_vals == wt_vals
-      match_vals[is.na(ht_vals) & is.na(wt_vals)] = TRUE
+      match_vals[is.na(ht_vals) & is.na(wt_vals)] <- TRUE
 
       # If the columns match exactly, then just put a single column with that
       # name in and drop the other two.
       if(sum(match_vals, na.rm=TRUE)==length(match_vals)) {
-        wide_df[,c] <- ht_vals
-        wide_df[,c(paste0(c, ".x"), paste0(c, ".y"))] <- list(NULL)
+        wide_df[,col] <- ht_vals
+        wide_df[,c(paste0(col, ".x"), paste0(col, ".y"))] <- list(NULL)
       } else {
         wide_df[,paste0("match_", c)] <- match_vals
-        colnames(wide_df)[colnames(wide_df)==paste0(c, ".x")] <- paste0("ht_", c)
-        colnames(wide_df)[colnames(wide_df)==paste0(c, ".y")] <- paste0("wt_", c)
+        colnames(wide_df)[colnames(wide_df)==paste0(col, ".x")] <- paste0("ht_",
+                                                                          col)
+        colnames(wide_df)[colnames(wide_df)==paste0(col, ".y")] <- paste0("wt_",
+                                                                          col)
       }
     }
 
