@@ -446,8 +446,6 @@ test_that("longwide works as expected when not dropping unmatched values", {
   wide_syn <- longwide(sub_syn, extra_cols = c("r1", "r2"),
                        keep_unmatched_data = TRUE)
 
-  wide_syn2 <- longwide(sub_syn, extra_cols = c("r1", "r2"))
-
   # check for correct number of columns and correct naming; here r2 will not
   # be all matches since there are unmatched heights/weights
   expect_equal(ncol(wide_syn), ncol(sub_syn)+6)
@@ -467,58 +465,6 @@ test_that("longwide works as expected when not dropping unmatched values", {
   ss_ids <- sub_syn$id[sub_syn$gcr_result=="Include"]
 
   expect_equal(sort(obs_ids), sort(ss_ids))
-
-  # spot check that data is correct; add in checks for additional columns
-  set.seed(7)
-  # check height ids
-  ht_sub <-
-    sub_syn[sub_syn$param == "HEIGHTCM" & sub_syn$id %in% obs_ids, ]
-  for (x in ht_sub$id[sample(1:nrow(ht_sub), 20)]) {
-    w_idx <- wide_syn$ht_id == x
-    ht_idx <- ht_sub$id == x
-
-    # since some of the values in the height ID columns are missing, there will
-    # be NA's in "w_idx", which will make subsetting using "w_idx" not work; fix
-    # this by identifying the NA values as FALSE
-    w_idx <- !is.na(w_idx) & w_idx
-
-    # check ages
-    expect_equal(wide_syn$agey[w_idx], round(ht_sub$agedays[ht_idx] / 365.25), 4)
-    expect_equal(wide_syn$agem[w_idx],
-                 round(round(ht_sub$agedays[ht_idx] / 365.25), 4) * 12, 4)
-    expect_equal(wide_syn$agedays[w_idx], ht_sub$agedays[ht_idx])
-
-    # check height
-    expect_equal(wide_syn$ht[w_idx], ht_sub$measurement[ht_idx])
-
-    # check extra columns
-    expect_equal(wide_syn$ht_r1[w_idx], ht_sub$r1[ht_idx])
-    expect_equal(wide_syn$ht_r2[w_idx], ht_sub$r2[ht_idx])
-  }
-
-  # check weight ids
-  wt_sub <-
-    sub_syn[sub_syn$param == "WEIGHTKG" & sub_syn$id %in% obs_ids, ]
-  for (x in wt_sub$id[sample(1:nrow(wt_sub), 20)]) {
-    w_idx <- wide_syn$wt_id == x
-    wt_idx <- wt_sub$id == x
-
-    # again identify the NA values in "w_idx" as FALSE
-    w_idx <- !is.na(w_idx) & w_idx
-
-    # check ages
-    expect_equal(wide_syn$agey[w_idx], round(wt_sub$agedays[wt_idx] / 365.25), 4)
-    expect_equal(wide_syn$agem[w_idx],
-                 round(round(wt_sub$agedays[wt_idx] / 365.25), 4) * 12, 4)
-    expect_equal(wide_syn$agedays[w_idx], wt_sub$agedays[wt_idx])
-
-    # check weight
-    expect_equal(wide_syn$wt[w_idx], wt_sub$measurement[wt_idx])
-
-    # check extra columns
-    expect_equal(wide_syn$wt_r1[w_idx], wt_sub$r1[wt_idx])
-    expect_equal(wide_syn$wt_r2[w_idx], wt_sub$r2[wt_idx])
-  }
 })
 
 test_that("longwide works as expected with other exclusion codes", {

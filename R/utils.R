@@ -299,7 +299,7 @@ longwide <-
         wide_df[,col] <- ht_vals
         wide_df[,c(paste0(col, ".x"), paste0(col, ".y"))] <- list(NULL)
       } else {
-        wide_df[,paste0("match_", c)] <- match_vals
+        wide_df[,paste0("match_", col)] <- match_vals
         colnames(wide_df)[colnames(wide_df)==paste0(col, ".x")] <- paste0("ht_",
                                                                           col)
         colnames(wide_df)[colnames(wide_df)==paste0(col, ".y")] <- paste0("wt_",

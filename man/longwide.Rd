@@ -52,7 +52,7 @@ a column C1 differs on agedays matched height and weight values, then include
 separate ht_C1 and wt_C1 columns as well as a match_C1 column that gives
 booleans indicating where ht_C1 and wt_C1 are the same. If the agedays
 matched height and weight columns are identical, then only include a single
-version of C1. Defaults to not keeping any extra columns.}
+version of C1. Defaults to empty vector (not keeping any additional columns).}
 
 \item{keep_unmatched_data}{boolean indicating whether to keep height/weight
 observations that do not have a matching weight/height on that day}
