@@ -1,0 +1,31 @@
+# Adapted from:
+# https://github.com/VaultVulp/gp-docker-action#complete-workflow-example
+name: Build and publish
+
+on:
+  push:
+    branches:
+      - $default-branch
+      - upd-v2
+      - upd-v3
+    tags: ['v*.*.*' ]
+  pull_request:
+    branches:
+      - $default-branch
+      - upd-v2
+      - upd-v3
+
+
+jobs:
+  build-and-publish-image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2.5.0
+
+      - name: Build and publish Docker image
+        uses: VaultVulp/gp-docker-action@1.5.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          image-name: carriedaymont/growthcleanr
+          image-tag: ${{ github.ref_name }}
