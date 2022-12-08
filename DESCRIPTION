@@ -45,4 +45,4 @@ Suggests:
     knitr (>= 1.29),
     rmarkdown (>= 2.3),
     testthat (>= 2.3.2)
-RoxygenNote: 7.2.1
+RoxygenNote: 7.2.2

@@ -136,20 +136,41 @@ recode_sex <- function(input_data,
 
 #' Transform data in growthcleanr format into wide structure for BMI calculation
 #'
-#' \code{longwide} transforms data from long to wide format. Ideal for transforming output from growthcleanr::cleangrowth() into a format suitable for growthcleanr::ext_bmiz().
+#' \code{longwide} transforms data from long to wide format. Ideal for
+#' transforming output from growthcleanr::cleangrowth() into a format suitable
+#' for growthcleanr::ext_bmiz().
 #'
-#' @param long_df A data frame to be transformed. Expects columns: id, subjid, sex, agedays, param, measurement, and gcr_result.
+#' @param long_df A data frame to be transformed. Expects columns: id, subjid,
+#' sex, agedays, param, measurement, and gcr_result.
 #' @param id name of observation ID column
 #' @param subjid name of subject ID column
 #' @param sex name of sex descriptor column
 #' @param agedays name of age (in days) descriptor column
 #' @param param name of parameter column to identify each type of measurement
-#' @param measurement name of measurement column containing the actual measurement data
+#' @param measurement name of measurement column containing the actual
+#' measurement data
 #' @param gcr_result name of column of results from growthcleanr::cleangrowth()
-#' @param include_all Determines whether the function keeps all exclusion codes. If TRUE, all exclusion types are kept and the inclusion_types argument is ignored. Defaults to FALSE.
-#' @param inclusion_types Vector indicating which exclusion codes from the cleaning algorithm should be included in the data, given that include_all is FALSE. For all options, see growthcleanr::cleangrowth(). Defaults to c("Include").
+#' @param include_all Determines whether the function keeps all exclusion codes.
+#' If TRUE, all exclusion types are kept and the inclusion_types argument is
+#' ignored. Defaults to FALSE.
+#' @param inclusion_types Vector indicating which exclusion codes from the
+#' cleaning algorithm should be included in the data, given that include_all is
+#' FALSE. For all options, see growthcleanr::cleangrowth(). Defaults to
+#' c("Include").
+#' @param extra_cols Vector of additional columns to include in the output. If
+#' a column C1 differs on agedays matched height and weight values, then include
+#' separate ht_C1 and wt_C1 columns as well as a match_C1 column that gives
+#' booleans indicating where ht_C1 and wt_C1 are the same. If the agedays
+#' matched height and weight columns are identical, then only include a single
+#' version of C1. Defaults to empty vector (not keeping any additional columns).
+#' @param keep_unmatched_data boolean indicating whether to keep height/weight
+#' observations that do not have a matching weight/height on that day
 #'
-#' @return Returns a data frame transformed from long to wide. Includes only values flagged with indicated inclusion types. Note that, for each subject, heights without corresponding weights for a given age (and vice versa) will be dropped.
+#' @return Returns a data frame transformed from long to wide. Includes only
+#' values flagged with indicated inclusion types. Potentially includes
+#' additional columns if arguments are passed to extra_cols. For each subject,
+#' heights without corresponding weights for a given age (and vice versa) will
+#' be dropped unless keep_unmatched_data is set to TRUE.
 #'
 #' @export
 #' @rawNamespace import(tidyr, except = extract)
@@ -182,101 +203,114 @@ longwide <-
            measurement = "measurement",
            gcr_result = "gcr_result",
            include_all = FALSE,
-           inclusion_types = c("Include")) {
-  # avoid "no visible binding" warnings
-  sex_recoded <- agey <- agem <- HEIGHTCM <- WEIGHTKG <- NULL
-  wt <- wt_id <- ht <- ht_id <- NULL
+           inclusion_types = c("Include"),
+           extra_cols = NULL,
+           keep_unmatched_data = FALSE) {
+    # avoid "no visible binding" warnings
+    sex_recoded <- agey <- agem <- HEIGHTCM <- WEIGHTKG <- NULL
+    wt <- wt_id <- ht <- ht_id <- NULL
 
-  # selects each column with specified / default variable name
-  long_df %>%
-    select(id, subjid, sex, agedays,
-           param, measurement, gcr_result) -> obs_df
+    # check that all needed columns are present, if not, throw an error.
+    if(all(c(id, subjid, sex, agedays, param, measurement, gcr_result,
+             extra_cols) %in% colnames(long_df))) {
+      long_df %>%
+        select(id, subjid, sex, agedays, param, measurement, gcr_result,
+               all_of(extra_cols)) -> obs_df
+    } else {
+      # catch error if any variables were not found
+      stop("not all specified columns were present")
+    }
 
-  # if all columns could be found,
-  # 7 columns will be present in the correct order. Thus, rename
-  if (ncol(obs_df) == 7) {
-    names(obs_df) <- c("id",
-                       "subjid",
-                       "sex",
-                       "agedays",
-                       "param",
-                       "measurement",
-                       "gcr_result")
-  } else {
-    # catch error if any variables were not found
-    stop("not all needed columns were present")
-  }
+    # extract values flagged with indicated inclusion types:
+    if (include_all == TRUE) {
+      obs_df <- obs_df
+    } else if (include_all == FALSE) {
+      obs_df <- obs_df[obs_df[,gcr_result] %in% inclusion_types,]
+    } else{
+      stop(paste0("include_all is not a logical of length 1. It is a ",
+                  typeof(include_all), " of length ", length(include_all)))
+    }
 
-  # extract values flagged with indicated inclusion types:
-  if (include_all == TRUE) {
-    obs_df <- obs_df
-  } else if (include_all == FALSE) {
-    obs_df <- obs_df[obs_df$gcr_result %in% inclusion_types,]
-  } else{
-    stop(paste0("include_all is not a logical of length 1. It is a ",
-                typeof(include_all), " of length ", length(include_all)))
-  }
+    # calculate age in years
+    obs_df$agey <- round(obs_df$agedays / 365.25, 4)
 
+    # calculate age in months
+    obs_df$agem <- round((obs_df$agey * 12), 4)
 
-  # only include observations at least 24 months old
-  obs_df <- obs_df[obs_df$agedays >= 730, ]
+    # recode sex to expected ext_bmiz() format
+    obs_df <- recode_sex(
+      input_data = obs_df,
+      sourcecol = "sex",
+      sourcem = "0",
+      sourcef = "1",
+      targetcol = "sex_recoded",
+      targetm = 1L,
+      targetf = 2L
+    )
 
-  # calculate age in years
-  obs_df$agey <- round(obs_df$agedays / 365.25, 4)
-
-  # calculate age in months
-  obs_df$agem <- round((obs_df$agey * 12), 4)
-
-  # recode sex to expected ext_bmiz() format
-  obs_df <- recode_sex(
-    input_data = obs_df,
-    sourcecol = "sex",
-    sourcem = "0",
-    sourcef = "1",
-    targetcol = "sex_recoded",
-    targetm = 1L,
-    targetf = 2L
-  )
-
-  obs_df %>%
-    mutate(sex = sex_recoded) %>%
-    mutate(param = as.character(param)) %>%
-    select(subjid, id, agey, agem, agedays, sex, param, measurement) -> clean_df
+    obs_df %>%
+      mutate(sex = sex_recoded) %>%
+      mutate(param = as.character(param)) %>%
+      select(subjid, id, agey, agem, agedays, sex, param, measurement,
+             all_of(extra_cols)) -> clean_df
 
 
-  # check for unique weight and height ids
-  if (any(duplicated(clean_df$id))) {
-    stop("duplicate IDs in long_df")
-  }
+    # check for unique weight and height ids
+    if (any(duplicated(clean_df$id))) {
+      stop("duplicate IDs in long_df")
+    }
 
-  # separate heights and weights using unique ids
-  clean_df %>%
-    pivot_wider(names_from = param, values_from = measurement) -> param_separated
+    # separate heights and weights using unique ids
+    clean_df %>%
+      pivot_wider(names_from = param, values_from = measurement) -> param_separated
 
-  # extract heights and weights attached to ids
-  param_separated %>%
-    filter(!is.na(HEIGHTCM)) %>%
-    filter(is.na(WEIGHTKG)) %>%
-    mutate(ht_id = id) %>%
-    select(-id) %>%
-    select(-WEIGHTKG) -> height
+    # extract heights and weights attached to ids
+    param_separated %>%
+      filter(!is.na(HEIGHTCM)) %>%
+      filter(is.na(WEIGHTKG)) %>% # why this, shouldn't the !is.na height take care of it
+      mutate(ht_id = id) %>%
+      select(-id) %>%
+      select(-WEIGHTKG) -> height
 
-  param_separated %>%
-    filter(is.na(HEIGHTCM)) %>%
-    filter(!is.na(WEIGHTKG)) %>%
-    mutate(wt_id = id) %>%
-    select(-id) %>%
-    select(-HEIGHTCM) -> weight
+    param_separated %>%
+      filter(is.na(HEIGHTCM)) %>%
+      filter(!is.na(WEIGHTKG)) %>%
+      mutate(wt_id = id) %>%
+      select(-id) %>%
+      select(-HEIGHTCM) -> weight
+
+    # join based on subjid, age, and sex, potentially keep unmatched values too
+    wide_df <- merge(height,
+                     weight,
+                     by = c("subjid", "agey", "agem", "agedays", "sex"),
+                     all = keep_unmatched_data) %>%
+      mutate(wt = WEIGHTKG, ht = HEIGHTCM)
 
 
-  # join based on subjid, age, and sex
-  wide_df <- merge(height,
-                   weight,
-                   by = c("subjid", "agey", "agem", "agedays", "sex")) %>%
-    mutate(wt = WEIGHTKG, ht = HEIGHTCM) %>% # rename height and weight
-    select(subjid, agey, agem, sex, wt, wt_id, ht, ht_id, agedays)
+    for(col in extra_cols) {
+      ht_vals <- wide_df[,paste0(col, ".x")]
+      wt_vals <- wide_df[,paste0(col, ".y")]
+      match_vals <- ht_vals == wt_vals
+      match_vals[is.na(ht_vals) & is.na(wt_vals)] <- TRUE
 
-  return(wide_df)
+      # If the columns match exactly, then just put a single column with that
+      # name in and drop the other two.
+      if(sum(match_vals, na.rm=TRUE)==length(match_vals)) {
+        wide_df[,col] <- ht_vals
+        wide_df[,c(paste0(col, ".x"), paste0(col, ".y"))] <- list(NULL)
+      } else {
+        wide_df[,paste0("match_", col)] <- match_vals
+        colnames(wide_df)[colnames(wide_df)==paste0(col, ".x")] <- paste0("ht_",
+                                                                          col)
+        colnames(wide_df)[colnames(wide_df)==paste0(col, ".y")] <- paste0("wt_",
+                                                                          col)
+      }
+    }
+
+    # Drop WEIGHTKG and HEIGHTCM columns since they are in ht and wt
+    wide_df <- wide_df %>% select(-c(HEIGHTCM, WEIGHTKG))
+
+    return(wide_df)
 }
 
 #' Compute BMI using standard formula
