@@ -55,7 +55,8 @@ temporary_extraneous_infants <- function(df) {
   subj.all.dups <- df[valid.rows &
                         extraneous.this.day &
                         is.na(delta.median.sd), unique(subjid)]
-  # add the "other map" -- now inluding head circumference
+
+  # add the "other map" -- now including head circumference
   other_p_map <- c(
     "HEIGHTCM" = "WEIGHTKG",
     "WEIGHTKG" = "HEIGHTCM",

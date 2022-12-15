@@ -75,7 +75,9 @@ cleanbatch <- function(data.df,
       data.df$batch[1]
     ))
 
-  # temp SDEs ----
+  # NOTE: in each step, we redo temp SDEs
+
+  # initial temp SDEs ----
 
   # save a copy of all original measurement values before any transformation
   data.df[, v.orig := v]
@@ -89,6 +91,59 @@ cleanbatch <- function(data.df,
 
   # capture a list of subjects with possible extraneous for efficiency later
   subj.dup <- data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', unique(subjid)]
+
+  # carried forwards ----
+
+  # 9.  Exclude values that are carried forward. For the purposes of this analysis, any value that is identical to the preceding value for the same parameter
+  #     and subject is considered carried forward. The chances of having identical measurements, even at an age/interval when little or no growth would be expected,
+  #     is fairly small, and when this is the case the carried forward measurements provide little new information.
+  # a.	Calculate d_prev_wt=wt-wtprev and d_prev_ht=ht-htprev. Use original measurements rather than transformed
+  #     measurements (unit errors and switches).
+  # b.	Unlike most steps, do this step for all extraneous values (exc_*==2) in addition to included values (exc_*==0), comparing all values for one day to all
+  #     values from the prior day – if there are any values with a d_prev*==0, the value on the latter day should be excluded.
+  # c.	Replace exc_*=3 for all values with d_prev*==0 & (exc_*==0 OR exc_*==2)
+  if (!include.carryforward) {
+    if (!quietly)
+      cat(sprintf(
+        "[%s] Exclude measurements carried forward...\n",
+        Sys.time()
+      ))
+    # for efficiency, bring get.prev and get.next inline here (working on valid rows within a single parameter for a single subject)
+    # structure c(NA, field.name[-.N]) == get.prev
+    data.df[, prev.v := as.double(NaN)]
+    data.df[valid(data.df), prev.v := c(NA, v.orig[-.N]), by = .(subjid, param)]
+
+    # optimize "carry forward" for children without extraneous.
+    data.df[!(subjid %in% subj.dup) &
+              v.orig == prev.v, exclude := 'Exclude-Carried-Forward']
+
+    # need to handle children with extraneous measurements on same day separately
+    data.df[subjid %in% subj.dup &
+              valid(data.df, include.temporary.extraneous = TRUE), exclude := (function(df) {
+                setkey(df, agedays)
+                ages = unique(agedays)
+                # no point in looking for measurements carried forward if all measurements are from a single day of life
+                if (length(ages) > 1) {
+                  # iterate over each age
+                  for (i in 2:length(ages)) {
+                    # find the set of measurements from the previous age in days
+                    all.prev.v = df[agedays == ages[i - 1], v.orig]
+                    # if a measurement for the current age is found in the set of measurements from the previous age, then mark it as carried forward
+                    df[agedays == ages[i] &
+                         v.orig %in% all.prev.v, exclude := 'Exclude-Carried-Forward']
+                  }
+                }
+                return(df$exclude)
+              })(copy(.SD)), .SDcols = c('agedays', 'exclude', 'v.orig'), by = .(subjid, param)]
+  }
+
+  # 9d.  Replace exc_*=0 if exc_*==2 & redo step 5 (temporary extraneous)
+  data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
+  data.df[temporary_extraneous(data.df), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
+
+  # BIV ----
+
+
 
 
   # end ----
