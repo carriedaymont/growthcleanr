@@ -367,13 +367,28 @@ cleangrowth <- function(subjid,
     # calculate z scores
     if (!quietly)
       cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
+    # for infants, use z and who
     measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE)
-    data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
+    measurement.to.z_who <- read_anthro(ref.data.path, cdc.only = F)
+
+    data.all[, z.orig_cdc := measurement.to.z(param, agedays, sex, v)]
+    data.all[, z.orig_who := measurement.to.z_who(param, agedays, sex, v)]
 
     # calculate "standard deviation" scores
     if (!quietly)
       cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
-    data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, TRUE)]
+    data.all[, sd.orig_cdc := measurement.to.z(param, agedays, sex, v, TRUE)]
+    data.all[, sd.orig_who := measurement.to.z_who(param, agedays, sex, v, TRUE)]
+
+    # smooth z-scores/SD scores between ages 1 - 3yo using weighted scores
+    # older uses cdc, younger uses who
+    who_weight <- 3 - (agedays/365.25)
+    cdc_weight <- (agedays/365.25) - 1
+
+    data.all[agedays/365.25 => 1 & agedays/365.25 <= 3,
+             z.orig := (z.orig_cdc*cdc_weight + z.orig_who*who_weight)/2]
+    data.all[agedays/365.25 => 1 & agedays/365.25 <= 3,
+             sd.orig := (sd.orig_cdc*cdc_weight + sd.orig_who*who_weight)/2]
 
     # sort by subjid, param, agedays
     setkey(data.all, subjid, param, agedays)
@@ -819,7 +834,7 @@ read_anthro <- function(path = "", cdc.only = FALSE) {
   return(function(param, agedays, sex, measurement, csd = FALSE) {
     # For now, we will only use CDC growth reference data, note that the cubically interpolated file
     # we are using has linear measurments derived from length data for children < 731 days, and height thereafter
-    src <- ifelse(agedays < 731 & !cdc.only, 'WHO', 'CDC')
+    src <- ifelse(agedays < 3*365.25 & !cdc.only, 'WHO', 'CDC')
 
     # keep column sequence the same fo efficient join
     dt <- data.table(src, param, sex, agedays, measurement)
