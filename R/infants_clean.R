@@ -75,6 +75,8 @@ cleanbatch <- function(data.df,
       data.df$batch[1]
     ))
 
+  # temp SDEs ----
+
   # save a copy of all original measurement values before any transformation
   data.df[, v.orig := v]
 
@@ -83,7 +85,7 @@ cleanbatch <- function(data.df,
       "[%s] Preliminarily identify potential extraneous...\n",
       Sys.time()
     ))
-  data.df$exclude[temporary_extraneous(data.df)] <- 'Exclude-Temporary-Extraneous-Same-Day'
+  data.df$exclude[temporary_extraneous_infants(data.df)] <- 'Exclude-Temporary-Extraneous-Same-Day'
 
   # capture a list of subjects with possible extraneous for efficiency later
   subj.dup <- data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', unique(subjid)]
