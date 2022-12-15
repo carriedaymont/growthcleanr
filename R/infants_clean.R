@@ -139,12 +139,88 @@ cleanbatch <- function(data.df,
 
   # 9d.  Replace exc_*=0 if exc_*==2 & redo step 5 (temporary extraneous)
   data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
-  data.df[temporary_extraneous(data.df), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
+  data.df[temporary_extraneous_infants(data.df), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
 
   # BIV ----
 
+  # Wt limits from do-file Oct 10 2022, in dataset, highest plausible weight=29.5kg, 65 lbs
+  # HC Limits based on analysis in do-file from Oct 11 2022: in dataset, lowest plausible 18.5, z=-13, highest plausible 63.5, z=11.2  (at birth, highest=42, z=6)
 
 
+  exc_nam <- "Exclude-Absolute-BIV"
+
+  # identify absolute cutoffs
+  # Min/max weight at birth based on published births
+  data.df[valid(data.df) & param == "WEIGHTKG" & measurement < 0.2,
+          exclude := exc_nam]
+  # Min weight after birth based on rules about who can go home with alowance for significant weight loss -- this is for outpatient data only so very low weight babies would still be in NICU
+  data.df[valid(data.df) & param == "WEIGHTKG" & measurement > 10.5 &
+            agedays == 0,
+          exclude := exc_nam]
+  # Max weight for <2y based on eval (see do-file from Oct 10 2022), highest plaus weight 29.5kg
+  data.df[valid(data.df) & param == "WEIGHTKG" & measurement < 1 &
+            agedays == 0,
+          exclude := exc_nam]
+  # Max weight for <2y based on eval (see do-file from Oct 10 2022), highest plaus weight 29.5kg
+  data.df[valid(data.df) & param == "WEIGHTKG" & measurement > 35 &
+            agedays < 2,
+          exclude := exc_nam]
+  # Max weight for all based on published data
+  data.df[valid(data.df) & param == "WEIGHTKG" & measurement > 600,
+          exclude := exc_nam]
+
+  # Min/max HC based on analysis in do file from
+  # Also, 18 is z=-6 for 22 0/7 in Fenton and 65 is z=6 for 40 0/7
+  data.df[valid(data.df) & param == "HEIGHTCM" & measurement < 18,
+          exclude := exc_nam]
+  data.df[valid(data.df) & param == "HEIGHTCM" & measurement > 65 &
+            agedays == 0,
+          exclude := exc_nam]
+
+  # Min/max HC based on analysis in do file from Oct 11 2022
+  # Also, 13 is z=-6 for 22 0/7 in Fenton and
+  data.df[valid(data.df) & param == "HEADCM" & measurement < 13,
+          exclude := exc_nam]
+  data.df[valid(data.df) & param == "HEADCM" & measurement > 75,
+          exclude := exc_nam]
+  data.df[valid(data.df) & param == "HEADCM" & measurement > 50 &
+            agedays == 0,
+          exclude := exc_nam]
+
+  exc_nam <- "Exclude-Z-BIV"
+
+  # identify z cutoff
+  # ***Note, using unrecentered values***
+  #  *For weight only do after birth
+  data.df[valid(data.df) & param == "WEIGHTKG" & z.orig < - 25 &
+            agedays < 1,
+          exclude := exc_nam]
+  data.df[valid(data.df) & param == "WEIGHTKG" & z.orig < -15 &
+            agedays >= 1,
+          exclude := exc_nam]
+  data.df[valid(data.df) & param == "WEIGHTKG" & z.orig > 15,
+          exclude := exc_nam]
+
+  # *Max z-score for height based on analysis of CHOP data because 15/25 too loose for upper limits
+  data.df[valid(data.df) & param == "HEIGHTCM" & z.orig < - 25 &
+            agedays < 1,
+          exclude := exc_nam]
+  data.df[valid(data.df) & param == "HEIGHTCM" & z.orig < -15 &
+            agedays >= 1,
+          exclude := exc_nam]
+  data.df[valid(data.df) & param == "HEIGHTCM" & z.orig > 8,
+          exclude := exc_nam]
+
+  # head circumference
+  data.df[valid(data.df) & param == "HEADCM" & z.orig < -15,
+          exclude := exc_nam]
+  data.df[valid(data.df) & param == "HEADCM" & z.orig > 15,
+          exclude := exc_nam]
+
+
+  # 9d.  Replace exc_*=0 if exc_*==2 & redo step 5 (temporary extraneous)
+  data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
+  data.df[temporary_extraneous_infants(data.df), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
 
   # end ----
 
