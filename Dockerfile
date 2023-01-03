@@ -1,4 +1,4 @@
-FROM rocker/tidyverse:latest
+FROM ghcr.io/rocker-org/tidyverse:latest
 
 LABEL maintainer="Daniel Chudnov <dlchudnov@mitre.org>"
 
