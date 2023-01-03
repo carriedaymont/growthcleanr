@@ -2,19 +2,7 @@
 # https://github.com/VaultVulp/gp-docker-action#complete-workflow-example
 name: Build and publish
 
-on:
-  push:
-    branches:
-      - $default-branch
-      - upd-v2
-      - upd-v3
-    tags: ['v*.*.*' ]
-  pull_request:
-    branches:
-      - $default-branch
-      - upd-v2
-      - upd-v3
-
+on: [push, pull_request]
 
 jobs:
   build-and-publish-image:
