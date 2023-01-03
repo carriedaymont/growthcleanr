@@ -16,4 +16,5 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           # image-name: mitre/growthcleanr
-          image-tag: ${{ github.event.pull_request.head.ref }}
+          # image-tag: ${{ github.event.pull_request.head.ref }}
+          image-tag: buildtest
