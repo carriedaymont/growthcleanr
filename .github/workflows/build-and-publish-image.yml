@@ -15,5 +15,5 @@ jobs:
         uses: VaultVulp/gp-docker-action@1.5.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          image-name: mitre/growthcleanr
+          # image-name: mitre/growthcleanr
           image-tag: ${{ github.event.pull_request.head.ref }}
