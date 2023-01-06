@@ -1,0 +1,23 @@
+# Adapted from:
+# https://github.com/VaultVulp/gp-docker-action#complete-workflow-example
+name: Build and publish tag
+
+on:
+  push:
+    tags:
+    - "*"
+
+jobs:
+  build-and-publish-image:
+    if: github.repository == 'mitre/growthcleanr'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2.5.0
+
+      - name: Build and publish Docker image
+        uses: VaultVulp/gp-docker-action@1.5.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          image-name: gcr-image
+          extract-git-tag: true
