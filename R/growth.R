@@ -704,6 +704,7 @@ cleangrowth <- function(subjid,
 #'
 #' @param path Path to supplied reference anthro data. Defaults to package anthro tables.
 #' @param cdc.only Whether or not only CDC data should be used. Defaults to false.
+#' @param infants boolean on if infants version is being used. will be merged in to main algorithm.
 #'
 #' @return Function for calculating BMI based on measurement, age in days, sex, and measurement value.
 #' @export
@@ -716,7 +717,7 @@ cleangrowth <- function(subjid,
 #' # Return calculating function while specifying a path and using only CDC data
 #' afunc <- read_anthro(path = system.file("extdata", package = "growthcleanr"),
 #'                      cdc.only = TRUE)
-read_anthro <- function(path = "", cdc.only = FALSE) {
+read_anthro <- function(path = "", cdc.only = FALSE, infants = FALSE) {
   # avoid "no visible bindings" warning
   src <- param <- sex <- age <- ret <- m <- NULL
   csdneg <- csdpos <- s <- NULL
@@ -742,9 +743,19 @@ read_anthro <- function(path = "", cdc.only = FALSE) {
     system.file(file.path("extdata", "growthfile_cdc_ext.csv.gz"), package = "growthcleanr"),
     file.path(path, "growthfile_cdc_ext.csv.gz")
   )
+  #infants/default reference
+  growth_cdc_bridge_ext_path <- ifelse(
+    path == "",
+    system.file(file.path("extdata", "gc-recenterfile-2022-12-20.gz"), package = "growthcleanr"),
+    file.path(path, "gc-recenterfile-2022-12-20.gz")
+  )
 
-
-  growth_cdc_ext <- read.csv(gzfile(growth_cdc_ext_path))
+  growth_cdc_ext <-
+    if (!infants){
+      read.csv(gzfile(growth_cdc_ext_path))
+    } else {
+      read.csv(gzfile(growth_cdc_bridge_ext_path))
+    }
 
   l <- list(
     with(
