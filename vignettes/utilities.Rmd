@@ -28,6 +28,9 @@ a BMI > 39, and it is likely that these BMIs represent data entry errors. For th
 cases, extended BMIz is set to 8.21, a value that is slightly greater than the largest
 value that can be calculated.
 
+The CDC SAS macro was updated in December 2022, and `ext_bmiz()` has been
+updated to match it as of growthcleanr v2.1.0.
+
 ## Converting long growthcleanr data to wide format w/BMI
 
 Because `ext_bmiz()` performs cross-sectional analysis of BMI, observation data must be
