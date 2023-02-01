@@ -96,13 +96,26 @@ To install and run `growthcleanr` using Docker, open the PowerShell on Windows,
 or open the Terminal on macOS, and enter this `docker` command:
 
 ```{bash, eval = FALSE}
-% docker run -it mitre/growthcleanr:latest R
+% docker run -it ghcr.io/mitre/growthcleanr/gcr-image:latest R
 ```
 
-The first time this command is run, it might take a few minutes to download and
-extract several necessary components, but this should be fully automated. If
-successful, you should see an R prompt, from which you can use `growthcleanr` as
-described below.
+The image tag `latest` in the example above will refer to the latest version of
+the package available on the main branch of the
+[mitre/growthcleanr](https://github.com/mitre/growthcleanr) repository, which is
+typically in close sync with the upstream
+[carriedaymont/growthcleanr](https://github.com/carriedaymont/growthcleanr)
+repository. This will usually be the latest released version of `growthcleanr`.
+To explicitly choose a release by name, replace `latest` with the release tag,
+e.g. for the released package `v2.1.0`:
+
+```{bash, eval = FALSE}
+% docker run -it ghcr.io/mitre/growthcleanr/gcr-image:v2.1.0 R
+```
+
+Whichever package you use, the first time this command is run, it might take a
+few minutes to download and extract several necessary components, but this
+should be fully automated. If successful, you should see an R prompt, from which
+you can use the `growthcleanr` package immediately.
 
 This R environment is virtualized inside Docker, however, and isolated from your
 local machine. Because of this, you will need to map a local folder on your
@@ -111,7 +124,8 @@ you are on Windows, and your data is in `C:\Users\exampleuser\analysis`, specify
 a mapping using the added `-v` step below:
 
 ```{bash, eval = FALSE}
-% docker run -it -v C:\Users\exampleusers\analysis:/usr/src/app mitre/growthcleanr:latest R
+% docker run -it -v C:\Users\exampleusers\analysis:/usr/src/app \
+    ghcr.io/mitre/growthcleanr/gcr-image:latest R
 ```
 
 Note that the slashes in file paths reverse direction from the reference to the
@@ -127,7 +141,8 @@ If you are on macOS, and your data is in `/Users/exampleuser/analysis`, specify
 a folder mapping like this:
 
 ```{bash, eval = FALSE}
-% docker run -it -v /Users/exampleuser/analysis:/usr/src/app mitre/growthcleanr:latest R
+% docker run -it -v /Users/exampleuser/analysis:/usr/src/app \
+    ghcr.io/mitre/growthcleanr/gcr-image:latest R
 ```
 
 If you mapped a folder, then inside the Docker environment's R prompt, when you

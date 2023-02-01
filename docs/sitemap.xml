@@ -49,13 +49,10 @@
     <loc>/index.html</loc>
   </url>
   <url>
-    <loc>/LICENSE-text.html</loc>
-  </url>
-  <url>
-    <loc>/LICENSE.html</loc>
-  </url>
-  <url>
     <loc>/news/index.html</loc>
+  </url>
+  <url>
+    <loc>/reference/CDCref_d.html</loc>
   </url>
   <url>
     <loc>/reference/acf_answers.html</loc>
@@ -65,9 +62,6 @@
   </url>
   <url>
     <loc>/reference/bmianthro.html</loc>
-  </url>
-  <url>
-    <loc>/reference/CDCref_d.html</loc>
   </url>
   <url>
     <loc>/reference/cleangrowth.html</loc>
@@ -121,13 +115,13 @@
     <loc>/reference/tanner_ht_vel_with_2sd.html</loc>
   </url>
   <url>
-    <loc>/reference/testacf.html</loc>
-  </url>
-  <url>
     <loc>/reference/test_syngrowth_sas_output_compare.html</loc>
   </url>
   <url>
     <loc>/reference/test_syngrowth_wide.html</loc>
+  </url>
+  <url>
+    <loc>/reference/testacf.html</loc>
   </url>
   <url>
     <loc>/reference/weianthro.html</loc>
