@@ -4,6 +4,7 @@ pkgdown_sha: ~
 articles:
   adult-algorithm: adult-algorithm.html
   configuration: configuration.html
+  developer-guidelines: developer-guidelines.html
   installation: installation.html
   large-data-sets: large-data-sets.html
   next-steps: next-steps.html
@@ -12,4 +13,3 @@ articles:
   usage: usage.html
   utilities: utilities.html
 last_built: 2023-02-01T22:38Z
-
