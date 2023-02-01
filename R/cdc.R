@@ -28,9 +28,9 @@ set_cols_first <- function(DT, cols, intersection = TRUE)
     )))
   }
   else {
-    return(setcolorder(DT, c(cols, setdiff(names(
-      DT
-    ), cols))))
+    return(setcolorder(DT, c(cols, setdiff(
+      names(DT), cols
+    ))))
   }
 }
 
@@ -169,14 +169,16 @@ ext_bmiz <- function (data,
   data <- data[between(age, 24, 240) & !(is.na(wt) & is.na(ht)),
                .(seq_, sexn, age, wt, ht, bmi)]
   v1 <- c("seq_", "id", "sexn", "age", "wt", "ht", "bmi")
+
   dref_path <-
     ifelse(
       ref.data.path == "",
-      system.file("extdata/CDCref_d.csv.gz",
-                  package = "growthcleanr"),
-      paste(ref.data.path, "CDCref_d.csv.gz",
-            sep = "")
+      system.file("extdata/CDCref_d.csv.gz", package = "growthcleanr"),
+      paste(ref.data.path, "CDCref_d.csv.gz", sep = "")
     )
+  # Note: referring to underscore-leading column as `_AGEMOS1`, i.e. with
+  # backticks, results in a no visible binding warning, but vars can't start
+  # with an "_", so we have to use backticks at assignment up above as well.
   dref <- fread(dref_path)[`_AGEMOS1` > 23 & denom == "age"]
   names(dref) <- tolower(names(dref))
   names(dref) <- gsub("^_", "", names(dref))
@@ -194,6 +196,7 @@ ext_bmiz <- function (data,
                                 mht2,
                                 sht2)]
   names(d20) <- gsub("2", "", names(d20))
+
   dref <- dref[, .(sexn,
                    agemos1,
                    lwt1,
@@ -206,6 +209,7 @@ ext_bmiz <- function (data,
                    mht1,
                    sht1)]
   names(dref) <- gsub("1", "", names(dref))
+
   dref <- rbindlist(list(dref, d20))
   adj_bmi_met <- dref[agemos == 240, .(sexn, mbmi, sbmi)] %>%
     setnames(., c("sexn", "mref", "sref"))
@@ -231,6 +235,8 @@ ext_bmiz <- function (data,
       fapp <- function(vars, ...)
         approx(.d$age, vars,
                xout = uages)$y
+      # Note: specifying v with "..v" gives no visible binding warning, use
+      # with option
       data.frame(sapply(.d[, v, with = FALSE], fapp))
     }
     dref <- rbindlist(lapply(1:2, fapprox))
