@@ -135,6 +135,8 @@ ext_bmiz <- function (data,
             adjust.integer.age = TRUE,
             ref.data.path = "")
   {
+
+    # avoid "no visible binding" warnings
     agemos <- agemos1 <- agemos2 <- agey <- NULL
     bmip95 <- bp <- bz <- denom <- ebp <- ebz <- haz <- l <- NULL
     lbmi1 <- lbmi2 <- lht1 <- lht2 <- lwt1 <- lwt2 <- m <- NULL
@@ -142,11 +144,14 @@ ext_bmiz <- function (data,
     mwt2 <- p95 <- s <- sbmi <- sbmi1 <- sbmi2 <- seq_ <- NULL
     sex <- sht1 <- sht2 <- sigma <- sref <- swt1 <- NULL
     swt2 <- waz <- z1 <- `_AGEMOS1` <- NULL
+
     setDT(data)
+
     setnames(data,
              old = c(age, wt, ht, bmi),
-             new = c("age",
-                     "wt", "ht", "bmi"))
+             new = c("age", "wt", "ht", "bmi"))
+
+    # needed for merging back with original data
     data$seq_ <- 1L:nrow(data)
     dorig <- copy(data)
     if (adjust.integer.age) {
@@ -155,13 +160,12 @@ ext_bmiz <- function (data,
       }
     }
 
-    # DF changes (and then replace 'sex' with 'sexn' thoughout (which I've done):
     data[, sexn := toupper(substr(sex, 1, 1))]
     data[, sexn := fcase(sexn %in% c(1, 'B', 'M'), 1L,
                          sexn %in% c(2, 'G', 'F'), 2L)]
 
     data <- data[between(age, 24, 240) & !(is.na(wt) & is.na(ht)),
-                 .(seq_, sexn, age, wt, ht, bmi)] # DF changes change sex to sexn
+                 .(seq_, sexn, age, wt, ht, bmi)]
     v1 <- c("seq_", "id", "sexn", "age", "wt", "ht", "bmi")
     dref_path <-
       ifelse(
@@ -174,7 +178,7 @@ ext_bmiz <- function (data,
     dref <- fread(dref_path)[`_AGEMOS1` > 23 & denom == "age"]
     names(dref) <- tolower(names(dref))
     names(dref) <- gsub("^_", "", names(dref))
-    setnames(dref, 'sex', 'sexn') # DF changes
+    setnames(dref, 'sex', 'sexn')
 
     d20 <- dref[agemos2 == 240, .(sexn,
                                   agemos2,
@@ -229,39 +233,45 @@ ext_bmiz <- function (data,
       }
       dref <- rbindlist(lapply(1:2, fapprox))
     }
+
     setkey(data, sexn, age)
     setkey(dref, sexn, age)
     dt <- dref[data]
-    dt[, `:=`(c("waz", "mwaz"), z_score(dt$wt, dt$wl, dt$wm,
-                                        dt$ws))]
-    dt[, `:=`(c("haz", "mhaz"), z_score(dt$ht, dt$hl, dt$hm,
-                                        dt$hs))]
+
+    dt[, `:=`(c("waz", "mwaz"), z_score(dt$wt, dt$wl, dt$wm, dt$ws))]
+    dt[, `:=`(c("haz", "mhaz"), z_score(dt$ht, dt$hl, dt$hm, dt$hs))]
     dt[, `:=`(c("bz", "mbz"), z_score(dt$bmi, dt$bl, dt$bm, dt$bs))]
+
     setDT(dt)
     setnames(dt, c("bl", "bm", "bs"), c("l", "m", "s"))
     dt[, `:=`(c("wl", "wm", "ws", "hl", "hm", "hs"), NULL)]
+
     dt <- mutate(
       dt,
       bp = 100 * pnorm(bz),
-      p95 = m * (1 + l *
-                   s * qnorm(0.95)) ^
-        (1 / l),
+      p95 = m * (1 + l * s * qnorm(0.95)) ^ (1 / l),
       p97 = m * (1 + l * s * qnorm(0.97)) ^ (1 / l),
       bmip95 = 100 * (bmi / p95),
       wp = 100 * pnorm(waz),
-      hp = 100 *
-        pnorm(haz),
+      hp = 100 * pnorm(haz),
+
+      # other BMI metrics -- PMID 31439056
       z1 = ((bmi / m) - 1) / s,
-      dist1 = z1 * m *
-        s,
+      # LMS formula when L=1: ((BMI/M)-1)/S
+      dist1 = z1 * m * s,
+      # unadjusted distance from median
       adist1 = z1 * sref * mref,
-      perc1 = z1 * 100 *
-        s,
+      # Adjusted (to age 20y) dist from median
+      perc1 = z1 * 100 * s,
+      # unadjusted %distance from median
       aperc1 = z1 * 100 * sref,
-      obese = 1L * (bmi >=
-                      p95),
+      # adj %distance from median
+
+      obese = 1L * (bmi >= p95),
       sev_obese = 1L * (bmip95 >= 120)
     ) %>% setDT()
+
+    # now create Extended z-score for BMI >=95th P
     dt[, `:=`(ebz = bz,
               ebp = bp,
               agey = age / 12)]
@@ -269,14 +279,14 @@ ext_bmiz <- function (data,
       sigma,
       fifelse(
         sexn == 1,
-        0.3728 + 0.5196 * agey -
-          0.0091 * agey ^ 2,
+        0.3728 + 0.5196 * agey - 0.0091 * agey ^ 2,
         0.8334 + 0.3712 * agey - 0.0011 * agey ^ 2
       )
     )]
     dt[bp >= 95, `:=`(ebp, 90 + 10 * pnorm((bmi - p95) / sigma))]
     dt[bp >= 95, `:=`(ebz, qnorm(ebp / 100))]
     dt[bp > 99 & is.infinite(ebz), `:=`(ebz, 8.21)]
+
     x <- c("agey", "mref", "sref", "sexn", "wt", "ht", "bmi")
     dt[, `:=`((x), NULL)]
     setnames(
@@ -310,7 +320,8 @@ ext_bmiz <- function (data,
         "bmi_m",
         "bmi_s"
       )
-    ) # DF changes
+    )
+
     v <- c(
       "seq_",
       "bmiz",
@@ -330,13 +341,16 @@ ext_bmiz <- function (data,
       "original_bmiz",
       "sev_obese",
       "obese"
-    ) # DF changes
+    )
     dt <- dt[, v, with = FALSE]
+
     setkey(dt, seq_)
     setkey(dorig, seq_)
     dtot <- dt[dorig]
     set_cols_first(dtot, names(dorig))
     dtot[, `:=`(c("seq_"), NULL)]
+
+    # Add labels for convenience
     dtot <-
       dtot %>% labelled::set_variable_labels(
         age = "Age (months)",
@@ -358,7 +372,6 @@ ext_bmiz <- function (data,
         sigma = "Scale parameter for half-normal distribution",
         bmip = "LMS / Extended BMI percentile",
         bmiz = "LMS / Extended BMI z-score",
-        # DF changes
         sev_obese = "BMI >= 120% of 95th percentile (0/1)",
         obese = "BMI >= 95th percentile (0/1)"
       )
