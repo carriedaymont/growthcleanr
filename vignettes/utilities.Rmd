@@ -17,19 +17,23 @@ for weight, height, and BMI. Note that for BMIs ≤ 95th percentile of the CDC
 growth charts, the extended values for BMI are equal to the LMS values. The
 extended values differ only for children who have a BMI > 95th percentile.
 
-The function assumes a variable ‘sex’ (coded as 1=boys / 2=girls) and variables for age
-in months, weight (kg), height (cm), and BMI (weight/ht2). Please be careful with age -
-the units should be months and use the most accurate information available (e.g.,
-23.4928 months. The extended BMIz is the inverse cumulative distribution function (CDF)
-of the extended BMI percentile. If the extended percentile is very close to 100, the
-`qnorm` function in R produces an infinite value. The occurs only if the extended BMI
-percentile is > 99.99999999999999. This occurs infrequently, such as a 48-month-old with
-a BMI > 39, and it is likely that these BMIs represent data entry errors. For these
-cases, extended BMIz is set to 8.21, a value that is slightly greater than the largest
-value that can be calculated.
+The function assumes a variable ‘sex’ (coded as any of '1', 'b', 'B', 'Boys', 'm',
+'M', 'male', or 'Male' for male subjects and any of '2', 'g', 'G', 'Girls', 'f',
+'F', 'female', or 'Female' for female subjects) and variables for age in months, weight (kg),
+height (cm), and BMI (weight/ht2). Please be careful with age - the units should be
+months and use the most accurate information available (e.g., 23.4928 months. The
+extended BMIz is the inverse cumulative distribution function (CDF) of the extended
+BMI percentile. If the extended percentile is very close to 100, the `qnorm` function
+in R produces an infinite value. The occurs only if the extended BMI percentile
+is > 99.99999999999999. This occurs infrequently, such as a 48-month-old with a BMI > 39,
+and it is likely that these BMIs represent data entry errors. For these cases, extended
+BMIz is set to 8.21, a value that is slightly greater than the largest value that can
+be calculated.
 
-The CDC SAS macro was updated in December 2022, and `ext_bmiz()` has been
-updated to match it as of growthcleanr v2.1.0.
+The CDC SAS macro was updated in December 2022, according to the findings of
+[this NCHS report](https://dx.doi.org/10.15620/cdc:121711).  The `ext_bmiz()` function
+has been updated to match it as of growthcleanr v2.1.0.
+
 
 ## Converting long growthcleanr data to wide format w/BMI
 
