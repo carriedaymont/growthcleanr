@@ -155,7 +155,8 @@ cleangrowth <- function(subjid,
                         quietly = TRUE,
                         adult_cutpoint = 20,
                         weight_cap = Inf,
-                        adult_columns_filename = "") {
+                        adult_columns_filename = "",
+                        infants = F) {
   # avoid "no visible binding" warnings
   N <- age_years <- batch <- exclude <- index <- line <- NULL
   newbatch <- sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
@@ -392,10 +393,26 @@ cleangrowth <- function(subjid,
     who_weight <- 3 - (agedays/365.25)
     cdc_weight <- (agedays/365.25) - 1
 
-    data.all[agedays/365.25 >= 1 & agedays/365.25 <= 3,
-             z.orig := (z.orig_cdc*cdc_weight + z.orig_who*who_weight)/2]
-    data.all[agedays/365.25 >= 1 & agedays/365.25 <= 3,
-             sd.orig := (sd.orig_cdc*cdc_weight + sd.orig_who*who_weight)/2]
+    smooth_val <- data.all$agedays/365.25 >= 1 &
+      data.all$agedays/365.25 <= 3 &
+      !data.all$param == "HEADCM"
+    data.all[smooth_val,
+             z.orig := (z.orig_cdc[smooth_val]*cdc_weight[smooth_val] +
+                          z.orig_who[smooth_val]*who_weight[smooth_val])/2]
+    data.all[smooth_val,
+             sd.orig := (sd.orig_cdc[smooth_val]*cdc_weight[smooth_val] +
+                           sd.orig_who[smooth_val]*who_weight[smooth_val])/2]
+
+    # otherwise use WHO and CDC for older and younger, respectively
+    who_val <- data.all$param == "HEADCM" |
+      data.all$agedays/365.25 < 1
+    data.all[who_val, z.orig := z.orig_who[who_val]]
+    data.all[who_val, sd.orig := sd.orig_who[who_val]]
+
+    cdc_val <- data.all$param != "HEADCM" |
+      data.all$agedays/365.25 > 3
+    data.all[cdc_val, z.orig := z.orig_cdc[cdc_val]]
+    data.all[cdc_val, sd.orig := sd.orig_cdc[cdc_val]]
 
     # sort by subjid, param, agedays
     setkey(data.all, subjid, param, agedays)
@@ -434,6 +451,26 @@ cleangrowth <- function(subjid,
     # returns a data table indexed by param, sex, agedays. can use NHANES reference
     # data, derive from input, or use user-supplied data.
     if (!is.data.table(sd.recenter)) {
+      # INFANTS CHANGES:
+      # use recentering file derived from work, independent of sex
+      if (infants){
+        infants_reference_medians_path <- ifelse(
+          ref.data.path == "",
+          system.file(file.path("extdata",
+                                "gc-recenterfile-2022-12-20_format.csv.gz"),
+                      package = "growthcleanr"),
+          file.path(ref.data.path, "gc-recenterfile-2022-12-20_format.csv.gz")
+        )
+        sd.recenter <- fread(infants_reference_medians_path)
+        if (!quietly)
+          cat(
+            sprintf(
+              "[%s] Using infants reference medians...\n",
+              Sys.time()
+            )
+          )
+      }
+
       # Use NHANES medians if the string "nhanes" is specified instead of a data.table
       # or if sd.recenter is not specified as "derive" and N < 5000.
       if ((is.character(sd.recenter) & tolower(sd.recenter) == "nhanes") |
@@ -743,6 +780,8 @@ read_anthro <- function(path = "", cdc.only = FALSE) {
     system.file(file.path("extdata", "growthfile_cdc_ext.csv.gz"), package = "growthcleanr"),
     file.path(path, "growthfile_cdc_ext.csv.gz")
   )
+
+  growth_cdc_ext <- read.csv(gzfile(growth_cdc_ext_path))
 
   l <- list(
     with(
