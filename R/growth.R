@@ -390,8 +390,8 @@ cleangrowth <- function(subjid,
 
     # smooth z-scores/SD scores between ages 1 - 3yo using weighted scores
     # older uses cdc, younger uses who
-    who_weight <- 3 - (agedays/365.25)
-    cdc_weight <- (agedays/365.25) - 1
+    who_weight <- 3 - (data.all$agedays/365.25)
+    cdc_weight <- (data.all$agedays/365.25) - 1
 
     smooth_val <- data.all$agedays/365.25 >= 1 &
       data.all$agedays/365.25 <= 3 &
@@ -406,13 +406,17 @@ cleangrowth <- function(subjid,
     # otherwise use WHO and CDC for older and younger, respectively
     who_val <- data.all$param == "HEADCM" |
       data.all$agedays/365.25 < 1
-    data.all[who_val, z.orig := z.orig_who[who_val]]
-    data.all[who_val, sd.orig := sd.orig_who[who_val]]
+    data.all[who_val | (smooth_val & is.na(data.all$z.orig_cdc)),
+             z.orig := z.orig_who[who_val | (smooth_val & is.na(data.all$z.orig_cdc))]]
+    data.all[who_val | (smooth_val & is.na(data.all$sd.orig_cdc)),
+             sd.orig := sd.orig_who[who_val  | (smooth_val & is.na(data.all$sd.orig_cdc))]]
 
     cdc_val <- data.all$param != "HEADCM" |
       data.all$agedays/365.25 > 3
-    data.all[cdc_val, z.orig := z.orig_cdc[cdc_val]]
-    data.all[cdc_val, sd.orig := sd.orig_cdc[cdc_val]]
+    data.all[cdc_val  | (smooth_val & is.na(data.all$z.orig_who)),
+             z.orig := z.orig_cdc[cdc_val | (smooth_val & is.na(data.all$z.orig_who))]]
+    data.all[cdc_val | (smooth_val & is.na(data.all$sd.orig_who)),
+             sd.orig := sd.orig_cdc[cdc_val | (smooth_val & is.na(data.all$sd.orig_who))]]
 
     # sort by subjid, param, agedays
     setkey(data.all, subjid, param, agedays)
@@ -469,12 +473,14 @@ cleangrowth <- function(subjid,
               Sys.time()
             )
           )
-      }
+      } else if ((is.character(sd.recenter) &
+                  tolower(sd.recenter) == "nhanes") |
+          (!(is.character(sd.recenter) &
+             tolower(sd.recenter) == "derive") & (data.all[, .N] < 5000))) {
 
-      # Use NHANES medians if the string "nhanes" is specified instead of a data.table
-      # or if sd.recenter is not specified as "derive" and N < 5000.
-      if ((is.character(sd.recenter) & tolower(sd.recenter) == "nhanes") |
-          (!(is.character(sd.recenter) & tolower(sd.recenter) == "derive") & (data.all[, .N] < 5000))) {
+        # Use NHANES medians if the string "nhanes" is specified instead of a data.table
+        # or if sd.recenter is not specified as "derive" and N < 5000.
+
         nhanes_reference_medians_path <- ifelse(
           ref.data.path == "",
           system.file(file.path("extdata", "nhanes-reference-medians.csv.gz"), package = "growthcleanr"),
@@ -522,11 +528,21 @@ cleangrowth <- function(subjid,
     }
 
     # ensure recentering medians are sorted correctly
-    setkey(sd.recenter, param, sex, agedays)
+    if (!infants){
+      setkey(sd.recenter, param, sex, agedays)
 
-    # add sd.recenter to data, and recenter
-    setkey(data.all, param, sex, agedays)
-    data.all <- sd.recenter[data.all]
+      # add sd.recenter to data, and recenter
+      setkey(data.all, param, sex, agedays)
+      data.all <- sd.recenter[data.all]
+    } else {
+      # infant recenter doesn't have sex
+      setkey(sd.recenter, param, agedays)
+
+      # add sd.recenter to data, and recenter
+      setkey(data.all, param, agedays)
+      data.all <- sd.recenter[data.all]
+    }
+
     setkey(data.all, subjid, param, agedays)
     data.all[, tbc.sd := sd.orig - sd.median]
 
