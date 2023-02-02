@@ -392,9 +392,9 @@ cleangrowth <- function(subjid,
     who_weight <- 3 - (agedays/365.25)
     cdc_weight <- (agedays/365.25) - 1
 
-    data.all[agedays/365.25 => 1 & agedays/365.25 <= 3,
+    data.all[agedays/365.25 >= 1 & agedays/365.25 <= 3,
              z.orig := (z.orig_cdc*cdc_weight + z.orig_who*who_weight)/2]
-    data.all[agedays/365.25 => 1 & agedays/365.25 <= 3,
+    data.all[agedays/365.25 >= 1 & agedays/365.25 <= 3,
              sd.orig := (sd.orig_cdc*cdc_weight + sd.orig_who*who_weight)/2]
 
     # sort by subjid, param, agedays
@@ -717,7 +717,7 @@ cleangrowth <- function(subjid,
 #' # Return calculating function while specifying a path and using only CDC data
 #' afunc <- read_anthro(path = system.file("extdata", package = "growthcleanr"),
 #'                      cdc.only = TRUE)
-read_anthro <- function(path = "", cdc.only = FALSE, infants = FALSE) {
+read_anthro <- function(path = "", cdc.only = FALSE) {
   # avoid "no visible bindings" warning
   src <- param <- sex <- age <- ret <- m <- NULL
   csdneg <- csdpos <- s <- NULL
@@ -743,19 +743,6 @@ read_anthro <- function(path = "", cdc.only = FALSE, infants = FALSE) {
     system.file(file.path("extdata", "growthfile_cdc_ext.csv.gz"), package = "growthcleanr"),
     file.path(path, "growthfile_cdc_ext.csv.gz")
   )
-  #infants/default reference
-  growth_cdc_bridge_ext_path <- ifelse(
-    path == "",
-    system.file(file.path("extdata", "gc-recenterfile-2022-12-20.gz"), package = "growthcleanr"),
-    file.path(path, "gc-recenterfile-2022-12-20.gz")
-  )
-
-  growth_cdc_ext <-
-    if (!infants){
-      read.csv(gzfile(growth_cdc_ext_path))
-    } else {
-      read.csv(gzfile(growth_cdc_bridge_ext_path))
-    }
 
   l <- list(
     with(
