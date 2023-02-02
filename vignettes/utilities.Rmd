@@ -7,7 +7,6 @@ vignette: >
   %\usepackage[utf8]{inputenc}
 ---
 
-
 The CDC provides a
 [SAS macro for computing BMI percentiles and Z-scores](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm).
 The function `ext_bmiz()`, included in `growthcleanr`, provides an equivalent
@@ -17,37 +16,38 @@ for weight, height, and BMI. Note that for BMIs ≤ 95th percentile of the CDC
 growth charts, the extended values for BMI are equal to the LMS values. The
 extended values differ only for children who have a BMI > 95th percentile.
 
-The function assumes a variable ‘sex’ (coded as any of '1', 'b', 'B', 'Boys', 'm',
-'M', 'male', or 'Male' for male subjects and any of '2', 'g', 'G', 'Girls', 'f',
-'F', 'female', or 'Female' for female subjects) and variables for age in months, weight (kg),
-height (cm), and BMI (weight/ht2). Please be careful with age - the units should be
-months and use the most accurate information available (e.g., 23.4928 months. The
-extended BMIz is the inverse cumulative distribution function (CDF) of the extended
-BMI percentile. If the extended percentile is very close to 100, the `qnorm` function
-in R produces an infinite value. The occurs only if the extended BMI percentile
-is > 99.99999999999999. This occurs infrequently, such as a 48-month-old with a BMI > 39,
-and it is likely that these BMIs represent data entry errors. For these cases, extended
-BMIz is set to 8.21, a value that is slightly greater than the largest value that can
-be calculated.
+The function assumes a variable ‘sex’
+
+and variables for age in months, weight (kg), height (cm), and BMI (weight/ht2).
+Please be careful with age - the units should be months and use the most
+accurate information available (e.g., 23.4928 months. The extended BMIz is the
+inverse cumulative distribution function (CDF) of the extended BMI percentile.
+If the extended percentile is very close to 100, the `qnorm` function in R
+produces an infinite value. The occurs only if the extended BMI percentile is >
+99.99999999999999. This occurs infrequently, such as a 48-month-old with a BMI >
+39, and it is likely that these BMIs represent data entry errors. For these
+cases, extended BMIz is set to 8.21, a value that is slightly greater than the
+largest value that can be calculated.
 
 The CDC SAS macro was updated in December 2022, according to the findings of
-[this NCHS report](https://dx.doi.org/10.15620/cdc:121711).  The `ext_bmiz()` function
-has been updated to match it as of growthcleanr v2.1.0.
-
+[this NCHS report](https://dx.doi.org/10.15620/cdc:121711). The `ext_bmiz()`
+function has been updated to match it as of growthcleanr v2.1.0.
 
 ## Converting long growthcleanr data to wide format w/BMI
 
-Because `ext_bmiz()` performs cross-sectional analysis of BMI, observation data must be
-in a wide format, i.e. with height and weight information on the same row. This is
-distinct from `cleangrowth()`, which performs longitudinal analysis on all observations
-for each subject, presented in a long format with one observation per row. To facilitate
-use of both functions, `growthcleanr` includes utility functions to transform data used
-with `cleangrowth()` for use with `ext_bmiz()`. They are optimized to move data directly
-from the output of `cleangrowth()` into input for `ext_bmiz()`, but have options to
-support independent use as well.
+Because `ext_bmiz()` performs cross-sectional analysis of BMI, observation data
+must be in a wide format, i.e. with height and weight information on the same
+row. This is distinct from `cleangrowth()`, which performs longitudinal analysis
+on all observations for each subject, presented in a long format with one
+observation per row. To facilitate use of both functions, `growthcleanr`
+includes utility functions to transform data used with `cleangrowth()` for use
+with `ext_bmiz()`. They are optimized to move data directly from the output of
+`cleangrowth()` into input for `ext_bmiz()`, but have options to support
+independent use as well.
 
-Using the `syngrowth` example dataset, to convert the data after it has been cleaned by
-`cleangrowth()` for use with `ext_bmiz()`, use `longwide()` and `simple_bmi()`:
+Using the `syngrowth` example dataset, to convert the data after it has been
+cleaned by `cleangrowth()` for use with `ext_bmiz()`, use `longwide()` and
+`simple_bmi()`:
 
 ```{r, eval = FALSE}
 # Use the built-in utility function to convert the input observations to wide
@@ -69,10 +69,10 @@ names(cleaned_data)
 [1] "id"          "subjid"      "sex"         "agedays"     "param"       "measurement" "gcr_result"
 ```
 
-The wide dataset `cleaned_data_wide` will include rows with aligned height and weight
-measurements drawn from the observations in `cleaned_data` marked by `cleangrowth()` for
-inclusion. As such, it will be a shorter dataset (fewer rows) based on fewer
-observations.
+The wide dataset `cleaned_data_wide` will include rows with aligned height and
+weight measurements drawn from the observations in `cleaned_data` marked by
+`cleangrowth()` for inclusion. As such, it will be a shorter dataset (fewer
+rows) based on fewer observations.
 
 ```{r, eval = FALSE}
 dim(cleaned_data)
@@ -91,13 +91,13 @@ head(cleaned_data_wide)
 6 002986c5-354d-bb9d-c180-4ce26813ca28 60.1594 721.9128   2 69.4 83343 151.1 83342 21973.22
 ```
 
-In this example, the subject identifiers previously marked as `subjid` are now in the
-`id` column; individual identifiers for observations of a single parameter are not
-present.
+In this example, the subject identifiers previously marked as `subjid` are now
+in the `id` column; individual identifiers for observations of a single
+parameter are not present.
 
-`longwide()` can be called with name mapping parameters if your input set uses different
-column names. For example, if `my_cleaned_data` specifies age in days as `aged` and
-parameter type as `type`, specify each, with quotes:
+`longwide()` can be called with name mapping parameters if your input set uses
+different column names. For example, if `my_cleaned_data` specifies age in days
+as `aged` and parameter type as `type`, specify each, with quotes:
 
 ```{r, eval = FALSE}
 head(my_cleaned_data)
@@ -135,16 +135,19 @@ formatted data frame directly to `ext_bmiz()`.
 
 ## Recoding sex values
 
-Note that `ext_bmiz()` expects the `sex` variable to be coded as a numeric value
-of `1` (male) or `2` (female). This difference from the `growthcleanr` [data
-preparation specification](quickstart.html#data-preparation-1.) sustains
+Note that `ext_bmiz()` allows for the `sex` variable to be coded using
+[a range of possible values](#computing-bmi-percentiles-and-z-scores), but not
+the same `0` and `1` values as `cleangrowth()`. This difference from the
+`growthcleanr`
+[data preparation specification](quickstart.html#data-preparation-1.) sustains
 compatibility with the CDC SAS macro. The `longwide()` function will handle this
-conversion given the expected input values of `0` (male) or `1` (female).
+conversion from `growthcleanr`'s `0` (male) or `1` (female), but not from other
+coded values.
 
-If you are using different input data for `ext_bmiz()`, ensure the `sex`
-variable in your data set is properly coded. To do so, use `recode_sex()`. For
-example, if you have data in the PCORnet CDM format, and want to prepare it for
-`ext_bmiz()`:
+If you are using input data with different value codes for `sex` with
+`ext_bmiz()`, use `recode_sex()` to ensure your values are recoded first. For
+example, if you have data in the PCORnet CDM format (using `M` and `F`), and
+want to prepare it for `ext_bmiz()`:
 
 ```{r, eval = FALSE}
 recode_sex(
@@ -163,7 +166,9 @@ output to match external specifications.
 
 ## Computing BMI percentiles and Z-scores
 
-With data in wide format with BMI, and with sex variables properly coded,
+With data in wide format with BMI, and with `sex` values properly coded (as any
+of '1', 'b', 'B', 'Boys', 'm', 'M', 'male', or 'Male' for male subjects and any
+of '2', 'g', 'G', 'Girls', 'f', 'F', 'female', or 'Female' for female subjects),
 `ext_bmiz()` can be called:
 
 ```{r, eval = FALSE}
@@ -198,7 +203,7 @@ head(cleaned_data_bmiz)
 The output columns include:
 
 | variable                     | description                                                                                                                                                                                                                       |
-| -------------------------    | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------                                                 |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | bmi                          | BMI                                                                                                                                                                                                                               |
 | bmiz, bmip                   | LMS / Extended z-score and percentile                                                                                                                                                                                             |
 | waz, wp                      | LMS Weight-for-sex/age z-score and percentile                                                                                                                                                                                     |
@@ -211,43 +216,44 @@ The output columns include:
 | sev_obese                    | BMI >= 120% of 95th percentile (0/1)                                                                                                                                                                                              |
 | obese                        | BMI >= 95th percentile (0/1)                                                                                                                                                                                                      |
 
-For convenience, these labels are available on the output of `ext_bmiz()`, e.g., when
-viewed in RStudio with `View(cleaned_data_bmi)`.
+For convenience, these labels are available on the output of `ext_bmiz()`, e.g.,
+when viewed in RStudio with `View(cleaned_data_bmi)`.
 
-Like `longwide()`, `ext_bmiz()` also includes options for mapping alternate column
-names, for age, weight, height, and BMI. The default column names are the same as the
-output from `longwide()` for convenience. If you have different column names, specify
-the column names without quotes. For example, for a dataset using "heightcm" and
-"weightkg" instead of "ht" and "wt":
+Like `longwide()`, `ext_bmiz()` also includes options for mapping alternate
+column names, for age, weight, height, and BMI. The default column names are the
+same as the output from `longwide()` for convenience. If you have different
+column names, specify the column names without quotes. For example, for a
+dataset using "heightcm" and "weightkg" instead of "ht" and "wt":
 
 ```{r, eval = FALSE}
 my_cleaned_data_bmiz <- ext_bmiz(my_cleaned_data_wide_bmi, ht = heightcm, wt = weightkg)
 ```
 
-For `ext_bmiz()`, use the most precise age in months available. If an input dataset only
-has age in months as integer values, by default `ext_bmiz()` will automatically convert
-these to double values and add `0.5` to account for the distribution of actual ages over
-the range of days within a month. This is enabled with the option `adjust.integer.age`,
-set to `TRUE` by default. Specify `FALSE` to disable.
+For `ext_bmiz()`, use the most precise age in months available. If an input
+dataset only has age in months as integer values, by default `ext_bmiz()` will
+automatically convert these to double values and add `0.5` to account for the
+distribution of actual ages over the range of days within a month. This is
+enabled with the option `adjust.integer.age`, set to `TRUE` by default. Specify
+`FALSE` to disable.
 
 ```{r, eval = FALSE}
 my_cleaned_data_bmi <- ext_bmiz(my_cleaned_data_wide, adjust.integer.age = FALSE)
 ```
 
-`ext_bmiz()` uses reference data provided by the CDC, included in the `growthcleanr`
-package as `inst/extdata/CDCref_d.csv`. This file is automatically loaded and used by
-default. If you are working with a different reference dataset or developing the
-`growthcleanr` package, specify an alternate path to this file with `ref.data.path`, as
-for `cleangrowth()`.
+`ext_bmiz()` uses reference data provided by the CDC, included in the
+`growthcleanr` package as `inst/extdata/CDCref_d.csv`. This file is
+automatically loaded and used by default. If you are working with a different
+reference dataset or developing the `growthcleanr` package, specify an alternate
+path to this file with `ref.data.path`, as for `cleangrowth()`.
 
 ## Related tools
 
-The CDC provides a [SAS Program for the 2000 CDC Growth
-Charts](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm) which can
-also be used to identify biologically implausible values using a different approach, as
-also implemented for `growthcleanr` in the function `ext_bmiz()`, described above. The
-SAS program was updated in December, 2022, and this function has been updated to match it
-as of growthcleanr v2.1.0.
+The CDC provides a
+[SAS Program for the 2000 CDC Growth Charts](https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm)
+which can also be used to identify biologically implausible values using a
+different approach, as also implemented for `growthcleanr` in the function
+`ext_bmiz()`, described above. The SAS program was updated in December, 2022,
+and this function has been updated to match it as of growthcleanr v2.1.0.
 
 [GrowthViz](https://github.com/mitre/GrowthViz) provides insights into how
 `growthcleanr` assesses data, packaged in a Jupyter notebook. It ships with the
