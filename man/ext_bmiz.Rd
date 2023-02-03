@@ -44,8 +44,9 @@ differ only for children who have a BMI > 95th percentile.
 \details{
 This function should produce output equivalent to the SAS macro provided at
 https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm. The macro
-was updated in December, 2022, and this function has been updated to match it
-as of growthcleanr v2.1.0.
+was updated in December, 2022, according to the findings of the NCHS
+report available at https://dx.doi.org/10.15620/cdc:121711. This function has
+been updated to match it as of growthcleanr v2.1.0.
 
 The extended BMIz is the inverse cumulative distribution function (CDF) of
 the extended BMI percentile. If the extended percentile is very close to
