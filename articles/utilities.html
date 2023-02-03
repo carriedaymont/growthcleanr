@@ -33,7 +33,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">growthcleanr</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.3</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.1.0</span>
       </span>
     </div>
 
@@ -114,7 +114,7 @@
       <h1 data-toc-skip>Utilities for computing pediatric BMI
 percentiles, Z-scores, and related tools</h1>
             
-            <h4 data-toc-skip class="date">2022-11-21</h4>
+            <h4 data-toc-skip class="date">2023-02-03</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/utilities.Rmd" class="external-link"><code>vignettes/utilities.Rmd</code></a></small>
       <div class="hidden name"><code>utilities.Rmd</code></div>
@@ -132,18 +132,30 @@ percentile), extended BMIz, and the CDC LMS z-scores for weight, height,
 and BMI. Note that for BMIs ≤ 95th percentile of the CDC growth charts,
 the extended values for BMI are equal to the LMS values. The extended
 values differ only for children who have a BMI &gt; 95th percentile.</p>
-<p>The function assumes a variable ‘sex’ (coded as 1=boys / 2=girls) and
-variables for age in months, weight (kg), height (cm), and BMI
-(weight/ht2). Please be careful with age - the units should be months
-and use the most accurate information available (e.g., 23.4928 months.
-The extended BMIz is the inverse cumulative distribution function (CDF)
-of the extended BMI percentile. If the extended percentile is very close
-to 100, the <code>qnorm</code> function in R produces an infinite value.
-The occurs only if the extended BMI percentile is &gt;
-99.99999999999999. This occurs infrequently, such as a 48-month-old with
-a BMI &gt; 39, and it is likely that these BMIs represent data entry
-errors. For these cases, extended BMIz is set to 8.21, a value that is
-slightly greater than the largest value that can be calculated.</p>
+<p>The function assumes a variable ‘sex’ and variables for age in
+months, weight (kg), height (cm), and BMI (weight/ht2). Please be
+careful with age - the units should be months and use the most accurate
+information available (e.g., 23.4928 months. The extended BMIz is the
+inverse cumulative distribution function (CDF) of the extended BMI
+percentile. If the extended percentile is very close to 100, the
+<code>qnorm</code> function in R produces an infinite value. The occurs
+only if the extended BMI percentile is &gt; 99.99999999999999. This
+occurs infrequently, such as a 48-month-old with a BMI &gt; 39, and it
+is likely that these BMIs represent data entry errors. For these cases,
+extended BMIz is set to 8.21, a value that is slightly greater than the
+largest value that can be calculated.</p>
+<p>The <code><a href="../reference/longwide.html">longwide()</a></code> function provides a convenient way to
+prepare data for use with <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>. The example in the
+next section shows a potential workflow for taking the “long” (one
+observation per row) data from <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code> and converting
+it to the “wide” (height and weight on one line) format required by
+<code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>. An additional function
+<code><a href="../reference/recode_sex.html">recode_sex()</a></code> supports recoding coded values for
+<code>sex</code> from one value set to another.</p>
+<p>The CDC SAS macro was updated in December 2022, according to the
+findings of <a href="https://dx.doi.org/10.15620/cdc:121711" class="external-link">this NCHS
+report</a>. The <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> function has been updated to
+match it as of growthcleanr v2.1.0.</p>
 <div class="section level2">
 <h2 id="converting-long-growthcleanr-data-to-wide-format-wbmi">Converting long growthcleanr data to wide format w/BMI<a class="anchor" aria-label="anchor" href="#converting-long-growthcleanr-data-to-wide-format-wbmi"></a>
 </h2>
@@ -223,9 +235,10 @@ forward values along with included records for the BMI calculation:</p>
 <span>  long_df <span class="op">=</span> <span class="va">cleaned_data</span>,</span>
 <span>  inclusion_types<span class="op">=</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Include"</span>, <span class="st">"Exclude-Carried-Forward"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>An additional option, <code>include_all</code>, set to
-<code>FALSE</code> by default, will include all observations for
-transformation.</p>
+<p>Another option, <code>include_all</code>, set to <code>FALSE</code>
+by default, will include all observations for transformation. Additional
+options provide flexibility to preserve additional columns and unmatched
+observation rows.</p>
 <p>See <code><a href="../reference/longwide.html">longwide()</a></code> for full details.</p>
 <p>With wide data in hand, output taken directly from
 <code><a href="../reference/longwide.html">longwide()</a></code> can have BMI added with
@@ -237,18 +250,20 @@ to <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>.</p>
 <div class="section level2">
 <h2 id="recoding-sex-values">Recoding sex values<a class="anchor" aria-label="anchor" href="#recoding-sex-values"></a>
 </h2>
-<p>Note that <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> expects the <code>sex</code>
-variable to be coded as a numeric value of <code>1</code> (male) or
-<code>2</code> (female). This difference from the
+<p>Note that <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> allows for the <code>sex</code>
+variable to be coded using <a href="#computing-bmi-percentiles-and-z-scores">a range of possible
+values</a>, but not the same <code>0</code> and <code>1</code> values as
+<code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>. This difference from the
 <code>growthcleanr</code> <a href="quickstart.html#data-preparation-1.">data preparation
 specification</a> sustains compatibility with the CDC SAS macro. The
-<code><a href="../reference/longwide.html">longwide()</a></code> function will handle this conversion given the
-expected input values of <code>0</code> (male) or <code>1</code>
-(female).</p>
-<p>If you are using different input data for <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>,
-ensure the <code>sex</code> variable in your data set is properly coded.
-To do so, use <code><a href="../reference/recode_sex.html">recode_sex()</a></code>. For example, if you have data
-in the PCORnet CDM format, and want to prepare it for
+<code><a href="../reference/longwide.html">longwide()</a></code> function will handle this conversion from
+<code>growthcleanr</code>’s <code>0</code> (male) or <code>1</code>
+(female), but not from other coded values.</p>
+<p>If you are using input data with different value codes for
+<code>sex</code> with <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, use
+<code><a href="../reference/recode_sex.html">recode_sex()</a></code> to ensure your values are recoded first. For
+example, if you have data in the PCORnet CDM format (using
+<code>M</code> and <code>F</code>), and want to prepare it for
 <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/recode_sex.html">recode_sex</a></span><span class="op">(</span></span>
@@ -267,35 +282,56 @@ output to match external specifications.</p>
 <div class="section level2">
 <h2 id="computing-bmi-percentiles-and-z-scores">Computing BMI percentiles and Z-scores<a class="anchor" aria-label="anchor" href="#computing-bmi-percentiles-and-z-scores"></a>
 </h2>
-<p>With data in wide format with BMI, and with sex variables properly
-coded, <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> can be called:</p>
+<p>With data in wide format with BMI, and with <code>sex</code> values
+properly coded (as any of ‘1’, ‘b’, ‘B’, ‘Boys’, ‘m’, ‘M’, ‘male’, or
+‘Male’ for male subjects and any of ‘2’, ‘g’, ‘G’, ‘Girls’, ‘f’, ‘F’,
+‘female’, or ‘Female’ for female subjects), <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> can
+be called:</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>cleaned_data_bmiz <span class="ot">&lt;-</span> <span class="fu">ext_bmiz</span>(cleaned_data_bmi)</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(cleaned_data_bmiz)</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>           id    agey     agem      bmi sex   wt     ht agedays      age     bmi_l    bmi_m      bmi_s         waz    mod_waz        haz    mod_haz     bmiz  mod_bmiz</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span><span class="sc">:</span> <span class="dv">1000287994</span> <span class="fl">10.0301</span> <span class="fl">120.3612</span> <span class="fl">22.84087</span>   <span class="dv">1</span> <span class="fl">40.1</span> <span class="fl">132.50</span>    <span class="dv">3661</span> <span class="fl">120.3612</span> <span class="sc">-</span><span class="fl">2.767881</span> <span class="fl">16.64016</span> <span class="fl">0.12002409</span>  <span class="fl">1.09852664</span>  <span class="fl">0.8417277</span> <span class="sc">-</span><span class="fl">0.9597118</span> <span class="sc">-</span><span class="fl">0.9717678</span> <span class="fl">1.757419</span> <span class="fl">1.5409867</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="dv">2</span><span class="sc">:</span> <span class="dv">1000287994</span> <span class="fl">11.0466</span> <span class="fl">132.5592</span> <span class="fl">22.84087</span>   <span class="dv">1</span> <span class="fl">40.1</span> <span class="fl">132.50</span>    <span class="dv">4032</span> <span class="fl">132.5592</span> <span class="sc">-</span><span class="fl">2.589785</span> <span class="fl">17.20379</span> <span class="fl">0.12676206</span>  <span class="fl">0.52509455</span>  <span class="fl">0.3595874</span> <span class="sc">-</span><span class="fl">1.6331550</span> <span class="sc">-</span><span class="fl">1.6408514</span> <span class="fl">1.584028</span> <span class="fl">1.2827508</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="dv">3</span><span class="sc">:</span> <span class="dv">1000287994</span> <span class="fl">12.0630</span> <span class="fl">144.7560</span> <span class="fl">18.35674</span>   <span class="dv">1</span> <span class="fl">40.1</span> <span class="fl">147.80</span>    <span class="dv">4403</span> <span class="fl">144.7560</span> <span class="sc">-</span><span class="fl">2.444694</span> <span class="fl">17.82828</span> <span class="fl">0.13146572</span> <span class="sc">-</span><span class="fl">0.08603109</span> <span class="sc">-</span><span class="fl">0.1155501</span> <span class="sc">-</span><span class="fl">0.2209003</span> <span class="sc">-</span><span class="fl">0.2267003</span> <span class="fl">0.214444</span> <span class="fl">0.1132188</span></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="dv">4</span><span class="sc">:</span> <span class="dv">1000287994</span> <span class="fl">13.0795</span> <span class="fl">156.9540</span> <span class="fl">24.12048</span>   <span class="dv">1</span> <span class="fl">57.8</span> <span class="fl">154.80</span>    <span class="dv">4774</span> <span class="fl">156.9540</span> <span class="sc">-</span><span class="fl">2.325379</span> <span class="fl">18.49734</span> <span class="fl">0.13420981</span>  <span class="fl">1.07298540</span>  <span class="fl">0.8792766</span> <span class="sc">-</span><span class="fl">0.2418916</span> <span class="sc">-</span><span class="fl">0.2436118</span> <span class="fl">1.475755</span> <span class="fl">1.1619424</span></span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="dv">5</span><span class="sc">:</span> <span class="dv">1000287994</span> <span class="fl">14.0959</span> <span class="fl">169.1508</span> <span class="fl">25.03608</span>   <span class="dv">1</span> <span class="fl">66.6</span> <span class="fl">163.10</span>    <span class="dv">5145</span> <span class="fl">169.1508</span> <span class="sc">-</span><span class="fl">2.222102</span> <span class="fl">19.19533</span> <span class="fl">0.13527053</span>  <span class="fl">1.24466369</span>  <span class="fl">1.0724802</span> <span class="sc">-</span><span class="fl">0.1772860</span> <span class="sc">-</span><span class="fl">0.1713432</span> <span class="fl">1.483245</span> <span class="fl">1.1877586</span></span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="dv">6</span><span class="sc">:</span> <span class="dv">1000287994</span>  <span class="fl">4.9479</span>  <span class="fl">59.3748</span> <span class="fl">16.88341</span>   <span class="dv">1</span> <span class="fl">19.5</span> <span class="fl">107.47</span>    <span class="dv">1806</span>  <span class="fl">59.3748</span> <span class="sc">-</span><span class="fl">2.533423</span> <span class="fl">15.43155</span> <span class="fl">0.07546578</span>  <span class="fl">0.48691152</span>  <span class="fl">0.3858433</span> <span class="sc">-</span><span class="fl">0.2363398</span> <span class="sc">-</span><span class="fl">0.2340109</span> <span class="fl">1.065532</span> <span class="fl">0.8981828</span></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>       bmip      p95      p97    bmip95       wp       hp obese sev_obese ext_bmiz ext_bmip    sigma</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span><span class="sc">:</span> <span class="fl">96.05768</span> <span class="fl">22.14172</span> <span class="fl">23.71268</span> <span class="fl">103.15762</span> <span class="fl">86.40127</span> <span class="fl">16.86001</span>     <span class="dv">1</span>         <span class="dv">0</span> <span class="fl">1.705525</span> <span class="fl">95.59517</span> <span class="fl">4.668954</span></span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="dv">2</span><span class="sc">:</span> <span class="fl">94.34063</span> <span class="fl">23.21872</span> <span class="fl">24.93200</span>  <span class="fl">98.37264</span> <span class="fl">70.02413</span>  <span class="fl">5.12182</span>     <span class="dv">0</span>         <span class="dv">0</span> <span class="fl">1.584028</span> <span class="fl">94.34063</span> <span class="fl">5.002164</span></span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="dv">3</span><span class="sc">:</span> <span class="fl">58.48996</span> <span class="fl">24.25081</span> <span class="fl">26.05464</span>  <span class="fl">75.69536</span> <span class="fl">46.57209</span> <span class="fl">41.25850</span>     <span class="dv">0</span>         <span class="dv">0</span> <span class="fl">0.214444</span> <span class="fl">58.48996</span> <span class="fl">5.316539</span></span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="dv">4</span><span class="sc">:</span> <span class="fl">92.99952</span> <span class="fl">25.21239</span> <span class="fl">27.05537</span>  <span class="fl">95.66916</span> <span class="fl">85.83612</span> <span class="fl">40.44321</span>     <span class="dv">0</span>         <span class="dv">0</span> <span class="fl">1.475755</span> <span class="fl">92.99952</span> <span class="fl">5.612141</span></span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="dv">5</span><span class="sc">:</span> <span class="fl">93.09953</span> <span class="fl">26.09135</span> <span class="fl">27.92776</span>  <span class="fl">95.95547</span> <span class="fl">89.33723</span> <span class="fl">42.96419</span>     <span class="dv">0</span>         <span class="dv">0</span> <span class="fl">1.483245</span> <span class="fl">93.09953</span> <span class="fl">5.888911</span></span>
-<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="dv">6</span><span class="sc">:</span> <span class="fl">85.66823</span> <span class="fl">17.91161</span> <span class="fl">18.39937</span>  <span class="fl">94.25957</span> <span class="fl">68.68395</span> <span class="fl">40.65845</span>     <span class="dv">0</span>         <span class="dv">0</span> <span class="fl">1.065532</span> <span class="fl">85.66823</span> <span class="fl">2.720945</span></span></code></pre></div>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>                                 subjid    agey      age   sex    wt wt_id    ht ht_id agedays      bmi      bmiz</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>                                 <span class="sc">&lt;</span>char<span class="sc">&gt;</span>   <span class="er">&lt;</span>num<span class="sc">&gt;</span>    <span class="er">&lt;</span>num<span class="sc">&gt;</span> <span class="er">&lt;</span>int<span class="sc">&gt;</span> <span class="er">&lt;</span>num<span class="sc">&gt;</span> <span class="er">&lt;</span>int<span class="sc">&gt;</span> <span class="er">&lt;</span>num<span class="sc">&gt;</span> <span class="er">&lt;</span>int<span class="sc">&gt;</span>   <span class="er">&lt;</span>int<span class="sc">&gt;</span>    <span class="er">&lt;</span>num<span class="sc">&gt;</span>     <span class="er">&lt;</span>num<span class="sc">&gt;</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span><span class="sc">:</span> 001aa16d<span class="sc">-</span>bf0e<span class="sc">-</span>a077<span class="sc">-</span>3b3d<span class="sc">-</span>5ab8b58545ad <span class="fl">10.0233</span> <span class="fl">120.2796</span>     <span class="dv">2</span>  <span class="fl">35.4</span>    <span class="dv">17</span> <span class="fl">141.6</span>    <span class="dv">15</span>    <span class="dv">3661</span> <span class="fl">17.65537</span> <span class="fl">0.3236612</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="dv">2</span><span class="sc">:</span> 001aa16d<span class="sc">-</span>bf0e<span class="sc">-</span>a077<span class="sc">-</span>3b3d<span class="sc">-</span>5ab8b58545ad <span class="fl">11.0390</span> <span class="fl">132.4680</span>     <span class="dv">2</span>  <span class="fl">39.2</span>    <span class="dv">19</span> <span class="fl">147.9</span>    <span class="dv">18</span>    <span class="dv">4032</span> <span class="fl">17.92048</span> <span class="fl">0.1734315</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="dv">3</span><span class="sc">:</span> 001aa16d<span class="sc">-</span>bf0e<span class="sc">-</span>a077<span class="sc">-</span>3b3d<span class="sc">-</span>5ab8b58545ad <span class="fl">12.0548</span> <span class="fl">144.6576</span>     <span class="dv">2</span>  <span class="fl">44.8</span>    <span class="dv">21</span> <span class="fl">155.1</span>    <span class="dv">20</span>    <span class="dv">4403</span> <span class="fl">18.62320</span> <span class="fl">0.1832443</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="dv">4</span><span class="sc">:</span> 001aa16d<span class="sc">-</span>bf0e<span class="sc">-</span>a077<span class="sc">-</span>3b3d<span class="sc">-</span>5ab8b58545ad <span class="fl">12.5914</span> <span class="fl">151.0968</span>     <span class="dv">2</span>  <span class="fl">47.8</span>    <span class="dv">23</span> <span class="fl">158.7</span>    <span class="dv">22</span>    <span class="dv">4599</span> <span class="fl">18.97903</span> <span class="fl">0.1829183</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="dv">5</span><span class="sc">:</span> 001aa16d<span class="sc">-</span>bf0e<span class="sc">-</span>a077<span class="sc">-</span>3b3d<span class="sc">-</span>5ab8b58545ad <span class="fl">13.0705</span> <span class="fl">156.8460</span>     <span class="dv">2</span>  <span class="fl">50.5</span>    <span class="dv">26</span> <span class="fl">160.8</span>    <span class="dv">24</span>    <span class="dv">4774</span> <span class="fl">19.53077</span> <span class="fl">0.2586449</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="dv">6</span><span class="sc">:</span> 001aa16d<span class="sc">-</span>bf0e<span class="sc">-</span>a077<span class="sc">-</span>3b3d<span class="sc">-</span>5ab8b58545ad  <span class="fl">3.9288</span>  <span class="fl">47.1456</span>     <span class="dv">2</span>  <span class="fl">16.6</span>     <span class="dv">2</span> <span class="fl">102.6</span>     <span class="dv">1</span>    <span class="dv">1435</span> <span class="fl">15.76933</span> <span class="fl">0.3453978</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>       bmip       waz       wp       haz       hp      p95      p97   bmip95   mod_bmiz   mod_waz   mod_haz</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>      <span class="sc">&lt;</span>num<span class="sc">&gt;</span>     <span class="er">&lt;</span>num<span class="sc">&gt;</span>    <span class="er">&lt;</span>num<span class="sc">&gt;</span>     <span class="er">&lt;</span>num<span class="sc">&gt;</span>    <span class="er">&lt;</span>num<span class="sc">&gt;</span>    <span class="er">&lt;</span>num<span class="sc">&gt;</span>    <span class="er">&lt;</span>num<span class="sc">&gt;</span>    <span class="er">&lt;</span>num<span class="sc">&gt;</span>      <span class="er">&lt;</span>num<span class="sc">&gt;</span>     <span class="er">&lt;</span>num<span class="sc">&gt;</span>     <span class="er">&lt;</span>num<span class="sc">&gt;</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span><span class="sc">:</span> <span class="fl">62.69027</span> <span class="fl">0.3498817</span> <span class="fl">63.67862</span> <span class="fl">0.5140553</span> <span class="fl">69.63933</span> <span class="fl">22.96109</span> <span class="fl">24.57902</span> <span class="fl">76.89254</span> <span class="fl">0.18485501</span> <span class="fl">0.2399201</span> <span class="fl">0.5008944</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="dv">2</span><span class="sc">:</span> <span class="fl">56.88438</span> <span class="fl">0.2311645</span> <span class="fl">59.14065</span> <span class="fl">0.5002225</span> <span class="fl">69.15408</span> <span class="fl">24.13836</span> <span class="fl">25.90525</span> <span class="fl">74.24067</span> <span class="fl">0.09543668</span> <span class="fl">0.1556259</span> <span class="fl">0.4955022</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="dv">3</span><span class="sc">:</span> <span class="fl">57.26968</span> <span class="fl">0.3237374</span> <span class="fl">62.69316</span> <span class="fl">0.4803298</span> <span class="fl">68.45036</span> <span class="fl">25.26981</span> <span class="fl">27.17179</span> <span class="fl">73.69745</span> <span class="fl">0.10065274</span> <span class="fl">0.2201655</span> <span class="fl">0.4855100</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="dv">4</span><span class="sc">:</span> <span class="fl">57.25689</span> <span class="fl">0.3812700</span> <span class="fl">64.84986</span> <span class="fl">0.5153244</span> <span class="fl">69.68368</span> <span class="fl">25.83904</span> <span class="fl">27.80781</span> <span class="fl">73.45100</span> <span class="fl">0.10011666</span> <span class="fl">0.2596479</span> <span class="fl">0.5212281</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="dv">5</span><span class="sc">:</span> <span class="fl">60.20454</span> <span class="fl">0.4440465</span> <span class="fl">67.14955</span> <span class="fl">0.4849566</span> <span class="fl">68.61464</span> <span class="fl">26.32757</span> <span class="fl">28.35405</span> <span class="fl">74.18371</span> <span class="fl">0.14353771</span> <span class="fl">0.3024342</span> <span class="fl">0.4885546</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="dv">6</span><span class="sc">:</span> <span class="fl">63.51023</span> <span class="fl">0.4369963</span> <span class="fl">66.89430</span> <span class="fl">0.5348018</span> <span class="fl">70.36065</span> <span class="fl">18.02950</span> <span class="fl">18.60078</span> <span class="fl">87.46409</span> <span class="fl">0.24462581</span> <span class="fl">0.3332011</span> <span class="fl">0.5224816</span></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>      sigma original_bmip original_bmiz sev_obese obese</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>      <span class="sc">&lt;</span>num<span class="sc">&gt;</span>         <span class="er">&lt;</span>num<span class="sc">&gt;</span>         <span class="er">&lt;</span>num<span class="sc">&gt;</span>     <span class="er">&lt;</span>int<span class="sc">&gt;</span> <span class="er">&lt;</span>int<span class="sc">&gt;</span></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span><span class="sc">:</span> <span class="fl">4.443536</span>      <span class="fl">62.69027</span>     <span class="fl">0.3236612</span>         <span class="dv">0</span>     <span class="dv">0</span></span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a><span class="dv">2</span><span class="sc">:</span> <span class="fl">4.797031</span>      <span class="fl">56.88438</span>     <span class="fl">0.1734315</span>         <span class="dv">0</span>     <span class="dv">0</span></span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a><span class="dv">3</span><span class="sc">:</span> <span class="fl">5.148292</span>      <span class="fl">57.26968</span>     <span class="fl">0.1832443</span>         <span class="dv">0</span>     <span class="dv">0</span></span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a><span class="dv">4</span><span class="sc">:</span> <span class="fl">5.332930</span>      <span class="fl">57.25689</span>     <span class="fl">0.1829183</span>         <span class="dv">0</span>     <span class="dv">0</span></span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a><span class="dv">5</span><span class="sc">:</span> <span class="fl">5.497248</span>      <span class="fl">60.20454</span>     <span class="fl">0.2586449</span>         <span class="dv">0</span>     <span class="dv">0</span></span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a><span class="dv">6</span><span class="sc">:</span> <span class="fl">2.274792</span>      <span class="fl">63.51023</span>     <span class="fl">0.3453978</span>         <span class="dv">0</span>     <span class="dv">0</span></span></code></pre></div>
 <p>The output columns include:</p>
 <table class="table">
 <colgroup>
-<col width="12%">
-<col width="87%">
+<col width="11%">
+<col width="88%">
 </colgroup>
 <thead><tr class="header">
 <th>variable</th>
 <th>description</th>
 </tr></thead>
 <tbody>
+<tr class="odd">
+<td>bmi</td>
+<td>BMI</td>
+</tr>
+<tr class="even">
+<td>bmiz, bmip</td>
+<td>LMS / Extended z-score and percentile</td>
+</tr>
 <tr class="odd">
 <td>waz, wp</td>
 <td>LMS Weight-for-sex/age z-score and percentile</td>
@@ -305,31 +341,35 @@ coded, <code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> can be c
 <td>LMS Height-for-sex/age z-score and percentile</td>
 </tr>
 <tr class="odd">
-<td>bmiz, bmip</td>
-<td>LMS BMI-for-sex/age z-score and percentile</td>
+<td>p95, p97</td>
+<td>95th and 97th percentile of BMI in growth charts</td>
 </tr>
 <tr class="even">
-<td>mod_waz, mod_haz, mod_bmi</td>
-<td>Modified z-scores for identifying outliers (see the information in
-the <a href="https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm" class="external-link">CDC
-SAS growth charts program website</a>)</td>
-</tr>
-<tr class="odd">
 <td>bmip95</td>
 <td>BMI expressed as a percentage of the 95th percentile. A value ≥ 120
 is widely used as the cut point for severe obesity.</td>
 </tr>
+<tr class="odd">
+<td>mod_bmiz, mod_waz, mod_haz</td>
+<td>Modified BMI-for-age, Weight-for-age, and Height-for-age z-scores
+for identifying outliers (see the information in the <a href="https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm" class="external-link">CDC
+SAS growth charts program website</a>)</td>
+</tr>
 <tr class="even">
 <td>sigma</td>
-<td>Scale parameter of the half-normal distribution</td>
+<td>Scale parameter for half-normal distribution</td>
 </tr>
 <tr class="odd">
-<td>ext_bmip</td>
-<td>Extended BMI percentile</td>
+<td>original_bmiz, original_bmip</td>
+<td>LMS BMI-for-sex/age z-score and percentile</td>
 </tr>
 <tr class="even">
-<td>ext_bmiz</td>
-<td>Extended BMI z-score</td>
+<td>sev_obese</td>
+<td>BMI &gt;= 120% of 95th percentile (0/1)</td>
+</tr>
+<tr class="odd">
+<td>obese</td>
+<td>BMI &gt;= 95th percentile (0/1)</td>
 </tr>
 </tbody>
 </table>
@@ -368,7 +408,10 @@ as for <code><a href="../reference/cleangrowth.html">cleangrowth()</a></code>.</
 Program for the 2000 CDC Growth Charts</a> which can also be used to
 identify biologically implausible values using a different approach, as
 also implemented for <code>growthcleanr</code> in the function
-<code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, described above.</p>
+<code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code>, described above. The SAS program was updated in
+December, 2022, according to the findings of <a href="https://dx.doi.org/10.15620/cdc:121711" class="external-link">this NCHS report</a>, and
+<code><a href="../reference/ext_bmiz.html">ext_bmiz()</a></code> has been updated to match it as of growthcleanr
+v2.1.0.</p>
 <p><a href="https://github.com/mitre/GrowthViz" class="external-link">GrowthViz</a> provides
 insights into how <code>growthcleanr</code> assesses data, packaged in a
 Jupyter notebook. It ships with the same <code>syngrowth</code>
@@ -394,7 +437,7 @@ results included.</p>
 
 <div class="pkgdown">
   <p></p>
-<p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.6.</p>
+<p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.7.</p>
 </div>
 
       </footer>
