@@ -17,7 +17,7 @@ Authors@R: c(
     person("Achilleos","Andreas", role = "ctb"),
     person("Butts","Jessica", role = "ctb"),
     person("Nguyen","Sheila", role = "ctb"),
-    person("Soleymani","Taraneh", role = "ctb")
+    person("Soleymani","Taraneh", role = "ctb"),
     person("Olivier","Max", role = "ctb")
   )
 Description: Identifies implausible anthropometric (e.g., height,
