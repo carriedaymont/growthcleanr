@@ -1,4 +1,4 @@
-# CRAN submission growthcleanr 2.0.3
+# CRAN submission growthcleanr 2.1.0
 
 ## R CMD check results
 There were no ERRORs, WARNINGs, or NOTEs.
@@ -7,8 +7,15 @@ There were no ERRORs, WARNINGs, or NOTEs.
 There are currently no downstream dependencies for this package.
 
 
-
 # Previous Submissions
+
+# CRAN submission growthcleanr 2.0.3
+
+## R CMD check results
+There were no ERRORs, WARNINGs, or NOTEs.
+
+## Downstream dependencies
+There are currently no downstream dependencies for this package.
 
 # CRAN submission growthcleanr 2.0.2 (1)
 
@@ -51,7 +58,7 @@ There are currently no downstream dependencies for this package.
 # CRAN submission growthcleanr 2.0.1 (5)
 
 ## R CMD check results
-There were no ERRORs or WARNINGs. 
+There were no ERRORs or WARNINGs.
 
 There was 1 NOTE:
 
@@ -81,7 +88,7 @@ Vignette files are now added to Rbuildignore, VignetteBuilder removed.
     'adult-algorithm.Rmd', 'configuration.Rmd', 'installation.Rmd',
       'large-data-sets.Rmd', 'next-steps.Rmd', 'output.Rmd',
       'quickstart.Rmd', 'usage.Rmd', 'utilities.Rmd'
-      
+
 Vignette files are now added to Rbuildignore.
 
 *   Directory 'inst/doc' does not exist.
@@ -105,7 +112,7 @@ There are currently no downstream dependencies for this package.
 # CRAN submission growthcleanr 2.0.1 (4)
 
 ## R CMD check results
-There were no ERRORs or WARNINGs. 
+There were no ERRORs or WARNINGs.
 
 There was 1 NOTE:
 
@@ -148,7 +155,7 @@ There are currently no downstream dependencies for this package.
 # CRAN submission growthcleanr 2.0.1 (3)
 
 ## R CMD check results
-There were no ERRORs or WARNINGs. 
+There were no ERRORs or WARNINGs.
 
 There was 1 NOTE:
 
@@ -182,7 +189,7 @@ There are currently no downstream dependencies for this package.
 # CRAN submission growthcleanr 2.0.1 (2)
 
 ## R CMD check results
-There were no ERRORs or WARNINGs. 
+There were no ERRORs or WARNINGs.
 
 There was 1 NOTE:
 
@@ -210,7 +217,7 @@ These are not misspelled.
       Status: 200
       Message: OK
       CRAN URL not in canonical form
-    The canonical URL of the CRAN page for a package is 
+    The canonical URL of the CRAN page for a package is
       https://CRAN.R-project.org/package=pkgname
 
 This has been fixed.
@@ -236,7 +243,7 @@ There are currently no downstream dependencies for this package.
 # CRAN submission grwothcleanr 2.0.1 (1)
 
 ## R CMD check results
-There were no ERRORs or WARNINGs. 
+There were no ERRORs or WARNINGs.
 
 There was 1 NOTE:
 
