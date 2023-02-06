@@ -461,9 +461,9 @@ cleangrowth <- function(subjid,
         infants_reference_medians_path <- ifelse(
           ref.data.path == "",
           system.file(file.path("extdata",
-                                "gc-recenterfile-2022-12-20_format.csv.gz"),
+                                "chop-rcfile-2023-02-03.csv_format.csv.gz"),
                       package = "growthcleanr"),
-          file.path(ref.data.path, "gc-recenterfile-2022-12-20_format.csv.gz")
+          file.path(ref.data.path, "chop-rcfile-2023-02-03.csv_format.csv.gz")
         )
         sd.recenter <- fread(infants_reference_medians_path)
         if (!quietly)
