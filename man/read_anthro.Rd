@@ -10,6 +10,8 @@ read_anthro(path = "", cdc.only = FALSE)
 \item{path}{Path to supplied reference anthro data. Defaults to package anthro tables.}
 
 \item{cdc.only}{Whether or not only CDC data should be used. Defaults to false.}
+
+\item{infants}{boolean on if infants version is being used. will be merged in to main algorithm.}
 }
 \value{
 Function for calculating BMI based on measurement, age in days, sex, and measurement value.

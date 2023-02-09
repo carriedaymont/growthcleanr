@@ -84,6 +84,7 @@
 #' @param adult_columns_filename Name of file to save original adult data, with additional output columns to
 #' as CSV. Defaults to "", for which this data will not be saved. Useful
 #' for post-analysis. For more information on this output, please see README.
+#' @param infants TRUE/FALSE. Run the alpha-release of the infants algorithm (expands pediatric algorithm to clean 0 - 2). Defaults to FALSE.
 #'
 #' @return Vector of exclusion codes for each of the input measurements.
 #'
@@ -156,7 +157,7 @@ cleangrowth <- function(subjid,
                         adult_cutpoint = 20,
                         weight_cap = Inf,
                         adult_columns_filename = "",
-                        infants = F) {
+                        infants = FALSE) {
   # avoid "no visible binding" warnings
   N <- age_years <- batch <- exclude <- index <- line <- NULL
   newbatch <- sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
@@ -184,11 +185,11 @@ cleangrowth <- function(subjid,
   if (!is.numeric(weight_cap) | weight_cap < 0){
     stop("weight_cap not numeric. Please enter a positive number.")
   }
-  if (any(!param %in% c("LENTGCM", "HEIGHTCM", "WEIGHTKG", "HEIGHIN",
+  if (any(!param %in% c("LENGTHCM", "HEIGHTCM", "WEIGHTKG", "HEIGHIN",
                         "WEIGHTLBS", "HEADCM"))){
     cat(sprintf("[%s] Parameters included that do not match 'param' specifications. Filtering out...\n", Sys.time()))
     data.all.ages <-
-      data.all.ages[param %in% c("LENTGCM", "HEIGHTCM", "WEIGHTKG", "HEIGHIN",
+      data.all.ages[param %in% c("LENGTHCM", "HEIGHTCM", "WEIGHTKG", "HEIGHIN",
                                  "WEIGHTLBS", "HEADCM"),]
   }
 
@@ -372,51 +373,64 @@ cleangrowth <- function(subjid,
     # NOTE: this will be changed in future to consider this difference
     data.all[param == 'LENGTHCM', param := 'HEIGHTCM']
 
-    # calculate z scores
-    if (!quietly)
-      cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
-    # for infants, use z and who
-    measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE)
-    measurement.to.z_who <- read_anthro(ref.data.path, cdc.only = F)
+    # calculate z/sd scores
+    if(infants){
+      if (!quietly)
+        cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
+      # for infants, use z and who
+      measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE)
+      measurement.to.z_who <- read_anthro(ref.data.path, cdc.only = F)
 
-    data.all[, z.orig_cdc := measurement.to.z(param, agedays, sex, v)]
-    data.all[, z.orig_who := measurement.to.z_who(param, agedays, sex, v)]
+      data.all[, z.orig_cdc := measurement.to.z(param, agedays, sex, v)]
+      data.all[, z.orig_who := measurement.to.z_who(param, agedays, sex, v)]
 
-    # calculate "standard deviation" scores
-    if (!quietly)
-      cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
-    data.all[, sd.orig_cdc := measurement.to.z(param, agedays, sex, v, TRUE)]
-    data.all[, sd.orig_who := measurement.to.z_who(param, agedays, sex, v, TRUE)]
+      # calculate "standard deviation" scores
+      if (!quietly)
+        cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
+      data.all[, sd.orig_cdc := measurement.to.z(param, agedays, sex, v, TRUE)]
+      data.all[, sd.orig_who := measurement.to.z_who(param, agedays, sex, v, TRUE)]
 
-    # smooth z-scores/SD scores between ages 1 - 3yo using weighted scores
-    # older uses cdc, younger uses who
-    who_weight <- 3 - (data.all$agedays/365.25)
-    cdc_weight <- (data.all$agedays/365.25) - 1
+      # smooth z-scores/SD scores between ages 1 - 3yo using weighted scores
+      # older uses cdc, younger uses who
+      who_weight <- 3 - (data.all$agedays/365.25)
+      cdc_weight <- (data.all$agedays/365.25) - 1
 
-    smooth_val <- data.all$agedays/365.25 >= 1 &
-      data.all$agedays/365.25 <= 3 &
-      !data.all$param == "HEADCM"
-    data.all[smooth_val,
-             z.orig := (z.orig_cdc[smooth_val]*cdc_weight[smooth_val] +
-                          z.orig_who[smooth_val]*who_weight[smooth_val])/2]
-    data.all[smooth_val,
-             sd.orig := (sd.orig_cdc[smooth_val]*cdc_weight[smooth_val] +
-                           sd.orig_who[smooth_val]*who_weight[smooth_val])/2]
+      smooth_val <- data.all$agedays/365.25 >= 1 &
+        data.all$agedays/365.25 <= 3 &
+        !data.all$param == "HEADCM"
+      data.all[smooth_val,
+               z.orig := (z.orig_cdc[smooth_val]*cdc_weight[smooth_val] +
+                            z.orig_who[smooth_val]*who_weight[smooth_val])/2]
+      data.all[smooth_val,
+               sd.orig := (sd.orig_cdc[smooth_val]*cdc_weight[smooth_val] +
+                             sd.orig_who[smooth_val]*who_weight[smooth_val])/2]
 
-    # otherwise use WHO and CDC for older and younger, respectively
-    who_val <- data.all$param == "HEADCM" |
-      data.all$agedays/365.25 < 1
-    data.all[who_val | (smooth_val & is.na(data.all$z.orig_cdc)),
-             z.orig := z.orig_who[who_val | (smooth_val & is.na(data.all$z.orig_cdc))]]
-    data.all[who_val | (smooth_val & is.na(data.all$sd.orig_cdc)),
-             sd.orig := sd.orig_who[who_val  | (smooth_val & is.na(data.all$sd.orig_cdc))]]
+      # otherwise use WHO and CDC for older and younger, respectively
+      who_val <- data.all$param == "HEADCM" |
+        data.all$agedays/365.25 < 1
+      data.all[who_val | (smooth_val & is.na(data.all$z.orig_cdc)),
+               z.orig := z.orig_who[who_val | (smooth_val & is.na(data.all$z.orig_cdc))]]
+      data.all[who_val | (smooth_val & is.na(data.all$sd.orig_cdc)),
+               sd.orig := sd.orig_who[who_val  | (smooth_val & is.na(data.all$sd.orig_cdc))]]
 
-    cdc_val <- data.all$param != "HEADCM" |
-      data.all$agedays/365.25 > 3
-    data.all[cdc_val  | (smooth_val & is.na(data.all$z.orig_who)),
-             z.orig := z.orig_cdc[cdc_val | (smooth_val & is.na(data.all$z.orig_who))]]
-    data.all[cdc_val | (smooth_val & is.na(data.all$sd.orig_who)),
-             sd.orig := sd.orig_cdc[cdc_val | (smooth_val & is.na(data.all$sd.orig_who))]]
+      cdc_val <- data.all$param != "HEADCM" |
+        data.all$agedays/365.25 > 3
+      data.all[cdc_val  | (smooth_val & is.na(data.all$z.orig_who)),
+               z.orig := z.orig_cdc[cdc_val | (smooth_val & is.na(data.all$z.orig_who))]]
+      data.all[cdc_val | (smooth_val & is.na(data.all$sd.orig_who)),
+               sd.orig := sd.orig_cdc[cdc_val | (smooth_val & is.na(data.all$sd.orig_who))]]
+    } else {
+      # calculate z scores
+      if (!quietly)
+        cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
+      measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE)
+      data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
+
+      # calculate "standard deviation" scores
+      if (!quietly)
+        cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
+      data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, TRUE)]
+    }
 
     # sort by subjid, param, agedays
     setkey(data.all, subjid, param, agedays)
@@ -586,23 +600,44 @@ cleangrowth <- function(subjid,
         num.batches
       ))
     if (num.batches == 1) {
-      ret.df <- cleanbatch(data.all,
-                           log.path = log.path,
-                           quietly = quietly,
-                           parallel = parallel,
-                           measurement.to.z = measurement.to.z,
-                           ewma.fields = ewma.fields,
-                           ewma.exp = ewma.exp,
-                           recover.unit.error = recover.unit.error,
-                           include.carryforward = include.carryforward,
-                           sd.extreme = sd.extreme,
-                           z.extreme = z.extreme,
-                           exclude.levels = exclude.levels,
-                           tanner.ht.vel = tanner.ht.vel,
-                           who.ht.vel = who.ht.vel,
-                           lt3.exclude.mode = lt3.exclude.mode,
-                           error.load.threshold = error.load.threshold,
-                           error.load.mincount = error.load.mincount)
+      if (!infants){
+        ret.df <- cleanbatch(data.all,
+                             log.path = log.path,
+                             quietly = quietly,
+                             parallel = parallel,
+                             measurement.to.z = measurement.to.z,
+                             ewma.fields = ewma.fields,
+                             ewma.exp = ewma.exp,
+                             recover.unit.error = recover.unit.error,
+                             include.carryforward = include.carryforward,
+                             sd.extreme = sd.extreme,
+                             z.extreme = z.extreme,
+                             exclude.levels = exclude.levels,
+                             tanner.ht.vel = tanner.ht.vel,
+                             who.ht.vel = who.ht.vel,
+                             lt3.exclude.mode = lt3.exclude.mode,
+                             error.load.threshold = error.load.threshold,
+                             error.load.mincount = error.load.mincount)
+      } else {
+        ret.df <- cleanbatch_infants(
+          data.all,
+          log.path = log.path,
+          quietly = quietly,
+          parallel = parallel,
+          measurement.to.z = measurement.to.z,
+          ewma.fields = ewma.fields,
+          ewma.exp = ewma.exp,
+          recover.unit.error = recover.unit.error,
+          include.carryforward = include.carryforward,
+          sd.extreme = sd.extreme,
+          z.extreme = z.extreme,
+          exclude.levels = exclude.levels,
+          tanner.ht.vel = tanner.ht.vel,
+          who.ht.vel = who.ht.vel,
+          lt3.exclude.mode = lt3.exclude.mode,
+          error.load.threshold = error.load.threshold,
+          error.load.mincount = error.load.mincount)
+      }
     } else {
       # create log directory if necessary
       if (!is.na(log.path)) {
@@ -610,29 +645,55 @@ cleangrowth <- function(subjid,
         ifelse(!dir.exists(log.path), dir.create(log.path, recursive = TRUE), FALSE)
       }
 
-      ret.df <- ddply(
-        data.all,
-        .(batch),
-        cleanbatch,
-        .parallel = parallel,
-        .paropts = list(.packages = "data.table"),
-        log.path = log.path,
-        quietly = quietly,
-        parallel = parallel,
-        measurement.to.z = measurement.to.z,
-        ewma.fields = ewma.fields,
-        ewma.exp = ewma.exp,
-        recover.unit.error = recover.unit.error,
-        include.carryforward = include.carryforward,
-        sd.extreme = sd.extreme,
-        z.extreme = z.extreme,
-        exclude.levels = exclude.levels,
-        tanner.ht.vel = tanner.ht.vel,
-        who.ht.vel = who.ht.vel,
-        lt3.exclude.mode = lt3.exclude.mode,
-        error.load.threshold = error.load.threshold,
-        error.load.mincount = error.load.mincount
-      )
+      if (!infants){
+        ret.df <- ddply(
+          data.all,
+          .(batch),
+          cleanbatch,
+          .parallel = parallel,
+          .paropts = list(.packages = "data.table"),
+          log.path = log.path,
+          quietly = quietly,
+          parallel = parallel,
+          measurement.to.z = measurement.to.z,
+          ewma.fields = ewma.fields,
+          ewma.exp = ewma.exp,
+          recover.unit.error = recover.unit.error,
+          include.carryforward = include.carryforward,
+          sd.extreme = sd.extreme,
+          z.extreme = z.extreme,
+          exclude.levels = exclude.levels,
+          tanner.ht.vel = tanner.ht.vel,
+          who.ht.vel = who.ht.vel,
+          lt3.exclude.mode = lt3.exclude.mode,
+          error.load.threshold = error.load.threshold,
+          error.load.mincount = error.load.mincount
+        )
+      } else {
+        ret.df <- ddply(
+          data.all,
+          .(batch),
+          cleanbatch_infants,
+          .parallel = parallel,
+          .paropts = list(.packages = "data.table"),
+          log.path = log.path,
+          quietly = quietly,
+          parallel = parallel,
+          measurement.to.z = measurement.to.z,
+          ewma.fields = ewma.fields,
+          ewma.exp = ewma.exp,
+          recover.unit.error = recover.unit.error,
+          include.carryforward = include.carryforward,
+          sd.extreme = sd.extreme,
+          z.extreme = z.extreme,
+          exclude.levels = exclude.levels,
+          tanner.ht.vel = tanner.ht.vel,
+          who.ht.vel = who.ht.vel,
+          lt3.exclude.mode = lt3.exclude.mode,
+          error.load.threshold = error.load.threshold,
+          error.load.mincount = error.load.mincount
+        )
+      }
       stopCluster(cl)
     }
 

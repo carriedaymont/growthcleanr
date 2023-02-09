@@ -1,5 +1,6 @@
-# Main pediatric growthcleanr function -- cleanbatch
-# internal supporting functions for pediatrics can be found in: pediatric_support.R
+# Main pediatric growthcleanr function -- infants cleanbatch
+# internal supporting functions for pediatrics can be found in: infants_support.R
+# note
 
 #' Function to clean data (optionally in batches):
 #' 4.  Dataset split (optional)
@@ -16,23 +17,23 @@
 #' @import data.table
 #' @importFrom stats median
 #' @noRd
-cleanbatch <- function(data.df,
-                       log.path,
-                       quietly,
-                       parallel,
-                       measurement.to.z,
-                       ewma.fields,
-                       ewma.exp,
-                       recover.unit.error,
-                       include.carryforward,
-                       sd.extreme,
-                       z.extreme,
-                       exclude.levels,
-                       tanner.ht.vel,
-                       who.ht.vel,
-                       lt3.exclude.mode,
-                       error.load.threshold,
-                       error.load.mincount) {
+cleanbatch_infants <- function(data.df,
+                               log.path,
+                               quietly,
+                               parallel,
+                               measurement.to.z,
+                               ewma.fields,
+                               ewma.exp,
+                               recover.unit.error,
+                               include.carryforward,
+                               sd.extreme,
+                               z.extreme,
+                               exclude.levels,
+                               tanner.ht.vel,
+                               who.ht.vel,
+                               lt3.exclude.mode,
+                               error.load.threshold,
+                               error.load.mincount) {
   # avoid "no visible binding" warnings
   abs.2ndlast.sd <- abs.tbc.sd <- abs.tbc.sd.next <- abs.tbc.sd.prev <- abssum2 <- NULL
   aft.g.befp1 <- agedays <- agedays.other <- bef.g.aftm1 <- delta <- NULL
@@ -147,43 +148,49 @@ cleanbatch <- function(data.df,
   # HC Limits based on analysis in do-file from Oct 11 2022: in dataset, lowest plausible 18.5, z=-13, highest plausible 63.5, z=11.2  (at birth, highest=42, z=6)
 
 
+  if (!quietly)
+    cat(sprintf(
+      "[%s] Exclude BIVs...\n",
+      Sys.time()
+    ))
+
   exc_nam <- "Exclude-Absolute-BIV"
 
   # identify absolute cutoffs
   # Min/max weight at birth based on published births
-  data.df[valid(data.df) & param == "WEIGHTKG" & measurement < 0.2,
+  data.df[valid(data.df) & param == "WEIGHTKG" & v < 0.2,
           exclude := exc_nam]
   # Min weight after birth based on rules about who can go home with alowance for significant weight loss -- this is for outpatient data only so very low weight babies would still be in NICU
-  data.df[valid(data.df) & param == "WEIGHTKG" & measurement > 10.5 &
+  data.df[valid(data.df) & param == "WEIGHTKG" & v > 10.5 &
             agedays == 0,
           exclude := exc_nam]
   # Max weight for <2y based on eval (see do-file from Oct 10 2022), highest plaus weight 29.5kg
-  data.df[valid(data.df) & param == "WEIGHTKG" & measurement < 1 &
+  data.df[valid(data.df) & param == "WEIGHTKG" & v < 1 &
             agedays == 0,
           exclude := exc_nam]
   # Max weight for <2y based on eval (see do-file from Oct 10 2022), highest plaus weight 29.5kg
-  data.df[valid(data.df) & param == "WEIGHTKG" & measurement > 35 &
+  data.df[valid(data.df) & param == "WEIGHTKG" & v > 35 &
             agedays < 2,
           exclude := exc_nam]
   # Max weight for all based on published data
-  data.df[valid(data.df) & param == "WEIGHTKG" & measurement > 600,
+  data.df[valid(data.df) & param == "WEIGHTKG" & v > 600,
           exclude := exc_nam]
 
   # Min/max HC based on analysis in do file from
   # Also, 18 is z=-6 for 22 0/7 in Fenton and 65 is z=6 for 40 0/7
-  data.df[valid(data.df) & param == "HEIGHTCM" & measurement < 18,
+  data.df[valid(data.df) & param == "HEIGHTCM" & v < 18,
           exclude := exc_nam]
-  data.df[valid(data.df) & param == "HEIGHTCM" & measurement > 65 &
+  data.df[valid(data.df) & param == "HEIGHTCM" & v > 65 &
             agedays == 0,
           exclude := exc_nam]
 
   # Min/max HC based on analysis in do file from Oct 11 2022
   # Also, 13 is z=-6 for 22 0/7 in Fenton and
-  data.df[valid(data.df) & param == "HEADCM" & measurement < 13,
+  data.df[valid(data.df) & param == "HEADCM" & v < 13,
           exclude := exc_nam]
-  data.df[valid(data.df) & param == "HEADCM" & measurement > 75,
+  data.df[valid(data.df) & param == "HEADCM" & v > 75,
           exclude := exc_nam]
-  data.df[valid(data.df) & param == "HEADCM" & measurement > 50 &
+  data.df[valid(data.df) & param == "HEADCM" & v > 50 &
             agedays == 0,
           exclude := exc_nam]
 
@@ -228,5 +235,6 @@ cleanbatch <- function(data.df,
     cat(sprintf("[%s] Completed Batch #%s...\n", Sys.time(), data.df$batch[1]))
   if (!quietly & parallel)
     sink()
+
   return(data.df[j = .(line, exclude, tbc.sd, tbc.other.sd, param)]) #debugging
 }
