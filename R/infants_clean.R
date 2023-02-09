@@ -194,7 +194,7 @@ cleanbatch_infants <- function(data.df,
             agedays == 0,
           exclude := exc_nam]
 
-  exc_nam <- "Exclude-Z-BIV"
+  exc_nam <- "Exclude-Standardized-BIV"
 
   # identify z cutoff
   # ***Note, using unrecentered values***
