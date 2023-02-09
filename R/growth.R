@@ -392,11 +392,11 @@ cleangrowth <- function(subjid,
 
       # smooth z-scores/SD scores between ages 1 - 3yo using weighted scores
       # older uses cdc, younger uses who
-      who_weight <- 3 - (data.all$agedays/365.25)
-      cdc_weight <- (data.all$agedays/365.25) - 1
+      who_weight <- 4 - (data.all$agedays/365.25)
+      cdc_weight <- (data.all$agedays/365.25) - 2
 
-      smooth_val <- data.all$agedays/365.25 >= 1 &
-        data.all$agedays/365.25 <= 3 &
+      smooth_val <- data.all$agedays/365.25 >= 2 &
+        data.all$agedays/365.25 <= 4 &
         !data.all$param == "HEADCM"
       data.all[smooth_val,
                z.orig := (z.orig_cdc[smooth_val]*cdc_weight[smooth_val] +
@@ -407,14 +407,14 @@ cleangrowth <- function(subjid,
 
       # otherwise use WHO and CDC for older and younger, respectively
       who_val <- data.all$param == "HEADCM" |
-        data.all$agedays/365.25 < 1
+        data.all$agedays/365.25 < 2
       data.all[who_val | (smooth_val & is.na(data.all$z.orig_cdc)),
                z.orig := z.orig_who[who_val | (smooth_val & is.na(data.all$z.orig_cdc))]]
       data.all[who_val | (smooth_val & is.na(data.all$sd.orig_cdc)),
                sd.orig := sd.orig_who[who_val  | (smooth_val & is.na(data.all$sd.orig_cdc))]]
 
       cdc_val <- data.all$param != "HEADCM" |
-        data.all$agedays/365.25 > 3
+        data.all$agedays/365.25 > 4
       data.all[cdc_val  | (smooth_val & is.na(data.all$z.orig_who)),
                z.orig := z.orig_cdc[cdc_val | (smooth_val & is.na(data.all$z.orig_who))]]
       data.all[cdc_val | (smooth_val & is.na(data.all$sd.orig_who)),
