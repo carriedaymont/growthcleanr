@@ -284,6 +284,120 @@ cleanbatch_infants <- function(data.df,
   }
 
 
+  # 9d.  Replace exc_*=0 if exc_*==2 & redo step 5 (temporary extraneous)
+  data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
+  data.df[temporary_extraneous_infants(data.df), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
+
+  # extreme ewma ----
+
+  # STOP HERE -- check EWMA FOR UPDATES
+
+  # 11.  Exclude extreme errors with EWMA
+  # a.	Erroneous measurements can distort the EWMA for measurements around them. Therefore, if the EWMA method identifies more than one value for a subject and
+  #     parameter that meets criteria for exclusion, we will only exclude the value that deviates the most from expected in any given step. Then we will repeat the
+  #     entire process until no measurements are identified that meet criteria for exclusion.
+  # b.	Perform a EWMA calculation
+  #   i.	Only use values where exc_*==0 to determine the EWMAs. However, calculate dewma_* variables for values where exc_*==0 or exc_*==2
+  if (!quietly)
+    cat(sprintf(
+      "[%s] Exclude extreme measurements based on EWMA...\n",
+      Sys.time()
+    ))
+  data.df <- data.df[, exclude := (function(df) {
+    num.ewma.excluded <- 0
+    # optimization: determine whether this subject has any extraneous
+    has.extraneous <- subjid %in% subj.dup
+    while (TRUE) {
+      df[, (ewma.fields) := as.double(NaN)]
+      df[valid(exclude), (ewma.fields) := ewma(agedays, tbc.sd, ewma.exp, TRUE)]
+
+      # note: at this point, only one ewma exists per param on a given day for a subject, so sort(ewma.all)[1] will returns the non-missing ewma.all
+      # restrict to children with possible extraneous for efficiency
+      if (has.extraneous) {
+        df[, `:=`(
+          ewma.all = sort(ewma.all)[1],
+          ewma.before = sort(ewma.before)[1],
+          ewma.after = sort(ewma.after)[1]
+        ), by = .(agedays)]
+      }
+      df[, `:=`(
+        dewma.all = tbc.sd - ewma.all,
+        dewma.before = tbc.sd - ewma.before,
+        dewma.after = tbc.sd - ewma.after
+      )]
+
+      # 11c.  Identify all values that meet all of the following criteria as potential exclusions:
+      #   i.	There are 3 or more measurements for that subject and parameter
+      #   ii.	(dewma_*>3.5 & dewma_*_bef>3 & dewma_*_aft>3 & tbc*sd>3.5) OR (dewma_*<-3.5 & dewma_*_bef<-3 & d & dewma_*_aft<-3 & tbc*sd<-3.5)
+      #   iii.	exc_*==0
+
+      num.valid <- sum(valid(df))
+      rep <- na_as_false(with(
+        df,
+        num.valid >= 3 & valid(df)
+        &
+          (
+            dewma.all > 3.5 & dewma.before > 3 & dewma.after > 3 & tbc.sd > 3.5
+            |
+              dewma.all < -3.5 &
+              dewma.before < -3 & dewma.after < -3 & tbc.sd < -3.5
+          )
+      ))
+      num.exclude <- sum(rep)
+      # 11d.  If there is only one potential exclusion identified in step 11c for a subject and parameter, replace exc_*=5 for that value
+      if (num.exclude == 1)
+        df[rep, exclude := 'Exclude-EWMA-Extreme']
+      # 11e.  If there is more than one potential exclusion identified in step 11c for a subject and parameter, calculate abssum_*=|tbc*sd+dewma_*| for each exclusion and
+      #     replace exc_*=5 for the value with the highest abssum_*
+      if (num.exclude > 1) {
+        # first order by decreasing abssum
+        worst.row <- with(df, order(rep, abs(tbc.sd + (
+          tbc.sd - ewma.all
+        )), decreasing = TRUE))[1]
+        df[worst.row, exclude := 'Exclude-EWMA-Extreme']
+      }
+
+      # 11f.  For subjects/parameters with only 2 values, calculate abstbc*sd=|tbc*sd|
+      # g.  Replace exc_*=6 for values that meet all of the following criteria
+      #   i.	There are 2 measurements for that subject and parameter
+      #   ii.	(dewma_*>3.5 & tbc*sd>3.5) OR (dewma_*<-3.5 & tbc*sd<-3.5)
+      #   iii.	If there are 2 measurements for a subject/parameter that meet criteria ii, only replace exc_*=6 for the value with the larger abstbc*sd
+      rep <- na_as_false(with(
+        df,
+        num.valid == 2 &
+          (
+            tbc.sd - ewma.all > 3.5 &
+              tbc.sd > 3.5 |
+              tbc.sd - ewma.all < -3.5 & tbc.sd < -3.5
+          )
+      ))
+      num.exclude <- sum(rep)
+      if (num.exclude == 1)
+        df[rep, exclude := 'Exclude-EWMA-Extreme-Pair']
+      if (num.exclude > 1) {
+        # first order by decreasing abssum
+        worst.row <- with(df, order(rep, abs(tbc.sd), decreasing = TRUE))[1]
+        df[worst.row, exclude := 'Exclude-EWMA-Extreme-Pair']
+      }
+
+      # 11h.  Recalculate temporary extraneous as in step 5
+      # optimize: only perform these steps if this subject is known to have extraneous measurements
+      if (has.extraneous) {
+        df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
+        df[temporary_extraneous(df), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
+      }
+
+      # 11i.  If there was at least one subject who had a potential exclusion identified in step 11c, repeat steps 11b-11g. If there were no subjects with potential
+      #     exclusions identified in step 11c, move on to step 12.
+      newly.excluded <- sum(df$exclude %in% c('Exclude-EWMA-Extreme', 'Exclude-EWMA-Extreme-Pair'))
+      if (newly.excluded > num.ewma.excluded) {
+        num.ewma.excluded <- newly.excluded
+      } else {
+        break
+      }
+    }
+    return(df$exclude)
+  })(copy(.SD)), by = .(subjid, param), .SDcols = c('index', 'sex', 'agedays', 'tbc.sd', 'exclude')]
 
   # end ----
 
