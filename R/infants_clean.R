@@ -229,6 +229,62 @@ cleanbatch_infants <- function(data.df,
   data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
   data.df[temporary_extraneous_infants(data.df), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
 
+  # evil twins ----
+  # Evil Twins: An important weakness in the original pediatric growthcleanr algorithm was that it often failed to identify two or more implausible measurements that occurred next to each other, even if they were extremely deviant from a child’s other measurements. This step is now added to identify these multiple extreme values, although it also identifies some single values.
+
+  exc_nam <- "Exclude-Evil-Twin"
+
+  # first, find out of any re possible evil twins in the first place
+  start_df <- calc_oob_evil_twins(data.df[valid(data.df),])
+
+  if (any(start_df$sum_oob > 2)) {
+    if (!quietly)
+      cat(sprintf(
+        "[%s] Exclude evil twins...\n",
+        Sys.time()
+      ))
+
+    df <- copy(data.df)
+
+    # start to evaluate and remove evil twins
+    data.df[, exclude := (function(df) {
+      # where we are updating results
+      upd.df <- copy(df)
+      upd.df <- calc_oob_evil_twins(df[valid(df),])
+      # count the amount of oobs for each subject/param and distribute it out
+      upd.df[, `:=` (sum_oob = sum(oob, na.rm = T)), by =.(subjid, param)]
+
+      any_oob <- TRUE
+      # while there are multiple oob, we want to remove
+      while (any_oob){
+
+        # now calculate the maximum difference from the median tbc.sd
+        upd.df[, `:=` (sd_med = median(tbc.sd, na.rm = T)), by =.(subjid, param)]
+        upd.df[, `:=` (med_diff = abs(tbc.sd - sd_med)), by =.(subjid, param)]
+        upd.df[, `:=` (max_diff = med_diff  == max(med_diff)), by =.(subjid, param)]
+        # for ones with no tbc.sd, mark as false
+        upd.df[is.na(max_diff), max_diff := FALSE]
+
+        upd.df[sum_oob > 0 & max_diff, exclude := exc_nam]
+
+        # STOP HERE:
+        # NEED TO ASSIGN TO DF, THEN UPDATE UPD.DF WITH NEW VALID
+        df[upd.df[exclude == exc_nam,], exclude := i.exclude, on = .(line)]
+
+        upd.df <- calc_oob_evil_twins(df[valid(df),])
+        upd.df[, `:=` (sum_oob = sum(oob, na.rm = T)), by =.(subjid, param)]
+
+        any_oob <- any(upd.df$sum_oob > 2)
+
+      }
+
+      return(df$exclude)
+    })(copy(.SD))]
+
+  }
+
+
+
   # end ----
 
   if (!quietly)

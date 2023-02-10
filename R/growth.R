@@ -241,7 +241,10 @@ cleangrowth <- function(subjid,
     'Exclude-Pair-Delta-19',
     'Exclude-Single-Outlier',
     'Exclude-Too-Many-Errors',
-    'Exclude-Too-Many-Errors-Other-Parameter'
+    'Exclude-Too-Many-Errors-Other-Parameter',
+    "Exclude-Absolute-BIV",
+    "Exclude-Standardized-BIV",
+    "Exclude-Evil-Twin"
   )
 
   # if there's no pediatric data, no need to go through this rigamarole
