@@ -6,6 +6,18 @@ There were no ERRORs, WARNINGs, or NOTEs.
 ## Downstream dependencies
 There are currently no downstream dependencies for this package.
 
+## CRAN manual test
+
+We have addressed each of the notes in the manual test as below:
+
+* Package CITATION file contains call(s) to old-style personList() or
+   as.personList().  Please use c() on person objects instead.
+   Package CITATION file contains call(s) to old-style citEntry() or
+   citHeader()/citFooter().  Please use bibentry() instead, possibly with
+   arguments 'header' and 'footer'.
+
+
+We have updated the citation accordingly.
 
 # Previous Submissions
 
