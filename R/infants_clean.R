@@ -414,6 +414,153 @@ cleanbatch_infants <- function(data.df,
   data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
   data.df[temporary_extraneous_infants(data.df), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
 
+  # SDEs ----
+
+  # STOP HERE: need to adapt to new work
+
+  # prepare a list of valid rows and initialize variables for convenience
+  valid.rows <- valid(data.df)
+  data.df[, `:=`(
+    ewma.all = as.double(NaN),
+    abssum2 = as.double(NaN),
+    median.other.sd = as.double(NaN),
+    extraneous = FALSE
+  )]
+
+  # 12c.	Calculate a EWMA step for all subjects/parameters with duplicates/extraneous and at
+  #       least one non-extraneous value with the following modifications
+  #   i.	For calculating the EWMA, include only the extraneous selected in 12c
+  #  ii.	Calculate dewma_* for all values of extraneous
+  # iii.	You do not need to calculate EWMAbef or EWMAaft for this step
+
+  # determine proportion of days with extraneous/duplication for each parameter ahead of time for efficiency
+  dup.ratio.df <- data.df[subjid %in% subj.dup &
+                            (valid.rows |
+                               temp.dups), list(dup = (.N > 1)), by = .(subjid, param, agedays)][j = list(dup.ratio =
+                                                                                                            mean(dup)), keyby = .(subjid, param)]
+  # identify subject/parameters where there is duplication but at least one day with no extraneous for that parameter
+  subj.param.not.all.dups <- dup.ratio.df[dup.ratio < 1.0, list(subjid, param)]
+  # identify subject/parameters where there is duplication for all days for that parameter
+  subj.param.all.dups <- dup.ratio.df[dup.ratio == 1, list(subjid, param)]
+  subj.all.dups <- subj.param.all.dups[, unique(subjid)]
+  # perform ewma for subjects with extraneous
+  data.df[subjid %in% subj.dup &
+            valid.rows, ewma.all := ewma(agedays, tbc.sd, ewma.exp, ewma.adjacent =
+                                           FALSE), by = .(subjid, param)]
+  # note: at this point, only one ewma.all exists per param on a given day for a subject, so sort(ewma.all)[1] will returns the non-missing ewma.all
+  data.df[subjid %in% subj.dup, ewma.all := sort(ewma.all)[1], by = .(subjid, param, agedays)]
+
+  # iv.  Calculate abssum2_*=|2*dewma_*|+|tbc*sd| (note that this is different from how we calculated abssum_* in step 11).
+  # NOTE: only children with more than one ageday with valid measurements will have a valid ewma from above
+  data.df[, abssum2 := 2 * abs(tbc.sd - ewma.all) + abs(tbc.sd)]
+
+  # 12d.  For each subject/parameter/age with extraneous and at least one non-extraneous value:
+  #   i.  Replace exc_*=7 for all values except the value that has the smallest abssum2_*.
+  data.df[data.table(subj.param.not.all.dups), extraneous := seq_along(abssum2) != which.min(abssum2), by =
+            .(subjid, param, agedays)]
+  data.df[temp.dups, exclude := 'Include']
+  data.df[(valid.rows |
+             temp.dups) &
+            extraneous, exclude := 'Exclude-Extraneous-Same-Day']
+  #  ii.  Determine dup_tot_* (# of days with extraneous for that subject/parameter) and nodup_tot_* (# of days with nonexlcuded
+  #       non-extraneous for that subject/parameter).
+  # iii.  If dup_tot_*/(dup_tot_*+nodup_tot_*) is greater than 1/2, replace exc_*=7 for all extraneous for that subject/parameter
+  #       for each age where the  largest measurement minus the smallest measurement for that subject/parameter/age is larger than
+  #       the maximum difference (ht 3cm; wt 0-9.999 kg 0.25kg; wt 10-29.9999 kg 0.5 kg; wt 30kg and higher 1 kg).
+
+  data.df[data.table(dup.ratio.df[dup.ratio > 1 / 2, list(subjid, param)]), exclude := (function(df) {
+    df[, `:=`(tbc.sd.min = as.double(NaN),
+              tbc.sd.max = as.double(NaN))]
+    df[valid(
+      exclude,
+      include.extraneous = TRUE,
+      include.temporary.extraneous = TRUE
+    ), `:=`(tbc.sd.min = min(tbc.sd),
+            tbc.sd.max = max(tbc.sd))]
+    df[tbc.sd.max - tbc.sd.min > ifelse(param == 'HEIGHTCM',
+                                        3,
+                                        ifelse(
+                                          param == 'WEIGHTKG',
+                                          ifelse(tbc.sd.min < 10, 0.25, ifelse(tbc.sd.min < 30, 0.5, 1)),
+                                          NA
+                                        )),
+       exclude := 'Exclude-Extraneous-Same-Day']
+    return(df$exclude)
+  })(copy(.SD)), .SDcols = c('exclude', 'tbc.sd'), by = .(subjid, param, agedays)]
+
+  # 12e.	For each subject/parameter/age with extraneous and no nonextraneous values:
+  #   i.	Replace exc_*=7 for all values except the value with the smallest |tbc*sd-median_tbcOsd|. If median_tbcOsd is missing because there are no values
+  #       for the other parameter, randomly choose one extraneous value for each subject/parameter/age to keep as exc_*=0 and replace exc_*=7 for all other
+  #       extraneous for that subject/parameter/age.
+  #  ii.  If the largest measurement minus the smallest measurement for that subject/parameter/age is larger than the maximum difference
+  #       (ht 3cm; wt 0-9.999 kg 0.25kg; wt 10-29.9999 kg 0.5 kg; wt 30kg and higher 1 kg)., replace exc_*=7 for all extraneous for that
+  #       subject/parameter/age.
+
+  # calculate median for other parameter (restrict to subjects with all duplication for at least one parameter)
+  data.df[subjid %in% subj.all.dups, exclude := (function(subj.df) {
+    # flag days that have extraneous / potentially valid parameters
+    subj.df[, `:=`(
+      extraneous.this.day = FALSE,
+      extraneous = FALSE,
+      tbc.sd.min = as.double(NaN),
+      tbc.sd.max = as.double(NaN)
+    )]
+    valid.rows = valid(
+      subj.df,
+      include.extraneous = TRUE,
+      include.temporary.extraneous = TRUE
+    )
+    subj.df[valid.rows, extraneous.this.day := (.N > 1), by = .(param, agedays)]
+    for (p in subj.df[j = unique(param)]) {
+      median.sd <- subj.df[param != p &
+                             !extraneous.this.day, median(tbc.sd)]
+      subj.df[param == p, median.other.sd := median.sd]
+    }
+    # safety check -- assign median.other.sd==0 to ensure "which.min" functions correctly below
+    subj.df[is.na(median.other.sd), median.other.sd := 0]
+    # identify rows as extraneous where |tbc*sd-median_tbcOsd| is not at the minimum value
+    subj.df[extraneous.this.day == TRUE, extraneous := (seq_along(median.other.sd) != which.min(abs(tbc.sd - median.other.sd))), by =
+              .(param, agedays)]
+    subj.df[extraneous.this.day &
+              !extraneous, exclude := 'Include']
+    subj.df[extraneous.this.day &
+              extraneous, exclude := 'Exclude-Extraneous-Same-Day']
+    subj.df[extraneous.this.day == TRUE, `:=`(tbc.sd.min = min(tbc.sd),
+                                              tbc.sd.max = max(tbc.sd)), by = .(param, agedays)]
+    subj.df[tbc.sd.max - tbc.sd.min > ifelse(param == 'HEIGHTCM',
+                                             3,
+                                             ifelse(
+                                               param == 'WEIGHTKG',
+                                               ifelse(tbc.sd.min < 10, 0.25, ifelse(tbc.sd.min < 30, 0.5, 1)),
+                                               NA
+                                             )),
+            exclude := 'Exclude-Extraneous-Same-Day']
+
+    # identify kids who had an SD or EWMA extreme excluded that was a extraneous and re-label as "Exclude-Extraneous-Same-Day"
+    subj.df[, extraneous.this.day := FALSE]
+    # consider any non-missing measurement when determining presence of extraneous
+    subj.df[exclude != 'Missing', extraneous.this.day := (.N > 1), by =
+              .(param, agedays)]
+    subj.df[extraneous.this.day &
+              exclude %in% c('Exclude-SD-Cutoff',
+                             'Exclude-EWMA-Extreme',
+                             'Exclude-EWMA-Extreme-Pair'), exclude := 'Exclude-Extraneous-Same-Day']
+
+    return(subj.df$exclude)
+  })(copy(.SD)), .SDcols = c('param', 'agedays', 'exclude', 'tbc.sd'), by =
+    .(subjid)]
+
+  # 12f.  For any values that were excluded with exc_*=4, 5, or 6 that are also extraneous, replace exc_*=7.
+  data.df[subjid %in% subj.dup, exclude := (function(subj.df) {
+    if (.N > 1) {
+      subj.df[exclude %in% c('Exclude-SD-Cutoff',
+                             'Exclude-EWMA-Extreme',
+                             'Exclude-EWMA-Extreme-Pair'), exclude := 'Exclude-Extraneous-Same-Day']
+    }
+    return(subj.df$exclude)
+  })(copy(.SD)), .SDcols = c('exclude'), by = .(subjid, param, agedays)]
+
+
   # end ----
 
   if (!quietly)
