@@ -267,8 +267,6 @@ cleanbatch_infants <- function(data.df,
 
         upd.df[sum_oob > 0 & max_diff, exclude := exc_nam]
 
-        # STOP HERE:
-        # NEED TO ASSIGN TO DF, THEN UPDATE UPD.DF WITH NEW VALID
         df[upd.df[exclude == exc_nam,], exclude := i.exclude, on = .(line)]
 
         upd.df <- calc_oob_evil_twins(df[valid(df),])
@@ -290,7 +288,6 @@ cleanbatch_infants <- function(data.df,
 
   # extreme ewma ----
 
-  # STOP HERE -- check EWMA FOR UPDATES
 
   # 11.  Exclude extreme errors with EWMA
   # a.	Erroneous measurements can distort the EWMA for measurements around them. Therefore, if the EWMA method identifies more than one value for a subject and
@@ -331,17 +328,31 @@ cleanbatch_infants <- function(data.df,
       #   ii.	(dewma_*>3.5 & dewma_*_bef>3 & dewma_*_aft>3 & tbc*sd>3.5) OR (dewma_*<-3.5 & dewma_*_bef<-3 & d & dewma_*_aft<-3 & tbc*sd<-3.5)
       #   iii.	exc_*==0
 
+      # a.	For VLEZ: DEWMA > 8, DEWMA_bef > 6, DEWMA_aft > 6, and tbc`p’z > 3.5
+      # b.	For non-VLEZ: DEWMA > 3.5, DEWMA_bef > 3, DEWMA_aft > 3, and tbc`p’z > 3.5
+      # c.	For VLEZ and non-VLEZ: DEWMA < -3.5, DEWMA_bef < -3, DEWMA_aft <-3, tbc`p’z < -3.5
+
+      # (z-score < -3 in the first 6 months of life )
+      vlez <- df$agedays < 6*30.4375 & df$tbc.sd < -3
+
       num.valid <- sum(valid(df))
       rep <- na_as_false(with(
         df,
         num.valid >= 3 & valid(df)
         &
+          (# for VLEZ only
+          (vlez &
+             dewma.all > 8 & dewma.before > 6 & dewma.after > 6 & tbc.sd > 3.5
+          ) |
+          # for non-VLEZ
+          (!vlez &
+             dewma.all > 3.5 & dewma.before > 3 & dewma.after > 3 & tbc.sd > 3.5
+          ) |
+          # for both
           (
-            dewma.all > 3.5 & dewma.before > 3 & dewma.after > 3 & tbc.sd > 3.5
-            |
-              dewma.all < -3.5 &
+            dewma.all < -3.5 &
               dewma.before < -3 & dewma.after < -3 & tbc.sd < -3.5
-          )
+          ))
       ))
       num.exclude <- sum(rep)
       # 11d.  If there is only one potential exclusion identified in step 11c for a subject and parameter, replace exc_*=5 for that value
@@ -354,31 +365,31 @@ cleanbatch_infants <- function(data.df,
         worst.row <- with(df, order(rep, abs(tbc.sd + (
           tbc.sd - ewma.all
         )), decreasing = TRUE))[1]
-        df[worst.row, exclude := 'Exclude-EWMA-Extreme']
+        df[worst.row, exclude := 'Exclude-EWMA1-Extreme']
       }
-
-      # 11f.  For subjects/parameters with only 2 values, calculate abstbc*sd=|tbc*sd|
-      # g.  Replace exc_*=6 for values that meet all of the following criteria
-      #   i.	There are 2 measurements for that subject and parameter
-      #   ii.	(dewma_*>3.5 & tbc*sd>3.5) OR (dewma_*<-3.5 & tbc*sd<-3.5)
-      #   iii.	If there are 2 measurements for a subject/parameter that meet criteria ii, only replace exc_*=6 for the value with the larger abstbc*sd
-      rep <- na_as_false(with(
-        df,
-        num.valid == 2 &
-          (
-            tbc.sd - ewma.all > 3.5 &
-              tbc.sd > 3.5 |
-              tbc.sd - ewma.all < -3.5 & tbc.sd < -3.5
-          )
-      ))
-      num.exclude <- sum(rep)
-      if (num.exclude == 1)
-        df[rep, exclude := 'Exclude-EWMA-Extreme-Pair']
-      if (num.exclude > 1) {
-        # first order by decreasing abssum
-        worst.row <- with(df, order(rep, abs(tbc.sd), decreasing = TRUE))[1]
-        df[worst.row, exclude := 'Exclude-EWMA-Extreme-Pair']
-      }
+#
+#       # 11f.  For subjects/parameters with only 2 values, calculate abstbc*sd=|tbc*sd|
+#       # g.  Replace exc_*=6 for values that meet all of the following criteria
+#       #   i.	There are 2 measurements for that subject and parameter
+#       #   ii.	(dewma_*>3.5 & tbc*sd>3.5) OR (dewma_*<-3.5 & tbc*sd<-3.5)
+#       #   iii.	If there are 2 measurements for a subject/parameter that meet criteria ii, only replace exc_*=6 for the value with the larger abstbc*sd
+#       rep <- na_as_false(with(
+#         df,
+#         num.valid == 2 &
+#           (
+#             tbc.sd - ewma.all > 3.5 &
+#               tbc.sd > 3.5 |
+#               tbc.sd - ewma.all < -3.5 & tbc.sd < -3.5
+#           )
+#       ))
+#       num.exclude <- sum(rep)
+#       if (num.exclude == 1)
+#         df[rep, exclude := 'Exclude-EWMA-Extreme-Pair']
+#       if (num.exclude > 1) {
+#         # first order by decreasing abssum
+#         worst.row <- with(df, order(rep, abs(tbc.sd), decreasing = TRUE))[1]
+#         df[worst.row, exclude := 'Exclude-EWMA-Extreme-Pair']
+#       }
 
       # 11h.  Recalculate temporary extraneous as in step 5
       # optimize: only perform these steps if this subject is known to have extraneous measurements
@@ -389,7 +400,7 @@ cleanbatch_infants <- function(data.df,
 
       # 11i.  If there was at least one subject who had a potential exclusion identified in step 11c, repeat steps 11b-11g. If there were no subjects with potential
       #     exclusions identified in step 11c, move on to step 12.
-      newly.excluded <- sum(df$exclude %in% c('Exclude-EWMA-Extreme', 'Exclude-EWMA-Extreme-Pair'))
+      newly.excluded <- sum(df$exclude %in% c('Exclude-EWMA1-Extreme', 'Exclude-EWMA-Extreme-Pair'))
       if (newly.excluded > num.ewma.excluded) {
         num.ewma.excluded <- newly.excluded
       } else {
@@ -398,6 +409,10 @@ cleanbatch_infants <- function(data.df,
     }
     return(df$exclude)
   })(copy(.SD)), by = .(subjid, param), .SDcols = c('index', 'sex', 'agedays', 'tbc.sd', 'exclude')]
+
+  # 9d.  Replace exc_*=0 if exc_*==2 & redo step 5 (temporary extraneous)
+  data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
+  data.df[temporary_extraneous_infants(data.df), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
 
   # end ----
 
