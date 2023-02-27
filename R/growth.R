@@ -654,6 +654,10 @@ cleangrowth <- function(subjid,
       )
     }
 
+    # replace result with missing if measurement or agedays are missing
+    res[is.na(measurement) |
+          agedays < 0, result := "Missing"]
+
     if (parallel){
       stopCluster(cl)
     }
