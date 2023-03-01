@@ -1,3 +1,13 @@
+# growthcleanr 2.1.1 - 2023-03-01
+
+## Changed
+
+- Fixed missing adult measurements to be labeled "Missing" in output (#119)
+- Added tests for missingness in adult output
+- Fixed missing "-RV" codes in adult output
+- Corrected contributor names in DESCRIPTION (#120)
+- Added email for Dan Chudnov in DESCRIPTION (#95)
+
 # growthcleanr 2.1.0 - 2023-02-03
 
 ## Added
