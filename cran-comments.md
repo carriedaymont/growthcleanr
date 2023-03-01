@@ -1,3 +1,13 @@
+# CRAN submission growthcleanr 2.1.1
+
+## R CMD check results
+There were no ERRORs, WARNINGs, or NOTEs.
+
+## Downstream dependencies
+There are currently no downstream dependencies for this package.
+
+# Previous Submissions
+
 # CRAN submission growthcleanr 2.1.0
 
 ## R CMD check results
@@ -18,8 +28,6 @@ We have addressed each of the notes in the manual test as below:
 
 
 We have updated the citation accordingly.
-
-# Previous Submissions
 
 # CRAN submission growthcleanr 2.1.0 (1)
 

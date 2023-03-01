@@ -88,6 +88,24 @@ test_that("growthcleanr works as expected on pediatric synthetic data", {
   expect_equal(113, catcount(d100_derived_exclusions, "Exclude-Carried-Forward"))
   expect_equal(3, catcount(d100_derived_exclusions, "Exclude-EWMA-8"))
 
+  # also run a test to make sure missing data returns as "missing"
+  d5_miss <- as.data.table(data_peds)[subjid %in% unique(data[, subjid])[1:5], ]
+
+  # add missing data randomly for 5 values
+  set.seed(10)
+  d5_miss$measurement[sample(1:nrow(d5_miss), 5)] <- NA
+
+  d5_miss <-
+    d5_miss[, gcr_result := cleangrowth(
+      subjid,
+      param,
+      agedays,
+      sex,
+      measurement
+    )]
+
+  expect_equal(sum(d5_miss$gcr_result == "Missing"), 5)
+
 })
 
 test_that("growthcleanr works as expected on adult synthetic data", {
@@ -173,6 +191,24 @@ test_that("growthcleanr works as expected on adult synthetic data", {
   expect_equal(7, catcount(d100cp_exclusions, "Exclude-Adult-Distinct-3-Or-More"))
   expect_true(is.na(catcount(d100cp_exclusions, "Exclude-Carried-Forward")))
   expect_equal(14, catcount(d100cp_exclusions, "Exclude-Adult-BIV"))
+
+  # also run a test to make sure missing data returns as "missing"
+  d5_miss <- as.data.table(data_adult)[subjid %in% unique(data[, subjid])[1:5], ]
+
+  # add missing data randomly for 5 values
+  set.seed(10)
+  d5_miss$measurement[sample(1:nrow(d5_miss), 5)] <- NA
+
+  d5_miss <-
+    d5_miss[, gcr_result := cleangrowth(
+      subjid,
+      param,
+      agedays,
+      sex,
+      measurement
+    )]
+
+  expect_equal(sum(d5_miss$gcr_result == "Missing"), 5)
 
 })
 

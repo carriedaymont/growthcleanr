@@ -160,6 +160,7 @@ cleangrowth <- function(subjid,
   N <- age_years <- batch <- exclude <- index <- line <- NULL
   newbatch <- sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
   v <- v_adult <- whoagegrp.ht <- whoagegrp_ht <- z.orig <- NULL
+  result <- NULL
 
   # preprocessing ----
 
@@ -239,8 +240,11 @@ cleangrowth <- function(subjid,
     "Include",
     "Exclude-Adult-BIV",
     "Exclude-Adult-Hundreds",
+    "Exclude-Adult-Hundreds-RV",
     "Exclude-Adult-Unit-Errors",
+    "Exclude-Adult-Unit-Errors-RV",
     "Exclude-Adult-Transpositions",
+    "Exclude-Adult-Transpositions-RV",
     "Exclude-Adult-Weight-Cap-Identical",
     "Exclude-Adult-Weight-Cap",
     "Exclude-Adult-Swapped-Measurements",
@@ -249,6 +253,7 @@ cleangrowth <- function(subjid,
     "Exclude-Adult-Distinct-Pairs",
     "Exclude-Adult-Distinct-3-Or-More",
     "Exclude-Adult-EWMA-Extreme",
+    "Exclude-Adult-EWMA-Extreme-RV",
     "Exclude-Adult-Distinct-Ordered-Pairs",
     "Exclude-Adult-EWMA-Moderate",
     "Exclude-Adult-Possibly-Impacted-By-Weight-Cap",
@@ -652,7 +657,12 @@ cleangrowth <- function(subjid,
         .paropts = list(.packages = "data.table"),
         weight_cap = weight_cap
       )
+
+      res <- as.data.table(res)
     }
+
+    # replace result with missing if measurement or agedays are missing
+    res[is.na(measurement) | agedays < 0, result := "Missing"]
 
     if (parallel){
       stopCluster(cl)
