@@ -8,7 +8,9 @@
 ## Changed
 
 - Updated `ext_bmiz()` to match Dec 2022 NCHS guidelines (#98)
-- New options to keep dates, columns, unmateched rows in `longwide()` (#71)
+- New options to keep dates, columns, unmatched rows in `longwide()` (#71)
+- Updated CITATION to match new CRAN requirements
+- Updated Dockerfile to build from repo, not CRAN
 
 # growthcleanr 2.0.3 - 2022-11-01
 
