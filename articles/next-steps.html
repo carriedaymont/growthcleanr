@@ -113,7 +113,7 @@
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Next steps</h1>
             
-            <h4 data-toc-skip class="date">2023-03-01</h4>
+            <h4 data-toc-skip class="date">2023-03-03</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/next-steps.Rmd" class="external-link"><code>vignettes/next-steps.Rmd</code></a></small>
       <div class="hidden name"><code>next-steps.Rmd</code></div>
@@ -167,7 +167,7 @@ sweep script is executed from the command line on the cleaned data file
 for as follows (with the assumption that cleaned.csv is in your current
 directory; otherwise, make sure to specify the path relative to your
 current directory):</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">%</span> Rscript exec/testadjustcf.R cleaned.csv</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> exec/testadjustcf.R cleaned.csv</span></code></pre></div>
 <p>To use <code><a href="../reference/testacf.html">testacf()</a></code>, run the following in the console (with
 <code>cleaned_data</code> in the environment):</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
@@ -398,7 +398,7 @@ output adjustment results as a data.frame in the
 <code>testacf_res</code> entry.</p>
 <p>For example, a 5-step sweep with the <code>line-grid</code> search
 would be run with this command:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">%</span> Rscript exec/textadjustcf.R <span class="at">--gridlength</span> 5 <span class="at">--searchtype</span> line-grid cleaned.csv</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> exec/textadjustcf.R <span class="at">--gridlength</span> 5 <span class="at">--searchtype</span> line-grid cleaned.csv</span></code></pre></div>
 <p>or with this function execution:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/testacf.html">testacf</a></span><span class="op">(</span></span>

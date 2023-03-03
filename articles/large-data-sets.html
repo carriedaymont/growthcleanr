@@ -113,7 +113,7 @@
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Working with large data sets</h1>
             
-            <h4 data-toc-skip class="date">2023-03-01</h4>
+            <h4 data-toc-skip class="date">2023-03-03</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/vignettes/large-data-sets.Rmd" class="external-link"><code>vignettes/large-data-sets.Rmd</code></a></small>
       <div class="hidden name"><code>large-data-sets.Rmd</code></div>
@@ -226,7 +226,7 @@ appropriate.</li>
 <p>If you have many small files saved, for example, as
 <code>mydata.00001.csv</code>, <code>mydata.00002.csv</code>, etc., this
 driver can be invoked using <code>parallel</code>:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">%</span> ls mydata.<span class="pp">?????</span>.csv <span class="kw">|</span> <span class="ex">parallel</span> <span class="at">-j2</span> <span class="at">--eta</span> <span class="dt">\</span></span>
+<div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ls</span> mydata.<span class="pp">?????</span>.csv <span class="kw">|</span> <span class="ex">parallel</span> <span class="at">-j2</span> <span class="at">--eta</span> <span class="dt">\</span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Rscript exec/gcdriver.R --quietly --sdrecenter nhanes {} {}-clean.csv"</span></span></code></pre></div>
 <p>This lists your input files, and passes the filename list to parallel
 to use in invoking the driver script, one file at a time, and to process
