@@ -96,7 +96,7 @@ To install and run `growthcleanr` using Docker, open the PowerShell on Windows,
 or open the Terminal on macOS, and enter this `docker` command:
 
 ```{bash, eval = FALSE}
-% docker run -it ghcr.io/mitre/growthcleanr/gcr-image:latest R
+docker run -it ghcr.io/mitre/growthcleanr/gcr-image:latest R
 ```
 
 The image tag `latest` in the example above will refer to the latest version of
@@ -109,7 +109,7 @@ To explicitly choose a release by name, replace `latest` with the release tag,
 e.g. for the released package `v2.1.0`:
 
 ```{bash, eval = FALSE}
-% docker run -it ghcr.io/mitre/growthcleanr/gcr-image:v2.1.0 R
+docker run -it ghcr.io/mitre/growthcleanr/gcr-image:v2.1.0 R
 ```
 
 Whichever package you use, the first time this command is run, it might take a
@@ -124,7 +124,7 @@ you are on Windows, and your data is in `C:\Users\exampleuser\analysis`, specify
 a mapping using the added `-v` step below:
 
 ```{bash, eval = FALSE}
-% docker run -it -v C:\Users\exampleusers\analysis:/usr/src/app \
+docker run -it -v C:\Users\exampleusers\analysis:/usr/src/app \
     ghcr.io/mitre/growthcleanr/gcr-image:latest R
 ```
 
@@ -141,7 +141,7 @@ If you are on macOS, and your data is in `/Users/exampleuser/analysis`, specify
 a folder mapping like this:
 
 ```{bash, eval = FALSE}
-% docker run -it -v /Users/exampleuser/analysis:/usr/src/app \
+docker run -it -v /Users/exampleuser/analysis:/usr/src/app \
     ghcr.io/mitre/growthcleanr/gcr-image:latest R
 ```
 
@@ -187,7 +187,7 @@ the `growthcleanr` source code and then install it from source. To clone the
 source using `git`:
 
 ```{bash, eval = FALSE}
-% git clone https://github.com/carriedaymont/growthcleanr.git
+git clone https://github.com/carriedaymont/growthcleanr.git
 ```
 
 Once you have the `growthcleanr` package source, open an R session from the
