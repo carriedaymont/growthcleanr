@@ -84,7 +84,7 @@
 #' @param adult_columns_filename Name of file to save original adult data, with additional output columns to
 #' as CSV. Defaults to "", for which this data will not be saved. Useful
 #' for post-analysis. For more information on this output, please see README.
-#' @param infants TRUE/FALSE. Run the alpha-release of the infants algorithm (expands pediatric algorithm to clean 0 - 2). Defaults to FALSE.
+#' @param infants TRUE/FALSE. Run the beta-release of the infants algorithm (expands pediatric algorithm to clean 0 - 2). Defaults to FALSE.
 #'
 #' @return Vector of exclusion codes for each of the input measurements.
 #'
@@ -308,17 +308,31 @@ cleangrowth <- function(subjid,
     tanner.fields <- colnames(tanner.ht.vel)
     tanner.fields <- tanner.fields[!tanner.fields %in% c('sex', 'tanner.months')]
 
-    who_max_ht_vel_path <- ifelse(
-      ref.data.path == "",
-      system.file(file.path("extdata", "who_ht_maxvel_3sd.csv.gz"), package = "growthcleanr"),
-      file.path(ref.data.path, "who_ht_maxvel_3sd.csv.gz")
-    )
+    if (!infants){
+      who_max_ht_vel_path <- ifelse(
+        ref.data.path == "",
+        system.file(file.path("extdata", "who_ht_maxvel_3sd.csv.gz"), package = "growthcleanr"),
+        file.path(ref.data.path, "who_ht_maxvel_3sd.csv.gz")
+      )
 
-    who_ht_vel_3sd_path <- ifelse(
-      ref.data.path == "",
-      system.file(file.path("extdata", "who_ht_vel_3sd.csv.gz"), package = "growthcleanr"),
-      file.path(ref.data.path, "who_ht_vel_3sd.csv.gz")
-    )
+      who_ht_vel_3sd_path <- ifelse(
+        ref.data.path == "",
+        system.file(file.path("extdata", "who_ht_vel_3sd.csv.gz"), package = "growthcleanr"),
+        file.path(ref.data.path, "who_ht_vel_3sd.csv.gz")
+      )
+    } else {
+      who_max_ht_vel_path <- ifelse(
+        ref.data.path == "",
+        system.file(file.path("extdata", "who_hc_maxvel_3sd_infants.csv.gz"), package = "growthcleanr"),
+        file.path(ref.data.path, "who_hc_maxvel_3sd_infants.csv.gz")
+      )
+
+      who_ht_vel_3sd_path <- ifelse(
+        ref.data.path == "",
+        system.file(file.path("extdata", "who_hc_vel_3sd_infants.csv.gz"), package = "growthcleanr"),
+        file.path(ref.data.path, "who_hc_vel_3sd_infants.csv.gz")
+      )
+    }
     who.max.ht.vel <- fread(who_max_ht_vel_path)
     who.ht.vel <- fread(who_ht_vel_3sd_path)
     setkey(who.max.ht.vel, sex, whoagegrp_ht)

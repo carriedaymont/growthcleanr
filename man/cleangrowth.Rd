@@ -139,7 +139,7 @@ to Inf. Defaults to Inf.}
 as CSV. Defaults to "", for which this data will not be saved. Useful
 for post-analysis. For more information on this output, please see README.}
 
-\item{infants}{TRUE/FALSE. Run the alpha-release of the infants algorithm (expands pediatric algorithm to clean 0 - 2). Defaults to FALSE.}
+\item{infants}{TRUE/FALSE. Run the beta-release of the infants algorithm (expands pediatric algorithm to clean 0 - 2). Defaults to FALSE.}
 }
 \value{
 Vector of exclusion codes for each of the input measurements.
