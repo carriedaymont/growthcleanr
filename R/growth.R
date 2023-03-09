@@ -396,8 +396,10 @@ cleangrowth <- function(subjid,
       if (!quietly)
         cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
       # for infants, use z and who
-      measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE)
-      measurement.to.z_who <- read_anthro(ref.data.path, cdc.only = F)
+      measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE,
+                                      infants = T)
+      measurement.to.z_who <- read_anthro(ref.data.path, cdc.only = FALSE,
+                                          infants = T)
 
       data.all[, z.orig_cdc := measurement.to.z(param, agedays, sex, v)]
       data.all[, z.orig_who := measurement.to.z_who(param, agedays, sex, v)]
@@ -836,7 +838,7 @@ cleangrowth <- function(subjid,
 #'
 #' @param path Path to supplied reference anthro data. Defaults to package anthro tables.
 #' @param cdc.only Whether or not only CDC data should be used. Defaults to false.
-#' @param infants boolean on if infants version is being used. will be merged in to main algorithm.
+#' @param infants boolean on if beta infants version is being used. will be merged in to main algorithm.
 #'
 #' @return Function for calculating BMI based on measurement, age in days, sex, and measurement value.
 #' @export
@@ -849,121 +851,251 @@ cleangrowth <- function(subjid,
 #' # Return calculating function while specifying a path and using only CDC data
 #' afunc <- read_anthro(path = system.file("extdata", package = "growthcleanr"),
 #'                      cdc.only = TRUE)
-read_anthro <- function(path = "", cdc.only = FALSE) {
+read_anthro <- function(path = "", cdc.only = FALSE, infants = FALSE) {
   # avoid "no visible bindings" warning
   src <- param <- sex <- age <- ret <- m <- NULL
   csdneg <- csdpos <- s <- NULL
 
   # set correct path based on input reference table path (if any)
-  weianthro_path <- ifelse(
-    path == "",
-    system.file(file.path("extdata", "weianthro.txt.gz"), package = "growthcleanr"),
-    file.path(path, "weianthro.txt.gz")
-  )
-  lenanthro_path <- ifelse(
-    path == "",
-    system.file(file.path("extdata", "lenanthro.txt.gz"), package = "growthcleanr"),
-    file.path(path, "lenanthro.txt.gz")
-  )
-  bmianthro_path <- ifelse(
-    path == "",
-    system.file(file.path("extdata", "bmianthro.txt.gz"), package = "growthcleanr"),
-    file.path(path, "bmianthro.txt.gz")
-  )
-  growth_cdc_ext_path <- ifelse(
-    path == "",
-    system.file(file.path("extdata", "growthfile_cdc_ext.csv.gz"), package = "growthcleanr"),
-    file.path(path, "growthfile_cdc_ext.csv.gz")
-  )
-
+  if (!infants){
+    weianthro_path <- ifelse(
+      path == "",
+      system.file(file.path("extdata", "weianthro.txt.gz"), package = "growthcleanr"),
+      file.path(path, "weianthro.txt.gz")
+    )
+    lenanthro_path <- ifelse(
+      path == "",
+      system.file(file.path("extdata", "lenanthro.txt.gz"), package = "growthcleanr"),
+      file.path(path, "lenanthro.txt.gz")
+    )
+    bmianthro_path <- ifelse(
+      path == "",
+      system.file(file.path("extdata", "bmianthro.txt.gz"), package = "growthcleanr"),
+      file.path(path, "bmianthro.txt.gz")
+    )
+    growth_cdc_ext_path <- ifelse(
+      path == "",
+      system.file(file.path("extdata", "growthfile_cdc_ext.csv.gz"), package = "growthcleanr"),
+      file.path(path, "growthfile_cdc_ext.csv.gz")
+    )
+  } else {
+    weianthro_path <- lenanthro_path <- bmianthro_path <-
+      ifelse(
+        path == "",
+        system.file(file.path("extdata", "growthfile_who.csv.gz"), package = "growthcleanr"),
+        file.path(path, "growthfile_who.csv.gz")
+      )
+    growth_cdc_ext_path <- ifelse(
+      path == "",
+      system.file(file.path("extdata", "growthfile_cdc_ext_infants.csv.gz"), package = "growthcleanr"),
+      file.path(path, "growthfile_cdc_ext_infants.csv.gz")
+    )
+  }
   growth_cdc_ext <- read.csv(gzfile(growth_cdc_ext_path))
 
-  l <- list(
-    with(
-      read.table(gzfile(weianthro_path), header = TRUE),
-      data.frame(
-        src = 'WHO',
-        param = 'WEIGHTKG',
-        sex = sex - 1,
-        age,
-        l,
-        m,
-        s,
-        csdpos = as.double(NA),
-        csdneg = as.double(NA)
-      )
-    ),
-    with(
-      read.table(gzfile(lenanthro_path), header = TRUE),
-      data.frame(
-        src = 'WHO',
-        param = 'HEIGHTCM',
-        sex = sex - 1,
-        age,
-        l,
-        m,
-        s,
-        csdpos = as.double(NA),
-        csdneg = as.double(NA)
-      )
-    ),
-    with(
-      read.table(gzfile(bmianthro_path), header = TRUE),
-      data.frame(
-        src = 'WHO',
-        param = 'BMI',
-        sex = sex - 1,
-        age,
-        l,
-        m,
-        s,
-        csdpos = as.double(NA),
-        csdneg = as.double(NA)
-      )
-    ),
-    with(
-      growth_cdc_ext,
-      data.frame(
-        src = 'CDC',
-        param = 'WEIGHTKG',
-        sex,
-        age = agedays,
-        l = cdc_wt_l,
-        m = cdc_wt_m,
-        s = cdc_wt_s,
-        csdpos = cdc_wt_csd_pos,
-        csdneg = cdc_wt_csd_neg
-      )
-    ),
-    with(
-      growth_cdc_ext,
-      data.frame(
-        src = 'CDC',
-        param = 'HEIGHTCM',
-        sex,
-        age = agedays,
-        l = cdc_ht_l,
-        m = cdc_ht_m,
-        s = cdc_ht_s,
-        csdpos = cdc_ht_csd_pos,
-        csdneg = cdc_ht_csd_neg
-      )
-    ),
-    with(
-      growth_cdc_ext,
-      data.frame(
-        src = 'CDC',
-        param = 'BMI',
-        sex,
-        age = agedays,
-        l = cdc_bmi_l,
-        m = cdc_bmi_m,
-        s = cdc_bmi_s,
-        csdpos = cdc_bmi_csd_pos,
-        csdneg = cdc_bmi_csd_neg
+  l <- if (!infants){
+    list(
+      with(
+        read.table(gzfile(weianthro_path), header = TRUE),
+        data.frame(
+          src = 'WHO',
+          param = 'WEIGHTKG',
+          sex = sex - 1,
+          age,
+          l,
+          m,
+          s,
+          csdpos = as.double(NA),
+          csdneg = as.double(NA)
+        )
+      ),
+      with(
+        read.table(gzfile(lenanthro_path), header = TRUE),
+        data.frame(
+          src = 'WHO',
+          param = 'HEIGHTCM',
+          sex = sex - 1,
+          age,
+          l,
+          m,
+          s,
+          csdpos = as.double(NA),
+          csdneg = as.double(NA)
+        )
+      ),
+      with(
+        read.table(gzfile(bmianthro_path), header = TRUE),
+        data.frame(
+          src = 'WHO',
+          param = 'BMI',
+          sex = sex - 1,
+          age,
+          l,
+          m,
+          s,
+          csdpos = as.double(NA),
+          csdneg = as.double(NA)
+        )
+      ),
+      with(
+        growth_cdc_ext,
+        data.frame(
+          src = 'CDC',
+          param = 'WEIGHTKG',
+          sex,
+          age = agedays,
+          l = cdc_wt_l,
+          m = cdc_wt_m,
+          s = cdc_wt_s,
+          csdpos = cdc_wt_csd_pos,
+          csdneg = cdc_wt_csd_neg
+        )
+      ),
+      with(
+        growth_cdc_ext,
+        data.frame(
+          src = 'CDC',
+          param = 'HEIGHTCM',
+          sex,
+          age = agedays,
+          l = cdc_ht_l,
+          m = cdc_ht_m,
+          s = cdc_ht_s,
+          csdpos = cdc_ht_csd_pos,
+          csdneg = cdc_ht_csd_neg
+        )
+      ),
+      with(
+        growth_cdc_ext,
+        data.frame(
+          src = 'CDC',
+          param = 'BMI',
+          sex,
+          age = agedays,
+          l = cdc_bmi_l,
+          m = cdc_bmi_m,
+          s = cdc_bmi_s,
+          csdpos = cdc_bmi_csd_pos,
+          csdneg = cdc_bmi_csd_neg
+        )
       )
     )
-  )
+  } else {
+    list(
+      with(
+        read.csv(gzfile(weianthro_path), header = TRUE),
+        data.frame(
+          src = 'WHO',
+          param = 'WEIGHTKG',
+          sex,
+          age = agedays,
+          l = who_wt_l,
+          m = who_wt_m,
+          s = who_wt_s,
+          csdpos = who_wt_csd_pos,
+          csdneg =  who_wt_csd_neg
+        )
+      ),
+      with(
+        read.csv(gzfile(lenanthro_path), header = TRUE),
+        data.frame(
+          src = 'WHO',
+          param = 'HEIGHTCM',
+          sex,
+          age = agedays,
+          l = who_ht_l,
+          m = who_ht_m,
+          s = who_ht_s,
+          csdpos = who_ht_csd_pos,
+          csdneg =  who_ht_csd_neg
+        )
+      ),
+      with(
+        read.csv(gzfile(lenanthro_path), header = TRUE),
+        data.frame(
+          src = 'WHO',
+          param = 'HEADCM',
+          sex,
+          age = agedays,
+          l = who_hc_l,
+          m = who_hc_m,
+          s = who_hc_s,
+          csdpos = who_hc_csd_pos,
+          csdneg =  who_hc_csd_neg
+        )
+      ),
+      with(
+        read.csv(gzfile(bmianthro_path), header = TRUE),
+        data.frame(
+          src = 'WHO',
+          param = 'BMI',
+          sex,
+          age = agedays,
+          l = who_bmi_l,
+          m = who_bmi_m,
+          s = who_bmi_s,
+          csdpos = who_bmi_csd_pos,
+          csdneg =  who_bmi_csd_neg
+        )
+      ),
+      with(
+        growth_cdc_ext,
+        data.frame(
+          src = 'CDC',
+          param = 'WEIGHTKG',
+          sex,
+          age = agedays,
+          l = cdc_wt_l,
+          m = cdc_wt_m,
+          s = cdc_wt_s,
+          csdpos = cdc_wt_csd_pos,
+          csdneg = cdc_wt_csd_neg
+        )
+      ),
+      with(
+        growth_cdc_ext,
+        data.frame(
+          src = 'CDC',
+          param = 'HEIGHTCM',
+          sex,
+          age = agedays,
+          l = cdc_ht_l,
+          m = cdc_ht_m,
+          s = cdc_ht_s,
+          csdpos = cdc_ht_csd_pos,
+          csdneg = cdc_ht_csd_neg
+        )
+      ),
+      with(
+        growth_cdc_ext,
+        data.frame(
+          src = 'CDC',
+          param = 'HEADCM',
+          sex,
+          age = agedays,
+          l = cdc_hc_l,
+          m = cdc_hc_m,
+          s = cdc_hc_s,
+          csdpos = cdc_hc_csd_pos,
+          csdneg = cdc_hc_csd_neg
+        )
+      ),
+      with(
+        growth_cdc_ext,
+        data.frame(
+          src = 'CDC',
+          param = 'BMI',
+          sex,
+          age = agedays,
+          l = cdc_bmi_l,
+          m = cdc_bmi_m,
+          s = cdc_bmi_s,
+          csdpos = cdc_bmi_csd_pos,
+          csdneg = cdc_bmi_csd_neg
+        )
+      )
+    )
+  }
 
   anthro <- rbindlist(l)
 
