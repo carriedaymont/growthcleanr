@@ -1,4 +1,4 @@
-FROM rocker/tidyverse:latest
+FROM ghcr.io/rocker-org/tidyverse:latest
 
 LABEL maintainer="Daniel Chudnov <dlchudnov@mitre.org>"
 
@@ -13,7 +13,7 @@ RUN mkdir /app/R_libs
 RUN echo "R_LIBS_USER=/app/R_libs" > /home/gcuser/.Renviron
 RUN echo ".libPaths(c('/app/R_libs', .libPaths()))" > /home/gcuser/.Rprofile
 
-RUN R -e "devtools::install_github('mitre/growthcleanr', dependencies = TRUE, ref = 'main', lib='/app/R_libs')"
+RUN R -e "devtools::install_github('mitre/growthcleanr', dependencies = TRUE, ref = 'main', lib = '/app/R_libs')"
 
 ADD exec/gcdriver.R /usr/local/bin/
 RUN chmod ugo+rx /usr/local/bin/gcdriver.R

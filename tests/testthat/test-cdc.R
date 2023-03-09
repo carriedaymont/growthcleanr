@@ -43,15 +43,15 @@ test_that("ext_bmiz produces comparable output to CDC SAS implementation", {
     "haz" = "haz",
     "hp" = "hapct",
     "p95" = "bmi95",
-    "bmip95" = "bmipct95",
-    "mod_bmiz" = "X_Fbmiz",
-    "mod_waz" = "X_Fwaz",
-    "mod_haz" = "X_Fhaz"
+    "bmip95" = "bmip95",
+    "mod_bmiz" = "mod_bmiz",
+    "mod_waz" = "mod_waz",
+    "mod_haz" = "mod_haz"
   )
 
   # check all values within a tolerance of 1e-4
   err_df <- abs(as.data.frame(myd_bmi)[, names(map_to_cdc)] -
-                  cdcdata[, map_to_cdc])
+                  cdcdata[, unname(map_to_cdc)])
   # 99.99% of values should be within tolerance of 1e-4
   expect_gte(sum(err_df <= 1e-4) / nrow(cdcdata) / length(map_to_cdc) *
                100,

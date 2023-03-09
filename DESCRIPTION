@@ -1,23 +1,24 @@
 Package: growthcleanr
 Type: Package
 Title: Data Cleaner for Anthropometric Measurements
-Version: 2.0.2
+Version: 2.1.1
 Authors@R: c(
-    person("Daymont","Carrie", email = "cdaymont@pennstatehealth.psu.edu", role = "aut"),
-    person("Grundmeier","Robert", role = "aut"),
-    person("Miller","Jeffrey", role = "aut"),
-    person("Campos","Diego", role = "aut"),
-    person("Chudnov","Dan", role = "ctb"),
-    person("De los Santos","Hannah", email = "hdelossantos@mitre.org", role = c("ctb","cre")),
-    person("Cao","Lusha", role = "ctb"),
-    person("Silva","Steffani", role = "ctb"),
-    person("Zhang","Hanzhe", role = "ctb"),
-    person("Boyas","Matt", role = "ctb"),
-    person("Freedman","David", role = "ctb"),
-    person("Achilleos","Andreas", role = "ctb"),
-    person("Butts","Jessica", role = "ctb"),
-    person("Nguyen","Sheila", role = "ctb"),
-    person("Soleymani","Taraneh", role = "ctb")
+    person("Carrie", "Daymont", email = "cdaymont@pennstatehealth.psu.edu", role = c("ctb","cre")),
+    person("Robert", "Grundmeier", role = "aut"),
+    person("Jeffrey", "Miller", role = "aut"),
+    person("Diego", "Campos", role = "aut"),
+    person("Dan", "Chudnov", email = "dlchudnov@mitre.org", role = "ctb"),
+    person("Hannah", "De los Santos", email = "hdelossantos@mitre.org", role = c("ctb")),
+    person("Lusha", "Cao", role = "ctb"),
+    person("Steffani", "Silva", role = "ctb"),
+    person("Hanzhe", "Zhang", role = "ctb"),
+    person("Matt", "Boyas", role = "ctb"),
+    person("David", "Freedman", role = "ctb"),
+    person("Andreas", "Achilleos", role = "ctb"),
+    person("Jessica", "Butts", role = "ctb"),
+    person("Sheila", "Nguyen", role = "ctb"),
+    person("Taraneh", "Soleymani", role = "ctb"),
+    person("Max", "Olivier", role = "ctb")
   )
 Description: Identifies implausible anthropometric (e.g., height,
     weight) measurements in irregularly spaced longitudinal datasets, such as those from electronic health records.

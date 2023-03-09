@@ -9,6 +9,7 @@
 status](https://www.r-pkg.org/badges/version/growthcleanr)](https://cran.r-project.org/package=growthcleanr)
 [![R build
 status](https://github.com/carriedaymont/growthcleanr/workflows/R-CMD-check/badge.svg)](https://github.com/carriedaymont/growthcleanr/actions)
+[![Docker](https://github.com/mitre/growthcleanr/actions/workflows/build-and-publish-image-tag.yml/badge.svg)](https://github.com/mitre/growthcleanr/actions/workflows/build-and-publish-image-tag.yml)
 
 <!-- badges: end -->
 
@@ -103,6 +104,10 @@ The rest of this documentation includes:
 - [Next
   steps](https://carriedaymont.github.io/growthcleanr/articles/next-steps.html),
   notes on potential enhancements to the pediatric and adult algorithms
+- [Developer
+  guidelines](https://carriedaymont.github.io/growthcleanr/articles/developer-guidelines.html),
+  advice for contributors to this package, including a CRAN release
+  checklist
 
 ## Changes
 

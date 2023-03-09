@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/v4-shims.min.css" integrity="sha256-wZjR52fzng1pJHwx4aV2AO3yyTOXrcDW7jBpJtTwVxw=" crossorigin="anonymous">
 <!-- clipboard.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min.js" integrity="sha256-inc5kl9MA1hkeYUt+EC3BhlIgyp/2jDIyBLS6k3UxPI=" crossorigin="anonymous"></script><!-- headroom.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/headroom.min.js" integrity="sha256-AsUX4SJE1+yuDu5+mAVzJbuYNPHj/WroHuZ8Ir/CkE0=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/jQuery.headroom.min.js" integrity="sha256-ZX/yNShbjqsohH1k95liqY9Gd8uOiE1S4vZc+9KQ1K4=" crossorigin="anonymous"></script><!-- pkgdown --><link href="pkgdown.css" rel="stylesheet">
 <script src="pkgdown.js"></script><meta property="og:title" content="Data Cleaner for Anthropometric Measurements">
-<meta property="og:description" content="‘growthcleanr’ identifies implausible anthropometric (e.g., height,
+<meta property="og:description" content="Identifies implausible anthropometric (e.g., height,
     weight) measurements in irregularly spaced longitudinal datasets, such as those from electronic health records.">
 <!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
 <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
@@ -34,7 +34,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="index.html">growthcleanr</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.0.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.1.1</span>
       </span>
     </div>
 
@@ -80,6 +80,9 @@
     <li>
       <a href="articles/next-steps.html">Next steps</a>
     </li>
+    <li>
+      <a href="articles/developer-guidelines.html">Developer guidelines</a>
+    </li>
   </ul>
 </li>
 <li>
@@ -121,6 +124,13 @@
 </blockquote>
 <p>This package also includes an R version of the <a href="https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm" class="external-link">SAS macro published by the CDC</a> for calculating percentiles and Z-scores of pediatric growth observations and utilities for working with both functions. As of summer 2021, it also supports cleaning anthropometric measurements for adults up to age 65. The adult algorithm has not yet been published in a peer-reviewed publication, but is described in detail at <a href="https://carriedaymont.github.io/growthcleanr/articles/adult-algorithm.html" class="external-link">Adult algorithm</a>.</p>
 <div class="section level2">
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+</h2>
+<p>To install the stable version from CRAN:</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"growthcleanr"</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
 <h2 id="summary">Summary<a class="anchor" aria-label="anchor" href="#summary"></a>
 </h2>
 <p>The <code>growthcleanr</code> package processes data prepared in a specific format to identify biologically implausible height and weight measurements. It bases these evaluations on techniques which use patient-specific longitudinal analysis and variations from published growth trajectory charts for pediatric subjects. These techniques are performed in a specific order which refines and improves results throughout the process.</p>
@@ -134,7 +144,9 @@
 <li>
 <a href="https://carriedaymont.github.io/growthcleanr/articles/quickstart.html" class="external-link">Quickstart</a>, a brief tour of using growthcleanr, including data preparation</li>
 <li>
-<a href="https://carriedaymont.github.io/growthcleanr/articles/usage.html" class="external-link">Installation</a>, examples of cleaning data, multiple options, example data</li>
+<a href="https://carriedaymont.github.io/growthcleanr/articles/installation.html" class="external-link">Installation</a>, options for installing growthcleanr, with notes on specific platforms and source-level installation for developers</li>
+<li>
+<a href="https://carriedaymont.github.io/growthcleanr/articles/usage.html" class="external-link">Usage</a>, examples of cleaning data, multiple options, example data</li>
 </ul>
 </div>
 <div class="section level3">
@@ -153,6 +165,8 @@
 <a href="https://carriedaymont.github.io/growthcleanr/articles/large-data-sets.html" class="external-link">Working with large datasets</a>, notes and suggestions for running <code>growthcleanr</code> with large data sources</li>
 <li>
 <a href="https://carriedaymont.github.io/growthcleanr/articles/next-steps.html" class="external-link">Next steps</a>, notes on potential enhancements to the pediatric and adult algorithms</li>
+<li>
+<a href="https://carriedaymont.github.io/growthcleanr/articles/developer-guidelines.html" class="external-link">Developer guidelines</a>, advice for contributors to this package, including a CRAN release checklist</li>
 </ul>
 </div>
 </div>
@@ -168,6 +182,7 @@
     <div class="links">
 <h2 data-toc-skip>Links</h2>
 <ul class="list-unstyled">
+<li><a href="https://cloud.r-project.org/package=growthcleanr" class="external-link">View on CRAN</a></li>
 <li><a href="https://github.com/carriedaymont/growthcleanr" class="external-link">Browse source code</a></li>
 <li><a href="https://github.com/carriedaymont/growthcleanr/issues" class="external-link">Report a bug</a></li>
 </ul>
@@ -176,9 +191,8 @@
 <div class="license">
 <h2 data-toc-skip>License</h2>
 <ul class="list-unstyled">
-<li>
-<a href="https://opensource.org/licenses/mit-license.php" class="external-link">MIT</a> + file <a href="LICENSE-text.html">LICENSE</a>
-</li>
+<li><a href="LICENSE.html">Full license</a></li>
+<li><small><a href="https://opensource.org/licenses/mit-license.php" class="external-link">MIT</a> + file <a href="LICENSE-text.html">LICENSE</a></small></li>
 </ul>
 </div>
 
@@ -193,11 +207,10 @@
 <div class="developers">
 <h2 data-toc-skip>Developers</h2>
 <ul class="list-unstyled">
-<li>Daymont Carrie <br><small class="roles"> Author </small>  </li>
-<li>Grundmeier Robert <br><small class="roles"> Author </small>  </li>
-<li>Miller Jeffrey <br><small class="roles"> Author </small>  </li>
-<li>Campos Diego <br><small class="roles"> Author </small>  </li>
-<li>De los Santos Hannah <br><small class="roles"> Contributor, maintainer </small>  </li>
+<li>Carrie Daymont <br><small class="roles"> Contributor, maintainer </small>  </li>
+<li>Robert Grundmeier <br><small class="roles"> Author </small>  </li>
+<li>Jeffrey Miller <br><small class="roles"> Author </small>  </li>
+<li>Diego Campos <br><small class="roles"> Author </small>  </li>
 <li><a href="authors.html">More about authors...</a></li>
 </ul>
 </div>
@@ -205,7 +218,9 @@
 <div class="dev-status">
 <h2 data-toc-skip>Dev status</h2>
 <ul class="list-unstyled">
+<li><a href="https://cran.r-project.org/package=growthcleanr" class="external-link"><img src="https://www.r-pkg.org/badges/version/growthcleanr" alt="CRAN status"></a></li>
 <li><a href="https://github.com/carriedaymont/growthcleanr/actions" class="external-link"><img src="https://github.com/carriedaymont/growthcleanr/workflows/R-CMD-check/badge.svg" alt="R build status"></a></li>
+<li><a href="https://github.com/mitre/growthcleanr/actions/workflows/build-and-publish-image-tag.yml" class="external-link"><img src="https://github.com/mitre/growthcleanr/actions/workflows/build-and-publish-image-tag.yml/badge.svg" alt="Docker"></a></li>
 </ul>
 </div>
 
@@ -215,12 +230,12 @@
 
       <footer><div class="copyright">
   <p></p>
-<p>Developed by Daymont Carrie, Grundmeier Robert, Miller Jeffrey, Campos Diego, De los Santos Hannah.</p>
+<p>Developed by Carrie Daymont, Robert Grundmeier, Jeffrey Miller, Diego Campos.</p>
 </div>
 
 <div class="pkgdown">
   <p></p>
-<p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.6.</p>
+<p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.7.</p>
 </div>
 
       </footer>
