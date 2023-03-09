@@ -14,11 +14,14 @@ longwide(
   measurement = "measurement",
   gcr_result = "gcr_result",
   include_all = FALSE,
-  inclusion_types = c("Include")
+  inclusion_types = c("Include"),
+  extra_cols = NULL,
+  keep_unmatched_data = FALSE
 )
 }
 \arguments{
-\item{long_df}{A data frame to be transformed. Expects columns: id, subjid, sex, agedays, param, measurement, and gcr_result.}
+\item{long_df}{A data frame to be transformed. Expects columns: id, subjid,
+sex, agedays, param, measurement, and gcr_result.}
 
 \item{id}{name of observation ID column}
 
@@ -30,19 +33,41 @@ longwide(
 
 \item{param}{name of parameter column to identify each type of measurement}
 
-\item{measurement}{name of measurement column containing the actual measurement data}
+\item{measurement}{name of measurement column containing the actual
+measurement data}
 
 \item{gcr_result}{name of column of results from growthcleanr::cleangrowth()}
 
-\item{include_all}{Determines whether the function keeps all exclusion codes. If TRUE, all exclusion types are kept and the inclusion_types argument is ignored. Defaults to FALSE.}
+\item{include_all}{Determines whether the function keeps all exclusion codes.
+If TRUE, all exclusion types are kept and the inclusion_types argument is
+ignored. Defaults to FALSE.}
 
-\item{inclusion_types}{Vector indicating which exclusion codes from the cleaning algorithm should be included in the data, given that include_all is FALSE. For all options, see growthcleanr::cleangrowth(). Defaults to c("Include").}
+\item{inclusion_types}{Vector indicating which exclusion codes from the
+cleaning algorithm should be included in the data, given that include_all is
+FALSE. For all options, see growthcleanr::cleangrowth(). Defaults to
+c("Include").}
+
+\item{extra_cols}{Vector of additional columns to include in the output. If
+a column C1 differs on agedays matched height and weight values, then include
+separate ht_C1 and wt_C1 columns as well as a match_C1 column that gives
+booleans indicating where ht_C1 and wt_C1 are the same. If the agedays
+matched height and weight columns are identical, then only include a single
+version of C1. Defaults to empty vector (not keeping any additional columns).}
+
+\item{keep_unmatched_data}{boolean indicating whether to keep height/weight
+observations that do not have a matching weight/height on that day}
 }
 \value{
-Returns a data frame transformed from long to wide. Includes only values flagged with indicated inclusion types. Note that, for each subject, heights without corresponding weights for a given age (and vice versa) will be dropped.
+Returns a data frame transformed from long to wide. Includes only
+values flagged with indicated inclusion types. Potentially includes
+additional columns if arguments are passed to extra_cols. For each subject,
+heights without corresponding weights for a given age (and vice versa) will
+be dropped unless keep_unmatched_data is set to TRUE.
 }
 \description{
-\code{longwide} transforms data from long to wide format. Ideal for transforming output from growthcleanr::cleangrowth() into a format suitable for growthcleanr::ext_bmiz().
+\code{longwide} transforms data from long to wide format. Ideal for
+transforming output from growthcleanr::cleangrowth() into a format suitable
+for growthcleanr::ext_bmiz().
 }
 \examples{
 # Run on a small subset of given data

@@ -1,3 +1,38 @@
+# growthcleanr 2.1.1 - 2023-03-01
+
+## Changed
+
+- Fixed missing adult measurements to be labeled "Missing" in output (#119)
+- Added tests for missingness in adult output
+- Fixed missing "-RV" codes in adult output
+- Corrected contributor names in DESCRIPTION (#120)
+- Added email for Dan Chudnov in DESCRIPTION (#95)
+
+# growthcleanr 2.1.0 - 2023-02-03
+
+## Added
+
+- Use dependabot to update GitHub workflow action versions (#94)
+- Use GitHub action to build and publish container image (#101)
+
+## Changed
+
+- Updated `ext_bmiz()` to match Dec 2022 NCHS guidelines (#98)
+- New options to keep dates, columns, unmatched rows in `longwide()` (#71)
+- Updated CITATION to match new CRAN requirements
+- Updated Dockerfile to build from repo, not CRAN
+
+# growthcleanr 2.0.3 - 2022-11-01
+
+## Added
+
+- CRAN release checklist now added under Developer Guidelines vignette (#99)
+
+## Changed
+
+- All possible levels for `cleangrowth()` output factor now enumerated
+- Updated maintainer to Carrie Daymont
+
 # growthcleanr 2.0.2 - 2022-09-13
 
 ## Added

@@ -1,14 +1,12 @@
-citHeader("To cite growthcleanr in publications use:")
-
-citEntry(entry = "Article",
+bibentry(bibtype = "Article",
   title        = "Automated identification of implausible values in growth data from pediatric electronic health records",
-  author       = personList(
-                  as.person("Carrie Daymont"),
-                  as.person("Michelle E Ross"),
+  author       = c(
+                  person("Carrie Daymont"),
+                  person("Michelle E Ross"),
                   person(given="A", family = "Russell Localio"),
-                  as.person("Alexander G Fiks"),
-                  as.person("Richard C Wasserman"),
-                  as.person("Robert W Grundmeier")),
+                  person("Alexander G Fiks"),
+                  person("Richard C Wasserman"),
+                  person("Robert W Grundmeier")),
   journal      = "Journal of the American Medical Informatics Association",
   year         = "2017",
   doi = "10.1093/jamia/ocx037",

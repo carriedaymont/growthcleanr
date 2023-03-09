@@ -103,7 +103,7 @@ If you have many small files saved, for example, as `mydata.00001.csv`,
 `mydata.00002.csv`, etc., this driver can be invoked using `parallel`:
 
 ```{bash, eval = FALSE}
-% ls mydata.?????.csv | parallel -j2 --eta \
+ls mydata.?????.csv | parallel -j2 --eta \
   "Rscript exec/gcdriver.R --quietly --sdrecenter nhanes {} {}-clean.csv"
 ```
 

@@ -28,7 +28,7 @@ file `R/adjustcarryforward.R`. It is separate from the main `R/growth.R` file as
 it is set up to be run separately, using the output from `cleangrowth()`. The
 `adjustcarryforward()` function is available in the main package namespace.
 
-The primary tools for running this function are the script `exec/testadjustcf.R` and the function `testacf()`. 
+The primary tools for running this function are the script `exec/testadjustcf.R` and the function `testacf()`.
 These will run the experimental function on an existing dataset (specified as a
 CSV file or data frame) and pass it a sweep of parameter values for testing the new strategy.
 This tool will produce a combined output file or list that includes the original result
@@ -51,7 +51,7 @@ directory; otherwise, make sure to specify the path relative to your current
 directory):
 
 ```bash
-% Rscript exec/testadjustcf.R cleaned.csv
+Rscript exec/testadjustcf.R cleaned.csv
 ```
 
 To use `testacf()`, run the following in the console (with `cleaned_data` in the environment):
@@ -188,7 +188,7 @@ and TIME are the system date and time. For the function, a list will be returned
 For example, a 5-step sweep with the `line-grid` search would be run with this command:
 
 ```bash
-% Rscript exec/textadjustcf.R --gridlength 5 --searchtype line-grid cleaned.csv
+Rscript exec/textadjustcf.R --gridlength 5 --searchtype line-grid cleaned.csv
 ```
 
 or with this function execution:
