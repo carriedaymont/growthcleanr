@@ -56,6 +56,8 @@ cleanbatch_infants <- function(data.df,
   whoagegrp.ht <- whoinc.1.ht <- whoinc.2.ht <- whoinc.3.ht <- whoinc.4.ht <- NULL
   whoinc.6.ht <- whoinc.age.ht <- z.orig <- NULL
 
+  oob <- sd_med <- med_diff <- max_diff <- sum_oob <- i.exclude <- NULL
+
   data.df <- data.table(data.df, key = c('subjid', 'param', 'agedays', 'index'))
 
   if (parallel & !is.na(log.path)) {

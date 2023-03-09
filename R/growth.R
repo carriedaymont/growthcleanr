@@ -162,6 +162,7 @@ cleangrowth <- function(subjid,
   N <- age_years <- batch <- exclude <- index <- line <- NULL
   newbatch <- sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
   v <- v_adult <- whoagegrp.ht <- whoagegrp_ht <- z.orig <- NULL
+  z.orig_cdc <- z.orig_who <- sd.orig_cdc <- sd.orig_who <- NULL
 
   # preprocessing ----
 
