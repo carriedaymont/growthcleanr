@@ -187,10 +187,15 @@ cleangrowth <- function(subjid,
   }
   if (any(!param %in% c("LENGTHCM", "HEIGHTCM", "WEIGHTKG", "HEIGHIN",
                         "WEIGHTLBS", "HEADCM"))){
-    cat(sprintf("[%s] Parameters included that do not match 'param' specifications. Filtering out...\n", Sys.time()))
+    cat(sprintf("[%s] Parameters included that do not match 'param' specifications. Marking as missing...\n", Sys.time()))
     data.all.ages <-
-      data.all.ages[param %in% c("LENGTHCM", "HEIGHTCM", "WEIGHTKG", "HEIGHIN",
-                                 "WEIGHTLBS", "HEADCM"),]
+      data.all.ages[
+        !param %in% c("LENGTHCM", "HEIGHTCM", "WEIGHTKG", "HEIGHIN",
+                      "WEIGHTLBS", "HEADCM"), v := NA]
+    data.all.ages <-
+      data.all.ages[
+        !param %in% c("LENGTHCM", "HEIGHTCM", "WEIGHTKG", "HEIGHIN",
+                      "WEIGHTLBS", "HEADCM"), v_adult := NA]
   }
 
   # rate limit cutpoint -- min 18, max 20
