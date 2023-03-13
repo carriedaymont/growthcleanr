@@ -1,4 +1,4 @@
-# growthcleanr 3.0.0 - 2023-03-13
+# growthcleanr 3.0.0-infants-beta - 2023-03-13
 
 ## Added
 
