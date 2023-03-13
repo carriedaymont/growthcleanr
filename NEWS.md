@@ -1,3 +1,10 @@
+# growthcleanr 3.0.0 - 2023-03-13
+
+## Added
+
+- Added the infants beta release algorithm -- expands pediatric algorithm to consider 0 - 2 years old, with infants = TRUE in cleangrowth()
+  - Updated velocity data for the extension (#122)
+
 # growthcleanr 2.1.1 - 2023-03-01
 
 ## Changed
