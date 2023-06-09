@@ -477,8 +477,23 @@ cleangrowth <- function(subjid,
       # NOTE: SD SCORES IN CODE ARE Z IN INFANT DOCS -- USE sd.orig ONLY
 
       # correcting z scores
+      # add age in months
+      data.all[, agemonths := agedays/30.4375]
 
+      # TO ADD: REMOVE ADDED COLUMNS FROM DATA ALL
+      potcorr <- data.all$param == "WEIGHTKG" &
+        data.all$sd.orig < -2 &
+        data.all$agemonths < 10
 
+      # integer weight is in grams, rounded to the nearest 10
+      data.all[potcorr, intwt := round(v*100)*10]
+      # replace to facilitate merging with fenton curves
+      data.all[intwt >= 250 & intwt <=560, intwt := 570]
+
+      # MERGE WITH FENTON CURVES =- STOP HERE
+
+      # remove added columns
+      data.all[, c("intwt") := NULL]
     } else {
       # calculate z scores
       if (!quietly)
