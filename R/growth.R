@@ -451,7 +451,7 @@ cleangrowth <- function(subjid,
 
       smooth_val <- data.all$agedays/365.25 >= 2 &
         data.all$agedays/365.25 <= 4 &
-        !data.all$param == "HEADCM"
+        data.all$param != "HEADCM"
       data.all[smooth_val,
                z.orig := (z.orig_cdc[smooth_val]*cdc_weight[smooth_val] +
                             z.orig_who[smooth_val]*who_weight[smooth_val])/2]
@@ -463,16 +463,22 @@ cleangrowth <- function(subjid,
       who_val <- data.all$param == "HEADCM" |
         data.all$agedays/365.25 < 2
       data.all[who_val | (smooth_val & is.na(data.all$z.orig_cdc)),
-               z.orig := z.orig_who[who_val | (smooth_val & is.na(data.all$z.orig_cdc))]]
+               z.orig := data.all$z.orig_who[who_val | (smooth_val & is.na(data.all$z.orig_cdc))]]
       data.all[who_val | (smooth_val & is.na(data.all$sd.orig_cdc)),
-               sd.orig := sd.orig_who[who_val  | (smooth_val & is.na(data.all$sd.orig_cdc))]]
+               sd.orig := data.all$sd.orig_who[who_val  | (smooth_val & is.na(data.all$sd.orig_cdc))]]
 
       cdc_val <- data.all$param != "HEADCM" |
         data.all$agedays/365.25 > 4
       data.all[cdc_val  | (smooth_val & is.na(data.all$z.orig_who)),
-               z.orig := z.orig_cdc[cdc_val | (smooth_val & is.na(data.all$z.orig_who))]]
+               z.orig := data.all$z.orig_cdc[cdc_val | (smooth_val & is.na(data.all$z.orig_who))]]
       data.all[cdc_val | (smooth_val & is.na(data.all$sd.orig_who)),
-               sd.orig := sd.orig_cdc[cdc_val | (smooth_val & is.na(data.all$sd.orig_who))]]
+               sd.orig := data.all$sd.orig_cdc[cdc_val | (smooth_val & is.na(data.all$sd.orig_who))]]
+
+      # NOTE: SD SCORES IN CODE ARE Z IN INFANT DOCS -- USE sd.orig ONLY
+
+      # correcting z scores
+
+
     } else {
       # calculate z scores
       if (!quietly)
