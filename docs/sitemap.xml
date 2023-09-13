@@ -76,7 +76,19 @@
     <loc>/reference/ext_bmiz.html</loc>
   </url>
   <url>
+    <loc>/reference/fentlms_foraga.html</loc>
+  </url>
+  <url>
+    <loc>/reference/fentlms_forz.html</loc>
+  </url>
+  <url>
     <loc>/reference/growth_cdc_ext.html</loc>
+  </url>
+  <url>
+    <loc>/reference/growth_cdc_ext_infants.html</loc>
+  </url>
+  <url>
+    <loc>/reference/growth_who_ext.html</loc>
   </url>
   <url>
     <loc>/reference/index.html</loc>
@@ -89,6 +101,9 @@
   </url>
   <url>
     <loc>/reference/nhanes-reference-medians.html</loc>
+  </url>
+  <url>
+    <loc>/reference/rc-reference-medians.html</loc>
   </url>
   <url>
     <loc>/reference/read_anthro.html</loc>
@@ -115,6 +130,9 @@
     <loc>/reference/tanner_ht_vel_2sd.html</loc>
   </url>
   <url>
+    <loc>/reference/tanner_ht_vel_rev.html</loc>
+  </url>
+  <url>
     <loc>/reference/tanner_ht_vel_with_2sd.html</loc>
   </url>
   <url>
@@ -128,6 +146,12 @@
   </url>
   <url>
     <loc>/reference/weianthro.html</loc>
+  </url>
+  <url>
+    <loc>/reference/who_hc_maxvel.html</loc>
+  </url>
+  <url>
+    <loc>/reference/who_hc_vel_3sd.html</loc>
   </url>
   <url>
     <loc>/reference/who_ht_maxvel.html</loc>
