@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-and-publish-image:
-    if: github.repository == 'mitre/growthcleanr'
+    if: github.repository == 'carriedaymont/growthcleanr'
     runs-on: ubuntu-latest
 
     steps:
