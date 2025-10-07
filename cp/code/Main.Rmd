@@ -1,0 +1,131 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(include = FALSE, echo = FALSE, eval = TRUE)
+```
+
+```{r}
+library(growthcleanr)
+library(dplyr)
+library(data.table)
+library(dplyr)
+library(data.table)
+library(stringr)
+```
+
+### **Initial Dataset Creation (Hidden)**
+
+```{r, eval = FALSE}
+# Load in STATA output:
+stata_gc_in <- data.table::fread("../data/2025-10-01-gc-Stata-chopd1p-results.csv")
+
+data.work <- stata_gc_in %>% select(id, subjid, param, sex, agedays, param, measurement, exc_wt, exc_ht, potcorr, tbcwtz, ctbcwtz ) %>% mutate(
+  param = case_when(param == "Weight" ~ "WEIGHTKG",
+                    param == "Height" ~ "HEIGHTCM",
+                    TRUE ~ param)) %>% filter(param %in% c("WEIGHTKG", "HEIGHTCM"))
+data.work <- data.work %>% mutate(gcr_result_carrie = case_when(
+  param == "WEIGHTKG" ~ exc_wt,
+  param == "HEIGHTCM" ~ exc_ht,
+  TRUE ~ "ERR"
+)) %>% select(-c(exc_wt, exc_ht)) 
+# subset_ids <- data.work %>% distinct(subjid) %>% slice_sample(n=50)
+# data.work <- data.work %>% filter(subjid %in% subset_ids$subjid)
+data.work <- as.data.table(data.work)
+setkey(data.work, subjid, param, agedays)
+cleaned_data <- data.work[,gcr_result_cp := cleangrowth(subjid, param, agedays, sex, measurement, prelim_infants = TRUE)]
+# write.csv(cleaned_data, paste("../data/baseline_comparison_of_stata_vs_R_", Sys.Date(), ".csv", sep = ""))
+```
+
+### **Discrepant Subjid Histories - Dataset Creation (Hidden)**
+
+```{r, eval = FALSE}
+# Load in comparison data 
+data_in <- read.csv("../data/baseline_comparison_of_stata_vs_R_2025-10-07.csv") %>% select(-X)
+
+# Isolate discrepancies between R and Stata - save those patient histories to file for targeted work.
+# Assuming these discrepances are representative, fixing this should fix all.
+
+# We need to mutate gcr_result names in the R outputs to make them commensurate first.
+data.work <- data_in %>% mutate(gcr_result_cp = gsub("^Exclude", "", gcr_result_cp),
+                                gcr_result_cp = gsub("-", " ", gcr_result_cp),
+                                gcr_result_cp = str_trim(gcr_result_cp),
+                                gcr_result_carrie = tolower(gcr_result_carrie),
+                                gcr_result_cp = tolower(gcr_result_cp),
+                                results_pasted = paste(gcr_result_carrie, gcr_result_cp, sep = " ; "))
+
+# Isolate subjid histories with discrepancies. 
+discrepant_ids <- data.work %>% mutate(results_equal = case_when(gcr_result_carrie == gcr_result_cp ~ TRUE, TRUE ~ FALSE)) %>% filter(!results_equal) %>% select(subjid) %>% distinct(subjid)
+# View(as.data.frame(table(data.work$results_pasted)) %>% arrange(desc(Freq)))
+
+data.work <- data.work %>% filter(subjid %in% discrepant_ids$subjid)
+# write.csv(data.work, paste("../data/baseline_discrepant_patient_histories_", Sys.Date(), ".csv", sep = ""), row.names = FALSE)
+```
+
+### **Main GC Harmonizing Workflow**
+
+```{r, eval = TRUE}
+# Load in new source code:
+files <- list.files("../code/modified_source_code/", pattern = "\\.[rR]$", full.names = TRUE)
+sapply(files, source, local = TRUE)
+invisible(lapply(files, function(f) source(f, chdir = TRUE)))
+```
+
+```{r}
+# Begin chipping away at discrepancies:
+data_in <- read.csv("../data/baseline_discrepant_patient_histories_2025-10-07.csv")
+data.work <- data_in 
+```
+
+### Handling potcorr:
+
+```{r, eval = TRUE}
+# Load in new source code:
+files <- list.files("../code/modified_source_code/", pattern = "\\.[rR]$", full.names = TRUE)
+sapply(files, source, local = TRUE)
+invisible(lapply(files, function(f) source(f, chdir = TRUE)))
+
+# data.work
+data.work <- as.data.table(data.work)
+# subset_ids <- data.work %>% distinct(subjid) %>% slice_sample(n=50)
+# data.work <- data.work %>% filter(subjid %in% subset_ids$subjid)
+setkey(data.work, subjid, param, agedays)
+cleaned_data <- data.work[,gcr_result_cp_updated := cleangrowth(subjid, param, agedays, sex, measurement, prelim_infants = TRUE)]
+# View(cleaned_data)
+
+# 368777
+library(readr)
+roundingerrorcheck <- read_csv("~/Github/Daymont_Contract/growthcleanr/cp/data/roundingerrorcheck.csv")
+# View(roundingerrorcheck %>% filter(subjid == "368777"))
+# View(growth_cp_midpoint_df %>% filter(potcorr == TRUE))
+# View(midpoint_check_corrected_zscores)
+
+
+# Close - but 35211 is not corrected for some reason.
+```
+
+
+
+```{r}
+stata_gc_in <- data.table::fread("../data/2025-10-01-gc-Stata-chopd1p-results.csv")
+stata.work <- stata_gc_in %>% select(subjid,id, potcorr,potcorr_wt,tbcwtz, ctbcwtz, swtz, scwtz, ht, wt, agedays)
+our_data_out <- read.csv("../data/midpoint_check_corrected_zscores.csv")
+our_data.work <- our_data_out %>% group_by(subjid) %>% filter(agedays == 0 & param == "WEIGHTKG")
+tempout <- stata.work %>% group_by(subjid) %>% filter(potcorr_wt == 1 & agedays == 0)
+checkecheck <- merge(our_data.work, tempout, by = "subjid",, all.x = TRUE)
+checkecheck <- checkecheck %>% mutate(even = round(sd.corr,4) == round(ctbcwtz,4))
+checkecheck 
+
+View(checkecheck)
+
+```
+```{r}
+check <- cleaned_data %>% mutate(gcr_result_cp_updated = gsub("^Exclude", "", gcr_result_cp_updated),
+                                gcr_result_cp_updated = gsub("-", " ", gcr_result_cp_updated),
+                                gcr_result_cp_updated = str_trim(gcr_result_cp_updated),
+                        gcr_result_cp_updated = tolower(gcr_result_cp_updated)) %>% mutate(change = gcr_result_cp == gcr_result_cp_updated)
+
+# table(check$change)
+```
