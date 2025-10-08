@@ -541,7 +541,7 @@ cleangrowth <- function(subjid,
       data.all[smooth_val,
                sd.orig := (data.all$sd.orig_cdc[smooth_val]*cdc_weight[smooth_val] +
                              data.all$sd.orig_who[smooth_val]*who_weight[smooth_val])/2]
-      
+      # <- 
       # otherwise use WHO and CDC for older and younger, respectively
       who_val <- data.all$param == "HEADCM" |
         data.all$ageyears < 2
@@ -2074,8 +2074,13 @@ cleanbatch_infants <- function(data.df,
     cf_idx <- data.sub$index[data.sub$cf]
     data.df[index %in% cf_idx, exclude := "Exclude-Carried-Forward"]
     
+    ### CP NOTE - Check closely - potential overwrite of carried forwar
+    
     # redo temp sde
-    data.df$exclude[temporary_extraneous_infants(data.df)] <- 'Exclude-Temporary-Extraneous-Same-Day'
+    # data.df$exclude[temporary_extraneous_infants(data.df)] <- 'Exclude-Temporary-Extraneous-Same-Day'
+    
+    ### CP NOTE - Check closely - potential overwrite of carried forwar
+    
     
     # find out if values are whole or half imperial
     data.df[param == "WEIGHTKG",

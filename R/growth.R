@@ -706,6 +706,8 @@ cleangrowth <- function(subjid,
       # remove many added columns
       data.all <- data.all[, colnames(data.all) %in% orig_colnames,
                            with = FALSE]
+      write.csv(data.all, "../data/midpoint_check_corrected_zscores_unmodified.csv")
+      
     } else {
       # calculate z scores
       if (!quietly)

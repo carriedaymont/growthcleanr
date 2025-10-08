@@ -76,7 +76,8 @@ invisible(lapply(files, function(f) source(f, chdir = TRUE)))
 ```{r}
 # Begin chipping away at discrepancies:
 data_in <- read.csv("../data/baseline_discrepant_patient_histories_2025-10-07.csv")
-data.work <- data_in 
+data.work <- data_in #%>% filter(gcr_result_carrie != gcr_result_cp)
+# View(as.data.frame(table(data.work$results_pasted)))
 ```
 
 ### Handling potcorr:
@@ -93,7 +94,7 @@ data.work <- as.data.table(data.work)
 # data.work <- data.work %>% filter(subjid %in% subset_ids$subjid)
 setkey(data.work, subjid, param, agedays)
 cleaned_data <- data.work[,gcr_result_cp_updated := cleangrowth(subjid, param, agedays, sex, measurement, prelim_infants = TRUE)]
-# View(cleaned_data)
+View(cleaned_data)
 
 # 368777
 library(readr)
@@ -104,6 +105,17 @@ roundingerrorcheck <- read_csv("~/Github/Daymont_Contract/growthcleanr/cp/data/r
 
 
 # Close - but 35211 is not corrected for some reason.
+
+cleaned_data <- cleaned_data %>% mutate(gcr_result_cp_updated = gsub("^Exclude", "", gcr_result_cp_updated),
+                                gcr_result_cp_updated = gsub("-", " ", gcr_result_cp_updated),
+                                gcr_result_cp_updated = str_trim(gcr_result_cp_updated),
+                                gcr_result_carrie = tolower(gcr_result_carrie),
+                                gcr_result_cp_updated = tolower(gcr_result_cp_updated),
+                                results_pasted_updated = paste(gcr_result_carrie, gcr_result_cp_updated, sep = " ; "))
+
+check2 <- cleaned_data %>% filter(gcr_result_carrie != gcr_result_cp_updated)
+View(as.data.frame(table(check2$results_pasted_updated)))
+# View(as.data.frame(table(cleaned_data$results_pasted, cleaned_data$results_pasted_updated)))
 ```
 
 
@@ -117,10 +129,9 @@ tempout <- stata.work %>% group_by(subjid) %>% filter(potcorr_wt == 1 & agedays 
 checkecheck <- merge(our_data.work, tempout, by = "subjid",, all.x = TRUE)
 checkecheck <- checkecheck %>% mutate(even = round(sd.corr,4) == round(ctbcwtz,4))
 checkecheck 
-
 View(checkecheck)
-
 ```
+
 ```{r}
 check <- cleaned_data %>% mutate(gcr_result_cp_updated = gsub("^Exclude", "", gcr_result_cp_updated),
                                 gcr_result_cp_updated = gsub("-", " ", gcr_result_cp_updated),
@@ -128,4 +139,36 @@ check <- cleaned_data %>% mutate(gcr_result_cp_updated = gsub("^Exclude", "", gc
                         gcr_result_cp_updated = tolower(gcr_result_cp_updated)) %>% mutate(change = gcr_result_cp == gcr_result_cp_updated)
 
 # table(check$change)
+```
+
+### Compare to source data:
+
+```{r, eval = TRUE}
+# Load in new source code:
+files <- list.files("../../R/", pattern = "\\.[rR]$", full.names = TRUE)
+sapply(files, source, local = TRUE)
+invisible(lapply(files, function(f) source(f, chdir = TRUE)))
+
+# data.work
+data.work <- as.data.table(data.work)
+# subset_ids <- data.work %>% distinct(subjid) %>% slice_sample(n=50)
+# data.work <- data.work %>% filter(subjid %in% subset_ids$subjid)
+setkey(data.work, subjid, param, agedays)
+cleaned_data <- data.work[,gcr_result_cp_updated := cleangrowth(subjid, param, agedays, sex, measurement, prelim_infants = TRUE)]
+# View(cleaned_data)
+
+# 368777
+library(readr)
+```
+
+```{r}
+# roundingerrorcheck <- read_csv("~/Github/Daymont_Contract/growthcleanr/cp/data/roundingerrorcheck.csv")
+stata_gc_in <- data.table::fread("../data/2025-10-01-gc-Stata-chopd1p-results.csv")
+stata.work <- stata_gc_in %>% select(subjid,id, potcorr,potcorr_wt,tbcwtz, ctbcwtz, swtz, scwtz, ht, wt, agedays)
+our_data_out <- read.csv("../data/midpoint_check_corrected_zscores_unmodified.csv")
+our_data.work <- our_data_out %>% group_by(subjid) %>% filter(agedays == 0 & param == "WEIGHTKG")
+tempout <- stata.work %>% group_by(subjid) %>% filter(potcorr_wt == 1 & agedays == 0)
+checkecheck <- merge(our_data.work, tempout, by = "subjid",, all.x = TRUE)
+checkecheck <- checkecheck %>% mutate(even = round(sd.corr,4) == round(ctbcwtz,4))
+View(checkecheck )
 ```
