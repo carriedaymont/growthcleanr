@@ -1,11 +1,30 @@
----
-title: "R Notebook"
-output: html_notebook
----
+# Supporting pediatric growthcleanr functions
+# Supporting functions for pediatric piece of algorithm
 
-#### R-Oxygen Markup (Hidden)
+#' Helper function for cleanbatch to identify subset of observations that are either "included" or a "temporary extraneous"
+#'
+#' @keywords internal
+#' @noRd
+valid <- function(df,
+                  include.temporary.extraneous = FALSE,
+                  include.extraneous = FALSE,
+                  include.carryforward = FALSE) {
+  exclude <- if (is.data.frame(df))
+    df$exclude
+  else
+    df
+  return(
+    exclude < 'Exclude'
+    |
+      include.temporary.extraneous &
+      exclude == 'Exclude-Temporary-Extraneous-Same-Day'
+    | include.extraneous & exclude == 'Exclude-Extraneous-Same-Day'
+    |
+      include.carryforward &
+      exclude == 'Exclude-Carried-Forward'
+  )
+}
 
-```{r}
 # Main growthcleanr algorithm and other exported functions
 # Main growthcleanr algorithm (cleangrowth): adult and pediatric are in *_clean.R
 #(main bulk of algorithm) and *_support.R (supporting functions)
@@ -140,12 +159,6 @@ output: html_notebook
 #'                            parallel = TRUE,
 #'                            num.batches = 2)
 #' }
-```
-
-
-#### Main cleangrowth() function declaration.
-
-```{r}
 cleangrowth <- function(subjid,
                         param,
                         agedays,
@@ -172,7 +185,7 @@ cleangrowth <- function(subjid,
                         weight_cap = Inf,
                         adult_columns_filename = "",
                         prelim_infants = FALSE,
-                        id = NULL){ # CP Added ID column) {
+                        id = NULL) {
   # avoid "no visible binding" warnings
   N <- age_years <- batch <- exclude <- index <- line <- NULL
   newbatch <- sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
@@ -1296,7 +1309,7 @@ cleangrowth <- function(subjid,
       sort = FALSE
     )
     # Merge checkpoint diagnostics by ID
-    all_results <- merge(all_results, checkpoint_data %>% select(-c(subjid, param, agedays)), by = "id", all.x = TRUE)
+    all_results <- merge(all_results, checkpoint_data, by = "id", all.x = TRUE)
     all_results <- all_results[match(data.all.ages$id, all_results$id)]
     
     # restore original row order
@@ -1313,12 +1326,9 @@ cleangrowth <- function(subjid,
     return(data.table())
   }
   
+  
 }
-```
 
-#### Read_anthro
-
-```{r}
 #' Function to calculate z-scores and csd-scores based on anthro tables.
 #'
 #' @param path Path to supplied reference anthro data. Defaults to package anthro tables.
@@ -2113,12 +2123,11 @@ cleanbatch_infants <- function(data.df,
     # and non single values
     tmp <- table(paste0(data.df$subjid, "_", data.df$param))
     not_single <- paste0(data.df$subjid, "_", data.df$param) %in% names(tmp)[tmp > 1]
-    # CP TOGGLED TO FALSE but then back to true because nothing changed?
     valid_set <- valid(data.df, include.temporary.extraneous = TRUE) &
       !data.df$nnte_full &
       not_single
     data.sub <- data.df[valid_set,]
-    # CP TOGGLED UP TO OFF
+    
     # for ease, order by subject, parameter, and agedays
     data.sub <- data.sub[order(subjid, param, agedays)]
     
@@ -2128,7 +2137,7 @@ cleanbatch_infants <- function(data.df,
                paste0(data.sub$subjid, "_", data.sub$param)[data.sub$sum_sde > 1]]
     data.sub[no_sde == TRUE, cf :=  (v.orig - shift(v.orig)) == 0, by = c("subjid", "param")]
     data.sub[is.na(cf), cf := FALSE]
-    # CP MODIFY
+    
     # for values with sdes, compare to all values from the prior day
     data.sub[no_sde == FALSE, cf := (function(df){
       ages <- unique(agedays)
@@ -2142,20 +2151,7 @@ cleanbatch_infants <- function(data.df,
         }
       }
     })(copy(.SD)), .SDcols = c('agedays', 'cf', 'v.orig'), by = .(subjid, param)]
-#     data.sub[no_sde == FALSE, cf := (function(df){
-#   ages <- sort(unique(df$agedays))
-#   if (length(ages) > 1){
-#     for (i in seq_along(ages)[-1]) {
-#       # all prior days, not just the last one
-#       all.prev.v <- df[agedays < ages[i], v.orig]
-#       if (length(all.prev.v))
-#         df[agedays == ages[i] & v.orig %in% all.prev.v, cf := TRUE]
-#     }
-#   } 
-#   df$cf
-# })(copy(.SD)), by = .(subjid, param)]
-
-    # CP MODIFY 
+    
     # merge in the carried forwards
     cf_idx <- data.sub$index[data.sub$cf]
     data.df[index %in% cf_idx, exclude := "Exclude-Carried-Forward"]
@@ -2495,20 +2491,6 @@ cleanbatch_infants <- function(data.df,
           c.dewma.all = ctbc.sd - c.ewma.all
         )]
         
-        # CP ADD
-        # ---- FIX: Stata-style EWMA 2 middle detection ----
-# Identify 3-point sequences where the middle point deviates most from EWMA
-# df[, is_mid3 := FALSE]
-# if (nrow(df) > 2) {
-#   df[, is_mid3 := abs(dewma.before) > shift(abs(dewma.before)) &
-#                      abs(dewma.before) > shift(abs(dewma.before), type = "lead"), 
-#      by = .(subjid, param)]
-# }
-# 
-# df[is_mid3 == TRUE & exclude == "Include",
-#    exclude := "Exclude-EWMA-2-Middle"]
-# ---- END FIX ----
-# CP ADD
         
         # calculate potential exclusions
         df[valid_set, pot_excl :=
@@ -3346,21 +3328,6 @@ cleanbatch_infants <- function(data.df,
   setnames(who.ht.vel, colnames(who.ht.vel), gsub('_', '.', colnames(who.ht.vel)))
   setkey(who.ht.vel, sex, whoagegrp.ht)
   
-  ### CP ADD SECTION ###
-  # ---- FIX: enforce Stata-style WHO binning ----
-  # Convert ages to WHO monthly bins using floor() to match Stata
-  who.ht.vel[, whoagegrp_ht := as.integer(whoagegrp_ht)]
-  setkey(who.ht.vel, sex, whoagegrp_ht)
-  
-  # When merging into data.df later, derive the same floor-binned variable
-  data.df[, whoagegrp_ht := floor(agedays / 30.4375)]
-  setkey(data.df, sex, whoagegrp_ht)
-  
-  # Merge using roll=TRUE so values carry forward correctly
-  data.df <- who.ht.vel[data.df, roll = TRUE]
-  # ---- END FIX ----
-  ### CP ADD SECTION ###
-  
   # read in who hc data
   who_max_hc_vel_path <- ifelse(
     ref.data.path == "",
@@ -3441,9 +3408,7 @@ cleanbatch_infants <- function(data.df,
         
         # 17D
         # generate the who age group variable
-        # CP change to floor from round
-        df[, whoagegrp.ht := floor(agedays/30.4375)]
-        # CP change to floor from round
+        df[, whoagegrp.ht := round(agedays/30.4375)]
         df[whoagegrp.ht > 24 | dplyr::lead(whoagegrp.ht) > 24,
            whoagegrp.ht := NA]
         
@@ -3485,13 +3450,12 @@ cleanbatch_infants <- function(data.df,
         df[, who_mindiff_ht := as.numeric(who_mindiff_ht)]
         df[, who_maxdiff_ht := as.numeric(who_maxdiff_ht)]
         
-        # CP ADD IN OR EQUAL TO FROM < or > 
         # 17G
-        df[d_agedays <= whoinc.age.ht*30.4375, who_mindiff_ht :=
+        df[d_agedays < whoinc.age.ht*30.4375, who_mindiff_ht :=
              who_mindiff_ht * d_agedays/(whoinc.age.ht*30.4375)]
-        df[d_agedays >= whoinc.age.ht*30.4375, who_maxdiff_ht :=
+        df[d_agedays > whoinc.age.ht*30.4375, who_maxdiff_ht :=
              who_maxdiff_ht * d_agedays/(whoinc.age.ht*30.4375)]
-         # CP ADD IN OR EQUAL TO FROM < or > 
+        
         df[d_agedays < 9*30.4375, who_mindiff_ht := who_mindiff_ht*.5-3]
         df[d_agedays < 9*30.4375, who_maxdiff_ht := who_maxdiff_ht*2+3]
         
@@ -3607,21 +3571,10 @@ cleanbatch_infants <- function(data.df,
         dewma.after = tbc.sd - ewma.after
       )]
       
-      ## CP MODIFY
       # add differences for convenience
-      # df[, diff_prev := (v-dplyr::lag(v))]
-      # df[, diff_next := (dplyr::lead(v)-v)]
+      df[, diff_prev := (v-dplyr::lag(v))]
+      df[, diff_next := (dplyr::lead(v)-v)]
       
-      df[, diff_prev := ctbc.sd - dplyr::lag(ctbc.sd)]
-df[is.na(diff_prev), diff_prev := 0]
-# df[d_agedays == 0, diff_prev := NA_real_]
-# df[is.na(dplyr::lag(ctbc.sd)), diff_prev := NA_real_]
-# df[, mindiff_prev := zoo::na.locf(mindiff_prev, na.rm = FALSE)]
-# df[, maxdiff_prev := zoo::na.locf(maxdiff_prev, na.rm = FALSE)]
-# eps <- 1e-6
-# df[diff_prev < (mindiff_prev - eps) & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
-# df[diff_prev > (maxdiff_prev + eps) & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
-      ## CP MODIFY
       if (nrow(df) > 2){
         # 17P/R: identify pairs and calculate exclusions
         df[, pair := (v-dplyr::lag(v)) < mindiff_prev |
@@ -3634,24 +3587,14 @@ df[is.na(diff_prev), diff_prev := 0]
         df[pair & abs(dewma.after) > dplyr::lead(abs(dewma.before)),
            aft.g.aftm1 := TRUE]
         
-        # Q ### CP MOD
+        # Q
         df[, val_excl := exclude]
-        # df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
-        # df[diff_next < mindiff & aft.g.aftm1, val_excl := "Exclude-Min-diff"]
-        # df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
-        # df[diff_next > maxdiff & aft.g.aftm1, val_excl := "Exclude-Max-diff"]
-        # df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
-        df[, val_excl := exclude]
-        
-        # Stata uses only the backward-looking difference (current - previous)
-        # and compares against the 3-SD WHO velocity limits for that age bin.
-        
-        # apply lower and upper velocity thresholds
         df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
+        df[diff_next < mindiff & aft.g.aftm1, val_excl := "Exclude-Min-diff"]
         df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
+        df[diff_next > maxdiff & aft.g.aftm1, val_excl := "Exclude-Max-diff"]
         
         
-        ### CP MOD UP 
         
       } else { # only 2 values
         # 17Q/R -- exclusions for pairs
@@ -3840,58 +3783,3 @@ df[is.na(diff_prev), diff_prev := 0]
   
   return(data.df[j = .(line, exclude, tbc.sd, param)]) #debugging
 }
-```
-
-
-### Load in additional helper functions:
-
-- Valid()
-```{r}
-# Oriignal Valid Toggled off
-# Supporting pediatric growthcleanr functions
-# Supporting functions for pediatric piece of algorithm
-
-#' Helper function for cleanbatch to identify subset of observations that are either "included" or a "temporary extraneous"
-#'
-#' @keywords internal
-#' @noRd
-# valid <- function(df,
-#                   include.temporary.extraneous = FALSE,
-#                   include.extraneous = FALSE,
-#                   include.carryforward = FALSE) {
-#   exclude <- if (is.data.frame(df))
-#     df$exclude
-#   else
-#     df
-#   return(
-#     exclude < 'Exclude'
-#     |
-#       include.temporary.extraneous &
-#       exclude == 'Exclude-Temporary-Extraneous-Same-Day'
-#     | include.extraneous & exclude == 'Exclude-Extraneous-Same-Day'
-#     |
-#       include.carryforward &
-#       exclude == 'Exclude-Carried-Forward'
-#   )
-# }
-
-valid <- function(df,
-                  include.temporary.extraneous = FALSE,
-                  include.extraneous = FALSE,
-                  include.carryforward = FALSE) {
-  exclude <- if (is.data.frame(df)) df$exclude else df
-  exclude <- as.character(exclude)
-
-  keep <- !grepl("^Exclude", exclude)
-
-  if (include.temporary.extraneous)
-    keep <- keep | exclude == "Exclude-Temporary-Extraneous-Same-Day"
-  if (include.extraneous)
-    keep <- keep | exclude == "Exclude-Extraneous-Same-Day"
-  if (include.carryforward)
-    keep <- keep | exclude == "Exclude-Carried-Forward"
-
-  return(keep)
-}
-
-```

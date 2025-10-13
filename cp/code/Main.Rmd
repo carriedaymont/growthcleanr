@@ -35,7 +35,7 @@ data.work <- data.work %>% mutate(gcr_result_carrie = case_when(
 # data.work <- data.work %>% filter(subjid %in% subset_ids$subjid)
 data.work <- as.data.table(data.work)
 setkey(data.work, subjid, param, agedays)
-cleaned_data <- data.work[,gcr_result_cp := cleangrowth(subjid, param, agedays, sex, measurement, prelim_infants = TRUE)]
+cleaned_data <- data.work[,gcr_result_cp := cleangrowth(subjid, param, agedays, sex, measurement, prelim_infants = TRUE, sd.re)]
 # write.csv(cleaned_data, paste("../data/baseline_comparison_of_stata_vs_R_", Sys.Date(), ".csv", sep = ""))
 ```
 
@@ -76,99 +76,279 @@ invisible(lapply(files, function(f) source(f, chdir = TRUE)))
 ```{r}
 # Begin chipping away at discrepancies:
 data_in <- read.csv("../data/baseline_discrepant_patient_histories_2025-10-07.csv")
-data.work <- data_in #%>% filter(gcr_result_carrie != gcr_result_cp)
-# View(as.data.frame(table(data.work$results_pasted)))
+# data.work <- data_in %>% filter(gcr_result_carrie != gcr_result_cp)
+View(as.data.frame(table(data.work$results_pasted)))
 ```
 
-### Handling potcorr:
+### Modify
 
 ```{r, eval = TRUE}
 # Load in new source code:
 files <- list.files("../code/modified_source_code/", pattern = "\\.[rR]$", full.names = TRUE)
 sapply(files, source, local = TRUE)
 invisible(lapply(files, function(f) source(f, chdir = TRUE)))
+source(knitr::purl("../code/modified_source_code/Contracted_Fix_Main.Rmd", output = tempfile()))
+
+stata_gc_in <- data.table::fread("../data/2025-10-01-gc-Stata-chopd1p-results.csv")
+# data_in <- read.csv("../data/baseline_discrepant_patient_histories_2025-10-07.csv")
+data_in <- stata_gc_in %>% select(id, subjid, param, agedays, sex, measurement)
 
 # data.work
-data.work <- as.data.table(data.work)
+data.work <- as.data.table(data_in)
 # subset_ids <- data.work %>% distinct(subjid) %>% slice_sample(n=50)
 # data.work <- data.work %>% filter(subjid %in% subset_ids$subjid)
 setkey(data.work, subjid, param, agedays)
-cleaned_data <- data.work[,gcr_result_cp_updated := cleangrowth(subjid, param, agedays, sex, measurement, prelim_infants = TRUE)]
-View(cleaned_data)
-
-# 368777
-library(readr)
-roundingerrorcheck <- read_csv("~/Github/Daymont_Contract/growthcleanr/cp/data/roundingerrorcheck.csv")
-# View(roundingerrorcheck %>% filter(subjid == "368777"))
-# View(growth_cp_midpoint_df %>% filter(potcorr == TRUE))
-# View(midpoint_check_corrected_zscores)
-
-
-# Close - but 35211 is not corrected for some reason.
-
-cleaned_data <- cleaned_data %>% mutate(gcr_result_cp_updated = gsub("^Exclude", "", gcr_result_cp_updated),
-                                gcr_result_cp_updated = gsub("-", " ", gcr_result_cp_updated),
-                                gcr_result_cp_updated = str_trim(gcr_result_cp_updated),
-                                gcr_result_carrie = tolower(gcr_result_carrie),
-                                gcr_result_cp_updated = tolower(gcr_result_cp_updated),
-                                results_pasted_updated = paste(gcr_result_carrie, gcr_result_cp_updated, sep = " ; "))
-
-check2 <- cleaned_data %>% filter(gcr_result_carrie != gcr_result_cp_updated)
-View(as.data.frame(table(check2$results_pasted_updated)))
-# View(as.data.frame(table(cleaned_data$results_pasted, cleaned_data$results_pasted_updated)))
-```
+cleaned_data <- cleangrowth(
+  subjid = data.work$subjid,
+  param = data.work$param,
+  agedays = data.work$agedays,
+  sex = data.work$sex,
+  measurement = data.work$measurement,
+  prelim_infants = TRUE,
+  id = data.work$id, sd.recenter = "nhanes"
+)
+load_in_midpoint <- read.csv("../data/midpoint_check_corrected_zscores.csv") %>% select(-1, -c(line, subjid, param, agedays, v, v_adult, sex, sd.orig, sd.corr, sd.orig_uncorr)) 
 
 
 
-```{r}
-stata_gc_in <- data.table::fread("../data/2025-10-01-gc-Stata-chopd1p-results.csv")
-stata.work <- stata_gc_in %>% select(subjid,id, potcorr,potcorr_wt,tbcwtz, ctbcwtz, swtz, scwtz, ht, wt, agedays)
-our_data_out <- read.csv("../data/midpoint_check_corrected_zscores.csv")
-our_data.work <- our_data_out %>% group_by(subjid) %>% filter(agedays == 0 & param == "WEIGHTKG")
-tempout <- stata.work %>% group_by(subjid) %>% filter(potcorr_wt == 1 & agedays == 0)
-checkecheck <- merge(our_data.work, tempout, by = "subjid",, all.x = TRUE)
-checkecheck <- checkecheck %>% mutate(even = round(sd.corr,4) == round(ctbcwtz,4))
-checkecheck 
-View(checkecheck)
+R_data_modified <- merge(cleaned_data, load_in_midpoint, by= "id", all.x = TRUE) %>%
+  rename_with(~ paste0("R_", .x), .cols = -id)
+names(R_data_modified)
+# write.csv(R_data_modified, paste("../data/", Sys.Date(), "_Updated_R_Output.csv", sep = ""))
 ```
 
 ```{r}
-check <- cleaned_data %>% mutate(gcr_result_cp_updated = gsub("^Exclude", "", gcr_result_cp_updated),
-                                gcr_result_cp_updated = gsub("-", " ", gcr_result_cp_updated),
-                                gcr_result_cp_updated = str_trim(gcr_result_cp_updated),
-                        gcr_result_cp_updated = tolower(gcr_result_cp_updated)) %>% mutate(change = gcr_result_cp == gcr_result_cp_updated)
+checkdf <- merge(stata_gc_in, R_data_modified, by = "id", all.y = TRUE)
+checkdf <- checkdf %>%
+  rename(
+    fen_wt_l = fen_wtg_l,
+    fen_wt_m = fen_wtg_m,
+    fen_wt_s = fen_wtg_s
+  )
+checkdf$age
+names(checkdf)
+checkdf <- checkdf  %>%
+  mutate(
+    Stata_who_z = case_when(param == "HEIGHTCM" ~ whohtz, param == "WEIGHTKG" ~ whowtz, TRUE ~ NA),
+    Stata_cdc_z = case_when(param == "HEIGHTCM" ~ cdchtz, param == "WEIGHTKG" ~ cdcwtz, TRUE ~ NA),
+    Stata_tbc.sd = case_when(param == "HEIGHTCM" ~ cdchtz, param == "WEIGHTKG" ~ cdcwtz, TRUE ~ NA),
+    Stata_ctbc.sd = case_when(param == "HEIGHTCM" ~ ctbchtz, param == "WEIGHTKG" ~ ctbcwtz, TRUE ~ NA),
+    Stata_exclude = case_when(param == "HEIGHTCM"  ~ exc_ht, param == "WEIGHTKG" ~ exc_wt, TRUE ~ NA),
+    Stata_smoothed_z = case_when(param == "HEIGHTCM"  ~ shtz, param == "WEIGHTKG" ~ swtz, TRUE ~ NA),
+    Stata_recentered_z = case_when(param == "HEIGHTCM"  ~ rchtz, param == "WEIGHTKG" ~ rcwtz, TRUE ~ NA),
+    fen_wt_l_eq = fen_wt_l  == R_fen_wt_l,
+    fen_wt_m_eq = fen_wt_m  == R_fen_wt_m,
+    fen_wt_s_eq = fen_wt_s  == R_fen_wt_s,
+    fen_ht_l_eq = fen_ht_l  == R_fen_ht_l,
+    fen_ht_m_eq = fen_ht_m  == R_fen_ht_m,
+    fen_ht_s_eq = fen_ht_s  == R_fen_ht_s,
+    fen_hc_l_eq = fen_hc_l  == R_fen_hc_l,
+    fen_hc_m_eq = fen_hc_m  == R_fen_hc_m,
+    fen_hc_s_eq = fen_hc_s  == R_fen_hc_s
+  ) %>%  select(
+  id,
+  subjid,
+  potcorr, R_potcorr, R_pmagedays, R_cagedays,
+  R_subjid,
+  sex,
+  R_sex,
+  agedays,
+  R_agedays,
+  ga, 
+  R_cagedays,
+  Stata_exclude, 
+  R_exclude,
+  # Same,
+  param,
+  R_param,
+  measurement,
+  R_v,
+  # potcorr, R_potcorr,
+  intwt,
+  R_intwt,
+  Stata_ctbc.sd,
+  R_ctbc.sd, 
+  R_sd.corr, R_sd.orig,
+  Stata_smoothed_z,
+  STATA_nnte = nnte,
+  fen_wt_l,  R_fen_wt_l,  fen_wt_l_eq,
+    fen_wt_m,  R_fen_wt_m,  fen_wt_m_eq,
+    fen_wt_s,  R_fen_wt_s,  fen_wt_s_eq,
+    fen_ht_l,  R_fen_ht_l,  fen_ht_l_eq,
+    fen_ht_m,  R_fen_ht_m,  fen_ht_m_eq,
+    fen_ht_s,  R_fen_ht_s,  fen_ht_s_eq,
+    fen_hc_l,  R_fen_hc_l,  fen_hc_l_eq,
+    fen_hc_m,  R_fen_hc_m,  fen_hc_m_eq,
+    fen_hc_s,  R_fen_hc_s,  fen_hc_s_eq) %>% mutate(R_exclude = gsub("^Exclude", "", R_exclude),
+                                R_exclude = gsub("-", " ", R_exclude),
+                                R_exclude = str_trim(R_exclude),
+                                Stata_exclude = gsub("-", " ", Stata_exclude),
+                                Stata_exclude = tolower(Stata_exclude),
+                                R_exclude = tolower(R_exclude),
+                                results_pasted = paste(Stata_exclude, R_exclude, sep = " ; "),
+             Same = Stata_exclude == R_exclude)  %>%  mutate(sd_same = round(Stata_smoothed_z,5) == round(R_sd.corr,5),
+                                                             sd_diff = abs(Stata_smoothed_z-R_sd.corr))%>% relocate(Same,sd_same,sd_diff)
+# View(checkdf)
 
-# table(check$change)
+table_out <- checkdf %>% group_by(subjid) %>% filter(any(Same == FALSE))
+write.csv(table_out, paste("../data/", Sys.Date(), "Primary_Discrepant_Pat_Hxs.csv"))
 ```
 
-### Compare to source data:
-
-```{r, eval = TRUE}
+```{r}
+# View(stata_gc_in)
 # Load in new source code:
-files <- list.files("../../R/", pattern = "\\.[rR]$", full.names = TRUE)
+files <- list.files("../code/modified_source_code/", pattern = "\\.[rR]$", full.names = TRUE)
 sapply(files, source, local = TRUE)
 invisible(lapply(files, function(f) source(f, chdir = TRUE)))
+source(knitr::purl("../code/modified_source_code/Contracted_Fix_Main.Rmd", output = tempfile()))
+
+stata_gc_in <- data.table::fread("../data/2025-10-01-gc-Stata-chopd1p-results.csv")
+data_in <- read.csv("../data/ 2025-10-13 Primary_Discrepant_Pat_Hxs.csv")
+
 
 # data.work
-data.work <- as.data.table(data.work)
-# subset_ids <- data.work %>% distinct(subjid) %>% slice_sample(n=50)
-# data.work <- data.work %>% filter(subjid %in% subset_ids$subjid)
+data.work <- as.data.table(data_in)
+subset_ids <- data.work %>% distinct(subjid) %>% slice_sample(n=10)
+data.work <- data.work %>% filter(subjid %in% unique(subset_ids$subjid))
+# ewmas <- read.csv("../data/ewma_folks.csv")
+# data.work <- data.work %>% filter(subjid %in% unique(ewmas$x))
+# ewmas
 setkey(data.work, subjid, param, agedays)
-cleaned_data <- data.work[,gcr_result_cp_updated := cleangrowth(subjid, param, agedays, sex, measurement, prelim_infants = TRUE)]
-# View(cleaned_data)
+cleaned_data <- cleangrowth(
+  subjid = data.work$subjid,
+  param = data.work$param,
+  agedays = data.work$agedays,
+  sex = data.work$sex,
+  measurement = data.work$measurement,
+  prelim_infants = TRUE,
+  id = data.work$id, sd.recenter = "nhanes"
+)
+load_in_midpoint <- read.csv("../data/midpoint_check_corrected_zscores.csv") %>% select(-1, -c(line, subjid, param, agedays, v, v_adult, sex, sd.orig, sd.corr, sd.orig_uncorr)) 
 
-# 368777
-library(readr)
+R_data_modified <- merge(cleaned_data, load_in_midpoint, by= "id", all.x = TRUE) %>%
+  rename_with(~ paste0("R_", .x), .cols = -id)
+checkdf <- merge(stata_gc_in, R_data_modified, by = "id", all.y = TRUE)
+checkdf <- checkdf %>%
+  rename(
+    fen_wt_l = fen_wtg_l,
+    fen_wt_m = fen_wtg_m,
+    fen_wt_s = fen_wtg_s
+  )
+checkdf <- checkdf  %>%
+  mutate(
+    Stata_who_z = case_when(param == "HEIGHTCM" ~ whohtz, param == "WEIGHTKG" ~ whowtz, TRUE ~ NA),
+    Stata_cdc_z = case_when(param == "HEIGHTCM" ~ cdchtz, param == "WEIGHTKG" ~ cdcwtz, TRUE ~ NA),
+    Stata_tbc.sd = case_when(param == "HEIGHTCM" ~ cdchtz, param == "WEIGHTKG" ~ cdcwtz, TRUE ~ NA),
+    Stata_ctbc.sd = case_when(param == "HEIGHTCM" ~ ctbchtz, param == "WEIGHTKG" ~ ctbcwtz, TRUE ~ NA),
+    Stata_exclude = case_when(param == "HEIGHTCM"  ~ exc_ht, param == "WEIGHTKG" ~ exc_wt, TRUE ~ NA),
+    Stata_smoothed_z = case_when(param == "HEIGHTCM"  ~ shtz, param == "WEIGHTKG" ~ swtz, TRUE ~ NA),
+    Stata_recentered_z = case_when(param == "HEIGHTCM"  ~ rchtz, param == "WEIGHTKG" ~ rcwtz, TRUE ~ NA),
+    fen_wt_l_eq = fen_wt_l  == R_fen_wt_l,
+    fen_wt_m_eq = fen_wt_m  == R_fen_wt_m,
+    fen_wt_s_eq = fen_wt_s  == R_fen_wt_s,
+    fen_ht_l_eq = fen_ht_l  == R_fen_ht_l,
+    fen_ht_m_eq = fen_ht_m  == R_fen_ht_m,
+    fen_ht_s_eq = fen_ht_s  == R_fen_ht_s,
+    fen_hc_l_eq = fen_hc_l  == R_fen_hc_l,
+    fen_hc_m_eq = fen_hc_m  == R_fen_hc_m,
+    fen_hc_s_eq = fen_hc_s  == R_fen_hc_s
+  ) %>%  select(
+  id,
+  subjid,
+  potcorr, R_potcorr, R_pmagedays, R_cagedays,
+  R_subjid,
+  sex,
+  R_sex,
+  agedays,
+  R_agedays,
+  ga, 
+  R_cagedays,
+  Stata_exclude, 
+  R_exclude,
+  # Same,
+  param,
+  R_param,
+  measurement,
+  R_v,
+  # potcorr, R_potcorr,
+  intwt,
+  R_intwt,
+  Stata_ctbc.sd,
+  R_ctbc.sd, 
+  R_sd.corr, R_sd.orig,
+  Stata_smoothed_z,
+  STATA_nnte = nnte,
+  fen_wt_l,  R_fen_wt_l,  fen_wt_l_eq,
+    fen_wt_m,  R_fen_wt_m,  fen_wt_m_eq,
+    fen_wt_s,  R_fen_wt_s,  fen_wt_s_eq,
+    fen_ht_l,  R_fen_ht_l,  fen_ht_l_eq,
+    fen_ht_m,  R_fen_ht_m,  fen_ht_m_eq,
+    fen_ht_s,  R_fen_ht_s,  fen_ht_s_eq,
+    fen_hc_l,  R_fen_hc_l,  fen_hc_l_eq,
+    fen_hc_m,  R_fen_hc_m,  fen_hc_m_eq,
+    fen_hc_s,  R_fen_hc_s,  fen_hc_s_eq) %>% mutate(R_exclude = gsub("^Exclude", "", R_exclude),
+                                R_exclude = gsub("-", " ", R_exclude),
+                                R_exclude = str_trim(R_exclude),
+                                Stata_exclude = gsub("-", " ", Stata_exclude),
+                                Stata_exclude = tolower(Stata_exclude),
+                                R_exclude = tolower(R_exclude),
+                                results_pasted = paste(Stata_exclude, R_exclude, sep = " ; "),
+             Same = Stata_exclude == R_exclude)  %>%  mutate(sd_same = round(Stata_smoothed_z,5) == round(R_sd.corr,5),
+                                                             sd_diff = abs(Stata_smoothed_z-R_sd.corr))%>% relocate(Same,sd_same,sd_diff)
+```
+# Handling mismatches in results:
+```{r}
+# checkdf_table_dro2 <- checkdf %>% filter(!is.na(Same))
+# prev_table <- (as.data.frame(table(checkdf_table_dro2$results_pasted)) %>% arrange(desc(Freq)))
+# write.csv(prev_table, paste("../data/reference_tabulation_of_mismatches", Sys.Date(), ".csv", sep = ""))
+# View(prev_table)
+```
+# AFYER Change
+
+```{r}
+checkdf_table_dro_up <- checkdf %>% filter(!is.na(Same)) %>% filter(Same == FALSE)
+updatedtable <- (as.data.frame(table(checkdf_table_dro_up$results_pasted)) %>% arrange(desc(Freq)))
+View(updatedtable)
 ```
 
 ```{r}
-# roundingerrorcheck <- read_csv("~/Github/Daymont_Contract/growthcleanr/cp/data/roundingerrorcheck.csv")
-stata_gc_in <- data.table::fread("../data/2025-10-01-gc-Stata-chopd1p-results.csv")
-stata.work <- stata_gc_in %>% select(subjid,id, potcorr,potcorr_wt,tbcwtz, ctbcwtz, swtz, scwtz, ht, wt, agedays)
-our_data_out <- read.csv("../data/midpoint_check_corrected_zscores_unmodified.csv")
-our_data.work <- our_data_out %>% group_by(subjid) %>% filter(agedays == 0 & param == "WEIGHTKG")
-tempout <- stata.work %>% group_by(subjid) %>% filter(potcorr_wt == 1 & agedays == 0)
-checkecheck <- merge(our_data.work, tempout, by = "subjid",, all.x = TRUE)
-checkecheck <- checkecheck %>% mutate(even = round(sd.corr,4) == round(ctbcwtz,4))
-View(checkecheck )
+prev_table <- read.csv("../data/reference_tabulation_of_mismatches2025-10-13.csv") %>% select(-1) 
+View(merge(prev_table, updatedtable, by = "Var1", all = TRUE))
+```
+
+### EWMA Section
+
+```{r}
+# checkdf_table_dro2 <- checkdf %>% filter(!is.na(Same))
+# prev_table <- (as.data.frame(table(checkdf_table_dro2$results_pasted)) %>% arrange(desc(Freq)))
+# write.csv(prev_table, paste("../data/reference_tabulation_of_ewma_mismatches", Sys.Date(), ".csv", sep = ""))
+# View(prev_table)
+ewma2_orig <- read.csv("../data/reference_tabulation_of_ewma_mismatches2025-10-13.csv") %>% select(-1)
+checkdf_table_dro_up <- checkdf %>% filter(!is.na(Same) & subjid %in% ewmas$x)
+updatedtable <- (as.data.frame(table(checkdf_table_dro_up$results_pasted)) %>% arrange(desc(Freq)))
+View(merge(ewma2_orig, updatedtable, by = "Var1", all = TRUE))
+```
+
+```{R}
+Source_table <-  read.csv("../data/baseline_discrepant_patient_histories_2025-10-07.csv")
+Source_table<- as.data.frame(table(Source_table$gcr_result_carrie))
+View(merge(Source_table, updatedtable, by = "Var1", all = TRUE))
+
+```
+
+```{r}
+datsel <- checkdf %>% group_by(subjid) %>% filter(any(grepl("ewma2", results_pasted)))
+ewmas <- unique(datsel$subjid)
+write.csv(ewmas, "../data/ewma_folks.csv")
+```
+
+```{R}
+# Example CAse:
+
+View(checkdf %>% filter(subjid == "16210" & !is.na(Same) & param == "HEIGHTCM"))
+```
+
+
+```{R}
+read.csv(:)
 ```
