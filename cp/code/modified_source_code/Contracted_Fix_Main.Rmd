@@ -2154,18 +2154,43 @@ cleanbatch_infants <- function(data.df,
     
     ### CP NOTE - Check closely - potential overwrite of carried forwar
     
-    
+    ### CP DROP IN
     # find out if values are whole or half imperial
-    data.df[param == "WEIGHTKG",
-            wholehalfimp := (v.orig * 2.20462262)%%1 < 0.01]
-    data.df[param == "HEIGHTCM",
-            wholehalfimp := (v.orig * 1.27)%%1 < 0.01]
-    data.df[param == "HEIGHTCM",
-            wholehalfimp := (v.orig * 1.27 / 2)%%1 < 0.01]
-    data.df[param == "HEADCM",
-            wholehalfimp := (v.orig * 1.27)%%1 < 0.01]
-    data.df[param == "HEADCM",
-            wholehalfimp := (v.orig * 1.27 / 2)%%1 < 0.01]
+    # data.df[param == "WEIGHTKG",
+    #         wholehalfimp := (v.orig * 2.20462262)%%1 < 0.01]
+    # data.df[param == "HEIGHTCM",
+    #         wholehalfimp := (v.orig * 1.27)%%1 < 0.01]
+    # data.df[param == "HEIGHTCM",
+    #         wholehalfimp := (v.orig * 1.27 / 2)%%1 < 0.01]
+    # data.df[param == "HEADCM",
+    #         wholehalfimp := (v.orig * 1.27)%%1 < 0.01]
+    # data.df[param == "HEADCM",
+    #         wholehalfimp := (v.orig * 1.27 / 2)%%1 < 0.01]
+    # 
+   # determine if measurements are in whole or half imperial units
+
+# Weight: whole pounds (within 0.01 lb of integer)
+data.df[param == "WEIGHTKG",
+        wholehalfimp := abs((v.orig * 2.20462262) %% 1) < 0.01]
+
+# Height: whole or half inches (within 0.01 inch tolerance)
+data.df[param == "HEIGHTCM", ":="(
+  wholeinch = abs((v.orig / 2.54) %% 1) < 0.01,
+  halfinch  = abs((v.orig / 2.54) %% 0.5) < 0.01
+)]
+data.df[param == "HEIGHTCM",
+        wholehalfimp := wholeinch | halfinch]
+
+# Head circumference: whole or half inches
+data.df[param == "HEADCM", ":="(
+  wholeinch = abs((v.orig / 2.54) %% 1) < 0.01,
+  halfinch  = abs((v.orig / 2.54) %% 0.5) < 0.01
+)]
+data.df[param == "HEADCM",
+        wholehalfimp := wholeinch | halfinch]
+    
+      ### CP UP
+    
     # find string carried forward length
     data.df[, seq_win := sequence(rle(as.character(exclude))$lengths),
             by = c("subjid", "param")]
@@ -2184,10 +2209,15 @@ cleanbatch_infants <- function(data.df,
       data.df[which(seq_win == 0)+1, "cs"]
     data.df[is.na(seq_win), cs := NA]
     
+    ## CP MOD DOWN
+    
     # find th diff between initial and cf
     data.df[!is.na(seq_win), absdiff :=
-              abs(sd.orig_uncorr - sd.orig_uncorr[1]),
+              # abs(sd.orig_uncorr - sd.orig_uncorr[1]),
+            abs(sd.orig_uncorr - shift(sd.orig_uncorr, 1, type = "lag")),
             by = c("subjid", "param", "cs")]
+    
+    ### CP MOD UP
     
     # handle CFs by case
     data.df[!is.na(seq_win), exclude := (function(df){
@@ -2200,6 +2230,7 @@ cleanbatch_infants <- function(data.df,
         df[seq_win != 0 & absdiff < .1 & wholehalfimp,
            exclude := "Exclude-1-CF-deltaZ-<0.1-wholehalfimp"]
       } else if (max(seq_win) > 1){
+        
         df[seq_win != 0 & agedays/365.25 > 16 & sex == 1 & absdiff < 0.05,
            exclude := "Exclude-Teen-2-plus-CF-deltaZ-<0.05"]
         df[seq_win != 0 & agedays/365.25 > 17 & sex == 0 & absdiff < 0.05,
@@ -2211,7 +2242,18 @@ cleanbatch_infants <- function(data.df,
         df[seq_win != 0 & agedays/365.25 > 17 & sex == 0 & absdiff < .1 &
              wholehalfimp,
            exclude := "Exclude-Teen-2-plus-CF-deltaZ-<0.1-wholehalfimp"]
+        ### CP ADD 
+        df[seq_win != 0 & absdiff < 0.05,
+           exclude := "Exclude-1-CF-deltaZ-<0.05"]
+        
+        # use short circuiting to have the lower end covered (>= 0.05)
+        df[seq_win != 0 & absdiff < .1 & wholehalfimp,
+           exclude := "Exclude-1-CF-deltaZ-<0.1-wholehalfimp"]
+        ### CP ADD UP
       }
+      
+      
+      
       
       return(df$exclude)
     })(copy(.SD)),
@@ -3616,6 +3658,8 @@ df[is.na(diff_prev), diff_prev := 0]
 # df[diff_prev > (maxdiff_prev + eps) & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
       ## CP MODIFY
       if (nrow(df) > 2){
+        # CP Down
+           
         # 17P/R: identify pairs and calculate exclusions
         df[, pair := (v-dplyr::lag(v)) < mindiff_prev |
              (dplyr::lead(v)-v) < mindiff |
@@ -3627,12 +3671,16 @@ df[is.na(diff_prev), diff_prev := 0]
         df[pair & abs(dewma.after) > dplyr::lead(abs(dewma.before)),
            aft.g.aftm1 := TRUE]
         
+        if (unique(df$subjid) == "5556" & unique(df$param == "HEIGHTCM")) {
+  fwrite(df, "../data/mindiff_debug_NNNNN.csv")
+           } 
+        
         # Q ### CP MOD
         df[, val_excl := exclude]
         # df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
-        # df[diff_next < mindiff & aft.g.aftm1, val_excl := "Exclude-Min-diff"]
+        df[diff_next < mindiff & aft.g.aftm1, val_excl := "Exclude-Min-diff"]
         # df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
-        # df[diff_next > maxdiff & aft.g.aftm1, val_excl := "Exclude-Max-diff"]
+        df[diff_next > maxdiff & aft.g.aftm1, val_excl := "Exclude-Max-diff"]
         # df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
         df[, val_excl := exclude]
         
