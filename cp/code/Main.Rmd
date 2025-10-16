@@ -3,6 +3,19 @@ title: "R Notebook"
 output: html_notebook
 ---
 
+```{r}
+library(growthcleanr)
+library(dplyr)
+library(data.table)
+library(dplyr)
+library(data.table)
+library(stringr)
+```
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(include = FALSE, echo = FALSE, eval = TRUE)
+```
+
 **Pausing Code to Evaluate Changes Thus Far**
 
 1. Generate Baseline - STATA vs. Unmodified R Code
@@ -38,10 +51,12 @@ data.work <- data.work %>% mutate(gcr_result_carrie = case_when(
   param == "HEIGHTCM" ~ exc_ht,
   TRUE ~ "ERR"
 )) %>% select(-c(exc_wt, exc_ht)) 
+data.work <- data.work  %>% filter(subjid %in% Merged_Maps_sub$subjid.x)
+
 data.work <- as.data.table(data.work)
 setkey(data.work, subjid, param, agedays)
 cleaned_data <- data.work[,gcr_result_cp := cleangrowth(subjid, param, agedays, sex, measurement, prelim_infants = TRUE,  sd.recenter = "nhanes")]
-
+# View(cleaned_data %>% filter(subjid == "444336"))
 # Baseline_Characteristics_Table
 Baseline_Characteristics_Table <- cleaned_data %>% select(gcr_result_carrie, gcr_result_cp) %>% mutate(gcr_result_cp = gsub("^Exclude", "", gcr_result_cp),
                                 gcr_result_cp = gsub("-", " ", gcr_result_cp),
@@ -207,7 +222,7 @@ View(datsel)
 SOIs<- unique(datsel$subjid)
 ```
 
-```{R}
+```{R, include = TRUE}
 # Load Modified code
 files <- list.files("../code/modified_source_code/", pattern = "\\.[rR]$", full.names = TRUE)
 sapply(files, source, local = TRUE)
@@ -244,8 +259,8 @@ data.work <- data.work %>% mutate(gcr_result_carrie = case_when(
   TRUE ~ "ERR"
 )) %>% select(-c(exc_wt, exc_ht)) 
 
-data.work <- data.work  %>% filter(subjid %in% Merged_Maps_sub$subjid.x)
-data.work <- data.work # %>% filter(subjid %in% conflicted_pats)
+# data.work <- data.work  %>% filter(subjid %in% carried_forward_folks$subjid.x)
+# data.work <- data.work  %>% filter(subjid %in% conflicted_pats)
 data.work <- as.data.table(data.work)
 setkey(data.work, subjid, param, agedays)
 cleaned_data_updated <- cleangrowth(
@@ -255,10 +270,11 @@ cleaned_data_updated <- cleangrowth(
   sex = data.work$sex,
   measurement = data.work$measurement,
   prelim_infants = TRUE,
-  id = data.work$id, sd.recenter = "nhanes"
+  id = data.work$id, 
+  sd.recenter = "nhanes"
 )
 
-# write.csv(cleaned_data_updated, paste("../data/Checkpoint_Updated_R_", Sys.Date(), ".csv", sep = ""))
+write.csv(cleaned_data_updated, paste("../data/Checkpoint_Updated_R_", Sys.Date(), ".csv", sep = ""))
 
 Modified_Characteristics_Table <- merge(data.work, cleaned_data_updated %>% select(id, exclude), by = "id")
 
@@ -271,7 +287,7 @@ Modified_Characteristics_Table <- Modified_Characteristics_Table %>% select(gcr_
                                 results_pasted = paste(gcr_result_carrie, gcr_result_cp_updated, sep = " ; "))
 
 Modified_Characteristics_Table <- as.data.frame(table(Modified_Characteristics_Table$results_pasted)) %>% arrange(desc(Freq))
-# write.csv(Modified_Characteristics_Table, paste("../deliverables/Modified_Characteristics_Table", Sys.Date(), ".csv", sep = ""))
+write.csv(Modified_Characteristics_Table, paste("../deliverables/Modified_Characteristics_Table", Sys.Date(), ".csv", sep = ""))
 Modified_Characteristics_Table
 
 
@@ -279,7 +295,7 @@ Modified_Characteristics_Table
 Baseline_Map <- read.csv("../data/baseline_comparison_of_stata_vs_R_2025-10-07.csv") %>% select(id, gcr_result_carrie, gcr_result_cp, subjid)
 # Updated_Map <- read.csv("../data/Checkpoint_Updated_R_2025-10-14.csv") %>% select(id, gcr_result_cp_updated = exclude)
 
-cleaned_data_updated <- read.csv("../data/Checkpoint_Updated_R_2025-10-14_evening.csv")
+# cleaned_data_updated <- read.csv("../data/Checkpoint_Updated_R_2025-10-14_evening.csv")
 
 Updated_Map <- cleaned_data_updated %>% select(id, subjid, gcr_result_cp_updated = exclude)
 Merged_Maps <- merge(Baseline_Map, Updated_Map, by = "id")
@@ -397,24 +413,64 @@ gt(tbl) %>%
     fn = function(x) rep("maroon", length(x))
   )
 
+# View(cleane)
 
 Merged_Maps_sub <- Merged_Maps %>% filter(gcr_result_carrie == "Min diff" & gcr_result_cp == "Min diff" &	gcr_result_cp_updated == "Include")
-# Merged_Maps_sub
+# View(Merged_Maps_sub)
 moddf <- merge(data.work, cleaned_data_updated %>% select(-subjid), by = "id") %>% filter()
 
 # View(moddf %>% filter(subjid %in% c(Merged_Maps_sub$subjid.x)) %>% select(subjid, agedays.x, param.x, sd.orig_uncorr, swtz, shtz,  measurement, v, gcr_result_carrie, exclude))
 
 # moddf$c.d
+
+
 ```
 
 ```{r}
+# Merged_Maps
+EWMA_middle_folks <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie == "EWMA2 middle" & gcr_result_cp_updated == "Include")) 
+# Select off cleaned data which represents this:
+ewma2_diagnostics_all <- read_csv("~/Github/Daymont_Contract/growthcleanr/cp/data/ewma2_diagnostics_all.csv") %>% filter(subjid %in% EWMA_middle_folks$subjid.x)
+ewma2_diagnostics_all <- merge(ewma2_diagnostics_all, EWMA_middle_folks %>% select(subjid = subjid.x, id, gcr_result_carrie, gcr_result_cp_updated) %>% distinct(), by = "id", all.x = TRUE)
+View(ewma2_diagnostics_all %>% filter(subjid.x == unique(ewma2_diagnostics_all$subjid.x)[2]) %>% distinct())
+ewma2_diagnostics_all %>% mutate(addcrithigh_cp :=
+                    dewma.before > 1 & dewma.after > 1 &
+                    ((tbc_diff_next > 1 & tbc_diff_plus_next > 1 & tbc_diff_minus_next > 1) | is.na(tbc_diff_next)) &
+                    ((tbc_diff_prior > 1 & tbc_diff_plus_prior > 1 & tbc_diff_minus_prior > 1) | is.na(tbc_diff_prior))) %>% filter(subjid.x == "16210")
 
-datsel <- merge(Baseline_Map, Updated_Map, by = c("id", "subjid"), all = TRUE) %>% group_by(subjid) %>% filter(any(gcr_result_carrie == "1 CF deltaZ <0.05" & gcr_result_cp_updated == "Exclude-Carried-Forward")) #%>% distinct(subjid)
-Modified_Characteristics_Table <- merge(data.work, cleaned_data_updated %>% select(-subjid), by = "id")
 
-View(Modified_Characteristics_Table %>% filter(subjid %in% c(datsel$subjid)) %>% select(subjid, agedays.x, param.x, sd.orig_uncorr, swtz, measurement, v, gcr_result_carrie, exclude))
+View(ewma2_diagnostics_all)
+View(stata_gc_in)
+```
+
+
+```{r}
+# Merged_Maps
+carried_forward_folks <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie == "Carried forward" & gcr_result_cp_updated == "Include")) 
+output <- read.csv("../data/Checkpoint_Updated_R_2025-10-14_evening.csv")
+View(output)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+datsel <- merge(Baseline_Map, Updated_Map, by = c("id", "subjid"), all = TRUE) %>% group_by(subjid) %>% filter(any(gcr_result_carrie == "EWMA2 middle" & gcr_result_cp_updated == "Include")) #%>% distinct(subjid)
+# Modified_Characteristics_Table <- merge(data.work, cleaned_data_updated %>% select(-subjid), by = "id")
+
+View(Modified_Characteristics_Table  %>% select(subjid, agedays.x, param.x, sd.orig_uncorr, swtz, measurement, v, gcr_result_carrie, exclude))
 Modified_Characteristics_Table$sd.orig_uncorr
-View()
+View(datsel)
 ```
 
 
@@ -442,7 +498,46 @@ View(review_ewmas)
 **Now, we should compare the EWMA values for our data against the STATA outputs.**
 
 ```{R}
-read.csv("../data/ewma2_debug_NNNNN.csv")
+example_mindif_issue <- read.csv("../data/mindiff_debug_NNNNN.csv")
+df <- example_mindif_issue %>%
+  dplyr::select(id,
+    subjid, param, agedays, v, exclude,
+    tbc.sd, ctbc.sd,
+    ewma.all, ewma.before, ewma.after,
+    dewma.all, dewma.before, dewma.after,
+    exp_vals,
+    diff_prev, diff_next,
+    mindiff_prev, mindiff, maxdiff_prev, maxdiff,
+    pair, bef.g.aftm1, aft.g.aftm1
+    # val_excl
+  )
+df
+
+
+View()
+
+# Check pair logic:
+
+if (nrow(df) > 2){
+        # 17P/R: identify pairs and calculate exclusions
+        df[, pair := (v-dplyr::lag(v)) < mindiff_prev |
+             (dplyr::lead(v)-v) < mindiff |
+             (v-dplyr::lag(v)) > maxdiff_prev | (dplyr::lead(v)-v) > maxdiff
+        ]
+  
+  df <- df %>% mutate(pair_Cp_condition1 = (v-dplyr::lag(v)) <= mindiff_prev)
+  df <- df %>% mutate(pair_Cp_condition2 = round(dplyr::lead(v)-v,1) <= mindiff ,
+                      pair_Cp_condition3 = (v-dplyr::lag(v)) >= maxdiff_prev,
+                      pair_Cp_condition4 = (dplyr::lead(v)-v) >= maxdiff,
+                      pair_Cp_condition2_value_1 = round(dplyr::lead(v)-v,1),
+                      pair_Cp_condition2_cp = round(dplyr::lead(v)-v,1) <= mindiff,
+                      mindiff_put = mindiff)
+df  
+
+
+View(Modified_Characteristics_Table)
+
+
 ```
 
 

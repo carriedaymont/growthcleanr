@@ -2129,20 +2129,83 @@ cleanbatch_infants <- function(data.df,
     data.sub[no_sde == TRUE, cf :=  (v.orig - shift(v.orig)) == 0, by = c("subjid", "param")]
     data.sub[is.na(cf), cf := FALSE]
     
-    # for values with sdes, compare to all values from the prior day
-    data.sub[no_sde == FALSE, cf := (function(df){
-      ages <- unique(agedays)
-      if (length(ages) > 1){
-        for (i in 2:length(ages)) {
-          # find the set of measurements from the previous age in days
-          all.prev.v <- df[agedays == ages[i - 1], v.orig]
-          # if a measurement for the current age is found in the set of measurements from the previous age, then mark it as carried forward
-          df[agedays == ages[i] &
-               v.orig %in% all.prev.v, cf := TRUE]
-        }
-      }
-    })(copy(.SD)), .SDcols = c('agedays', 'cf', 'v.orig'), by = .(subjid, param)]
+ library(dplyr)
+library(purrr)
+
+    ### VERSION CP which switches out of data.table() to process/troubleshoot ### 
     
+data.temp <- as.data.frame(data.sub) %>%
+  arrange(subjid, param, agedays) %>%
+  group_by(subjid, param) %>%
+  mutate(
+    cf = map_lgl(
+      seq_along(agedays),
+      function(i) {
+        # first observation can't be carried forward
+        if (i == 1) return(FALSE)
+
+        # find the immediately previous unique ageday for this subject/param
+        prev_ages <- unique(agedays[agedays < agedays[i]])
+        if (length(prev_ages) == 0) return(FALSE)
+        prev_age <- max(prev_ages)
+
+        # get all values from that previous ageday
+        prev_vals <- v.orig[agedays == prev_age]
+
+        # if current value matches any of those (within tolerance), flag as CF
+        any(abs(v.orig[i] - prev_vals) < 1e-6)
+      }
+    )
+  ) %>%
+  ungroup()
+data.sub <- data.table(data.temp)
+#### CP Untested, replicate of above code in data.table() if that sequence of mods works. This will be way faster than dplyr.
+
+# data.temp <- as.data.frame(data.sub) %>%
+#   arrange(subjid, param, agedays) %>%
+#   group_by(subjid, param) %>%
+#   mutate(
+#     cf = map_lgl(
+#       seq_along(agedays),
+#       function(i) {
+#         # first observation can't be carried forward
+#         if (i == 1) return(FALSE)
+# 
+#         # find the immediately previous unique ageday for this subject/param
+#         prev_ages <- unique(agedays[agedays < agedays[i]])
+#         if (length(prev_ages) == 0) return(FALSE)
+#         prev_age <- max(prev_ages)
+# 
+#         # get all values from that previous ageday
+#         prev_vals <- v.orig[agedays == prev_age]
+# 
+#         # if current value matches any of those (within tolerance), flag as CF
+#         any(abs(v.orig[i] - prev_vals) < 1e-6)
+#       }
+#     )
+#   ) %>%
+#   ungroup()
+
+
+
+    
+   
+    
+    
+    # # for values with sdes, compare to all values from the prior day
+    # data.sub[no_sde == FALSE, cf := (function(df){
+    #   ages <- unique(agedays)
+    #   if (length(ages) > 1){
+    #     for (i in 2:length(ages)) {
+    #       # find the set of measurements from the previous age in days
+    #       all.prev.v <- df[agedays == ages[i - 1], v.orig]
+    #       # if a measurement for the current age is found in the set of measurements from the previous age, then mark it as carried forward
+    #       df[agedays == ages[i] &
+    #            v.orig %in% all.prev.v, cf := TRUE]
+    #     }
+    #   }
+    # })(copy(.SD)), .SDcols = c('agedays', 'cf', 'v.orig'), by = .(subjid, param)]
+    # 
     # merge in the carried forwards
     cf_idx <- data.sub$index[data.sub$cf]
     data.df[index %in% cf_idx, exclude := "Exclude-Carried-Forward"]
@@ -3157,6 +3220,9 @@ df_sub %>%
                     addcritlow
                   , exclude := "Exclude-EWMA2-last-ext-high"]
            
+  #             if (unique(df_sub$subjid) == "13023") {
+  # fwrite(df_sub, "../data/ewma2_debug_NNNNN_lead_2.csv")}
+
            # figure out if any of the exclusions hit
            count_exclude <- sum(df_sub$exclude != "Include")
            if (count_exclude > 0){
@@ -3384,15 +3450,15 @@ df_sub %>%
   ### CP ADD SECTION ###
   # ---- FIX: enforce Stata-style WHO binning ----
   # Convert ages to WHO monthly bins using floor() to match Stata
-  who.ht.vel[, whoagegrp_ht := as.integer(whoagegrp_ht)]
-  setkey(who.ht.vel, sex, whoagegrp_ht)
+  # who.ht.vel[, whoagegrp_ht := as.integer(whoagegrp_ht)]
+  # setkey(who.ht.vel, sex, whoagegrp_ht)
   
   # When merging into data.df later, derive the same floor-binned variable
-  data.df[, whoagegrp_ht := floor(agedays / 30.4375)]
-  setkey(data.df, sex, whoagegrp_ht)
+  # data.df[, whoagegrp_ht := floor(agedays / 30.4375)]
+  # setkey(data.df, sex, whoagegrp_ht)
   
   # Merge using roll=TRUE so values carry forward correctly
-  data.df <- who.ht.vel[data.df, roll = TRUE]
+  # data.df <- who.ht.vel[data.df, roll = TRUE]
   # ---- END FIX ----
   ### CP ADD SECTION ###
   
@@ -3477,7 +3543,7 @@ df_sub %>%
         # 17D
         # generate the who age group variable
         # CP change to floor from round
-        df[, whoagegrp.ht := floor(agedays/30.4375)]
+        df[, whoagegrp.ht := round(agedays/30.4375)]
         # CP change to floor from round
         df[whoagegrp.ht > 24 | dplyr::lead(whoagegrp.ht) > 24,
            whoagegrp.ht := NA]
@@ -3522,9 +3588,9 @@ df_sub %>%
         
         # CP ADD IN OR EQUAL TO FROM < or > 
         # 17G
-        df[d_agedays <= whoinc.age.ht*30.4375, who_mindiff_ht :=
+        df[d_agedays < whoinc.age.ht*30.4375, who_mindiff_ht :=
              who_mindiff_ht * d_agedays/(whoinc.age.ht*30.4375)]
-        df[d_agedays >= whoinc.age.ht*30.4375, who_maxdiff_ht :=
+        df[d_agedays > whoinc.age.ht*30.4375, who_maxdiff_ht :=
              who_maxdiff_ht * d_agedays/(whoinc.age.ht*30.4375)]
          # CP ADD IN OR EQUAL TO FROM < or > 
         df[d_agedays < 9*30.4375, who_mindiff_ht := who_mindiff_ht*.5-3]
@@ -3631,70 +3697,55 @@ df_sub %>%
       exp_vals[maxdiff_e > 365.25] <- -2.5
       exp_vals[maxdiff_e > 730.5] <- -3.5
       df[, exp_vals := exp_vals]
-      
+          if (unique(df$subjid) == "444336" & unique(df$param == "HEIGHTCM")) {
+  fwrite(df, "../data/mindiff_debug_NNNNN.csv")
+           }
+
       # calculate ewma
       df[, (ewma.fields) := ewma(agedays, tbc.sd, exp_vals, TRUE)]
-      
+      if (unique(df$subjid) == "444336" & unique(df$param == "HEIGHTCM")) {
+  fwrite(df, "../data/mindiff_debug_NNNNN_lead_2.csv")}
       # calculate dewma
       df[, `:=`(
         dewma.all = tbc.sd - ewma.all,
         dewma.before = tbc.sd - ewma.before,
         dewma.after = tbc.sd - ewma.after
       )]
+      if (unique(df$subjid) == "444336" & unique(df$param == "HEIGHTCM")) {
+  fwrite(df, "../data/mindiff_debug_NNNNN_lead_3.csv")}
       
-      ## CP MODIFY
+  
+      
+      
+      
+      
+      ####### 17P/R ####### ORIGINAL ########
       # add differences for convenience
-      # df[, diff_prev := (v-dplyr::lag(v))]
-      # df[, diff_next := (dplyr::lead(v)-v)]
+      df[, diff_prev := (v-dplyr::lag(v))]
+      df[, diff_next := (dplyr::lead(v)-v)]
       
-      df[, diff_prev := ctbc.sd - dplyr::lag(ctbc.sd)]
-df[is.na(diff_prev), diff_prev := 0]
-# df[d_agedays == 0, diff_prev := NA_real_]
-# df[is.na(dplyr::lag(ctbc.sd)), diff_prev := NA_real_]
-# df[, mindiff_prev := zoo::na.locf(mindiff_prev, na.rm = FALSE)]
-# df[, maxdiff_prev := zoo::na.locf(maxdiff_prev, na.rm = FALSE)]
-# eps <- 1e-6
-# df[diff_prev < (mindiff_prev - eps) & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
-# df[diff_prev > (maxdiff_prev + eps) & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
-      ## CP MODIFY
       if (nrow(df) > 2){
-        # CP Down
-           
         # 17P/R: identify pairs and calculate exclusions
         df[, pair := (v-dplyr::lag(v)) < mindiff_prev |
              (dplyr::lead(v)-v) < mindiff |
              (v-dplyr::lag(v)) > maxdiff_prev | (dplyr::lead(v)-v) > maxdiff
         ]
         df[is.na(pair), pair := FALSE]
-        df[pair & abs(dewma.before) > dplyr::lag(abs(dewma.after)),
+        df[pair & abs(dewma.before) > dplyr::lead(abs(dewma.after)),
            bef.g.aftm1 := TRUE]
-        df[pair & abs(dewma.after) > dplyr::lead(abs(dewma.before)),
+        df[pair & abs(dewma.after) > dplyr::lag(abs(dewma.before)),
            aft.g.aftm1 := TRUE]
-        
-        if (unique(df$subjid) == "5556" & unique(df$param == "HEIGHTCM")) {
-  fwrite(df, "../data/mindiff_debug_NNNNN.csv")
-           } 
-        
-        # Q ### CP MOD
+
+        # Q
         df[, val_excl := exclude]
-        # df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
-        df[diff_next < mindiff & aft.g.aftm1, val_excl := "Exclude-Min-diff"]
-        # df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
-        df[diff_next > maxdiff & aft.g.aftm1, val_excl := "Exclude-Max-diff"]
-        # df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
-        df[, val_excl := exclude]
-        
-        # Stata uses only the backward-looking difference (current - previous)
-        # and compares against the 3-SD WHO velocity limits for that age bin.
-        
-        # apply lower and upper velocity thresholds
         df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
+        df[diff_next < mindiff & aft.g.aftm1, val_excl := "Exclude-Min-diff"]
         df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
-        
-        
-        ### CP MOD UP 
-        
-      } else { # only 2 values
+        df[diff_next > maxdiff & aft.g.aftm1, val_excl := "Exclude-Max-diff"]
+      }
+      if (unique(df$subjid) == "444336" & unique(df$param == "HEIGHTCM")) {
+  fwrite(df, "../data/mindiff_debug_NNNNN_lead_4.csv")}
+        else { # only 2 values
         # 17Q/R -- exclusions for pairs
         df[, val_excl := exclude]
         df[diff_prev < mindiff_prev & abs(tbc.sd) > dplyr::lag(abs(tbc.sd)),
@@ -3707,8 +3758,81 @@ df[is.na(diff_prev), diff_prev := 0]
            val_excl := "Exclude-Max-diff"]
       }
       
+      ######## BELOW IS MODIFIED BLOCK ######
+      ## CP MODIFY
+      # add differences for convenience
+      # df[, diff_prev := (v-dplyr::lag(v))]
+      # df[, diff_next := (dplyr::lead(v)-v)]
+      # 
+      # df[, diff_prev := ctbc.sd - dplyr::lag(ctbc.sd)]
+      # df[is.na(diff_prev), diff_prev := 0]
+      # df[is.na(diff_next), diff_next := 0]
+      # df[d_agedays == 0, diff_prev :=  NA_real_]
+      # df[is.na(dplyr::lag(ctbc.sd)), diff_prev := NA_real_]
+      # df[, mindiff_prev := zoo::na.locf(mindiff_prev, na.rm = FALSE)]
+      # df[, maxdiff_prev := zoo::na.locf(maxdiff_prev, na.rm = FALSE)]
+      # eps <- 1e-6
+      # df[diff_prev < (mindiff_prev - eps) & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
+      # df[diff_prev > (maxdiff_prev + eps) & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
+       
+      ## CP MODIFY
+  #     if (nrow(df) > 2){
+  #       # CP Down
+  #
+  #       # 17P/R: identify pairs and calculate exclusions
+  #       df[, pair :=
+  #            (v-dplyr::lag(v)) < mindiff_prev |
+  #            (dplyr::lead(v)-v) < mindiff |
+  #            (v-dplyr::lag(v)) > maxdiff_prev |
+  #            (dplyr::lead(v)-v) > maxdiff
+  #       ]
+  #
+  #       df[is.na(pair), pair := FALSE]
+  #
+  #       df[pair & abs(dewma.before) > dplyr::lag(abs(dewma.after)),
+  #          bef.g.aftm1 := TRUE]
+  #       df[pair & abs(dewma.after) > dplyr::lead(abs(dewma.before)),
+  #          aft.g.aftm1 := TRUE]
+  #
+        
+  #       # Q ### CP MOD
+  #       df[, val_excl := exclude]
+  #       df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
+  #       df[diff_next < mindiff & aft.g.aftm1, val_excl := "Exclude-Min-diff"]
+  #       df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
+  #       df[diff_next > maxdiff & aft.g.aftm1, val_excl := "Exclude-Max-diff"]
+  #       df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
+  #       df[, val_excl := exclude]
+  #
+  #       # Stata uses only the backward-looking difference (current - previous)
+  #       # and compares against the 3-SD WHO velocity limits for that age bin.
+  #
+  #       # apply lower and upper velocity thresholds
+  #       df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
+  #       df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
+  #
+  #
+        ### CP MOD UP
+
+      # } else { # only 2 values
+      #   # 17Q/R -- exclusions for pairs
+      #   df[, val_excl := exclude]
+      #   df[diff_prev < mindiff_prev & abs(tbc.sd) > dplyr::lag(abs(tbc.sd)),
+      #      val_excl := "Exclude-Min-diff"]
+      #   df[diff_next < mindiff & abs(tbc.sd) > dplyr::lead(abs(tbc.sd)),
+      #      val_excl := "Exclude-Min-diff"]
+      #   df[diff_prev > maxdiff_prev & abs(tbc.sd) > dplyr::lag(abs(tbc.sd)),
+      #      val_excl := "Exclude-Max-diff"]
+      #   df[diff_next > maxdiff &  abs(tbc.sd) > dplyr::lead(abs(tbc.sd)),
+      #      val_excl := "Exclude-Max-diff"]
+      # }
+      
+      ######## ABOVE IS MODIFIED BLOCK ######
+      
       # figure out if any of the exclusions hit
       count_exclude <- sum(df$val_excl != "Include")
+      
+
       if (count_exclude > 0){
         if (nrow(df) > 2){
           df[, absval := abs(dewma.all)]
@@ -3717,10 +3841,22 @@ df[is.na(diff_prev), diff_prev := 0]
         }
         
         # choose the highest abssum for exclusion
-        idx <- df$index[which.max(df[df$val_excl != "Include",
-                                     absval])]
+idx <- df$index[which.max(df[df$val_excl != "Include", ][["absval"]])]
+
         
-        exclude_all[ind_all == idx] <- df[index == idx, val_excl]
+        # exclude_all[ind_all == idx] <- df[index == idx, val_excl]\\
+        
+        if ("index" %in% names(df) && any(df$index == 822)) {
+  df_822 <- df[index == 822]
+  df_822[, loop_iter := if (exists("loop_iter", envir = .GlobalEnv)) {
+    get("loop_iter", envir = .GlobalEnv) + 1
+  } else { 1 }]
+  assign("loop_iter", df_822$loop_iter[1], envir = .GlobalEnv)
+
+  fwrite(df_822,
+         file = "../data/debug_index822_trace.csv",
+         append = TRUE)
+}
         
         #set up to continue on
         if (count_exclude > 1){
@@ -3736,10 +3872,13 @@ df[is.na(diff_prev), diff_prev := 0]
     }
     
     return(exclude_all)
-  })(copy(.SD)), by = .(subjid, param), .SDcols = colnames(data.df)]
+ # if (unique(exclude_all$subjid) == "444336") {
+  # fwrite(exclude_all, "../data/exclude_all_444336.csv")}
+    
+    })(copy(.SD)), by = .(subjid, param), .SDcols = colnames(data.df)]
   
   # 19: 1 or 2 measurements ----
-  
+  fwrite(data.df, "../data/lead_5_debug_NNNNN.csv")
   if (!quietly)
     cat(sprintf(
       "[%s] Exclude 1 or 2 measurements...\n",

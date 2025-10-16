@@ -2128,7 +2128,7 @@ cleanbatch_infants <- function(data.df,
                paste0(data.sub$subjid, "_", data.sub$param)[data.sub$sum_sde > 1]]
     data.sub[no_sde == TRUE, cf :=  (v.orig - shift(v.orig)) == 0, by = c("subjid", "param")]
     data.sub[is.na(cf), cf := FALSE]
-    # CP MODIFY
+    
     # for values with sdes, compare to all values from the prior day
     data.sub[no_sde == FALSE, cf := (function(df){
       ages <- unique(agedays)
@@ -2142,20 +2142,7 @@ cleanbatch_infants <- function(data.df,
         }
       }
     })(copy(.SD)), .SDcols = c('agedays', 'cf', 'v.orig'), by = .(subjid, param)]
-#     data.sub[no_sde == FALSE, cf := (function(df){
-#   ages <- sort(unique(df$agedays))
-#   if (length(ages) > 1){
-#     for (i in seq_along(ages)[-1]) {
-#       # all prior days, not just the last one
-#       all.prev.v <- df[agedays < ages[i], v.orig]
-#       if (length(all.prev.v))
-#         df[agedays == ages[i] & v.orig %in% all.prev.v, cf := TRUE]
-#     }
-#   } 
-#   df$cf
-# })(copy(.SD)), by = .(subjid, param)]
-
-    # CP MODIFY 
+    
     # merge in the carried forwards
     cf_idx <- data.sub$index[data.sub$cf]
     data.df[index %in% cf_idx, exclude := "Exclude-Carried-Forward"]
@@ -2167,18 +2154,43 @@ cleanbatch_infants <- function(data.df,
     
     ### CP NOTE - Check closely - potential overwrite of carried forwar
     
-    
+    ### CP DROP IN
     # find out if values are whole or half imperial
-    data.df[param == "WEIGHTKG",
-            wholehalfimp := (v.orig * 2.20462262)%%1 < 0.01]
-    data.df[param == "HEIGHTCM",
-            wholehalfimp := (v.orig * 1.27)%%1 < 0.01]
-    data.df[param == "HEIGHTCM",
-            wholehalfimp := (v.orig * 1.27 / 2)%%1 < 0.01]
-    data.df[param == "HEADCM",
-            wholehalfimp := (v.orig * 1.27)%%1 < 0.01]
-    data.df[param == "HEADCM",
-            wholehalfimp := (v.orig * 1.27 / 2)%%1 < 0.01]
+    # data.df[param == "WEIGHTKG",
+    #         wholehalfimp := (v.orig * 2.20462262)%%1 < 0.01]
+    # data.df[param == "HEIGHTCM",
+    #         wholehalfimp := (v.orig * 1.27)%%1 < 0.01]
+    # data.df[param == "HEIGHTCM",
+    #         wholehalfimp := (v.orig * 1.27 / 2)%%1 < 0.01]
+    # data.df[param == "HEADCM",
+    #         wholehalfimp := (v.orig * 1.27)%%1 < 0.01]
+    # data.df[param == "HEADCM",
+    #         wholehalfimp := (v.orig * 1.27 / 2)%%1 < 0.01]
+    # 
+   # determine if measurements are in whole or half imperial units
+
+# Weight: whole pounds (within 0.01 lb of integer)
+data.df[param == "WEIGHTKG",
+        wholehalfimp := abs((v.orig * 2.20462262) %% 1) < 0.01]
+
+# Height: whole or half inches (within 0.01 inch tolerance)
+data.df[param == "HEIGHTCM", ":="(
+  wholeinch = abs((v.orig / 2.54) %% 1) < 0.01,
+  halfinch  = abs((v.orig / 2.54) %% 0.5) < 0.01
+)]
+data.df[param == "HEIGHTCM",
+        wholehalfimp := wholeinch | halfinch]
+
+# Head circumference: whole or half inches
+data.df[param == "HEADCM", ":="(
+  wholeinch = abs((v.orig / 2.54) %% 1) < 0.01,
+  halfinch  = abs((v.orig / 2.54) %% 0.5) < 0.01
+)]
+data.df[param == "HEADCM",
+        wholehalfimp := wholeinch | halfinch]
+    
+      ### CP UP
+    
     # find string carried forward length
     data.df[, seq_win := sequence(rle(as.character(exclude))$lengths),
             by = c("subjid", "param")]
@@ -2197,10 +2209,15 @@ cleanbatch_infants <- function(data.df,
       data.df[which(seq_win == 0)+1, "cs"]
     data.df[is.na(seq_win), cs := NA]
     
+    ## CP MOD DOWN
+    
     # find th diff between initial and cf
     data.df[!is.na(seq_win), absdiff :=
-              abs(sd.orig_uncorr - sd.orig_uncorr[1]),
+              # abs(sd.orig_uncorr - sd.orig_uncorr[1]),
+            abs(sd.orig_uncorr - shift(sd.orig_uncorr, 1, type = "lag")),
             by = c("subjid", "param", "cs")]
+    
+    ### CP MOD UP
     
     # handle CFs by case
     data.df[!is.na(seq_win), exclude := (function(df){
@@ -2213,6 +2230,7 @@ cleanbatch_infants <- function(data.df,
         df[seq_win != 0 & absdiff < .1 & wholehalfimp,
            exclude := "Exclude-1-CF-deltaZ-<0.1-wholehalfimp"]
       } else if (max(seq_win) > 1){
+        
         df[seq_win != 0 & agedays/365.25 > 16 & sex == 1 & absdiff < 0.05,
            exclude := "Exclude-Teen-2-plus-CF-deltaZ-<0.05"]
         df[seq_win != 0 & agedays/365.25 > 17 & sex == 0 & absdiff < 0.05,
@@ -2224,7 +2242,18 @@ cleanbatch_infants <- function(data.df,
         df[seq_win != 0 & agedays/365.25 > 17 & sex == 0 & absdiff < .1 &
              wholehalfimp,
            exclude := "Exclude-Teen-2-plus-CF-deltaZ-<0.1-wholehalfimp"]
+        ### CP ADD 
+        df[seq_win != 0 & absdiff < 0.05,
+           exclude := "Exclude-1-CF-deltaZ-<0.05"]
+        
+        # use short circuiting to have the lower end covered (>= 0.05)
+        df[seq_win != 0 & absdiff < .1 & wholehalfimp,
+           exclude := "Exclude-1-CF-deltaZ-<0.1-wholehalfimp"]
+        ### CP ADD UP
       }
+      
+      
+      
       
       return(df$exclude)
     })(copy(.SD)),
@@ -2495,20 +2524,7 @@ cleanbatch_infants <- function(data.df,
           c.dewma.all = ctbc.sd - c.ewma.all
         )]
         
-        # CP ADD
-        # ---- FIX: Stata-style EWMA 2 middle detection ----
-# Identify 3-point sequences where the middle point deviates most from EWMA
-# df[, is_mid3 := FALSE]
-# if (nrow(df) > 2) {
-#   df[, is_mid3 := abs(dewma.before) > shift(abs(dewma.before)) &
-#                      abs(dewma.before) > shift(abs(dewma.before), type = "lead"), 
-#      by = .(subjid, param)]
-# }
-# 
-# df[is_mid3 == TRUE & exclude == "Include",
-#    exclude := "Exclude-EWMA-2-Middle"]
-# ---- END FIX ----
-# CP ADD
+      
         
         # calculate potential exclusions
         df[valid_set, pot_excl :=
@@ -2991,7 +3007,26 @@ cleanbatch_infants <- function(data.df,
                     ((tbc_diff_next < -1 & tbc_diff_plus_next < -1 & tbc_diff_minus_next < -1) | is.na(tbc_diff_next)) &
                     ((tbc_diff_prior < -1 & tbc_diff_plus_prior < -1 & tbc_diff_minus_prior < -1) | is.na(tbc_diff_prior))
            ]
-           
+           if (unique(df_sub$subjid) == "16210" & unique(df_sub$param == "HEIGHTCM")) {
+  fwrite(df_sub, "../data/ewma2_debug_NNNNN.csv")
+           }  
+      # --- Write EWMA2 diagnostics for all subjects/parameters ---
+out_path <- "../data/ewma2_diagnostics_all.csv"
+
+# append results for all rows processed in this step
+df_sub %>%
+  dplyr::select(
+    id, subjid, param, agedays,
+    dewma.before, dewma.after,
+    tbc_diff_next, tbc_diff_plus_next, tbc_diff_minus_next,
+    tbc_diff_prior, tbc_diff_plus_prior, tbc_diff_minus_prior,
+    addcrithigh, addcritlow
+  ) %>%
+  data.table::fwrite(
+    file = out_path,
+    append = file.exists(out_path)
+  )
+# ------------------------------------------------------------
            #15G: find all the values for the DOP
            # find the comparison -- making sure to keep only valid rows
            compare_df <- data.df[subjid == df_sub$subjid[1] &
@@ -3349,15 +3384,15 @@ cleanbatch_infants <- function(data.df,
   ### CP ADD SECTION ###
   # ---- FIX: enforce Stata-style WHO binning ----
   # Convert ages to WHO monthly bins using floor() to match Stata
-  who.ht.vel[, whoagegrp_ht := as.integer(whoagegrp_ht)]
-  setkey(who.ht.vel, sex, whoagegrp_ht)
+  # who.ht.vel[, whoagegrp_ht := as.integer(whoagegrp_ht)]
+  # setkey(who.ht.vel, sex, whoagegrp_ht)
   
   # When merging into data.df later, derive the same floor-binned variable
-  data.df[, whoagegrp_ht := floor(agedays / 30.4375)]
-  setkey(data.df, sex, whoagegrp_ht)
+  # data.df[, whoagegrp_ht := floor(agedays / 30.4375)]
+  # setkey(data.df, sex, whoagegrp_ht)
   
   # Merge using roll=TRUE so values carry forward correctly
-  data.df <- who.ht.vel[data.df, roll = TRUE]
+  # data.df <- who.ht.vel[data.df, roll = TRUE]
   # ---- END FIX ----
   ### CP ADD SECTION ###
   
@@ -3442,7 +3477,7 @@ cleanbatch_infants <- function(data.df,
         # 17D
         # generate the who age group variable
         # CP change to floor from round
-        df[, whoagegrp.ht := floor(agedays/30.4375)]
+        df[, whoagegrp.ht := round(agedays/30.4375)]
         # CP change to floor from round
         df[whoagegrp.ht > 24 | dplyr::lead(whoagegrp.ht) > 24,
            whoagegrp.ht := NA]
@@ -3487,9 +3522,9 @@ cleanbatch_infants <- function(data.df,
         
         # CP ADD IN OR EQUAL TO FROM < or > 
         # 17G
-        df[d_agedays <= whoinc.age.ht*30.4375, who_mindiff_ht :=
+        df[d_agedays < whoinc.age.ht*30.4375, who_mindiff_ht :=
              who_mindiff_ht * d_agedays/(whoinc.age.ht*30.4375)]
-        df[d_agedays >= whoinc.age.ht*30.4375, who_maxdiff_ht :=
+        df[d_agedays > whoinc.age.ht*30.4375, who_maxdiff_ht :=
              who_maxdiff_ht * d_agedays/(whoinc.age.ht*30.4375)]
          # CP ADD IN OR EQUAL TO FROM < or > 
         df[d_agedays < 9*30.4375, who_mindiff_ht := who_mindiff_ht*.5-3]
@@ -3596,32 +3631,33 @@ cleanbatch_infants <- function(data.df,
       exp_vals[maxdiff_e > 365.25] <- -2.5
       exp_vals[maxdiff_e > 730.5] <- -3.5
       df[, exp_vals := exp_vals]
-      
+          if (unique(df$subjid) == "444336" & unique(df$param == "HEIGHTCM")) {
+  fwrite(df, "../data/mindiff_debug_NNNNN.csv")
+           }
+
       # calculate ewma
       df[, (ewma.fields) := ewma(agedays, tbc.sd, exp_vals, TRUE)]
-      
+      if (unique(df$subjid) == "444336" & unique(df$param == "HEIGHTCM")) {
+  fwrite(df, "../data/mindiff_debug_NNNNN_lead_2.csv")}
       # calculate dewma
       df[, `:=`(
         dewma.all = tbc.sd - ewma.all,
         dewma.before = tbc.sd - ewma.before,
         dewma.after = tbc.sd - ewma.after
       )]
+      if (unique(df$subjid) == "444336" & unique(df$param == "HEIGHTCM")) {
+  fwrite(df, "../data/mindiff_debug_NNNNN_lead_3.csv")}
       
-      ## CP MODIFY
+  
+      
+      
+      
+      
+      ####### 17P/R ####### ORIGINAL ########
       # add differences for convenience
-      # df[, diff_prev := (v-dplyr::lag(v))]
-      # df[, diff_next := (dplyr::lead(v)-v)]
+      df[, diff_prev := (v-dplyr::lag(v))]
+      df[, diff_next := (dplyr::lead(v)-v)]
       
-      df[, diff_prev := ctbc.sd - dplyr::lag(ctbc.sd)]
-df[is.na(diff_prev), diff_prev := 0]
-# df[d_agedays == 0, diff_prev := NA_real_]
-# df[is.na(dplyr::lag(ctbc.sd)), diff_prev := NA_real_]
-# df[, mindiff_prev := zoo::na.locf(mindiff_prev, na.rm = FALSE)]
-# df[, maxdiff_prev := zoo::na.locf(maxdiff_prev, na.rm = FALSE)]
-# eps <- 1e-6
-# df[diff_prev < (mindiff_prev - eps) & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
-# df[diff_prev > (maxdiff_prev + eps) & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
-      ## CP MODIFY
       if (nrow(df) > 2){
         # 17P/R: identify pairs and calculate exclusions
         df[, pair := (v-dplyr::lag(v)) < mindiff_prev |
@@ -3629,31 +3665,21 @@ df[is.na(diff_prev), diff_prev := 0]
              (v-dplyr::lag(v)) > maxdiff_prev | (dplyr::lead(v)-v) > maxdiff
         ]
         df[is.na(pair), pair := FALSE]
-        df[pair & abs(dewma.before) > dplyr::lag(abs(dewma.after)),
+        df[pair & abs(dewma.before) > dplyr::lead(abs(dewma.after)),
            bef.g.aftm1 := TRUE]
-        df[pair & abs(dewma.after) > dplyr::lead(abs(dewma.before)),
+        df[pair & abs(dewma.after) > dplyr::lag(abs(dewma.before)),
            aft.g.aftm1 := TRUE]
-        
-        # Q ### CP MOD
+
+        # Q
         df[, val_excl := exclude]
-        # df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
-        # df[diff_next < mindiff & aft.g.aftm1, val_excl := "Exclude-Min-diff"]
-        # df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
-        # df[diff_next > maxdiff & aft.g.aftm1, val_excl := "Exclude-Max-diff"]
-        # df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
-        df[, val_excl := exclude]
-        
-        # Stata uses only the backward-looking difference (current - previous)
-        # and compares against the 3-SD WHO velocity limits for that age bin.
-        
-        # apply lower and upper velocity thresholds
         df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
+        df[diff_next < mindiff & aft.g.aftm1, val_excl := "Exclude-Min-diff"]
         df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
-        
-        
-        ### CP MOD UP 
-        
-      } else { # only 2 values
+        df[diff_next > maxdiff & aft.g.aftm1, val_excl := "Exclude-Max-diff"]
+      }
+      if (unique(df$subjid) == "444336" & unique(df$param == "HEIGHTCM")) {
+  fwrite(df, "../data/mindiff_debug_NNNNN_lead_4.csv")}
+        else { # only 2 values
         # 17Q/R -- exclusions for pairs
         df[, val_excl := exclude]
         df[diff_prev < mindiff_prev & abs(tbc.sd) > dplyr::lag(abs(tbc.sd)),
@@ -3666,8 +3692,81 @@ df[is.na(diff_prev), diff_prev := 0]
            val_excl := "Exclude-Max-diff"]
       }
       
+      ######## BELOW IS MODIFIED BLOCK ######
+      ## CP MODIFY
+      # add differences for convenience
+      # df[, diff_prev := (v-dplyr::lag(v))]
+      # df[, diff_next := (dplyr::lead(v)-v)]
+      # 
+      # df[, diff_prev := ctbc.sd - dplyr::lag(ctbc.sd)]
+      # df[is.na(diff_prev), diff_prev := 0]
+      # df[is.na(diff_next), diff_next := 0]
+      # df[d_agedays == 0, diff_prev :=  NA_real_]
+      # df[is.na(dplyr::lag(ctbc.sd)), diff_prev := NA_real_]
+      # df[, mindiff_prev := zoo::na.locf(mindiff_prev, na.rm = FALSE)]
+      # df[, maxdiff_prev := zoo::na.locf(maxdiff_prev, na.rm = FALSE)]
+      # eps <- 1e-6
+      # df[diff_prev < (mindiff_prev - eps) & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
+      # df[diff_prev > (maxdiff_prev + eps) & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
+       
+      ## CP MODIFY
+  #     if (nrow(df) > 2){
+  #       # CP Down
+  #
+  #       # 17P/R: identify pairs and calculate exclusions
+  #       df[, pair :=
+  #            (v-dplyr::lag(v)) < mindiff_prev |
+  #            (dplyr::lead(v)-v) < mindiff |
+  #            (v-dplyr::lag(v)) > maxdiff_prev |
+  #            (dplyr::lead(v)-v) > maxdiff
+  #       ]
+  #
+  #       df[is.na(pair), pair := FALSE]
+  #
+  #       df[pair & abs(dewma.before) > dplyr::lag(abs(dewma.after)),
+  #          bef.g.aftm1 := TRUE]
+  #       df[pair & abs(dewma.after) > dplyr::lead(abs(dewma.before)),
+  #          aft.g.aftm1 := TRUE]
+  #
+        
+  #       # Q ### CP MOD
+  #       df[, val_excl := exclude]
+  #       df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
+  #       df[diff_next < mindiff & aft.g.aftm1, val_excl := "Exclude-Min-diff"]
+  #       df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
+  #       df[diff_next > maxdiff & aft.g.aftm1, val_excl := "Exclude-Max-diff"]
+  #       df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
+  #       df[, val_excl := exclude]
+  #
+  #       # Stata uses only the backward-looking difference (current - previous)
+  #       # and compares against the 3-SD WHO velocity limits for that age bin.
+  #
+  #       # apply lower and upper velocity thresholds
+  #       df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
+  #       df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
+  #
+  #
+        ### CP MOD UP
+
+      # } else { # only 2 values
+      #   # 17Q/R -- exclusions for pairs
+      #   df[, val_excl := exclude]
+      #   df[diff_prev < mindiff_prev & abs(tbc.sd) > dplyr::lag(abs(tbc.sd)),
+      #      val_excl := "Exclude-Min-diff"]
+      #   df[diff_next < mindiff & abs(tbc.sd) > dplyr::lead(abs(tbc.sd)),
+      #      val_excl := "Exclude-Min-diff"]
+      #   df[diff_prev > maxdiff_prev & abs(tbc.sd) > dplyr::lag(abs(tbc.sd)),
+      #      val_excl := "Exclude-Max-diff"]
+      #   df[diff_next > maxdiff &  abs(tbc.sd) > dplyr::lead(abs(tbc.sd)),
+      #      val_excl := "Exclude-Max-diff"]
+      # }
+      
+      ######## ABOVE IS MODIFIED BLOCK ######
+      
       # figure out if any of the exclusions hit
       count_exclude <- sum(df$val_excl != "Include")
+      
+
       if (count_exclude > 0){
         if (nrow(df) > 2){
           df[, absval := abs(dewma.all)]
@@ -3676,10 +3775,22 @@ df[is.na(diff_prev), diff_prev := 0]
         }
         
         # choose the highest abssum for exclusion
-        idx <- df$index[which.max(df[df$val_excl != "Include",
-                                     absval])]
+idx <- df$index[which.max(df[df$val_excl != "Include", ][["absval"]])]
+
         
-        exclude_all[ind_all == idx] <- df[index == idx, val_excl]
+        # exclude_all[ind_all == idx] <- df[index == idx, val_excl]\\
+        
+        if ("index" %in% names(df) && any(df$index == 822)) {
+  df_822 <- df[index == 822]
+  df_822[, loop_iter := if (exists("loop_iter", envir = .GlobalEnv)) {
+    get("loop_iter", envir = .GlobalEnv) + 1
+  } else { 1 }]
+  assign("loop_iter", df_822$loop_iter[1], envir = .GlobalEnv)
+
+  fwrite(df_822,
+         file = "../data/debug_index822_trace.csv",
+         append = TRUE)
+}
         
         #set up to continue on
         if (count_exclude > 1){
@@ -3695,10 +3806,13 @@ df[is.na(diff_prev), diff_prev := 0]
     }
     
     return(exclude_all)
-  })(copy(.SD)), by = .(subjid, param), .SDcols = colnames(data.df)]
+ # if (unique(exclude_all$subjid) == "444336") {
+  # fwrite(exclude_all, "../data/exclude_all_444336.csv")}
+    
+    })(copy(.SD)), by = .(subjid, param), .SDcols = colnames(data.df)]
   
   # 19: 1 or 2 measurements ----
-  
+  fwrite(data.df, "../data/lead_5_debug_NNNNN.csv")
   if (!quietly)
     cat(sprintf(
       "[%s] Exclude 1 or 2 measurements...\n",
