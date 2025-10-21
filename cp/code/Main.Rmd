@@ -233,20 +233,20 @@ stata_gc_in <- data.table::fread("../data/2025-10-01-gc-Stata-chopd1p-results.cs
 conflicted_pats <- read.csv("../data/ 2025-10-13 Primary_Discrepant_Pat_Hxs.csv")
 conflicted_pats <- conflicted_pats$subjid
 data.work <- stata_gc_in %>% 
-#   select(
-#   id,
-#   subjid,
-#   param,
-#   sex,
-#   agedays,
-#   param,
-#   measurement,
-#   exc_wt,
-#   exc_ht,
-#   potcorr,
-#   tbcwtz,
-#   ctbcwtz
-# ) %>% 
+  select(
+  id,
+  subjid,
+  param,
+  sex,
+  agedays,
+  param,
+  measurement,
+  exc_wt,
+  exc_ht,
+  potcorr,
+  tbcwtz,
+  ctbcwtz
+) %>%
   mutate(param = case_when(
   param == "Weight" ~ "WEIGHTKG",
   param == "Height" ~ "HEIGHTCM",
@@ -259,8 +259,8 @@ data.work <- data.work %>% mutate(gcr_result_carrie = case_when(
   TRUE ~ "ERR"
 )) %>% select(-c(exc_wt, exc_ht)) 
 
-# data.work <- data.work  %>% filter(subjid %in% carried_forward_folks$subjid.x)
-# data.work <- data.work  %>% filter(subjid %in% conflicted_pats)
+# data.work <- data.work  %>% filter(subjid %in% mindiffs$subjid.x)
+data.work <- data.work  %>% filter(subjid %in% problematic_pats$subjid.x)
 data.work <- as.data.table(data.work)
 setkey(data.work, subjid, param, agedays)
 cleaned_data_updated <- cleangrowth(
@@ -274,7 +274,7 @@ cleaned_data_updated <- cleangrowth(
   sd.recenter = "nhanes"
 )
 
-write.csv(cleaned_data_updated, paste("../data/Checkpoint_Updated_R_", Sys.Date(), ".csv", sep = ""))
+# write.csv(cleaned_data_updated, paste("../data/Checkpoint_Updated_R_", Sys.Date(), ".csv", sep = ""))
 
 Modified_Characteristics_Table <- merge(data.work, cleaned_data_updated %>% select(id, exclude), by = "id")
 
@@ -287,7 +287,7 @@ Modified_Characteristics_Table <- Modified_Characteristics_Table %>% select(gcr_
                                 results_pasted = paste(gcr_result_carrie, gcr_result_cp_updated, sep = " ; "))
 
 Modified_Characteristics_Table <- as.data.frame(table(Modified_Characteristics_Table$results_pasted)) %>% arrange(desc(Freq))
-write.csv(Modified_Characteristics_Table, paste("../deliverables/Modified_Characteristics_Table", Sys.Date(), ".csv", sep = ""))
+# write.csv(Modified_Characteristics_Table, paste("../deliverables/Modified_Characteristics_Table", Sys.Date(), ".csv", sep = ""))
 Modified_Characteristics_Table
 
 
@@ -295,7 +295,7 @@ Modified_Characteristics_Table
 Baseline_Map <- read.csv("../data/baseline_comparison_of_stata_vs_R_2025-10-07.csv") %>% select(id, gcr_result_carrie, gcr_result_cp, subjid)
 # Updated_Map <- read.csv("../data/Checkpoint_Updated_R_2025-10-14.csv") %>% select(id, gcr_result_cp_updated = exclude)
 
-# cleaned_data_updated <- read.csv("../data/Checkpoint_Updated_R_2025-10-14_evening.csv")
+# cleaned_data_updated <- read.csv("../data/Checkpoint_Updated_R_2025-10-21.csv")
 
 Updated_Map <- cleaned_data_updated %>% select(id, subjid, gcr_result_cp_updated = exclude)
 Merged_Maps <- merge(Baseline_Map, Updated_Map, by = "id")
@@ -357,17 +357,6 @@ Merged_Maps <- Merged_Maps %>%
     gcr_result_cp_updated = map_to_stata(gcr_result_cp_updated)
   )
 
-library(networkD3)
-library(dplyr)
-
-# Merged_Maps <- Merged_Maps %>% filter(gcr_result_carrie!=gcr_result_cp)
-
-library(gt)
-library(gt)
-library(dplyr)
-
-library(gt)
-library(dplyr)
 
 # summarise the data
 tbl <- Merged_Maps %>%
@@ -413,18 +402,76 @@ gt(tbl) %>%
     fn = function(x) rep("maroon", length(x))
   )
 
-# View(cleane)
-
-Merged_Maps_sub <- Merged_Maps %>% filter(gcr_result_carrie == "Min diff" & gcr_result_cp == "Min diff" &	gcr_result_cp_updated == "Include")
-# View(Merged_Maps_sub)
-moddf <- merge(data.work, cleaned_data_updated %>% select(-subjid), by = "id") %>% filter()
-
-# View(moddf %>% filter(subjid %in% c(Merged_Maps_sub$subjid.x)) %>% select(subjid, agedays.x, param.x, sd.orig_uncorr, swtz, shtz,  measurement, v, gcr_result_carrie, exclude))
-
-# moddf$c.d
-
-
+# problematic_pats <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie != gcr_result_cp_updated))
+# write.csv(problematic_pats, paste("../data/problematic_pats_", Sys.Date(), ".csv", sep = ""))
 ```
+
+```{R}
+### Gonna isolate a few groups here to test:
+### Include-Min diff-Min diff
+maxdiffs <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie == "Include" &gcr_result_cp == "Max diff" & gcr_result_cp_updated == "Max diff")) 
+maxdiffs_folks <- maxdiffs %>% select(subjid.x) %>% distinct()
+
+
+View(cleaned_data_updated %>% filter(subjid == "98863"))
+sView(cleaned_data_updated %>% filter(exclude == "Exclude-Max-diff"))
+```
+result <- cleaned_data_updated %>%
+  group_by(subjid, param) %>%
+  arrange(agedays, .by_group = TRUE) %>%
+  mutate(
+    row_id = row_number(),
+    flag_exclude = exclude == "Exclude-Max-diff"
+  ) %>%
+  mutate(
+    # Mark neighbors of excluded rows
+    neighbor = lag(flag_exclude, default = FALSE) | 
+               flag_exclude | 
+               lead(flag_exclude, default = FALSE)
+  ) %>%
+  filter(neighbor) %>%
+  ungroup()
+
+
+maxdiffs <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie == "Include" &gcr_result_cp == "Absolute BIV" & gcr_result_cp_updated == "Absolute BIV")) 
+maxdiffs_folks <- maxdiffs %>% select(subjid.x) %>% distinct()
+result <- cleaned_data_updated %>%
+  group_by(subjid, param) %>%
+  arrange(agedays, .by_group = TRUE) %>%
+  mutate(
+    row_id = row_number(),
+    flag_exclude = exclude == "Absolute BIV"
+  ) %>%
+  mutate(
+    # Mark neighbors of excluded rows
+    neighbor = lag(flag_exclude, default = FALSE) | 
+               flag_exclude | 
+               lead(flag_exclude, default = FALSE)
+  ) %>%
+  filter(neighbor) %>%
+  ungroup()
+
+result
+
+View(cleaned_data_updated %>% filter(subjid == "35211"))
+View(cleaned_data_updated %>% filter(exclude == "Exclude-Max-diff"))
+```
+
+
+```{r}
+View_selected_cases <- merge(data.work, cleaned_data_updated %>% select(id, exclude), by = "id")
+
+# Modified_Characteristics_Table
+View_selected_cases <- View_selected_cases %>% mutate(gcr_result_cp_updated = gsub("^Exclude", "", gcr_result_cp_updated),
+                                gcr_result_cp_updated = gsub("-", " ", gcr_result_cp_updated),
+                                gcr_result_cp_updated = str_trim(gcr_result_cp_updated),
+                                gcr_result_carrie = tolower(gcr_result_carrie),
+                                gcr_result_cp_updated = tolower(gcr_result_cp_updated),
+                                results_pasted = paste(gcr_result_carrie, gcr_result_cp_updated, sep = " ; "))
+View_selected_cases %>% relocate(exclude)
+View(View_selected_cases$exclude)
+```
+
 
 ```{r}
 # Merged_Maps
@@ -540,6 +587,13 @@ View(Modified_Characteristics_Table)
 
 ```
 
+
+```{r}
+temp_stata_ewma_middle <- stata_gc_in %>% select(subjid, agedays, id, tbchtz, measurement, param,) %>% filter(param == "HEIGHTCM" & subjid == "16210") %>% arrange(agedays)
+
+tempdf <- calc_and_recenter_z_scores(temp_stata_ewma_middle, "p_plus", ref.data.path)
+
+```
 
 
 

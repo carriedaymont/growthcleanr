@@ -1,0 +1,65 @@
+"","Var1","Freq"
+"1","include ; include",119512
+"2","carried forward ; carried forward",1347
+"3","1 cf deltaz <0.05 ; 1 cf deltaz <0.05",830
+"4","1 cf imperial deltaz <0.1 ; 1 cf deltaz <0.1 wholehalfimp",157
+"5","ewma2 middle ; include",143
+"6","evil twins ; evil twins",82
+"7","min diff ; include",68
+"8","sde-ewma ; sde one day",62
+"9","include ; sde one day",59
+"10","sde-ewma ; include",54
+"11","ewma2 first ; ewma2 first",42
+"12","standardized biv ; standardized biv",26
+"13","include ; absolute biv",24
+"14","sde-ewma ; sde ewma",24
+"15","sde-extreme ; sde ewma",19
+"16","sde-extreme ; sde one day",17
+"17","ewma2 first ext ; include",15
+"18","include ; ewma2 first",14
+"19","sde-identical ; sde identical",13
+"20","ewma2 birth ht hc ; ewma2 birth ht hc",12
+"21","sde-extreme ; include",12
+"22","sde-all-exclude ; sde all exclude",11
+"23","include ; sde identical",10
+"24","sde-identical ; include",10
+"25","ewma2 first ; include",9
+"26","ewma2 first ext ; ewma2 first ext",9
+"27","1 cf imperial deltaz <0.1 ; carried forward",8
+"28","sde-all-exclude ; sde ewma",8
+"29","include ; error load",7
+"30","sde-all-exclude ; include",7
+"31","absolute biv ; absolute biv",6
+"32","include ; evil twins",6
+"33","sde-extreme ; sde all extreme",6
+"34","include ; sde all extreme",5
+"35","sde-ewma ; sde all extreme",5
+"36","1 meas ; include",4
+"37","ewma1 high sum ; include",4
+"38","include ; ewma2 birth ht hc",4
+"39","sde-one-day ; sde one day",4
+"40","1 cf deltaz <0.05 ; carried forward",3
+"41","ewma2 last ; include",3
+"42","sde-one-day ; include",3
+"43","1 cf imperial deltaz <0.1 ; 1 cf deltaz <0.05",2
+"44","2 meas <1 year ; 2 meas <1 year",2
+"45","2 meas >1 year ; 2 meas >1 year",2
+"46","2 meas >1 year ; include",2
+"47","ewma2 birth wt ; include",2
+"48","ewma2 middle ; ewma2 first",2
+"49","include ; ewma2 birth ht hc ext",2
+"50","include ; ewma2 first ext",2
+"51","include ; sde ewma",2
+"52","2 meas <1 year ; include",1
+"53","absolute biv ; standardized biv",1
+"54","carried forward ; 1 cf deltaz <0.05",1
+"55","ewma1 high sum ; evil twins",1
+"56","ewma1 high sum ; sde ewma",1
+"57","ewma2 birth ht hc ; include",1
+"58","ewma2 birth ht hc ext ; ewma2 birth ht hc ext",1
+"59","ewma2 birth ht hc ext ; include",1
+"60","ewma2 middle ; ewma2 first ext",1
+"61","max diff ; include",1
+"62","sde-extreme ; carried forward",1
+"63","sde-extreme ; evil twins",1
+"64","standardized biv ; sde ewma",1
