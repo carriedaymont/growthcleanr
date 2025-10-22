@@ -10,6 +10,7 @@ library(data.table)
 library(dplyr)
 library(data.table)
 library(stringr)
+library(gt)
 ```
 
 ```{r setup, include = FALSE}
@@ -260,7 +261,7 @@ data.work <- data.work %>% mutate(gcr_result_carrie = case_when(
 )) %>% select(-c(exc_wt, exc_ht)) 
 
 # data.work <- data.work  %>% filter(subjid %in% mindiffs$subjid.x)
-data.work <- data.work  %>% filter(subjid %in% problematic_pats$subjid.x)
+data.work <- data.work  %>% filter(subjid %in% sde_one_days$subjid.x)
 data.work <- as.data.table(data.work)
 setkey(data.work, subjid, param, agedays)
 cleaned_data_updated <- cleangrowth(
@@ -293,9 +294,7 @@ Modified_Characteristics_Table
 
 
 Baseline_Map <- read.csv("../data/baseline_comparison_of_stata_vs_R_2025-10-07.csv") %>% select(id, gcr_result_carrie, gcr_result_cp, subjid)
-# Updated_Map <- read.csv("../data/Checkpoint_Updated_R_2025-10-14.csv") %>% select(id, gcr_result_cp_updated = exclude)
-
-# cleaned_data_updated <- read.csv("../data/Checkpoint_Updated_R_2025-10-21.csv")
+# cleaned_data_updated <- read.csv("../data/Checkpoint_Updated_R_2025-10-22.csv")
 
 Updated_Map <- cleaned_data_updated %>% select(id, subjid, gcr_result_cp_updated = exclude)
 Merged_Maps <- merge(Baseline_Map, Updated_Map, by = "id")
@@ -402,9 +401,34 @@ gt(tbl) %>%
     fn = function(x) rep("maroon", length(x))
   )
 
+
 # problematic_pats <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie != gcr_result_cp_updated))
 # write.csv(problematic_pats, paste("../data/problematic_pats_", Sys.Date(), ".csv", sep = ""))
 ```
+
+```{r}
+View(cleaned_data_updated)
+```
+
+```{r}
+# We want to focus on the next most problematic item, which is SDE-EWMA -> SDE-One-Day
+sde_one_days <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie == "SDE-EWMA" &gcr_result_cp == "SDE-One-Day" & gcr_result_cp_updated == "SDE-One-Day")) 
+sde_one_days <- sde_one_days %>% select(subjid.x, id) %>% distinct()
+
+View(cleaned_data_updated %>% filter(subjid == "8008"))
+View(clean)
+```
+
+```{r}
+# We want to focus on the next most problematic item, which is SDE-EWMA -> SDE-One-Day
+sde_one_days <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie == "Min diff" &gcr_result_cp == "Min diff" & gcr_result_cp_updated == "Include")) 
+sde_one_days <- sde_one_days %>% select(subjid.x, id) %>% distinct()
+
+View(cleaned_data_updated %>% filter(subjid == "76234"))
+View(clean)
+```
+
+#### Code Archive 
 
 ```{R}
 ### Gonna isolate a few groups here to test:
@@ -461,7 +485,7 @@ View(cleaned_data_updated %>% filter(exclude == "Exclude-Max-diff"))
 ```{r}
 View_selected_cases <- merge(data.work, cleaned_data_updated %>% select(id, exclude), by = "id")
 
-# Modified_Characteristics_Table
+```{r}
 View_selected_cases <- View_selected_cases %>% mutate(gcr_result_cp_updated = gsub("^Exclude", "", gcr_result_cp_updated),
                                 gcr_result_cp_updated = gsub("-", " ", gcr_result_cp_updated),
                                 gcr_result_cp_updated = str_trim(gcr_result_cp_updated),

@@ -2827,7 +2827,7 @@ library(purrr)
         
         # calculate the time difference for all values, as well as exponential
         delta <- as_matrix_delta(subj_df$agedays)
-        delta <- ifelse(delta == 0, 0, (delta) ^ subj_df$exp_vals)
+        delta <- ifelse(delta == 0, 0, (delta + 5) ^ subj_df$exp_vals)
         
         rem_ids_extreme <- c()
         rem_ids <- c()
@@ -2836,7 +2836,7 @@ library(purrr)
           s_df <- copy(subj_df[subj_df$agedays == dd,])
           
           similar <- if (subj_df$param[1] == "WEIGHTKG"){
-            max(s_df$v)/min(s_df$v) <= 1.03 & max(s_df$v) - min(s_df$v) <= 2.5
+            max(s_df$v)/min(s_df$v) < 1.03 & max(s_df$v) - min(s_df$v) < 2.5
           } else if (subj_df$param[1] == "HEIGHTCM"){
             (max(s_df$v) - min(s_df$v) <  2.541 & min(s_df$v) < 127) |
               (max(s_df$v) - min(s_df$v) <  5.081 & min(s_df$v) >= 127)
@@ -3538,6 +3538,8 @@ library(purrr)
     
     # save initial exclusions to keep track
     ind_all <- copy(df$index)
+    id_all <- copy(df$id)
+
     exclude_all <- copy(df$exclude)
     
     testing <- TRUE
@@ -3603,11 +3605,13 @@ library(purrr)
         df[d_agedays >= 107 & d_agedays < 153, whoinc.age.ht := 4]
         df[d_agedays >= 153 & d_agedays < 199, whoinc.age.ht := 6]
         
+        
+        # Chris updated this to >= from ==
         # update the edge intervals
         df[d_agedays < 20, whoinc.age.ht := 1]
-        df[d_agedays > 199, d_agedays := 200]
-        df[d_agedays == 200, whoinc.age.ht := 6]
-        
+        df[d_agedays == 200, d_agedays := 200]
+        df[d_agedays >= 200, whoinc.age.ht := 6]
+        # Chris updated this to >= from ==
         # 17F
         # merge with WHO
         # add the column name we want to grab
@@ -3644,14 +3648,18 @@ library(purrr)
         df[d_agedays < 9*30.4375, who_maxdiff_ht := who_maxdiff_ht*2+3]
         
         # 17H
+        ### WAS an error CP below where it said whomindiff for the second on einstead of maxdiff##
         # tanner is implicit
         # greater than 9 months, use tanner if available, otherwise who
         df[(d_agedays < 9*30.4375 | is.na(min.ht.vel)) &
              !is.na(who_mindiff_ht), mindiff := who_mindiff_ht]
         df[(d_agedays < 9*30.4375 | is.na(min.ht.vel)) &
-             !is.na(who_mindiff_ht), maxdiff := who_maxdiff_ht]
+             !is.na(who_maxdiff_ht), maxdiff := who_maxdiff_ht]
+        
+        ### CP change to -3 from 3
         # otherwise, fill in
-        df[is.na(mindiff), mindiff := 3]
+        df[is.na(mindiff), mindiff := -3]
+        ### CP change up to -3 from 3
         # for birth measurements, add allowance of 1.5cm
         df[agedays == 0, mindiff := mindiff - 1.5]
         df[agedays == 0, maxdiff := maxdiff + 1.5]
@@ -3765,12 +3773,13 @@ library(purrr)
         # 17P/R: identify pairs and calculate exclusions
         df[, pair := (v-dplyr::lag(v)) < mindiff_prev |
              (dplyr::lead(v)-v) < mindiff |
-             (v-dplyr::lag(v)) > maxdiff_prev | (dplyr::lead(v)-v) > maxdiff
+             (v-dplyr::lag(v)) > maxdiff_prev | 
+             (dplyr::lead(v)-v) > maxdiff
         ]
         df[is.na(pair), pair := FALSE]
-        df[pair & abs(dewma.before) > dplyr::lag(abs(dewma.after)),
+        df[(pair & dplyr::lag(pair)) & abs(dewma.before) > dplyr::lag(abs(dewma.after)),
            bef.g.aftm1 := TRUE]
-        df[pair & abs(dewma.after) > dplyr::lead(abs(dewma.before)),
+        df[(pair & dplyr::lead(pair)) & abs(dewma.after) > dplyr::lead(abs(dewma.before)),
            aft.g.aftm1 := TRUE]
 
         # Q
@@ -3779,6 +3788,10 @@ library(purrr)
         df[diff_next < mindiff & aft.g.aftm1, val_excl := "Exclude-Min-diff"]
         df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
         df[diff_next > maxdiff & aft.g.aftm1, val_excl := "Exclude-Max-diff"]
+        df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl_code := "1"]
+        df[diff_next < mindiff & aft.g.aftm1, val_excl_code := "2"]
+        df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl_code := "3"]
+        df[diff_next > maxdiff & aft.g.aftm1, val_excl_code := "4"]
       }else { # only 2 values
         # 17Q/R -- exclusions for pairs
         df[, val_excl := exclude]
@@ -3790,14 +3803,17 @@ library(purrr)
            val_excl := "Exclude-Max-diff"]
         df[diff_next > maxdiff &  abs(tbc.sd) > dplyr::lead(abs(tbc.sd)),
            val_excl := "Exclude-Max-diff"]
+         df[diff_prev < mindiff_prev & abs(tbc.sd) > dplyr::lag(abs(tbc.sd)),
+           val_excl_code := "5"]
+        df[diff_next < mindiff & abs(tbc.sd) > dplyr::lead(abs(tbc.sd)),
+           val_excl_code := "6"]
+        df[diff_prev > maxdiff_prev & abs(tbc.sd) > dplyr::lag(abs(tbc.sd)),
+           val_excl_code := "7"]
+        df[diff_next > maxdiff &  abs(tbc.sd) > dplyr::lead(abs(tbc.sd)),
+           val_excl_code := "8"]
         } 
       
-      
-      if (unique(df$subjid) == "98863" && unique(df$param) == "HEIGHTCM") {
-    df[, loop_iter := iter_count]
-    out_path <- sprintf("../data/mindiff_debug_%03d_lead_4.csv", iter_count)
-    fwrite(df, out_path)
-  }
+  
       
         
       # figure out if any of the exclusions hit
@@ -3810,11 +3826,35 @@ library(purrr)
         }
 
         # choose the highest abssum for exclusion
-        idx <- df$index[which.max(df[df$val_excl != "Include",
-                                     absval])]
+        # idx <- df$index[which.max(df[df$val_excl != "Include",
+        #                              absval])]
+        idx <- df[val_excl != "Include", .SD[which.max(absval), index]]
+
 
         exclude_all[ind_all == idx] <- df[index == idx, val_excl]
+        if (unique(df$subjid) == "76234") {
+  print(paste("idx:", idx))
+  print(paste("index in df:", paste(df$index, collapse=", ")))
+  print(paste("ind_all:", paste(ind_all, collapse=", ")))
+  print(paste("id_all", id_all))
+}
+    
+        if (unique(df$subjid) == "76234") {
+  print("AAAA")
 
+  # Add loop ID column (optional, helps track iterations)
+  df[, loop_iter := iter_count]
+
+  # Define output path
+  out_path <- "../data/mindiff_subjid_76234_id_20275.csv"
+
+  # Append if file exists, otherwise write with header
+  if (!file.exists(out_path)) {
+    write.table(df, out_path, sep = ",", row.names = FALSE, col.names = FALSE, append = TRUE)
+  } else {
+    write.table(df, out_path, sep = ",", row.names = FALSE, col.names = TRUE)
+  }
+}
         #set up to continue on
         if (count_exclude > 1){
           testing <- TRUE
@@ -3827,6 +3867,37 @@ library(purrr)
         testing <- FALSE
       }
     }
+      
+#       if (count_exclude > 0){
+#   if (nrow(df) > 2){
+#     # Use the appropriate DEWMA based on exclusion type
+#     df[, absval := NA_real_]
+#     df[val_excl == "Exclude-Min-diff" & diff_prev < mindiff_prev, 
+#        absval := abs(dewma.before)]
+#     df[val_excl == "Exclude-Min-diff" & diff_next < mindiff, 
+#        absval := abs(dewma.after)]
+#     df[val_excl == "Exclude-Max-diff" & diff_prev > maxdiff_prev, 
+#        absval := abs(dewma.before)]
+#     df[val_excl == "Exclude-Max-diff" & diff_next > maxdiff, 
+#        absval := abs(dewma.after)]
+#   } else {
+#     df[, absval := abs(tbc.sd)]
+#   }
+#   
+#   # Choose the highest absval for exclusion
+#   idx <- df$index[which.max(df[df$val_excl != "Include", absval])]
+#   exclude_all[ind_all == idx] <- df[index == idx, val_excl]
+#   
+#   # Set up to continue on
+#   if (count_exclude > 1){
+#     testing <- TRUE
+#     df <- df[index != idx, ]
+#   } else {
+#     testing <- FALSE
+#   }
+# } else {
+#   testing <- FALSE
+# }}
 
     return(exclude_all)
   })(copy(.SD)), by = .(subjid, param), .SDcols = colnames(data.df)]
