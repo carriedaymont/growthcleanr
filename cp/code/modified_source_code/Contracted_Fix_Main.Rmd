@@ -204,7 +204,8 @@ cleangrowth <- function(subjid,
   
   # CP ADD -
   if (!is.null(id)) data.all.ages[, id := id]
-  
+  if (is.null(id)) data.all.ages[, id := seq_len(.N)]
+
   # CP ADD UP
   
   # quality checks
@@ -2805,7 +2806,7 @@ library(purrr)
       step <- "Exclude-SDE-EWMA"
       # next, check for trivial differences for SDEs on the same day
       # this only works if there are non-sde days
-      
+       
       if (any(subj_df$extraneous)){
         # 13D: calculating ewmas
         
@@ -3181,11 +3182,11 @@ library(purrr)
                   , exclude := "Exclude-EWMA2-first"]
            
            # e
-           df_sub[first_meas & agedays != 0 & (dplyr::lead(agedays)-agedays) >= 365.25 &
+           df_sub[first_meas & (dplyr::lead(agedays)-agedays) >= 365.25 &
                     dewma.all > 3 & (c.dewma.all > 3 | is.na(c.dewma.all)) &
                     addcrithigh
                   , exclude := "Exclude-EWMA2-first-ext"]
-           df_sub[first_meas & agedays != 0 & (dplyr::lead(agedays)-agedays) >= 365.25 &
+           df_sub[first_meas & (dplyr::lead(agedays)-agedays) >= 365.25 &
                     dewma.all < -3 & (c.dewma.all < -3 | is.na(c.dewma.all)) &
                     addcritlow
                   , exclude := "Exclude-EWMA2-first-ext"]

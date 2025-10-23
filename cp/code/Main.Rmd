@@ -135,7 +135,7 @@ Modified_Characteristics_Table <- as.data.frame(table(Modified_Characteristics_T
 
 ```{r}
 Baseline_Map <- read.csv("../data/baseline_comparison_of_stata_vs_R_2025-10-07.csv") %>% select(id, gcr_result_carrie, gcr_result_cp)
-# Updated_Map <- read.csv("../data/Checkpoint_Updated_R_2025-10-14.csv") %>% select(id, gcr_result_cp_updated = exclude)
+Updated_Map <- read.csv("../data/Checkpoint_Updated_R_2025-10-22.csv") %>% select(id, gcr_result_cp_updated = exclude)
 Updated_Map <- cleaned_data_updated %>% select(id, gcr_result_cp_updated = exclude)
 Merged_Maps <- merge(Baseline_Map, Updated_Map, by = "id")
 
@@ -261,7 +261,7 @@ data.work <- data.work %>% mutate(gcr_result_carrie = case_when(
 )) %>% select(-c(exc_wt, exc_ht)) 
 
 # data.work <- data.work  %>% filter(subjid %in% mindiffs$subjid.x)
-data.work <- data.work  %>% filter(subjid %in% sde_one_days$subjid.x)
+data.work <- data.work  %>% filter(!subjid %in% rem_ids$subjid.x)
 data.work <- as.data.table(data.work)
 setkey(data.work, subjid, param, agedays)
 cleaned_data_updated <- cleangrowth(
@@ -290,7 +290,9 @@ Modified_Characteristics_Table <- Modified_Characteristics_Table %>% select(gcr_
 Modified_Characteristics_Table <- as.data.frame(table(Modified_Characteristics_Table$results_pasted)) %>% arrange(desc(Freq))
 # write.csv(Modified_Characteristics_Table, paste("../deliverables/Modified_Characteristics_Table", Sys.Date(), ".csv", sep = ""))
 Modified_Characteristics_Table
+```
 
+```{R}
 
 
 Baseline_Map <- read.csv("../data/baseline_comparison_of_stata_vs_R_2025-10-07.csv") %>% select(id, gcr_result_carrie, gcr_result_cp, subjid)
@@ -408,15 +410,29 @@ gt(tbl) %>%
 
 ```{r}
 View(cleaned_data_updated)
+
+ ewmas_of_int <- Merged_Maps %>% group_by(subjid.x) %>% filter((gcr_result_carrie == "EWMA2 first ext"  & gcr_result_cp == "Include" & gcr_result_cp_updated == "Include")) 
+ ewmas_of_int2 <- Merged_Maps %>% group_by(subjid.x) %>% filter((gcr_result_carrie == "Include"  & gcr_result_cp == "EWMA2 first" & gcr_result_cp_updated == "EWMA2 first"))
+ write.csv(bind_rows(ewmas_of_int, ewmas_of_int2) %>% select(subjid.x, id ), "../data/ewma_first_ext_and_first_issues.csv")
+ 
+ 
+
 ```
 
 ```{r}
 # We want to focus on the next most problematic item, which is SDE-EWMA -> SDE-One-Day
-sde_one_days <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie == "SDE-EWMA" &gcr_result_cp == "SDE-One-Day" & gcr_result_cp_updated == "SDE-One-Day")) 
-sde_one_days <- sde_one_days %>% select(subjid.x, id) %>% distinct()
+sde_one_days <- Merged_Maps %>% group_by(subjid.x) %>% filter((gcr_result_carrie == "SDE-EWMA"  & gcr_result_cp == "SDE-One-Day" & gcr_result_cp_updated == "SDE-One-Day")) 
 
-View(cleaned_data_updated %>% filter(subjid == "8008"))
-View(clean)
+sde_ewma <- Merged_Maps %>% group_by(subjid.x) %>% filter((gcr_result_carrie == "Include"  & gcr_result_cp == "SDE-One-Day" & gcr_result_cp_updated == "SDE-One-Day")) 
+sde_ewma2 <- Merged_Maps %>% group_by(subjid.x) %>% filter((gcr_result_carrie == "SDE-EWMA"  & gcr_result_cp == "Include" & gcr_result_cp_updated == "Include")) 
+sde_ewma3 <- Merged_Maps %>% group_by(subjid.x) %>% filter((any(grepl("SDE",gcr_result_carrie) | grepl("SDE",gcr_result_cp)  | grepl("SDE",gcr_result_cp_updated))))
+
+rem_ids <- bind_rows(sde_one_days, sde_ewma, sde_ewma2, sde_ewma3) %>% select(subjid.x) %>% distinct()
+sde_one_days <- sde_one_days %>% select(subjid.x, id) %>% distinct() %>% select(subjid = subjid.x, 
+                                                                                id)
+rem_ids
+
+# write.csv(sde_one_days, "../data/sde_ewma_nofires.csv")
 ```
 
 ```{r}
