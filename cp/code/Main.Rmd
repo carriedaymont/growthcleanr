@@ -261,7 +261,8 @@ data.work <- data.work %>% mutate(gcr_result_carrie = case_when(
 )) %>% select(-c(exc_wt, exc_ht)) 
 
 # data.work <- data.work  %>% filter(subjid %in% mindiffs$subjid.x)
-data.work <- data.work  %>% filter(!subjid %in% rem_ids$subjid.x)
+# data.work <- data.work  %>% filter(!subjid %in% rem_ids$subjid.x)
+data.work <- data.work %>% filter(subjid %in% ewmas_of_int$subjid.x)
 data.work <- as.data.table(data.work)
 setkey(data.work, subjid, param, agedays)
 cleaned_data_updated <- cleangrowth(
@@ -290,9 +291,7 @@ Modified_Characteristics_Table <- Modified_Characteristics_Table %>% select(gcr_
 Modified_Characteristics_Table <- as.data.frame(table(Modified_Characteristics_Table$results_pasted)) %>% arrange(desc(Freq))
 # write.csv(Modified_Characteristics_Table, paste("../deliverables/Modified_Characteristics_Table", Sys.Date(), ".csv", sep = ""))
 Modified_Characteristics_Table
-```
 
-```{R}
 
 
 Baseline_Map <- read.csv("../data/baseline_comparison_of_stata_vs_R_2025-10-07.csv") %>% select(id, gcr_result_carrie, gcr_result_cp, subjid)
@@ -407,6 +406,92 @@ gt(tbl) %>%
 # problematic_pats <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie != gcr_result_cp_updated))
 # write.csv(problematic_pats, paste("../data/problematic_pats_", Sys.Date(), ".csv", sep = ""))
 ```
+
+
+```{r}
+### EWMA Spot Checks.
+# Read in the stata.
+stata_ewma_facts_in <- read.csv("../data/temp-2025-10-24.csv") %>% filter(subjid %in% ewmas_of_int$subjid.x)
+
+stata.gc <- stata_ewma_facts_in  %>% 
+  mutate(param = case_when(
+  param == "Weight" ~ "WEIGHTKG",
+  param == "Height" ~ "HEIGHTCM",
+  TRUE ~ param
+)) %>% filter(param %in% c("WEIGHTKG", "HEIGHTCM"))
+
+stata.gc <- as.data.table(stata.gc)
+setkey(stata.gc, subjid, param, agedays)
+stata_data_updated <- cleangrowth(
+  subjid = stata.gc$subjid,
+  param = stata.gc$param,
+  agedays = stata.gc$agedays,
+  sex = stata.gc$sex,
+  measurement = stata.gc$measurement,
+  prelim_infants = TRUE,
+  id = stata.gc$obsid, 
+  sd.recenter = "nhanes"
+)
+stata_data_updated <- as.data.frame(stata_data_updated)
+stata_data_updated$subjid <- as.numeric(as.character(stata_data_updated$subjid))
+
+ewma_lead <- read.csv("../data/sde_debug_NNNNN.csv")
+
+data.work_2 <- merge(stata.gc %>% select(subjid, obsid), ewma_lead, by.x = c("subjid", "obsid"), by.y = c("subjid", "line"))
+
+stata.gc$obsid
+# ### Isolate some examples of mismatches in a ewma step - this is where ewma fires for stata but not for R.
+# ewmas_of_int <- Merged_Maps %>% group_by(subjid.x) %>% filter((gcr_result_carrie == "EWMA2 first ext"  & gcr_result_cp == "Include" & gcr_result_cp_updated == "Include"))
+
+# Filter the run to those folks only.
+# Done above.
+
+# Isolate. Read in the lead.
+
+
+```
+
+
+
+
+
+
+datsel <- stata_in %>% select(subjid, param, agedays_stata = agedays, id = obsid, measurement, exc_ht, exc_wt,ewma_wt, ewma_ht,  absdewma_wt, absdewma_ht,  minabsdewma_wt, minabsdewma_ht, maxagediff_wt, maxagediff_ht)%>%
+  mutate(param = case_when(
+  param == "Weight" ~ "WEIGHTKG",
+  param == "Height" ~ "HEIGHTCM",
+  TRUE ~ param
+)) %>% filter(param %in% c("WEIGHTKG", "HEIGHTCM")) %>% mutate(
+  gcr_result_carrie = case_when(
+  param == "WEIGHTKG" ~ exc_wt,
+  param == "HEIGHTCM" ~ exc_ht,
+  TRUE ~ "ERR"
+),
+ewma = case_when(
+  param == "WEIGHTKG" ~ ewma_wt,
+  param == "HEIGHTCM" ~ ewma_ht
+),
+absdewma = case_when(
+  param == "WEIGHTKG" ~ absdewma_wt,
+  param == "HEIGHTCM" ~ absdewma_ht
+),
+minabsdewma = case_when(
+  param == "WEIGHTKG" ~ minabsdewma_wt,
+  param == "HEIGHTCM" ~ minabsdewma_ht
+),
+maxagediff = case_when(
+  param == "WEIGHTKG" ~ maxagediff_wt,
+  param == "HEIGHTCM" ~ maxagediff_ht
+)
+) %>% select(-c(exc_ht, exc_wt,ewma_wt, ewma_ht,  absdewma_wt, absdewma_ht,  minabsdewma_wt, minabsdewma_ht, maxagediff_wt, maxagediff_ht))
+
+datsel2 <- read.csv("../data/sde_debug_NNNNN.csv") 
+datsel2 <- datsel2# %>% select(subjid, id, ewma.all, ewma.before, ewma.after)
+datsel3 <- merge(datsel, datsel2, by = "id")
+datsel3
+```
+
+### DROP
 
 ```{r}
 View(cleaned_data_updated)

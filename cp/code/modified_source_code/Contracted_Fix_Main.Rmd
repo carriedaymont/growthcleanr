@@ -2875,6 +2875,11 @@ library(purrr)
         }
         # we're going to update excludes before moving on to the rest of this
         # subject
+  #       
+  #          if (unique(df_sub$subjid) == "13001015" & unique(df_sub$param) == "HEIGHTCM") {
+  # fwrite(df_sub, "../data/ewma_lead_NNNNN.csv")}
+           
+        
         exclude_all[orig_idx %in% subj_df$index[criteria_extreme]] <- step_extreme
         exclude_all[orig_idx %in% subj_df$index[criteria]] <- step
         
@@ -2892,6 +2897,7 @@ library(purrr)
       # all remaining are similar
       step_extreme <- "Exclude-SDE-All-Extreme"
       step <- "Exclude-SDE-One-Day"
+      
       if (any(subj_df$extraneous)){
         # check for SDEs
         all_sdes <- duplicated(subj_df$agedays) |
@@ -2964,7 +2970,7 @@ library(purrr)
         exclude_all[orig_idx %in% subj_df$index[criteria]] <- step
       }
     }
-    
+        
     # replace all the "exclude temp extraneous" with includes -- other SDEs
     # were removed
     exclude_all[exclude_all == "Exclude-Temporary-Extraneous-Same-Day"] <-
@@ -2994,7 +3000,13 @@ library(purrr)
   # columns
   
   # calculate plus/minus values
-  
+#    out_path <- "../data/sde_debug_NNNNN.csv"
+#           data.table::fwrite(
+#   data.df,
+#   file = out_path,
+#   append = file.exists(out_path),
+#   col.names = !file.exists(out_path)
+# )
   # order just for ease later
   data.df <- data.df[order(subjid, param, agedays),]
   data.df <- data.df[valid_set, exclude := (function(df) {
@@ -3015,9 +3027,17 @@ library(purrr)
     #15c: exclude agedays = 0 for ht, hc
     #15d: calculate ewma -- run within a subject/parameter
     
+     # print(df_sub)
+   out_path <- "../data/sde_debug_NNNNN.csv"
+          data.table::fwrite(
+  data.df,
+  file = out_path,
+  append = file.exists(out_path),
+  col.names = !file.exists(out_path)
+)
     
     
-    df[(param != "HEIGHTCM" | param != "HEADCM") & agedays != 0,
+    df[!((param == "HEIGHTCM" | param == "HEADCM") & agedays == 0),
        exclude := (function(df_sub) {
          # save initial exclusions to keep track
          ind_all <- copy(df_sub$index)
@@ -3026,7 +3046,7 @@ library(purrr)
          testing <- TRUE
          df_sub[, first_meas := FALSE]
          df_sub[agedays != 0 & seq_len(.N) == 1, first_meas := TRUE, by = .(subjid, param)]
-
+  
          while (testing & nrow(df_sub) >= 3){
            df_sub[, (ewma.fields) := as.double(NaN)]
            
@@ -3082,26 +3102,24 @@ library(purrr)
                     ((tbc_diff_next < -1 & tbc_diff_plus_next < -1 & tbc_diff_minus_next < -1) | is.na(tbc_diff_next)) &
                     ((tbc_diff_prior < -1 & tbc_diff_plus_prior < -1 & tbc_diff_minus_prior < -1) | is.na(tbc_diff_prior))
            ]
-#          if (unique(df_sub$subjid) == "16210" & unique(df_sub$param == "HEIGHTCM")) {
-# fwrite(df_sub, "../data/ewma2_debug_NNNNN.csv")
-#          }
+#        
 # # --- Write EWMA2 diagnostics for all subjects/parameters ---
-# out_path <- "../data/ewma2_diagnostics_all.csv"
 
-# append results for all rows processed in this step
-# df_sub %>%
-#   dplyr::select(
-#     id, subjid, param, agedays,
-#     dewma.before, dewma.after,
-#     tbc_diff_next, tbc_diff_plus_next, tbc_diff_minus_next,
-#     tbc_diff_prior, tbc_diff_plus_prior, tbc_diff_minus_prior,
-#     addcrithigh, addcritlow
-#   ) %>%
-#   data.table::fwrite(
-#     file = out_path,
-#     append = file.exists(out_path)
-#   )
 # ------------------------------------------------------------
+                             # out_path <- "../data/sde_debug_NNNNN.csv"
+#            print(df_sub)
+
+          # check conditions before writing
+          # if (unique(subj_df$subjid) == "3688") {
+            
+            # if file exists, append without column names
+          #   if (file.exists(out_path)) {
+          #     data.table::fwrite(df_sub, file = out_path, append = TRUE, col.names = FALSE)
+          #   } else {
+          #     # if not, write with header
+          #     data.table::fwrite(df_sub, file = out_path)
+          #   }
+          # # }
            #15G: find all the values for the DOP
            # find the comparison -- making sure to keep only valid rows
            compare_df <- data.df[subjid == df_sub$subjid[1] &
@@ -3147,9 +3165,8 @@ library(purrr)
             ]
            
            ### CP HOTSWAP U
-           
-  #          if (unique(df_sub$subjid) == "16210" & unique(df_sub$param) == "HEIGHTCM") {
-  # fwrite(df_sub, "../data/ewma_lead_NNNNN.csv")}
+# 
+
            
            #b
            df_sub[agedays == 0 & agedays[2] < 365.25 &
@@ -3257,8 +3274,13 @@ library(purrr)
                     addcritlow
                   , exclude := "Exclude-EWMA2-last-ext-high"]
            
-  #             if (unique(df_sub$subjid) == "13023") {
-  # fwrite(df_sub, "../data/ewma2_debug_NNNNN_lead_2.csv")}
+   out_path <- "../data/step15_debug_NNNNN.csv"
+          data.table::fwrite(
+  df_sub,
+  file = out_path,
+  append = file.exists(out_path),
+  col.names = !file.exists(out_path)
+)
 
            # figure out if any of the exclusions hit
            count_exclude <- sum(df_sub$exclude != "Include")
