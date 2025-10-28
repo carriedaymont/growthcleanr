@@ -1,0 +1,79 @@
+"","Var1","Freq"
+"1","include ; include",118997
+"2","carried forward ; carried forward",1283
+"3","1 cf deltaz <0.05 ; 1 cf deltaz <0.05",694
+"4","include ; max diff",392
+"5","ewma2 middle ; include",131
+"6","1 cf deltaz <0.05 ; carried forward",88
+"7","evil twins ; evil twins",82
+"8","1 cf imperial deltaz <0.1 ; 1 cf deltaz <0.1 wholehalfimp",75
+"9","include ; min diff",68
+"10","include ; sde one day",62
+"11","sde-ewma ; sde one day",62
+"12","carried forward ; include",61
+"13","1 cf imperial deltaz <0.1 ; carried forward",60
+"14","include ; error load",57
+"15","sde-ewma ; include",53
+"16","ewma2 first ; ewma2 first",42
+"17","min diff ; include",35
+"18","1 cf deltaz <0.05 ; include",32
+"19","min diff ; min diff",29
+"20","standardized biv ; standardized biv",26
+"21","include ; absolute biv",24
+"22","sde-ewma ; sde ewma",23
+"23","sde-extreme ; sde ewma",21
+"24","1 cf deltaz <0.05 ; teen 2 plus cf deltaz <0.05",19
+"25","1 cf imperial deltaz <0.1 ; 1 cf deltaz <0.05",18
+"26","sde-extreme ; sde one day",17
+"27","ewma2 first ext ; include",14
+"28","include ; ewma2 first",14
+"29","sde-identical ; sde identical",14
+"30","ewma2 birth ht hc ; ewma2 birth ht hc",12
+"31","sde-extreme ; include",12
+"32","sde-all-exclude ; sde all exclude",11
+"33","1 cf imperial deltaz <0.1 ; teen 2 plus cf deltaz <0.05",10
+"34","ewma2 middle ; max diff",10
+"35","ewma2 first ; include",9
+"36","ewma2 first ext ; ewma2 first ext",9
+"37","include ; evil twins",9
+"38","include ; sde identical",9
+"39","sde-identical ; include",8
+"40","absolute biv ; absolute biv",6
+"41","sde-all-exclude ; include",6
+"42","sde-all-exclude ; sde ewma",6
+"43","sde-extreme ; sde all extreme",6
+"44","include ; sde all extreme",5
+"45","sde-ewma ; sde all extreme",5
+"46","1 cf imperial deltaz <0.1 ; include",4
+"47","1 meas ; include",4
+"48","ewma1 high sum ; include",4
+"49","include ; ewma2 birth ht hc",4
+"50","min diff ; max diff",4
+"51","sde-one-day ; sde one day",4
+"52","carried forward ; sde one day",3
+"53","ewma2 last ; include",3
+"54","include ; ewma2 first ext",3
+"55","include ; sde ewma",3
+"56","sde-one-day ; include",3
+"57","2 meas <1 year ; 2 meas <1 year",2
+"58","2 meas >1 year ; 2 meas >1 year",2
+"59","2 meas >1 year ; include",2
+"60","ewma1 high sum ; sde ewma",2
+"61","ewma2 birth wt ; include",2
+"62","ewma2 middle ; ewma2 first",2
+"63","ewma2 middle ; min diff",2
+"64","include ; ewma2 birth ht hc ext",2
+"65","1 cf deltaz <0.05 ; sde one day",1
+"66","2 meas <1 year ; include",1
+"67","absolute biv ; standardized biv",1
+"68","ewma2 birth ht hc ; min diff",1
+"69","ewma2 birth ht hc ext ; ewma2 birth ht hc ext",1
+"70","ewma2 birth ht hc ext ; include",1
+"71","ewma2 first ext ; evil twins",1
+"72","ewma2 middle ; ewma2 first ext",1
+"73","max diff ; max diff",1
+"74","sde-all-exclude ; evil twins",1
+"75","sde-all-exclude ; ewma2 first",1
+"76","sde-all-exclude ; sde one day",1
+"77","sde-identical ; max diff",1
+"78","standardized biv ; evil twins",1

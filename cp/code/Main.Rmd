@@ -17,8 +17,100 @@ library(gt)
 knitr::opts_chunk$set(include = FALSE, echo = FALSE, eval = TRUE)
 ```
 
-**Pausing Code to Evaluate Changes Thus Far**
+#### Helper Functions
+```{r}
+map_to_stata <- function(x) {
+  case_when(
+    # --- Carry-forward family ---
+    x == "Exclude-1-CF-deltaZ-<0.05" ~ "1 CF deltaZ <0.05",
+    x == "Exclude-1-CF-deltaZ-<0.1-wholehalfimp" ~ "1 CF imperial deltaZ <0.1",
+    x == "Exclude-Teen-2-plus-CF-deltaZ-<0.05" ~ "Carried forward",
+    x == "Exclude-Carried-Forward" ~ "Carried forward",
 
+    # --- Measurement count flags ---
+    x == "Exclude-1-meas" ~ "1 meas",
+    x == "Exclude-2-meas-<1-year" ~ "2 meas <1 year",
+    x == "Exclude-2-meas->1-year" ~ "2 meas >1 year",
+
+    # --- Biologically implausible values ---
+    x == "Exclude-Absolute-BIV" ~ "Absolute BIV",
+    x == "Exclude-Standardized-BIV" ~ "Standardized BIV",
+
+    # --- EWMA steps ---
+    x == "Exclude-EWMA1-Extreme" ~ "EWMA1 high sum",
+    x == "Exclude-EWMA2-middle" ~ "EWMA2 middle",
+    x == "Exclude-EWMA2-first" ~ "EWMA2 first",
+    x == "Exclude-EWMA2-first-ext" ~ "EWMA2 first ext",
+    x == "Exclude-EWMA2-last" ~ "EWMA2 last",
+    x == "Exclude-EWMA2-birth-HT-HC" ~ "EWMA2 birth HT HC",
+    x == "Exclude-EWMA2-birth-HT-HC-ext" ~ "EWMA2 birth HT HC ext",
+    x == "Exclude-EWMA2-birth-WT" ~ "EWMA2 birth WT",
+
+    # --- Evil twins step ---
+    x == "Exclude-Evil-Twins" ~ "Evil Twins",
+
+    # --- Diff-based flags ---
+    x == "Exclude-Min-diff" ~ "Min diff",
+    x == "Exclude-Max-diff" ~ "Max diff",
+
+    # --- SDEs (same-day extraneous) ---
+    x == "Exclude-SDE-All-Exclude" ~ "SDE-All-Exclude",
+    x == "Exclude-SDE-All-Extreme" ~ "SDE-Extreme",
+    x == "Exclude-SDE-EWMA" ~ "SDE-EWMA",
+    x == "Exclude-SDE-Identical" ~ "SDE-Identical",
+    x == "Exclude-SDE-One-Day" ~ "SDE-One-Day",
+
+    # --- Miscellaneous / other ---
+    x == "Include" ~ "Include",
+    x == "Exclude-Error-load" ~ "Error load",
+
+    TRUE ~ x
+  )
+}
+
+print_table <- function(tbl){
+# build gt table with conditional coloring
+gt(tbl) %>%
+  fmt_number(columns = "n", sep_mark = ",") %>%
+  
+  # column 1 always green
+  data_color(
+    columns = c(gcr_result_carrie),
+    fn = function(x) rep("#6FCF97", length(x))
+  ) %>%
+  
+  # column 2: green if matches col1, orange otherwise
+  data_color(
+    columns = c(gcr_result_cp),
+    rows = gcr_result_cp == gcr_result_carrie,
+    fn = function(x) rep("#6FCF97", length(x))
+  ) %>%
+  data_color(
+    columns = c(gcr_result_cp),
+    rows = gcr_result_cp != gcr_result_carrie,
+    fn = function(x) rep("#F2994A", length(x))
+  ) %>%
+  
+  # column 3: same logic
+  data_color(
+    columns = c(gcr_result_cp_updated),
+    rows = gcr_result_cp_updated == gcr_result_carrie,
+    fn = function(x) rep("#6FCF97", length(x))
+  ) %>%
+  data_color(
+    columns = c(gcr_result_cp_updated),
+    rows = gcr_result_cp_updated != gcr_result_carrie,
+    fn = function(x) rep("#F2994A", length(x))
+  ) %>%
+  data_color(
+    columns = c(gcr_result_cp_updated),
+    rows = gcr_result_cp == gcr_result_carrie & gcr_result_cp_updated != gcr_result_cp,
+    fn = function(x) rep("maroon", length(x))
+  )
+}
+
+# **Pausing Code to Evaluate Changes Thus Far**
+```
 1. Generate Baseline - STATA vs. Unmodified R Code
 ```{R, eval = FALSE}
 # Let's evaluate the baseline GC (i.e., unmodified source files) against the modified code, strictly in terms of gcr_result only.
@@ -26,10 +118,10 @@ files <- list.files("../../R/", pattern = "\\.[rR]$", full.names = TRUE)
 sapply(files, source, local = TRUE)
 invisible(lapply(files, function(f) source(f, chdir = TRUE)))
 # Load in STATA output:
-stata_gc_in <- data.table::fread("../data/2025-10-01-gc-Stata-chopd1p-results.csv")
+stata_gc_in <- data.table::fread("../data/2025-10-25-gc-Stata-chopd1p-results.csv")
 
 data.work <- stata_gc_in %>% select(
-  id,
+  id = obsid,
   subjid,
   param,
   sex,
@@ -52,21 +144,23 @@ data.work <- data.work %>% mutate(gcr_result_carrie = case_when(
   param == "HEIGHTCM" ~ exc_ht,
   TRUE ~ "ERR"
 )) %>% select(-c(exc_wt, exc_ht)) 
-data.work <- data.work  %>% filter(subjid %in% Merged_Maps_sub$subjid.x)
+# data.work <- data.work  %>% filter(subjid %in% Merged_Maps_sub$subjid.x)
 
 data.work <- as.data.table(data.work)
 setkey(data.work, subjid, param, agedays)
 cleaned_data <- data.work[,gcr_result_cp := cleangrowth(subjid, param, agedays, sex, measurement, prelim_infants = TRUE,  sd.recenter = "nhanes")]
 # View(cleaned_data %>% filter(subjid == "444336"))
 # Baseline_Characteristics_Table
-Baseline_Characteristics_Table <- cleaned_data %>% select(gcr_result_carrie, gcr_result_cp) %>% mutate(gcr_result_cp = gsub("^Exclude", "", gcr_result_cp),
+
+# write.csv(cleaned_data, "../data/baseline_comparison_of_stata_vs_R_2025-10-28.csv")
+Baseline_Characteristics_Table <- cleaned_data %>% select(gcr_result_carrie, gcr_result_cp, id, subjid) %>% mutate(gcr_result_cp = gsub("^Exclude", "", gcr_result_cp),
                                 gcr_result_cp = gsub("-", " ", gcr_result_cp),
                                 gcr_result_cp = str_trim(gcr_result_cp),
                                 gcr_result_carrie = tolower(gcr_result_carrie),
                                 gcr_result_cp = tolower(gcr_result_cp),
                                 results_pasted = paste(gcr_result_carrie, gcr_result_cp, sep = " ; "))
-
-Baseline_Characteristics_Table <- as.data.frame(table(Baseline_Characteristics_Table$results_pasted)) %>% arrange(desc(Freq))
+table(Baseline_Characteristics_Table$results_pasted)
+# Baseline_Characteristics_Table <- as.data.frame(table(Baseline_Characteristics_Table$results_pasted)) %>% arrange(desc(Freq))
 # write.csv(Baseline_Characteristics_Table, paste("../deliverables/Baseline_Characteristics_Table", Sys.Date(), ".csv", sep = ""))
 ```
 
@@ -134,7 +228,7 @@ Modified_Characteristics_Table <- as.data.frame(table(Modified_Characteristics_T
 ```
 
 ```{r}
-Baseline_Map <- read.csv("../data/baseline_comparison_of_stata_vs_R_2025-10-07.csv") %>% select(id, gcr_result_carrie, gcr_result_cp)
+Baseline_Map <- read.csv("../data/baseline_comparison_of_stata_vs_R_2025-10-28.csv") %>% select(id, gcr_result_carrie, gcr_result_cp)
 Updated_Map <- read.csv("../data/Checkpoint_Updated_R_2025-10-22.csv") %>% select(id, gcr_result_cp_updated = exclude)
 Updated_Map <- cleaned_data_updated %>% select(id, gcr_result_cp_updated = exclude)
 Merged_Maps <- merge(Baseline_Map, Updated_Map, by = "id")
@@ -223,19 +317,28 @@ View(datsel)
 SOIs<- unique(datsel$subjid)
 ```
 
+#### TEST BLOCK
 ```{R, include = TRUE}
+library(growthcleanr)
+library(dplyr)
+library(data.table)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(gt)
+
 # Load Modified code
 files <- list.files("../code/modified_source_code/", pattern = "\\.[rR]$", full.names = TRUE)
 sapply(files, source, local = TRUE)
 invisible(lapply(files, function(f) source(f, chdir = TRUE)))
 source(knitr::purl("../code/modified_source_code/Contracted_Fix_Main.Rmd", output = tempfile()))
+
 # Load in STATA output:
 stata_gc_in <- data.table::fread("../data/2025-10-01-gc-Stata-chopd1p-results.csv")
-conflicted_pats <- read.csv("../data/ 2025-10-13 Primary_Discrepant_Pat_Hxs.csv")
-conflicted_pats <- conflicted_pats$subjid
+
 data.work <- stata_gc_in %>% 
   select(
-  id,
+  id ,
   subjid,
   param,
   sex,
@@ -260,9 +363,8 @@ data.work <- data.work %>% mutate(gcr_result_carrie = case_when(
   TRUE ~ "ERR"
 )) %>% select(-c(exc_wt, exc_ht)) 
 
-# data.work <- data.work  %>% filter(subjid %in% mindiffs$subjid.x)
-# data.work <- data.work  %>% filter(!subjid %in% rem_ids$subjid.x)
-data.work <- data.work %>% filter(subjid %in% ewmas_of_int$subjid.x)
+# data.work <- data.work %>% filter(subjid %in% conflicted_pats)
+
 data.work <- as.data.table(data.work)
 setkey(data.work, subjid, param, agedays)
 cleaned_data_updated <- cleangrowth(
@@ -290,65 +392,14 @@ Modified_Characteristics_Table <- Modified_Characteristics_Table %>% select(gcr_
 
 Modified_Characteristics_Table <- as.data.frame(table(Modified_Characteristics_Table$results_pasted)) %>% arrange(desc(Freq))
 # write.csv(Modified_Characteristics_Table, paste("../deliverables/Modified_Characteristics_Table", Sys.Date(), ".csv", sep = ""))
-Modified_Characteristics_Table
-
-
+# Modified_Characteristics_Table
 
 Baseline_Map <- read.csv("../data/baseline_comparison_of_stata_vs_R_2025-10-07.csv") %>% select(id, gcr_result_carrie, gcr_result_cp, subjid)
+
 # cleaned_data_updated <- read.csv("../data/Checkpoint_Updated_R_2025-10-22.csv")
 
 Updated_Map <- cleaned_data_updated %>% select(id, subjid, gcr_result_cp_updated = exclude)
 Merged_Maps <- merge(Baseline_Map, Updated_Map, by = "id")
-
-
-map_to_stata <- function(x) {
-  case_when(
-    # --- Carry-forward family ---
-    x == "Exclude-1-CF-deltaZ-<0.05" ~ "1 CF deltaZ <0.05",
-    x == "Exclude-1-CF-deltaZ-<0.1-wholehalfimp" ~ "1 CF imperial deltaZ <0.1",
-    x == "Exclude-Teen-2-plus-CF-deltaZ-<0.05" ~ "Carried forward",
-    x == "Exclude-Carried-Forward" ~ "Carried forward",
-
-    # --- Measurement count flags ---
-    x == "Exclude-1-meas" ~ "1 meas",
-    x == "Exclude-2-meas-<1-year" ~ "2 meas <1 year",
-    x == "Exclude-2-meas->1-year" ~ "2 meas >1 year",
-
-    # --- Biologically implausible values ---
-    x == "Exclude-Absolute-BIV" ~ "Absolute BIV",
-    x == "Exclude-Standardized-BIV" ~ "Standardized BIV",
-
-    # --- EWMA steps ---
-    x == "Exclude-EWMA1-Extreme" ~ "EWMA1 high sum",
-    x == "Exclude-EWMA2-middle" ~ "EWMA2 middle",
-    x == "Exclude-EWMA2-first" ~ "EWMA2 first",
-    x == "Exclude-EWMA2-first-ext" ~ "EWMA2 first ext",
-    x == "Exclude-EWMA2-last" ~ "EWMA2 last",
-    x == "Exclude-EWMA2-birth-HT-HC" ~ "EWMA2 birth HT HC",
-    x == "Exclude-EWMA2-birth-HT-HC-ext" ~ "EWMA2 birth HT HC ext",
-    x == "Exclude-EWMA2-birth-WT" ~ "EWMA2 birth WT",
-
-    # --- Evil twins step ---
-    x == "Exclude-Evil-Twins" ~ "Evil Twins",
-
-    # --- Diff-based flags ---
-    x == "Exclude-Min-diff" ~ "Min diff",
-    x == "Exclude-Max-diff" ~ "Max diff",
-
-    # --- SDEs (same-day extraneous) ---
-    x == "Exclude-SDE-All-Exclude" ~ "SDE-All-Exclude",
-    x == "Exclude-SDE-All-Extreme" ~ "SDE-Extreme",
-    x == "Exclude-SDE-EWMA" ~ "SDE-EWMA",
-    x == "Exclude-SDE-Identical" ~ "SDE-Identical",
-    x == "Exclude-SDE-One-Day" ~ "SDE-One-Day",
-
-    # --- Miscellaneous / other ---
-    x == "Include" ~ "Include",
-    x == "Exclude-Error-load" ~ "Error load",
-
-    TRUE ~ x
-  )
-}
 
 # Apply mapping to both columns
 Merged_Maps <- Merged_Maps %>%
@@ -357,368 +408,39 @@ Merged_Maps <- Merged_Maps %>%
     gcr_result_cp_updated = map_to_stata(gcr_result_cp_updated)
   )
 
-
 # summarise the data
 tbl <- Merged_Maps %>%
   count(gcr_result_carrie, gcr_result_cp, gcr_result_cp_updated) %>%
   arrange(desc(n))
 
-# build gt table with conditional coloring
-gt(tbl) %>%
-  fmt_number(columns = "n", sep_mark = ",") %>%
-  
-  # column 1 always green
-  data_color(
-    columns = c(gcr_result_carrie),
-    fn = function(x) rep("#6FCF97", length(x))
-  ) %>%
-  
-  # column 2: green if matches col1, orange otherwise
-  data_color(
-    columns = c(gcr_result_cp),
-    rows = gcr_result_cp == gcr_result_carrie,
-    fn = function(x) rep("#6FCF97", length(x))
-  ) %>%
-  data_color(
-    columns = c(gcr_result_cp),
-    rows = gcr_result_cp != gcr_result_carrie,
-    fn = function(x) rep("#F2994A", length(x))
-  ) %>%
-  
-  # column 3: same logic
-  data_color(
-    columns = c(gcr_result_cp_updated),
-    rows = gcr_result_cp_updated == gcr_result_carrie,
-    fn = function(x) rep("#6FCF97", length(x))
-  ) %>%
-  data_color(
-    columns = c(gcr_result_cp_updated),
-    rows = gcr_result_cp_updated != gcr_result_carrie,
-    fn = function(x) rep("#F2994A", length(x))
-  ) %>%
-  data_color(
-    columns = c(gcr_result_cp_updated),
-    rows = gcr_result_cp == gcr_result_carrie & gcr_result_cp_updated != gcr_result_cp,
-    fn = function(x) rep("maroon", length(x))
-  )
+print_table(tbl)
 
 
-# problematic_pats <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie != gcr_result_cp_updated))
-# write.csv(problematic_pats, paste("../data/problematic_pats_", Sys.Date(), ".csv", sep = ""))
+IDs_of_interest <- Merged_Maps %>% filter(gcr_result_carrie == "Include" &
+                         gcr_result_cp == "Include" & 
+                         gcr_result_cp_updated == "Carried forward") 
+
+# View(cleaned_data_updated %>% filter(subjid %in% IDs_of_interest$subjid.x))
 ```
-
-
-```{r}
-### EWMA Spot Checks.
-# Read in the stata.
-stata_ewma_facts_in <- read.csv("../data/temp-2025-10-24.csv") %>% filter(subjid %in% ewmas_of_int$subjid.x)
-
-stata.gc <- stata_ewma_facts_in  %>% 
-  mutate(param = case_when(
-  param == "Weight" ~ "WEIGHTKG",
-  param == "Height" ~ "HEIGHTCM",
-  TRUE ~ param
-)) %>% filter(param %in% c("WEIGHTKG", "HEIGHTCM"))
-
-stata.gc <- as.data.table(stata.gc)
-setkey(stata.gc, subjid, param, agedays)
-stata_data_updated <- cleangrowth(
-  subjid = stata.gc$subjid,
-  param = stata.gc$param,
-  agedays = stata.gc$agedays,
-  sex = stata.gc$sex,
-  measurement = stata.gc$measurement,
-  prelim_infants = TRUE,
-  id = stata.gc$obsid, 
-  sd.recenter = "nhanes"
-)
-stata_data_updated <- as.data.frame(stata_data_updated)
-stata_data_updated$subjid <- as.numeric(as.character(stata_data_updated$subjid))
-
-ewma_lead <- read.csv("../data/sde_debug_NNNNN.csv")
-
-data.work_2 <- merge(stata.gc %>% select(subjid, obsid), ewma_lead, by.x = c("subjid", "obsid"), by.y = c("subjid", "line"))
-
-stata.gc$obsid
-# ### Isolate some examples of mismatches in a ewma step - this is where ewma fires for stata but not for R.
-# ewmas_of_int <- Merged_Maps %>% group_by(subjid.x) %>% filter((gcr_result_carrie == "EWMA2 first ext"  & gcr_result_cp == "Include" & gcr_result_cp_updated == "Include"))
-
-# Filter the run to those folks only.
-# Done above.
-
-# Isolate. Read in the lead.
-
-
-```
-
-
-
-
-
-
-datsel <- stata_in %>% select(subjid, param, agedays_stata = agedays, id = obsid, measurement, exc_ht, exc_wt,ewma_wt, ewma_ht,  absdewma_wt, absdewma_ht,  minabsdewma_wt, minabsdewma_ht, maxagediff_wt, maxagediff_ht)%>%
-  mutate(param = case_when(
-  param == "Weight" ~ "WEIGHTKG",
-  param == "Height" ~ "HEIGHTCM",
-  TRUE ~ param
-)) %>% filter(param %in% c("WEIGHTKG", "HEIGHTCM")) %>% mutate(
-  gcr_result_carrie = case_when(
-  param == "WEIGHTKG" ~ exc_wt,
-  param == "HEIGHTCM" ~ exc_ht,
-  TRUE ~ "ERR"
-),
-ewma = case_when(
-  param == "WEIGHTKG" ~ ewma_wt,
-  param == "HEIGHTCM" ~ ewma_ht
-),
-absdewma = case_when(
-  param == "WEIGHTKG" ~ absdewma_wt,
-  param == "HEIGHTCM" ~ absdewma_ht
-),
-minabsdewma = case_when(
-  param == "WEIGHTKG" ~ minabsdewma_wt,
-  param == "HEIGHTCM" ~ minabsdewma_ht
-),
-maxagediff = case_when(
-  param == "WEIGHTKG" ~ maxagediff_wt,
-  param == "HEIGHTCM" ~ maxagediff_ht
-)
-) %>% select(-c(exc_ht, exc_wt,ewma_wt, ewma_ht,  absdewma_wt, absdewma_ht,  minabsdewma_wt, minabsdewma_ht, maxagediff_wt, maxagediff_ht))
-
-datsel2 <- read.csv("../data/sde_debug_NNNNN.csv") 
-datsel2 <- datsel2# %>% select(subjid, id, ewma.all, ewma.before, ewma.after)
-datsel3 <- merge(datsel, datsel2, by = "id")
-datsel3
-```
-
-### DROP
-
-```{r}
-View(cleaned_data_updated)
-
- ewmas_of_int <- Merged_Maps %>% group_by(subjid.x) %>% filter((gcr_result_carrie == "EWMA2 first ext"  & gcr_result_cp == "Include" & gcr_result_cp_updated == "Include")) 
- ewmas_of_int2 <- Merged_Maps %>% group_by(subjid.x) %>% filter((gcr_result_carrie == "Include"  & gcr_result_cp == "EWMA2 first" & gcr_result_cp_updated == "EWMA2 first"))
- write.csv(bind_rows(ewmas_of_int, ewmas_of_int2) %>% select(subjid.x, id ), "../data/ewma_first_ext_and_first_issues.csv")
- 
- 
-
-```
-
-```{r}
-# We want to focus on the next most problematic item, which is SDE-EWMA -> SDE-One-Day
-sde_one_days <- Merged_Maps %>% group_by(subjid.x) %>% filter((gcr_result_carrie == "SDE-EWMA"  & gcr_result_cp == "SDE-One-Day" & gcr_result_cp_updated == "SDE-One-Day")) 
-
-sde_ewma <- Merged_Maps %>% group_by(subjid.x) %>% filter((gcr_result_carrie == "Include"  & gcr_result_cp == "SDE-One-Day" & gcr_result_cp_updated == "SDE-One-Day")) 
-sde_ewma2 <- Merged_Maps %>% group_by(subjid.x) %>% filter((gcr_result_carrie == "SDE-EWMA"  & gcr_result_cp == "Include" & gcr_result_cp_updated == "Include")) 
-sde_ewma3 <- Merged_Maps %>% group_by(subjid.x) %>% filter((any(grepl("SDE",gcr_result_carrie) | grepl("SDE",gcr_result_cp)  | grepl("SDE",gcr_result_cp_updated))))
-
-rem_ids <- bind_rows(sde_one_days, sde_ewma, sde_ewma2, sde_ewma3) %>% select(subjid.x) %>% distinct()
-sde_one_days <- sde_one_days %>% select(subjid.x, id) %>% distinct() %>% select(subjid = subjid.x, 
-                                                                                id)
-rem_ids
-
-# write.csv(sde_one_days, "../data/sde_ewma_nofires.csv")
-```
-
-```{r}
-# We want to focus on the next most problematic item, which is SDE-EWMA -> SDE-One-Day
-sde_one_days <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie == "Min diff" &gcr_result_cp == "Min diff" & gcr_result_cp_updated == "Include")) 
-sde_one_days <- sde_one_days %>% select(subjid.x, id) %>% distinct()
-
-View(cleaned_data_updated %>% filter(subjid == "76234"))
-View(clean)
-```
-
-#### Code Archive 
 
 ```{R}
-### Gonna isolate a few groups here to test:
-### Include-Min diff-Min diff
-maxdiffs <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie == "Include" &gcr_result_cp == "Max diff" & gcr_result_cp_updated == "Max diff")) 
-maxdiffs_folks <- maxdiffs %>% select(subjid.x) %>% distinct()
-
-
-View(cleaned_data_updated %>% filter(subjid == "98863"))
-sView(cleaned_data_updated %>% filter(exclude == "Exclude-Max-diff"))
+# Cases where stata flags as ewma first ext but R include = many were where agedays was actually 0. Issue with STATA. Double-checking.
 ```
-result <- cleaned_data_updated %>%
-  group_by(subjid, param) %>%
-  arrange(agedays, .by_group = TRUE) %>%
-  mutate(
-    row_id = row_number(),
-    flag_exclude = exclude == "Exclude-Max-diff"
-  ) %>%
-  mutate(
-    # Mark neighbors of excluded rows
-    neighbor = lag(flag_exclude, default = FALSE) | 
-               flag_exclude | 
-               lead(flag_exclude, default = FALSE)
-  ) %>%
-  filter(neighbor) %>%
-  ungroup()
-
-
-maxdiffs <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie == "Include" &gcr_result_cp == "Absolute BIV" & gcr_result_cp_updated == "Absolute BIV")) 
-maxdiffs_folks <- maxdiffs %>% select(subjid.x) %>% distinct()
-result <- cleaned_data_updated %>%
-  group_by(subjid, param) %>%
-  arrange(agedays, .by_group = TRUE) %>%
-  mutate(
-    row_id = row_number(),
-    flag_exclude = exclude == "Absolute BIV"
-  ) %>%
-  mutate(
-    # Mark neighbors of excluded rows
-    neighbor = lag(flag_exclude, default = FALSE) | 
-               flag_exclude | 
-               lead(flag_exclude, default = FALSE)
-  ) %>%
-  filter(neighbor) %>%
-  ungroup()
-
-result
-
-View(cleaned_data_updated %>% filter(subjid == "35211"))
-View(cleaned_data_updated %>% filter(exclude == "Exclude-Max-diff"))
-```
-
 
 ```{r}
-View_selected_cases <- merge(data.work, cleaned_data_updated %>% select(id, exclude), by = "id")
+IDs_of_interest_ewma_first <- Merged_Maps %>% filter(gcr_result_carrie == "EWMA2 first ext" &
+                         gcr_result_cp == "Include" & 
+                         gcr_result_cp_updated == "Include") 
+View(cleaned_data_updated %>% filter(subjid %in% IDs_of_interest_ewma_first$subjid.x) %>% mutate(row_of_interest = ifelse(id %in% IDs_of_interest_ewma_first$id, 1, 0)))
+ewmafirstextagedays0_issues <- cleaned_data_updated %>% filter(subjid %in% IDs_of_interest_ewma_first$subjid.x) %>% mutate(row_of_interest = ifelse(id %in% IDs_of_interest_ewma_first$id, 1, 0)) %>% filter(row_of_interest == 1) %>% select(subjid, id, exclude)
+# write.csv(ewmafirstextagedays0_issues, "../data/Ewma2FirstExtOverFlags_agedays0.csv")
+ewmafirstextagedays0_issues
+```
 
 ```{r}
-View_selected_cases <- View_selected_cases %>% mutate(gcr_result_cp_updated = gsub("^Exclude", "", gcr_result_cp_updated),
-                                gcr_result_cp_updated = gsub("-", " ", gcr_result_cp_updated),
-                                gcr_result_cp_updated = str_trim(gcr_result_cp_updated),
-                                gcr_result_carrie = tolower(gcr_result_carrie),
-                                gcr_result_cp_updated = tolower(gcr_result_cp_updated),
-                                results_pasted = paste(gcr_result_carrie, gcr_result_cp_updated, sep = " ; "))
-View_selected_cases %>% relocate(exclude)
-View(View_selected_cases$exclude)
+stata_new <- read.csv("../data/2025-10-25-gc-Stata-chopd1p-results.csv") %>% mutate(exclude = case_when(param == "HEIGHTCM" ~ exc_ht, 
+                                                                                           param == "WEIGHTKG" ~ exc_wt,
+                                                                                           TRUE ~ NA)) %>% select(subjid, obsid, exclude, agedays, param)
+stata_new %>% filter(subjid %in% IDs_of_interest_ewma_first$subjid.x)  %>% filter(agedays == 0)
 ```
-
-
-```{r}
-# Merged_Maps
-EWMA_middle_folks <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie == "EWMA2 middle" & gcr_result_cp_updated == "Include")) 
-# Select off cleaned data which represents this:
-ewma2_diagnostics_all <- read_csv("~/Github/Daymont_Contract/growthcleanr/cp/data/ewma2_diagnostics_all.csv") %>% filter(subjid %in% EWMA_middle_folks$subjid.x)
-ewma2_diagnostics_all <- merge(ewma2_diagnostics_all, EWMA_middle_folks %>% select(subjid = subjid.x, id, gcr_result_carrie, gcr_result_cp_updated) %>% distinct(), by = "id", all.x = TRUE)
-View(ewma2_diagnostics_all %>% filter(subjid.x == unique(ewma2_diagnostics_all$subjid.x)[2]) %>% distinct())
-ewma2_diagnostics_all %>% mutate(addcrithigh_cp :=
-                    dewma.before > 1 & dewma.after > 1 &
-                    ((tbc_diff_next > 1 & tbc_diff_plus_next > 1 & tbc_diff_minus_next > 1) | is.na(tbc_diff_next)) &
-                    ((tbc_diff_prior > 1 & tbc_diff_plus_prior > 1 & tbc_diff_minus_prior > 1) | is.na(tbc_diff_prior))) %>% filter(subjid.x == "16210")
-
-
-View(ewma2_diagnostics_all)
-View(stata_gc_in)
-```
-
-
-```{r}
-# Merged_Maps
-carried_forward_folks <- Merged_Maps %>% group_by(subjid.x) %>% filter(any(gcr_result_carrie == "Carried forward" & gcr_result_cp_updated == "Include")) 
-output <- read.csv("../data/Checkpoint_Updated_R_2025-10-14_evening.csv")
-View(output)
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-```{r}
-
-datsel <- merge(Baseline_Map, Updated_Map, by = c("id", "subjid"), all = TRUE) %>% group_by(subjid) %>% filter(any(gcr_result_carrie == "EWMA2 middle" & gcr_result_cp_updated == "Include")) #%>% distinct(subjid)
-# Modified_Characteristics_Table <- merge(data.work, cleaned_data_updated %>% select(-subjid), by = "id")
-
-View(Modified_Characteristics_Table  %>% select(subjid, agedays.x, param.x, sd.orig_uncorr, swtz, measurement, v, gcr_result_carrie, exclude))
-Modified_Characteristics_Table$sd.orig_uncorr
-View(datsel)
-```
-
-
-```{r}
-data.work <- stata_gc_in  %>% mutate(param = case_when(
-  param == "Weight" ~ "WEIGHTKG",
-  param == "Height" ~ "HEIGHTCM",
-  TRUE ~ param
-)) %>% filter(param %in% c("WEIGHTKG", "HEIGHTCM"))
-
-data.work <- data.work %>% mutate(gcr_result_carrie = case_when(
-  param == "WEIGHTKG" ~ exc_wt,
-  param == "HEIGHTCM" ~ exc_ht,
-  TRUE ~ "ERR"
-)) %>% select(-c(exc_wt, exc_ht)) 
-
-
-ewma_dx <- read.csv("../data/ewma2_diagnostics_all.csv")
-review_ewmas <- merge(data.work, ewma_dx, by = "id", all = TRUE)
-View(review_ewmas %>% filter(subjid.x == "199479"))
-
-View(review_ewmas)
-```
-
-**Now, we should compare the EWMA values for our data against the STATA outputs.**
-
-```{R}
-example_mindif_issue <- read.csv("../data/mindiff_debug_NNNNN.csv")
-df <- example_mindif_issue %>%
-  dplyr::select(id,
-    subjid, param, agedays, v, exclude,
-    tbc.sd, ctbc.sd,
-    ewma.all, ewma.before, ewma.after,
-    dewma.all, dewma.before, dewma.after,
-    exp_vals,
-    diff_prev, diff_next,
-    mindiff_prev, mindiff, maxdiff_prev, maxdiff,
-    pair, bef.g.aftm1, aft.g.aftm1
-    # val_excl
-  )
-df
-
-
-View()
-
-# Check pair logic:
-
-if (nrow(df) > 2){
-        # 17P/R: identify pairs and calculate exclusions
-        df[, pair := (v-dplyr::lag(v)) < mindiff_prev |
-             (dplyr::lead(v)-v) < mindiff |
-             (v-dplyr::lag(v)) > maxdiff_prev | (dplyr::lead(v)-v) > maxdiff
-        ]
-  
-  df <- df %>% mutate(pair_Cp_condition1 = (v-dplyr::lag(v)) <= mindiff_prev)
-  df <- df %>% mutate(pair_Cp_condition2 = round(dplyr::lead(v)-v,1) <= mindiff ,
-                      pair_Cp_condition3 = (v-dplyr::lag(v)) >= maxdiff_prev,
-                      pair_Cp_condition4 = (dplyr::lead(v)-v) >= maxdiff,
-                      pair_Cp_condition2_value_1 = round(dplyr::lead(v)-v,1),
-                      pair_Cp_condition2_cp = round(dplyr::lead(v)-v,1) <= mindiff,
-                      mindiff_put = mindiff)
-df  
-
-
-View(Modified_Characteristics_Table)
-
-
-```
-
-
-```{r}
-temp_stata_ewma_middle <- stata_gc_in %>% select(subjid, agedays, id, tbchtz, measurement, param,) %>% filter(param == "HEIGHTCM" & subjid == "16210") %>% arrange(agedays)
-
-tempdf <- calc_and_recenter_z_scores(temp_stata_ewma_middle, "p_plus", ref.data.path)
-
-```
-
-
 
