@@ -1,0 +1,175 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{R}
+data.in <- read.csv("../../data/Data.df_for_new.sde_method2025-11-03.csv", check.names = FALSE) %>% select(-1)
+data.df <- data.in %>% as.data.table()
+View(data.df %>% group_by(agedays, param, subjid) %>% filter(any(exclude == "Exclude-Temporary-Extraneous-Same-Day")))
+```
+
+```{r}
+
+```
+
+```{r}
+# Step 13: Same-Day Extraneous (SDE) logic
+# Applied per subject and parameter (SP)
+# Skips NNTEs.
+data.df <- data.in %>% as.data.table() 
+
+data.df.subs <- data.df %>% group_by(subjid) %>% filter(any(exclude == "Exclude-Temporary-Extraneous-Same-Day")) %>% select(subjid) %>% distinct() %>% slice_sample(n=50)
+data.df <- data.df %>% filter(subjid %in% data.df.subs$subjid)
+
+
+
+data.df <- data.df %>% 
+  as.data.frame() %>% 
+  subset(valid(data.df, include.temporary.extraneous = TRUE) & 
+           nnte_full == FALSE) %>% select(subjid, obsid = id, agedays, param, v, tbc.sd, exclude, nnte_full) %>% group_by(subjid, param, agedays) %>% mutate(
+             sde_this = case_when(
+               any(exclude == "Exclude-Temporary-Extraneous-Same-Day") ~ TRUE,
+               TRUE ~ FALSE)) %>% arrange(subjid, param, agedays, obsid) %>% group_by(subjid, param, agedays) %>% mutate(exclude = case_when(
+                 length(unique(v)) == 1 & 
+                 exclude != "Include" ~ "Exclude-Same-Day-Identical",
+                        TRUE ~ exclude),
+                  # group size of identical values
+                  dup_count = ave(v, v, FUN = length),
+                  # mark duplicates other than the one with the highest obsid
+                  exclude = case_when(
+                    dup_count > 1 & obsid != max(obsid[v == v], na.rm = TRUE) ~ "Exclude-SDE-Identical",
+                    TRUE ~ exclude
+                  ),
+                  absdiff_rel_to_median = case_when(exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") ~
+ abs(tbc.sd-median(tbc.sd, na.rm = TRUE)),
+ TRUE ~ NA)),
+                  
+
+               
+
+data.df
+```
+
+
+temp_status <- ifelse(exclude %in% c("Include", "Exclude-Temporary-Extraneous"), 0, exclude)
+
+  # "eligible_subjid" records the subject ID for rows that are still eligible
+  eligible_subjid <- ifelse(temp_status == 0, subjid, NA)
+
+  # Reverse rank of obsid (highest obsid = smallest rank) for tie-breaking
+  reverse_obsid <- rank(-obsid, ties.method = "first")
+
+  # Determine whether this subject-parameter group contains an SDE group:
+  # an SDE group is defined as having both included and temporarily excluded values.
+  has_sde_group <- any(exclude == "Include" & exclude == "Exclude-Temporary-Extraneous")
+
+  if (has_sde_group) {
+
+    # --- 13B: Identical-Value Groups -------------------------------------
+    # Find all days where multiple measurements were taken (duplicates in agedays)
+    duplicate_days <- agedays[duplicated(agedays) | duplicated(agedays, fromLast = TRUE)]
+
+    for (dd in unique(duplicate_days)) {
+      day_df <- .SD[agedays == dd]
+
+      # If all values for the day are identical, retain the single fully included value
+      if (length(unique(day_df$v)) == 1) {
+        keep_id <- day_df$index[day_df$exclude == "Include"]
+        day_df[, exclude := "Exclude-SDE-Identical"]
+        day_df[index == keep_id, exclude := "Include"]
+
+      } else {
+        # If there are groups of identical values (e.g. 10, 10, 11, 11, 12)
+        for (val in unique(day_df$v)) {
+          val_group <- day_df[v == val]
+          if (nrow(val_group) > 1) {
+            # Keep the record with the highest obsid (possible correction)
+            keep_id <- val_group$index[which.max(val_group$obsid)]
+            day_df[index %in% setdiff(val_group$index, keep_id),
+                   exclude := "Exclude-SDE-Identical"]
+          }
+        }
+      }
+    }
+
+    # --- 13C: One-Day Groups ---------------------------------------------
+    # For SDE groups where only one day has valid included data
+    single_days <- unique(agedays[!duplicated(agedays)])
+    for (dd in single_days) {
+      day_df <- .SD[agedays == dd & temp_status == 0]
+      if (nrow(day_df) == 0) next
+
+      # Median of z-scores for this day
+      median_z <- median(day_df$z)
+      abs_diff_median <- abs(day_df$z - median_z)
+
+      # If all values are far from median (>2 SD), mark them as extreme
+      if (min(abs_diff_median) > 2) {
+        day_df[, exclude := "Exclude-SDE-All-Extreme"]
+
+      } else {
+        # Otherwise retain the one with smallest deviation from median
+        tied <- which(abs_diff_median == min(abs_diff_median))
+
+        if (length(tied) == 1) {
+          keep_id <- day_df$index[tied]
+          day_df[index != keep_id, exclude := "Exclude-SDE-One-Day"]
+
+        } else {
+          # Tie-breaking if multiple candidates equally close to median
+          # Try to use the DOP (Designated Other Parameter) median first
+          dop_df <- .SD[param == get_dop(param[1]) & exclude == "Include"]
+
+          if (nrow(dop_df) > 0) {
+            dop_median <- median(dop_df$z)
+            dop_abs_diff <- abs(day_df$z[tied] - dop_median)
+
+            if (min(dop_abs_diff) != max(dop_abs_diff)) {
+              keep_id <- day_df$index[tied][which.min(dop_abs_diff)]
+            } else {
+              keep_id <- day_df$index[tied][which.max(day_df$obsid[tied])]
+            }
+
+          } else {
+            # If no DOP available, use obsid as fallback
+            keep_id <- day_df$index[tied][which.max(day_df$obsid[tied])]
+          }
+
+          day_df[index != keep_id, exclude := "Exclude-SDE-One-Day"]
+        }
+      }
+    }
+
+    # --- 13D: Multi-Day EWMAs --------------------------------------------
+    # For SDE groups spanning multiple days
+    if (length(unique(agedays)) > 1) {
+      # Use your EWMA calculation function on z-scores
+      ewma_values <- calc_ewma(.SD$z, .SD$agedays)
+      abs_diff_ewma <- abs(.SD$z - ewma_values)
+
+      # Identify the record closest to the EWMA line
+      tied <- which(abs_diff_ewma == min(abs_diff_ewma))
+
+      if (length(tied) == 1) {
+        keep_id <- .SD$index[tied]
+        .SD[index != keep_id, exclude := "Exclude-SDE-EWMA"]
+      } else {
+        keep_id <- .SD$index[tied][which.max(.SD$obsid[tied])]
+        .SD[index != keep_id, exclude := "Exclude-SDE-EWMA"]
+      }
+    }
+
+    # --- Cleanup ----------------------------------------------------------
+    # Synchronize subject tracking after exclusions
+    eligible_subjid <- ifelse(exclude == "Include", subjid, NA)
+  }
+
+  # Return the modified data subset
+  .SD
+
+}, by = .(subjid, param)]
+data.df
+table(data.df$exclude)
+```

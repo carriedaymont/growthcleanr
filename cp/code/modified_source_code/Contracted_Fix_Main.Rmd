@@ -2662,6 +2662,7 @@ library(purrr)
       Sys.time()
     ))
   
+write.csv(data.df, paste("../data/Data.df_for_new.sde_method", Sys.Date(), ".csv", sep = ""))  
   # prepare a list of valid rows and initialize variables for convenience
   valid.rows <- valid(data.df, include.temporary.extraneous = TRUE) &
     !data.df$nnte_full  # does not use the "other"
