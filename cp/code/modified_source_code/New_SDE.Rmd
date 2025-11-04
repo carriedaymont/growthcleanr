@@ -4,22 +4,33 @@ output: html_notebook
 ---
 
 
+```{r}
+library(dplyr)
+library(data.table)
+ # Load Modified code
+files <- list.files("../code/modified_source_code/", pattern = "\\.[rR]$", full.names = TRUE)
+sapply(files, source, local = TRUE)
+invisible(lapply(files, function(f) source(f, chdir = TRUE)))
+source(knitr::purl("../../code/modified_source_code/Contracted_Fix_Main.Rmd", output = tempfile()))
+```
+
 ```{R}
 data.in <- read.csv("../../data/Data.df_for_new.sde_method2025-11-03.csv", check.names = FALSE) %>% select(-1)
-data.df <- data.in %>% as.data.table()
-View(data.df %>% group_by(agedays, param, subjid) %>% filter(any(exclude == "Exclude-Temporary-Extraneous-Same-Day")))
+
 ```
 
 ```{r}
-
+# 64398
 ```
 
 ```{r}
 # Step 13: Same-Day Extraneous (SDE) logic
 # Applied per subject and parameter (SP)
 # Skips NNTEs.
-data.df <- data.in %>% as.data.table() 
-
+data.df <- data.in %>% as.data.table()
+data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
+setkey(data.df, subjid, param, agedays)
+data.df[temporary_extraneous_infants(data.df), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
 data.df.subs <- data.df %>% group_by(subjid) %>% filter(any(exclude == "Exclude-Temporary-Extraneous-Same-Day")) %>% select(subjid) %>% distinct() %>% slice_sample(n=50)
 data.df <- data.df %>% filter(subjid %in% data.df.subs$subjid)
 
@@ -28,23 +39,29 @@ data.df <- data.df %>% filter(subjid %in% data.df.subs$subjid)
 data.df <- data.df %>% 
   as.data.frame() %>% 
   subset(valid(data.df, include.temporary.extraneous = TRUE) & 
-           nnte_full == FALSE) %>% select(subjid, obsid = id, agedays, param, v, tbc.sd, exclude, nnte_full) %>% group_by(subjid, param, agedays) %>% mutate(
+           nnte_full == FALSE) %>% select(subjid, obsid = id, agedays, param, v, tbc.sd, exclude, nnte_full) %>% group_by(subjid, param, agedays) %>% mutate( 
              sde_this = case_when(
                any(exclude == "Exclude-Temporary-Extraneous-Same-Day") ~ TRUE,
-               TRUE ~ FALSE)) %>% arrange(subjid, param, agedays, obsid) %>% group_by(subjid, param, agedays) %>% mutate(exclude = case_when(
-                 length(unique(v)) == 1 & 
-                 exclude != "Include" ~ "Exclude-Same-Day-Identical",
+               TRUE ~ FALSE)) %>% arrange(subjid, param, agedays, obsid) %>% group_by(subjid, param, agedays) %>% mutate(
+                 length(unique(v)),
+                 exclude = case_when(
+                 length(unique(v)) == 1 & obsid != max(obsid, na.rm = TRUE)  ~ "Exclude-SDE-Identical",
                         TRUE ~ exclude),
                   # group size of identical values
                   dup_count = ave(v, v, FUN = length),
                   # mark duplicates other than the one with the highest obsid
                   exclude = case_when(
-                    dup_count > 1 & obsid != max(obsid[v == v], na.rm = TRUE) ~ "Exclude-SDE-Identical",
+                    dup_count > 1 & obsid != max(obsid, na.rm = TRUE) & exclude != "Include" ~ "Exclude-SDE-Identical",
                     TRUE ~ exclude
-                  ),
-                  absdiff_rel_to_median = case_when(exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") ~
- abs(tbc.sd-median(tbc.sd, na.rm = TRUE)),
- TRUE ~ NA)),
+                  ),a
+  median_tbc = median(tbc.sd[exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day")], na.rm = TRUE),
+    absdiff_rel_to_median = case_when(
+      exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") ~ abs(tbc.sd - median_tbc),
+      TRUE ~ NA
+    ),
+  median_tbc_lt2 = ifelse(min(median_tbc, na.rm = TRUE) > 2, TRUE, FALSE),
+  
+                  
                   
 
                

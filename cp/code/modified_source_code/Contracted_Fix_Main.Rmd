@@ -1889,9 +1889,30 @@ temporary_extraneous_infants <- function(df) {
   
   # flag any extraneous value on the same day that is not the minimum distance from the median sd score
   # NOTE: in the case of exact ducplicates, "which.min" will pick the first
-  df[valid.rows &
-       extraneous.this.day, extraneous := seq_along(delta.median.sd) != which.min(delta.median.sd), by =
-       .(subjid, param, agedays)]
+  # df[valid.rows &
+  #      extraneous.this.day & , extraneous := seq_along(delta.median.sd) != which.min(delta.median.sd), by =
+  #      .(subjid, param, agedays)]
+  df[valid.rows & extraneous.this.day, extraneous := {
+  # number of unique tbc.sd values for this day
+  n_unique <- length(unique(tbc.sd))
+  
+  if (n_unique == 1) {
+    # all identical — keep only the highest index
+    keep <- max(index, na.rm = TRUE)
+    index != keep
+  } else {
+    # multiple distinct values — pick one closest to median, break ties by highest index
+    valid_idx <- which(!is.na(delta.median.sd))
+    if (length(valid_idx) <= 1) {
+      rep(FALSE, .N)
+    } else {
+      min_delta <- min(delta.median.sd[valid_idx], na.rm = TRUE)
+      tied <- valid_idx[delta.median.sd[valid_idx] == min_delta]
+      keep <- max(index[tied], na.rm = TRUE)
+      index != keep
+    }
+  }
+}, by = .(subjid, param, agedays)]
   # return the extraneous valid rows (i.e. the ones that should be temporarily excluded)
   return(df$extraneous & valid.rows)
 }
