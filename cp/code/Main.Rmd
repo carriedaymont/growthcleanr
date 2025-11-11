@@ -335,7 +335,7 @@ source(knitr::purl("../code/modified_source_code/Contracted_Fix_Main.Rmd", outpu
 
 # Load in STATA output:
 stata_gc_in <- data.table::fread("../data/2025-10-01-gc-Stata-chopd1p-results.csv")
-
+stata_gc_in_sde_pats <- stata_gc_in %>% group_by(subjid) %>% filter(any(grepl("SDE", exc_ht) | grepl("SDE", exc_wt))) %>% select(subjid) %>% distinct() 
 data.work <- stata_gc_in %>% 
   select(
   id ,
@@ -363,7 +363,7 @@ data.work <- data.work %>% mutate(gcr_result_carrie = case_when(
   TRUE ~ "ERR"
 )) %>% select(-c(exc_wt, exc_ht)) 
 
-# data.work <- data.work %>% filter(subjid %in% conflicted_pats)
+data.work <- data.work %>% filter(subjid %in% stata_gc_in_sde_pats$subjid)
 
 data.work <- as.data.table(data.work)
 setkey(data.work, subjid, param, agedays)
@@ -396,9 +396,10 @@ Modified_Characteristics_Table <- as.data.frame(table(Modified_Characteristics_T
 
 Baseline_Map <- read.csv("../data/baseline_comparison_of_stata_vs_R_2025-10-07.csv") %>% select(id, gcr_result_carrie, gcr_result_cp, subjid)
 
-# cleaned_data_updated <- read.csv("../data/Checkpoint_Updated_R_2025-10-22.csv")
+cleaned_data_updated <- read.csv("../data/Checkpoint_Updated_R_2025-10-22.csv")
 
 Updated_Map <- cleaned_data_updated %>% select(id, subjid, gcr_result_cp_updated = exclude)
+
 Merged_Maps <- merge(Baseline_Map, Updated_Map, by = "id")
 
 # Apply mapping to both columns
@@ -435,6 +436,8 @@ View(cleaned_data_updated %>% filter(subjid %in% IDs_of_interest_ewma_first$subj
 ewmafirstextagedays0_issues <- cleaned_data_updated %>% filter(subjid %in% IDs_of_interest_ewma_first$subjid.x) %>% mutate(row_of_interest = ifelse(id %in% IDs_of_interest_ewma_first$id, 1, 0)) %>% filter(row_of_interest == 1) %>% select(subjid, id, exclude)
 # write.csv(ewmafirstextagedays0_issues, "../data/Ewma2FirstExtOverFlags_agedays0.csv")
 ewmafirstextagedays0_issues
+
+
 ```
 
 ```{r}
