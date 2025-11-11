@@ -447,3 +447,158 @@ stata_new <- read.csv("../data/2025-10-25-gc-Stata-chopd1p-results.csv") %>% mut
 stata_new %>% filter(subjid %in% IDs_of_interest_ewma_first$subjid.x)  %>% filter(agedays == 0)
 ```
 
+
+### 11-11-2025
+
+#### TEST BLOCK
+```{R, include = TRUE}
+library(growthcleanr)
+library(dplyr)
+library(data.table)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(gt)
+
+# Load Modified code
+files <- list.files("../code/modified_source_code/", pattern = "\\.[rR]$", full.names = TRUE)
+sapply(files, source, local = TRUE)
+invisible(lapply(files, function(f) source(f, chdir = TRUE)))
+source(knitr::purl("../code/modified_source_code/Contracted_Fix_Main.Rmd", output = tempfile()))
+
+# Load in STATA output:
+# stata_gc_in <- data.table::fread("../data/2025-10-01-gc-Stata-chopd1p-results.csv")
+
+stata_gc_in <- data.table::fread("../data/2025-11-09-gc-Stata-chopd1p-results.csv")
+stata_gc_in_sde_pats <- stata_gc_in %>% group_by(subjid) %>% filter(any(grepl("SDE", exc_ht) | grepl("SDE", exc_wt))) %>% select(subjid) %>% distinct() 
+data.work <- stata_gc_in %>% 
+  select(
+  id = obsid,
+  subjid,
+  param,
+  sex,
+  agedays,
+  param,
+  measurement,
+  exc_wt,
+  exc_ht,
+  potcorr,
+  tbcwtz,
+  ctbcwtz
+) %>%
+  mutate(param = case_when(
+  param == "Weight" ~ "WEIGHTKG",
+  param == "Height" ~ "HEIGHTCM",
+  TRUE ~ param
+)) %>% filter(param %in% c("WEIGHTKG", "HEIGHTCM"))
+
+data.work <- data.work %>% mutate(gcr_result_carrie = case_when(
+  param == "WEIGHTKG" ~ exc_wt,
+  param == "HEIGHTCM" ~ exc_ht,
+  TRUE ~ "ERR"
+)) %>% select(-c(exc_wt, exc_ht)) 
+
+data.work <- data.work %>% filter(subjid %in% stata_gc_in_sde_pats$subjid)
+
+data.work <- as.data.table(data.work)
+setkey(data.work, subjid, param, agedays)
+cleaned_data_updated <- cleangrowth(
+  subjid = data.work$subjid,
+  param = data.work$param,
+  agedays = data.work$agedays,
+  sex = data.work$sex,
+  measurement = data.work$measurement,
+  prelim_infants = TRUE,
+  id = data.work$id, 
+  sd.recenter = "nhanes"
+)
+
+# write.csv(cleaned_data_updated, paste("../data/Checkpoint_Updated_R_", Sys.Date(), ".csv", sep = ""))
+
+Modified_Characteristics_Table <- merge(data.work, cleaned_data_updated %>% select(id, exclude), by = "id")
+
+# Modified_Characteristics_Table
+Modified_Characteristics_Table <- Modified_Characteristics_Table %>% select(gcr_result_carrie, gcr_result_cp_updated = exclude) %>% mutate(gcr_result_cp_updated = gsub("^Exclude", "", gcr_result_cp_updated),
+                                gcr_result_cp_updated = gsub("-", " ", gcr_result_cp_updated),
+                                gcr_result_cp_updated = str_trim(gcr_result_cp_updated),
+                                gcr_result_carrie = tolower(gcr_result_carrie),
+                                gcr_result_cp_updated = tolower(gcr_result_cp_updated),
+                                results_pasted = paste(gcr_result_carrie, gcr_result_cp_updated, sep = " ; "))
+
+Modified_Characteristics_Table <- as.data.frame(table(Modified_Characteristics_Table$results_pasted)) %>% arrange(desc(Freq))
+# write.csv(Modified_Characteristics_Table, paste("../deliverables/Modified_Characteristics_Table", Sys.Date(), ".csv", sep = ""))
+# Modified_Characteristics_Table
+
+Baseline_Map <- read.csv("../data/baseline_comparison_of_stata_vs_R_2025-10-07.csv") %>% select(id, gcr_result_carrie, gcr_result_cp, subjid)
+
+cleaned_data_updated <- read.csv("../data/Checkpoint_Updated_R_2025-10-22.csv")
+
+Updated_Map <- cleaned_data_updated %>% select(id, subjid, gcr_result_cp_updated = exclude)
+
+Merged_Maps <- merge(Baseline_Map, Updated_Map, by = "id")
+
+# Apply mapping to both columns
+Merged_Maps <- Merged_Maps %>%
+  mutate(
+    gcr_result_cp = map_to_stata(gcr_result_cp),
+    gcr_result_cp_updated = map_to_stata(gcr_result_cp_updated)
+  )
+
+# summarise the data
+tbl <- Merged_Maps %>%
+  count(gcr_result_carrie, gcr_result_cp, gcr_result_cp_updated) %>%
+  arrange(desc(n))
+print_table <- function(tbl){
+# build gt table with conditional coloring
+gt(tbl) %>%
+  fmt_number(columns = "n", sep_mark = ",") %>%
+  
+  # column 1 always green
+  data_color(
+    columns = c(gcr_result_carrie),
+    fn = function(x) rep("#6FCF97", length(x))
+  ) %>%
+  
+  # column 2: green if matches col1, orange otherwise
+  data_color(
+    columns = c(gcr_result_cp),
+    rows = gcr_result_cp == gcr_result_carrie,
+    fn = function(x) rep("#6FCF97", length(x))
+  ) %>%
+  data_color(
+    columns = c(gcr_result_cp),
+    rows = gcr_result_cp != gcr_result_carrie,
+    fn = function(x) rep("#F2994A", length(x))
+  ) %>%
+  
+  # column 3: same logic
+  data_color(
+    columns = c(gcr_result_cp_updated),
+    rows = gcr_result_cp_updated == gcr_result_carrie,
+    fn = function(x) rep("#6FCF97", length(x))
+  ) %>%
+  data_color(
+    columns = c(gcr_result_cp_updated),
+    rows = gcr_result_cp_updated != gcr_result_carrie,
+    fn = function(x) rep("#F2994A", length(x))
+  ) %>%
+  data_color(
+    columns = c(gcr_result_cp_updated),
+    rows = gcr_result_cp == gcr_result_carrie & gcr_result_cp_updated != gcr_result_cp,
+    fn = function(x) rep("maroon", length(x))
+  )
+}
+print_table(tbl)
+
+
+IDs_of_interest <- Merged_Maps %>% filter(gcr_result_carrie == "SDE-EWMA" &
+                         gcr_result_cp == "SDE-One-Day" & 
+                         gcr_result_cp_updated == "SDE-One-Day") 
+
+# View(cleaned_data_updated %>% filter(subjid %in% IDs_of_interest$subjid.x))
+
+# View(cleaned_data_updated %>% filter(subjid %in% IDs_of_interest$subjid.x) %>% mutate(interest_flag = ifelse(id %in% IDs_of_interest$id, 1, 0)))
+
+
+```
+
