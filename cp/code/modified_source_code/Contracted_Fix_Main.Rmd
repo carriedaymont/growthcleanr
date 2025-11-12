@@ -315,7 +315,8 @@ cleangrowth <- function(subjid,
       "Exclude-Absolute-BIV",
       "Exclude-Standardized-BIV",
       "Exclude-Evil-Twins",
-      "Exclude-EWMA1-Extreme"
+      "Exclude-EWMA1-Extreme",
+      "Exclude-SDE-EWMA-All-Extreme"
     )
   } else {
     exclude.levels.peds <- c(
@@ -2881,7 +2882,9 @@ ewma_df[, (ewma.fields) := ewma(agedays, tbc.sd, exp_val, TRUE), by = .(subjid, 
                   min_absdewma = suppressWarnings(min(absdewma[exclude %in% c("Exclude-Temporary-Extraneous-Same-Day",
                                                   "Include")],
                                                       na.rm = TRUE)),
-                  min_absdewma = ifelse(is.infinite(min_absdewma), NA_real_, min_absdewma),
+                  min_absdewma = ifelse(is.infinite(min_absdewma), NA_real_, min_absdewma)) %>% ungroup() %>% mutate(
+                  exclude = case_when(!is.na(min_absdewma) & min_absdewma > 2~"Exclude-SDE-EWMA-All-Extreme",
+                                   TRUE ~ exclude)) %>% group_by(subjid, param, agedays) %>% mutate(
 
                   n_min_absdewma = sum(exclude %in% c("Exclude-Temporary-Extraneous-Same-Day",
                                                   "Include") &
@@ -2938,12 +2941,12 @@ ewma_df[, (ewma.fields) := ewma(agedays, tbc.sd, exp_val, TRUE), by = .(subjid, 
 # print(data.sde)      
 data.df <- merge(data.df, data.sde %>% select(id, sde_exclude = exclude),by = "id", all.x = TRUE) %>% mutate(exclude = case_when(!is.na(sde_exclude) ~ sde_exclude,
                                                                                                           TRUE ~ exclude))
-              
+write.csv(data.sde, "../data/testoutsdeneww.csv")              
 print("AAA")
 data.df <- data.df %>% select(which(names(data.df) %in% keep_cols_sde))
     data.df <- as.data.table(data.df)
     setkey(data.df, subjid, param, agedays)
-write.csv(data.df, "../data/testoutsdeneww.csv")
+
                    
 
 

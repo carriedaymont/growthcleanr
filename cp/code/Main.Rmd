@@ -531,7 +531,7 @@ Modified_Characteristics_Table <- as.data.frame(table(Modified_Characteristics_T
 
 Baseline_Map <- read.csv("../data/baseline_comparison_of_stata_vs_R_2025-10-07.csv") %>% select(id, gcr_result_carrie, gcr_result_cp, subjid)
 
-cleaned_data_updated <- read.csv("../data/Checkpoint_Updated_R_2025-10-22.csv")
+# cleaned_data_updated <- read.csv("../data/Checkpoint_Updated_R_2025-10-22.csv")
 
 Updated_Map <- cleaned_data_updated %>% select(id, subjid, gcr_result_cp_updated = exclude)
 
@@ -580,7 +580,7 @@ gt(tbl) %>%
   data_color(
     columns = c(gcr_result_cp_updated),
     rows = gcr_result_cp_updated != gcr_result_carrie,
-    fn = function(x) rep("#F2994A", length(x))
+    fn = function(x) rep("#F2994A", len  gth(x))
   ) %>%
   data_color(
     columns = c(gcr_result_cp_updated),
@@ -595,10 +595,11 @@ IDs_of_interest <- Merged_Maps %>% filter(gcr_result_carrie == "SDE-EWMA" &
                          gcr_result_cp == "SDE-One-Day" & 
                          gcr_result_cp_updated == "SDE-One-Day") 
 
-# View(cleaned_data_updated %>% filter(subjid %in% IDs_of_interest$subjid.x))
+View(cleaned_data_updated %>% filter(subjid %in% IDs_of_interest$subjid.x))
 
 # View(cleaned_data_updated %>% filter(subjid %in% IDs_of_interest$subjid.x) %>% mutate(interest_flag = ifelse(id %in% IDs_of_interest$id, 1, 0)))
 
+# write.csv(IDs_of_interest, "../data/sde-oneday-folks-11-12-2025.csv")
 
 ```
 
