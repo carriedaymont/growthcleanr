@@ -2777,7 +2777,15 @@ group_by(subjid, param, agedays) %>%
         ) == 1 &
         exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") &
         absdiff_rel_to_median != suppressWarnings(min(absdiff_rel_to_median[exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day")], na.rm = TRUE)) ~ "Exclude-SDE-One-Day",
+      one_day_sde_flag &
+        sum(
+          exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day"),
+          na.rm = TRUE
+        ) == 1 &
+        exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") &
+        absdiff_rel_to_median == suppressWarnings(min(absdiff_rel_to_median[exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day")], na.rm = TRUE)) ~ "Include",
       TRUE ~ exclude
+      
     )) %>%
 
   # -------------------------------------------
@@ -2812,6 +2820,11 @@ group_by(subjid, param, agedays) %>%
         tied_vals > 1 &
         !is.na(absdiff_dop_med) &
         absdiff_dop_med != min_absdiff_dop_median ~ "Exclude-SDE-One-Day",
+      one_day_sde_flag &
+        exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") &
+        tied_vals > 1 &
+        !is.na(absdiff_dop_med) &
+        absdiff_dop_med == min_absdiff_dop_median ~ "Include",
       TRUE ~ exclude
     ),
     tied_vals = sum(exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day"), na.rm = TRUE),
@@ -2820,6 +2833,10 @@ group_by(subjid, param, agedays) %>%
         tied_vals > 1 &
         exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") &
         id != max(id[exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day")], na.rm = TRUE) ~ "Exclude-SDE-One-Day",
+       one_day_sde_flag &
+        tied_vals > 1 &
+        exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") &
+        id == max(id[exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day")], na.rm = TRUE) ~ "Include",
       TRUE ~ exclude
     )
   ) %>%
@@ -2882,8 +2899,9 @@ ewma_df[, (ewma.fields) := ewma(agedays, tbc.sd, exp_val, TRUE), by = .(subjid, 
                   min_absdewma = suppressWarnings(min(absdewma[exclude %in% c("Exclude-Temporary-Extraneous-Same-Day",
                                                   "Include")],
                                                       na.rm = TRUE)),
-                  min_absdewma = ifelse(is.infinite(min_absdewma), NA_real_, min_absdewma)) %>% ungroup() %>% mutate(
-                  exclude = case_when(!is.na(min_absdewma) & min_absdewma > 2~"Exclude-SDE-EWMA-All-Extreme",
+                  min_absdewma = ifelse(is.infinite(min_absdewma), NA_real_, min_absdewma)) %>% mutate(
+                  exclude = case_when(n() >= 2 & exclude %in% c("Exclude-Temporary-Extraneous-Same-Day",
+                                                  "Include") & !is.na(min_absdewma) & min_absdewma > 2 ~ "Exclude-SDE-EWMA-All-Extreme",
                                    TRUE ~ exclude)) %>% group_by(subjid, param, agedays) %>% mutate(
 
                   n_min_absdewma = sum(exclude %in% c("Exclude-Temporary-Extraneous-Same-Day",
@@ -3018,10 +3036,26 @@ data.df <- data.df %>% select(which(names(data.df) %in% keep_cols_sde))
              "after" = abs(df_sub$agedays - c(df_sub$agedays[2:(nrow(df_sub))], NA))
            )
            maxdiff <- sapply(1:nrow(tmp), function(x){max(tmp[x,], na.rm = TRUE)})
-           exp_vals <- rep(-1.5, nrow(tmp))
-           exp_vals[maxdiff > 365.25] <- -2.5
-           exp_vals[maxdiff > 730.5] <- -3.5
-           df_sub[, exp_vals := exp_vals]
+           # exp_vals <- rep(-1.5, nrow(tmp))
+           # exp_vals[maxdiff > 365.25] <- -2.5
+           # exp_vals[maxdiff > 730.5] <- -3.5
+           # df_sub[, exp_vals := exp_vals]
+           
+           
+           df_sub[, c("diff_before", "diff_after") :=
+              .(c(NA, diff(agedays)), c(diff(agedays), NA)),
+              by = .(subjid, param)]
+              
+              # Take the larger gap (the "Ba" value) and convert to years
+              df_sub[, maxdiff := pmax(abs(diff_before), abs(diff_after), na.rm = TRUE)]
+              df_sub[, ageyears := maxdiff / 365.25]
+              
+              # Apply the exact linear exponent rule from the specification
+              df_sub[, exp_vals := fcase(
+              ageyears <= 1, -1.5,
+              ageyears >= 3, -3.5,
+              default = -1.5 - (ageyears - 1)
+              )]
            
            # calculate ewma
            df_sub[, (ewma.fields) := ewma(agedays, tbc.sd, exp_vals, TRUE)]

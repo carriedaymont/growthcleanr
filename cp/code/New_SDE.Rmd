@@ -237,7 +237,7 @@ live_block
 # 106 are just pairs where we selected the opposite one.
 # 15 are different. Let's examine them.
 # After examining them - they appear to be correct in my code - verdict: STATA is picking the wrong ones. 
-
+# I have also validated that include -> ewma2 first seem correct.
 # Identify rows where Carrie and you disagree in the specific SDE-EWMA way
 disagreements <- Eval_dataset %>%
   mutate(type =
@@ -265,12 +265,28 @@ non_paired_mismatches <- live_block %>% mutate(flag = case_when(id %in%non_paire
 # View(non_paired_mismatches)
 table(paired_check$is_clean_pair)
 
-# > View(non_paired_mismatches %>% filter(subjid == "31198") %>% group_by(agedays) %>% filter(any(flag == TRUE)))
+View(non_paired_mismatches %>% filter(subjid == "31198") %>% group_by(agedays) %>% filter(any(flag == TRUE)))
+table <- merge(live_block %>% filter(subjid %in% paired_check$subjid), paired_check %>% select(obsid, gcr_result_carrie), by.x = "id", by.y = "obsid") %>% relocate(gcr_result_carrie, exclude) %>% select(-c(...1, ...2))
+# non_paired_mismatches$
+write.csv(table, paste("../data/Examples_of_SDE-EWMA_Mismatches", Sys.Date(), ".csv", sep = ""))
+
+View(cleaned_data_updated)
 ```
 
 
 ```{r}
 View(cleaned_data_updated %>% group_by(subjid) %>% filter(any(grepl("Temp", exclude))))
+```
+
+
+```{R}
+Eval_dataset <- merge(temp.work, cleaned_data_updated %>% select(obsid = id, exclude), by = "obsid") %>% mutate(gcr_result_carrie = map_to_stata(gcr_result_carrie), exclude = map_to_stata(exclude), res = paste(gcr_result_carrie, exclude))
+Eval_dataset_n <- Eval_dataset %>% group_by(subjid) %>% filter(any((gcr_result_carrie == "Include"  & exclude == "EWMA2 first"))) %>% relocate(gcr_result_carrie, exclude, param)
+
+Eval_dataset_n2 <- Eval_dataset %>% group_by(subjid) %>% filter(any((gcr_result_carrie == "Include"  & exclude == "Exclude-SDE-EWMA-All-Extreme"))) %>% relocate(gcr_result_carrie, exclude, param)
+
+
+View(Eval_dataset_n2)
 ```
 
 ```{r}
