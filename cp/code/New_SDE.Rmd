@@ -98,7 +98,7 @@ tester_stata <- read.csv("../data/temp_sde_tester.csv") %>% mutate(gcr_result_ca
 ))  
 tester.work <- tester_stata %>% arrange(subjid, param, agedays, obsid)
 
-# Load Modified code
+# Load Modified code <- 
 files <- list.files("../code/modified_source_code/", pattern = "\\.[rR]$", full.names = TRUE)
 sapply(files, source, local = TRUE)
 invisible(lapply(files, function(f) source(f, chdir = TRUE)))
@@ -157,7 +157,7 @@ library(growthcleanr)
 library(dplyr)
 library(data.table)
 library(dplyr)
-library(data.table)4
+library(data.table)
 library(stringr)
 library(gt)
 
@@ -179,6 +179,112 @@ source(knitr::purl("../code/modified_source_code/Contracted_Fix_Main.Rmd", outpu
 
 temp.work <- as.data.table(tester.work)
 temp.work <- temp.work #%>% filter(subjid %in% checkpoint$subjid)
+setkey(temp.work, subjid, param, agedays)
+cleaned_data_updated <- cleangrowth(
+  subjid = temp.work$subjid,
+  param = temp.work$param,
+  agedays = temp.work$agedays,
+  sex = temp.work$sex,
+  measurement = temp.work$measurement,
+  prelim_infants = TRUE,
+  id = temp.work$obsid, 
+  sd.recenter = "nhanes",
+  quietly = FALSE
+)
+
+df <- merge(tester_stata %>% select(obsid, gcr_result_carrie), cleaned_data_updated %>% select(obsid = id, exclude), by = "obsid") %>% mutate(gcr_result_carrie = map_to_stata(gcr_result_carrie), exclude = map_to_stata(exclude), res = paste(gcr_result_carrie, exclude))
+
+tbl <- df %>% filter(!gcr_result_carrie == "ERR")%>%
+  count(gcr_result_carrie, exclude) %>%
+  arrange(desc(n))
+print_table <- function(tbl) {
+  gt(tbl) %>%
+    fmt_number(columns = "n", sep_mark = ",") %>%
+    
+    # column 1 always green
+    data_color(
+      columns = c(gcr_result_carrie),
+      fn = function(x) rep("#6FCF97", length(x))
+    ) %>%
+    
+    # column 2: green if matches col1, orange otherwise
+    data_color(
+      columns = c(exclude),
+      rows = exclude == gcr_result_carrie,
+      fn = function(x) rep("#6FCF97", length(x))
+    ) %>%
+    data_color(
+      columns = c(exclude),
+      rows = exclude != gcr_result_carrie,
+      fn = function(x) rep("#F2994A", length(x))
+    )
+}
+print_table(tbl)
+```
+
+```{r}
+Eval_dataset <- merge(temp.work, cleaned_data_updated %>% select(obsid = id, exclude), by = "obsid") %>% mutate(gcr_result_carrie = map_to_stata(gcr_result_carrie), exclude = map_to_stata(exclude), res = paste(gcr_result_carrie, exclude))
+Eval_dataset <- Eval_dataset %>% group_by(subjid) %>% filter(any((gcr_result_carrie == "SDE-EWMA"  & exclude == "Include") | (gcr_result_carrie == "Include"  & exclude == "SDE-EWMA"))) %>% relocate(gcr_result_carrie, exclude, param)
+# live_block <- read_csv("~/Github/Daymont_Contract/growthcleanr/cp/data/testoutsdeneww.csv")
+
+# write.csv(live_block, paste("../data/SDE-EWMA-Include-Flips_Block_", Sys.Date(), ".csv", sep = ""))
+live_block <- read_csv("~/Github/Daymont_Contract/growthcleanr/cp/data/SDE-EWMA-Include-Flips_Block_2025-11-14.csv")
+
+live_block
+ ### Issue Summary as of 11/14/2025:
+# SDE Ewmas - In the 1% there are 121 rows which are Include-STATA and SDE-EWMA-R.
+# SDE Ewmas - In the 1% there are 106 rows which are Include-STATA and SDE-EWMA-R.
+# 106 are just pairs where we selected the opposite one.
+# 15 are different. Let's examine them.
+# After examining them - they appear to be correct in my code - verdict: STATA is picking the wrong ones. 
+
+# Identify rows where Carrie and you disagree in the specific SDE-EWMA way
+disagreements <- Eval_dataset %>%
+  mutate(type =
+           case_when(
+             gcr_result_carrie == "SDE-EWMA" & exclude == "Include" ~ "carrie_SDEEWMA",
+             gcr_result_carrie == "Include"  & exclude == "SDE-EWMA" ~ "R_SDEEWMA",
+             TRUE ~ NA_character_
+           )) %>%
+  filter(!is.na(type))
+# write.csv(disagreements, paste("../data/SDEMismatches", Sys.Date(), ".csv", sep = ""))
+# Now evaluate whether each day-level cluster holds a complementary pair
+paired_check <- disagreements %>%
+  group_by(subjid, param, agedays) %>%
+  mutate(
+    n_carrie_only = sum(type == "carrie_SDEEWMA"),
+    n_you_only    = sum(type == "R_SDEEWMA"),
+    obsid,
+    is_clean_pair = (n_carrie_only == 1 & n_you_only == 1)
+  ) 
+
+non_paired_ids <- paired_check$obsid[paired_check$is_clean_pair == FALSE]
+non_paired_mismatch <- paired_check %>% group_by(subjid) %>% filter(any(is_clean_pair == FALSE))
+non_paired_mismatches <- live_block %>% mutate(flag = case_when(id %in%non_paired_ids ~ TRUE,
+                                                                TRUE ~ FALSE)) %>% group_by(subjid) %>% filter(any(flag == TRUE)) %>% relocate(flag)
+# View(non_paired_mismatches)
+table(paired_check$is_clean_pair)
+
+# > View(non_paired_mismatches %>% filter(subjid == "31198") %>% group_by(agedays) %>% filter(any(flag == TRUE)))
+```
+
+
+```{r}
+View(cleaned_data_updated %>% group_by(subjid) %>% filter(any(grepl("Temp", exclude))))
+```
+
+```{r}
+# Here is a case where our R code did not flag the right one. Let's subset our 1% data to filter for the folks in this SDE problem dataset and re-run:
+tester_stata <- read.csv("../data/2025-11-09-gc-Stata-chopd1p-results.csv") %>% mutate(gcr_result_carrie = case_when(
+  param == "WEIGHTKG" ~ exc_wt,
+  param == "HEIGHTCM" ~ exc_ht,
+  param == "HEADCM" ~ exc_hc
+)) 
+
+tester.work <- tester_stata %>% arrange(subjid, param, agedays, obsid)
+
+temp.work <- as.data.table(tester.work)
+temp.work <- temp.work %>% filter(subjid %in% disagreements$subjid)
 setkey(temp.work, subjid, param, agedays)
 cleaned_data_updated <- cleangrowth(
   subjid = temp.work$subjid,
