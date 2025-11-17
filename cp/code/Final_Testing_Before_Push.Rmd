@@ -1,0 +1,256 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+### Final Testing before prod branch merge
+
+### 1Pct File Work
+
+```{R}
+library(growthcleanr)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(gt)
+```
+
+```{R}
+### Helper Functions:
+print_table <- function(tbl) {
+  gt(tbl) %>%
+    fmt_number(columns = "n", sep_mark = ",") %>%
+    
+    # column 1 always green
+    data_color(
+      columns = c(gcr_result_carrie),
+      fn = function(x) rep("#6FCF97", length(x))
+    ) %>%
+    
+    # column 2: green if matches col1, orange otherwise
+    data_color(
+      columns = c(exclude),
+      rows = exclude == gcr_result_carrie,
+      fn = function(x) rep("#6FCF97", length(x))
+    ) %>%
+    data_color(
+      columns = c(exclude),
+      rows = exclude != gcr_result_carrie,
+      fn = function(x) rep("#F2994A", length(x))
+    )
+}
+source_new_code <- function() {
+  files <- list.files("../code/modified_source_code/", pattern = "\\.[rR]$", full.names = TRUE)
+  invisible(lapply(files, source))
+  tmp <- knitr::purl(
+    "../code/modified_source_code/Contracted_Fix_Main.Rmd",
+    output = tempfile()
+  )
+  source(tmp, chdir = TRUE)
+}
+
+map_to_stata <- function(x) {
+  case_when(
+    # --- Carry-forward family ---
+    x == "Exclude-1-CF-deltaZ-<0.05" ~ "1 CF deltaZ <0.05",
+    x == "Exclude-1-CF-deltaZ-<0.1-wholehalfimp" ~ "1 CF imperial deltaZ <0.1",
+    x == "Exclude-Teen-2-plus-CF-deltaZ-<0.05" ~ "Carried forward",
+    x == "Exclude-Carried-Forward" ~ "Carried forward",
+
+    # --- Measurement count flags ---
+    x == "Exclude-1-meas" ~ "1 meas",
+    x == "Exclude-2-meas-<1-year" ~ "2 meas <1 year",
+    x == "Exclude-2-meas->1-year" ~ "2 meas >1 year",
+
+    # --- Biologically implausible values ---
+    x == "Exclude-Absolute-BIV" ~ "Absolute BIV",
+    x == "Exclude-Standardized-BIV" ~ "Standardized BIV",
+
+    # --- EWMA steps ---
+    x == "Exclude-EWMA1-Extreme" ~ "EWMA1 high sum",
+    x == "Exclude-EWMA2-middle" ~ "EWMA2 middle",
+    x == "Exclude-EWMA2-first" ~ "EWMA2 first",
+    x == "Exclude-EWMA2-first-ext" ~ "EWMA2 first ext",
+    x == "Exclude-EWMA2-last" ~ "EWMA2 last",
+    x == "Exclude-EWMA2-birth-HT-HC" ~ "EWMA2 birth HT HC",
+    x == "Exclude-EWMA2-birth-HT-HC-ext" ~ "EWMA2 birth HT HC ext",
+    x == "Exclude-EWMA2-birth-WT" ~ "EWMA2 birth WT",
+
+    # --- Evil twins step ---
+    x == "Exclude-Evil-Twins" ~ "Evil Twins",
+
+    # --- Diff-based flags ---
+    x == "Exclude-Min-diff" ~ "Min diff",
+    x == "Exclude-Max-diff" ~ "Max diff",
+
+    # --- SDEs (same-day extraneous) ---
+    x == "Exclude-SDE-All-Exclude" ~ "SDE-All-Exclude",
+    x == "Exclude-All-Extreme" ~ "All-Extreme",
+    x == "Exclude-SDE-All-Extreme" ~ "SDE-All-Extreme",
+    x == "Exclude-SDE-EWMA" ~ "SDE-EWMA",
+    x == "Exclude-SDE-Identical" ~ "SDE-Identical",
+    x == "Exclude-SDE-One-Day" ~ "SDE-One-Day",
+
+    # --- Miscellaneous / other ---
+    x == "Include" ~ "Include",
+    x == "Exclude-Error-load" ~ "Error load",
+    TRUE ~ x
+  )
+}
+```
+
+```{r, eval = FALSE}
+# Handle 100% Data Loading and Filtering, Save to file.
+
+# Subset data to represent the 1% file which we have been testing our code on.
+# one_percent_subjids <- read.csv("../data/2025-11-09-gc-Stata-chopd1p-results.csv") %>% select(subjid) %>% distinct()
+# # Load in 100% data.
+# full_dataset_carrie <- fread(
+#   "../data/2025-11-15-gc-Stata-chopdall-results.csv",
+#   select = c(
+#     "subjid", "agedays", "sex", "obsid",
+#     "exc_ht", "exc_wt", "exc_hc", "measurement", "param"
+#   )
+# ) %>%
+#   mutate(
+#     gcr_result_carrie = dplyr::case_when(
+#       param == "WEIGHTKG" ~ exc_wt,
+#       param == "HEIGHTCM" ~ exc_ht,
+#       param == "HEADCM"   ~ exc_hc
+#     )
+#   )
+# 
+#   # Subset it to our 1% sample group.
+# full_dataset_carrie <- full_dataset_carrie %>%  filter(subjid %in% one_percent_subjids$subjid)
+# # Write out to preserve.
+# write.csv(full_dataset_carrie, paste("../data/one_percent_dataset", Sys.Date(), ".csv", sep = ""))
+
+# Read in.
+data_in <- read.csv("../data/one_percent_dataset2025-11-17.csv")
+# Arrange.
+data.work <- data_in %>% arrange(subjid, param, agedays, obsid) %>% as.data.table()
+# Source our modified code.
+source_new_code()
+
+setkey(data.work, subjid, param, agedays)
+
+# Run cleangrowth.
+cleaned_data_updated <- cleangrowth(
+  subjid = data.work$subjid,
+  param = data.work$param,
+  agedays = data.work$agedays,
+  sex = data.work$sex,
+  measurement = data.work$measurement,
+  prelim_infants = TRUE,
+  id = data.work$obsid, 
+  sd.recenter = "nhanes",
+  quietly = FALSE
+)
+
+# View(cleaned_data_updated)
+
+# Compare results.
+df <- merge(data.work %>% select(obsid, gcr_result_carrie, subjid), 
+            cleaned_data_updated %>% select(obsid = id, exclude),
+            by = "obsid") %>% 
+  mutate(gcr_result_carrie = 
+         map_to_stata(gcr_result_carrie), 
+         exclude = map_to_stata(exclude), 
+         res = paste(gcr_result_carrie, exclude))
+
+# write.csv(df, paste("../data/1PCTComparison", Sys.Date(), ".csv", sep = ""))
+
+tbl <- df %>%
+  count(gcr_result_carrie, exclude) %>%
+  arrange(desc(n))
+
+print_table(tbl)
+
+```
+
+```{r}
+## There appears to be a problem with carried forwards in this new dataset. It's unlikely that it's an R problem but we should evaluate.
+Carried_Forward_Mismatch <- df %>% filter(res == "Include Carried forward")
+Carried_Forward.work <- merge(data.work %>% mutate(CF_Mismatch_Flag = ifelse(obsid %in% Carried_Forward_Mismatch$obsid, 1, 0)) %>% filter(subjid %in% Carried_Forward_Mismatch$subjid), cleaned_data_updated %>% select(obsid = id,  exclude), by = "obsid")
+```
+
+```{r}
+# The SDE-EWMAs are still flipped in choice, but I think R is correct. We have evaluated them enough to see the R code is using the correct (or at least internally consistent) decision-making logic.
+```
+
+```{R}
+# Now, evaluate Inclde EWMA2 middle
+EWMA2_Middle_Mismatch <- df %>% filter(res == "Include EWMA2 middle")
+EWMA2_Middle_Mismatch.work <- merge(data.work %>% mutate(EWMA2_Middle_Mismatch_Flag = ifelse(obsid %in% EWMA2_Middle_Mismatch$obsid, 1, 0)) %>% filter(subjid %in% EWMA2_Middle_Mismatch$subjid), cleaned_data_updated %>% select(obsid = id,  exclude), by = "obsid")
+
+# This one will probably require closer testing and an output DF mid-data stream. However, we've also looked at this for a long time and are confident that the R has been corrected. Let's see if there's direct mismatches.
+# Let's isolate the subjids in this subgroup1 and then re-run our little pipeline.
+
+data.work <- data_in %>% arrange(subjid, param, agedays, obsid) %>% as.data.table()
+
+# Source our modified code.
+source_new_code()
+
+
+tempdf <- data.work %>% filter(subjid %in% EWMA2_Middle_Mismatch.work$subjid)
+setkey(tempdf, subjid, param, agedays)
+# Run cleangrowth.
+cleaned_data_updated <- cleangrowth(
+  subjid = tempdf$subjid,
+  param = tempdf$param,
+  agedays = tempdf$agedays,
+  sex = tempdf$sex,
+  measurement = tempdf$measurement,
+  prelim_infants = TRUE,
+  id = tempdf$obsid, 
+  sd.recenter = "nhanes",
+  quietly = FALSE
+)
+
+# After spotchecking patient (13023):
+# This is apparently correct behavior. Issue pointing to STATA.
+
+```
+
+```{R}
+# Now we're going to check Include -> EWMA2 First.
+table(df$res)
+EWMA2_First_Mismatch <- df %>% filter(res == "Include EWMA2 first")
+EWMA2_First_Mismatch.work <- merge(data.work %>% mutate(EWMA2_First_Mismatch_Flag = ifelse(obsid %in% EWMA2_First_Mismatch$obsid, 1, 0)) %>% filter(subjid %in% EWMA2_First_Mismatch$subjid), cleaned_data_updated %>% select(obsid = id,  exclude), by = "obsid")
+
+
+data.work <- data_in %>% arrange(subjid, param, agedays, obsid) %>% as.data.table()
+
+# Source our modified code.
+source_new_code()
+
+
+tempdf <- data.work %>% filter(subjid %in% EWMA2_First_Mismatch$subjid)
+setkey(tempdf, subjid, param, agedays)
+# Run cleangrowth.
+cleaned_data_updated <- cleangrowth(
+  subjid = tempdf$subjid,
+  param = tempdf$param,
+  agedays = tempdf$agedays,
+  sex = tempdf$sex,
+  measurement = tempdf$measurement,
+  prelim_infants = TRUE,
+  id = tempdf$obsid, 
+  sd.recenter = "nhanes",
+  quietly = FALSE
+)
+
+# This all checks out. Points to STATA issue.
+```
+
+```{r}
+Mindiff_Mismatch <- df %>% filter(res == "Include Min diff" | res == "Min diff Include")
+Mindiff_Mismatch.work <- merge(data.work %>% mutate(EWMA2_First_Mismatch_Flag = ifelse(obsid %in% Mindiff_Mismatch$obsid, 1, 0)) %>% filter(subjid %in% Mindiff_Mismatch$subjid), cleaned_data_updated %>% select(obsid = id,  exclude), by = "obsid")
+View(Mindiff_Mismatch.work)
+
+
+123325 is subjid 2817096 is obsid STATA overflags about 5 measurements in a row here in this ~ 16.5-18 y.o., wehre probably they are fine measurements. Age measurement drops at end by about 8cm, R flags that as mindiff but stata does not.
+126695 is subjid 2895160 is obsid. STATA does not flag this as mindiff. it's a dip in measurement. it technically meets criteria for mindiff.
+
+R captures consistently. I think we should leave the R as is.
+```
