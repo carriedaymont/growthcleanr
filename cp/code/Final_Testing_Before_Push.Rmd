@@ -130,7 +130,10 @@ data_in <- read.csv("../data/one_percent_dataset2025-11-17.csv")
 # Arrange.
 data.work <- data_in %>% arrange(subjid, param, agedays, obsid) %>% as.data.table()
 # Source our modified code.
-source_new_code()
+# source_new_code()
+
+subj_subset <- data_in %>% select(subjid) %>% distinct() %>% slice_sample(n=50) 
+data.work <- data.work %>% filter(subjid %in% subj_subset$subjid)
 
 setkey(data.work, subjid, param, agedays)
 

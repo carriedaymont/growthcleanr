@@ -1,11 +1,30 @@
----
-title: "R Notebook"
-output: html_notebook
----
+# Supporting pediatric growthcleanr functions
+# Supporting functions for pediatric piece of algorithm
 
-#### R-Oxygen Markup (Hidden)
+#' Helper function for cleanbatch to identify subset of observations that are either "included" or a "temporary extraneous"
+#'
+#' @keywords internal
+#' @noRd
+valid <- function(df,
+                  include.temporary.extraneous = FALSE,
+                  include.extraneous = FALSE,
+                  include.carryforward = FALSE) {
+  exclude <- if (is.data.frame(df))
+    df$exclude
+  else
+    df
+  return(
+    exclude < 'Exclude'
+    |
+      include.temporary.extraneous &
+      exclude == 'Exclude-Temporary-Extraneous-Same-Day'
+    | include.extraneous & exclude == 'Exclude-Extraneous-Same-Day'
+    |
+      include.carryforward &
+      exclude == 'Exclude-Carried-Forward'
+  )
+}
 
-```{r}
 # Main growthcleanr algorithm and other exported functions
 # Main growthcleanr algorithm (cleangrowth): adult and pediatric are in *_clean.R
 #(main bulk of algorithm) and *_support.R (supporting functions)
@@ -140,12 +159,6 @@ output: html_notebook
 #'                            parallel = TRUE,
 #'                            num.batches = 2)
 #' }
-```
-
-
-#### Main cleangrowth() function declaration.
-
-```{r}
 cleangrowth <- function(subjid,
                         param,
                         agedays,
@@ -172,7 +185,7 @@ cleangrowth <- function(subjid,
                         weight_cap = Inf,
                         adult_columns_filename = "",
                         prelim_infants = FALSE,
-                        id = NULL){ # CP Added ID column) {
+                        id = NULL) {
   # avoid "no visible binding" warnings
   N <- age_years <- batch <- exclude <- index <- line <- NULL
   newbatch <- sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
@@ -204,8 +217,7 @@ cleangrowth <- function(subjid,
   
   # CP ADD -
   if (!is.null(id)) data.all.ages[, id := id]
-  if (is.null(id)) data.all.ages[, id := seq_len(.N)]
-
+  
   # CP ADD UP
   
   # quality checks
@@ -315,8 +327,7 @@ cleangrowth <- function(subjid,
       "Exclude-Absolute-BIV",
       "Exclude-Standardized-BIV",
       "Exclude-Evil-Twins",
-      "Exclude-EWMA1-Extreme",
-      "Exclude-SDE-EWMA-All-Extreme"
+      "Exclude-EWMA1-Extreme"
     )
   } else {
     exclude.levels.peds <- c(
@@ -595,7 +606,8 @@ cleangrowth <- function(subjid,
       fentlms_forz <- fread(
         system.file(file.path("extdata", "fentlms_forz.csv.gz"),
                     package = "growthcleanr"))
-
+      ##### CP MOD DOWN #####
+      
       # add age in months
       data.all[, agemonths := agedays / 30.4375]
       
@@ -613,10 +625,12 @@ cleangrowth <- function(subjid,
       # ensure it sticks around through merges
       setkey(data.all, subjid, param, agedays)
       
+
+      ### CP MODIFY ###
       # integer weight is in grams, rounded to the nearest 10
       data.all[potcorr == TRUE, intwt := trunc(v*100)*10]
       # data.all[potcorr == TRUE, intwt := round(v*10)]
-      # write.csv(fentlms_foraga, "../data/fentlms_foraga.csv")
+      write.csv(fentlms_foraga, "../data/fentlms_foraga.csv")
       # replace to facilitate merging with fenton curves
       data.all[intwt >= 250 & intwt <=560, intwt := 570]
       
@@ -712,7 +726,7 @@ cleangrowth <- function(subjid,
       data.all[potcorr == TRUE & pmagedays >= 350 & agedays <= 730 & !is.na(sd.c_who),
                sd.corr := sd.c_who]
       
-      # table(data.all$potcorr, is.na(data.all$sd.corr))
+      table(data.all$potcorr, is.na(data.all$sd.corr))
       print("AAA")
       print(summary(data.all[potcorr == TRUE, sd.corr - sd.orig]))
       
@@ -723,30 +737,20 @@ cleangrowth <- function(subjid,
       smooth_val <- data.all$agedays/365.25 >= 2 &
         data.all$agedays/365.25 <= 4 &
         data.all$param != "HEADCM"
-      # data.all[smooth_val,
-      #          sd.c := (sd.c_cdc[smooth_val]*cdc_weight[smooth_val] +
-      #                     sd.c_who[smooth_val]*who_weight[smooth_val])/2]
       data.all[smooth_val,
-  sd.c := (sd.c_cdc*((agedays/365.25) - 2) +
-           sd.c_who*(4 - (agedays/365.25))) / 2]
+               sd.c := (sd.c_cdc[smooth_val]*cdc_weight[smooth_val] +
+                          sd.c_who[smooth_val]*who_weight[smooth_val])/2]
       
       # otherwise use WHO and CDC for older and younger, respectively
-      # who_val <- data.all$param == "HEADCM" |
-      #   data.all$agedays/365.25 < 2
-      # data.all[who_val | (smooth_val & is.na(data.all$sd.c_cdc)),
-      #          sd.c := data.all$sd.c_who[who_val  | (smooth_val & is.na(data.all$sd.c_cdc))]]
-      # 
-      # cdc_val <- data.all$param != "HEADCM" |
-      #   data.all$agedays/365.25 > 4
-      # data.all[cdc_val | (smooth_val & is.na(data.all$sd.c_who)),
-      #          sd.c := data.all$sd.c_cdc[cdc_val | (smooth_val & is.na(data.all$sd.c_who))]]
+      who_val <- data.all$param == "HEADCM" |
+        data.all$agedays/365.25 < 2
+      data.all[who_val | (smooth_val & is.na(data.all$sd.c_cdc)),
+               sd.c := data.all$sd.c_who[who_val  | (smooth_val & is.na(data.all$sd.c_cdc))]]
       
-      data.all[
-  (param == "HEADCM") |
-  (agedays/365.25 < 2) |
-  (smooth_val & is.na(sd.c_cdc)),
-  sd.c := sd.c_who
-]
+      cdc_val <- data.all$param != "HEADCM" |
+        data.all$agedays/365.25 > 4
+      data.all[cdc_val | (smooth_val & is.na(data.all$sd.c_who)),
+               sd.c := data.all$sd.c_cdc[cdc_val | (smooth_val & is.na(data.all$sd.c_who))]]
       ### CP REPLACCE BLOCK BELOW 
       # # smooth corrected and uncorrected z scores
       # uncorrweight <-  4 - (data.all$agedays/365.25)
@@ -769,26 +773,15 @@ cleangrowth <- function(subjid,
       ### CP WORK BELOW
       
       # smooth corrected and uncorrected z scores (2–4y)
-      # uncorrweight <- 4 - (data.all$agedays/365.25)
-      # corrweight <- (data.all$agedays/365.25) - 2
-      # smooth_val <- data.all$agedays/365.25 >= 2 &
-      #   data.all$agedays/365.25 <= 4
-      # 
-      # data.all[smooth_val & !is.na(sd.c) & !is.na(sd.orig),
-      #          sd.corr := (sd.orig[smooth_val]*uncorrweight[smooth_val] +
-      #                        sd.c[smooth_val]*corrweight[smooth_val]) / 2]
+      uncorrweight <- 4 - (data.all$agedays/365.25)
+      corrweight <- (data.all$agedays/365.25) - 2
+      smooth_val <- data.all$agedays/365.25 >= 2 &
+        data.all$agedays/365.25 <= 4
 
-      data.all[
-  (agedays/365.25 >= 2) &
-  (agedays/365.25 <= 4) &
-  !is.na(sd.c) &
-  !is.na(sd.orig),
+      data.all[smooth_val & !is.na(sd.c) & !is.na(sd.orig),
+               sd.corr := (sd.orig[smooth_val]*uncorrweight[smooth_val] +
+                             sd.c[smooth_val]*corrweight[smooth_val]) / 2]
 
-  sd.corr :=
-    (sd.orig * (4 - agedays/365.25) +
-     sd.c     * ((agedays/365.25) - 2)) / 2
-]
-      
       # <2y corrected (Fenton/WHO)
       data.all[agedays/365.25 <= 2 & potcorr == TRUE & !is.na(sd.c),
                sd.corr := sd.c]
@@ -836,7 +829,7 @@ cleangrowth <- function(subjid,
       orig_colnames <- c(orig_colnames, "sd.corr")
       
       # remove many added columns
-      # write.csv(data.all, "../data/midpoint_check_corrected_zscores.csv")
+      write.csv(data.all, "../data/midpoint_check_corrected_zscores.csv")
       data.all <- data.all[, colnames(data.all) %in% c(orig_colnames, id),
                            with = FALSE]
       
@@ -1316,7 +1309,7 @@ cleangrowth <- function(subjid,
       sort = FALSE
     )
     # Merge checkpoint diagnostics by ID
-    all_results <- merge(all_results, checkpoint_data %>% select(-c(subjid, param, agedays)), by = "id", all.x = TRUE)
+    all_results <- merge(all_results, checkpoint_data, by = "id", all.x = TRUE)
     all_results <- all_results[match(data.all.ages$id, all_results$id)]
     
     # restore original row order
@@ -1333,12 +1326,9 @@ cleangrowth <- function(subjid,
     return(data.table())
   }
   
+  
 }
-```
 
-#### Read_anthro
-
-```{r}
 #' Function to calculate z-scores and csd-scores based on anthro tables.
 #'
 #' @param path Path to supplied reference anthro data. Defaults to package anthro tables.
@@ -1908,30 +1898,9 @@ temporary_extraneous_infants <- function(df) {
   
   # flag any extraneous value on the same day that is not the minimum distance from the median sd score
   # NOTE: in the case of exact ducplicates, "which.min" will pick the first
-  # df[valid.rows &
-  #      extraneous.this.day & , extraneous := seq_along(delta.median.sd) != which.min(delta.median.sd), by =
-  #      .(subjid, param, agedays)]
-  df[valid.rows & extraneous.this.day, extraneous := {
-  # number of unique tbc.sd values for this day
-  n_unique <- length(unique(tbc.sd))
-  
-  if (n_unique == 1) {
-    # all identical — keep only the highest index
-    keep <- max(index, na.rm = TRUE)
-    index != keep
-  } else {
-    # multiple distinct values — pick one closest to median, break ties by highest index
-    valid_idx <- which(!is.na(delta.median.sd))
-    if (length(valid_idx) <= 1) {
-      rep(FALSE, .N)
-    } else {
-      min_delta <- min(delta.median.sd[valid_idx], na.rm = TRUE)
-      tied <- valid_idx[delta.median.sd[valid_idx] == min_delta]
-      keep <- max(index[tied], na.rm = TRUE)
-      index != keep
-    }
-  }
-}, by = .(subjid, param, agedays)]
+  df[valid.rows &
+       extraneous.this.day, extraneous := seq_along(delta.median.sd) != which.min(delta.median.sd), by =
+       .(subjid, param, agedays)]
   # return the extraneous valid rows (i.e. the ones that should be temporarily excluded)
   return(df$extraneous & valid.rows)
 }
@@ -1992,38 +1961,31 @@ calc_and_recenter_z_scores <- function(df, cn, ref.data.path){
   df[, cn.orig_cdc := measurement.to.z(param, agedays, sex, get(cn), TRUE)]
   df[, cn.orig_who := measurement.to.z_who(param, agedays, sex, get(cn), TRUE)]
   
-  # smooth z-scores/SD scores between ages 2-4yo using weighted scores
+  # smooth z-scores/SD scores between ages 1 - 3yo using weighted scores
   # older uses cdc, younger uses who
   who_weight <- 4 - (df$agedays/365.25)
   cdc_weight <- (df$agedays/365.25) - 2
   
-  smooth_val <- df$agedays/365.25 >= 2 & df$agedays/365.25 <= 4 & df$param != "HEADCM"
-  
+  smooth_val <- df$agedays/365.25 >= 2 &
+    df$agedays/365.25 <= 4 &
+    df$param != "HEADCM"
   df[smooth_val,
      cn.orig := (cn.orig_cdc[smooth_val]*cdc_weight[smooth_val] +
                    cn.orig_who[smooth_val]*who_weight[smooth_val])/2]
   
   # otherwise use WHO and CDC for older and younger, respectively
-  ### CP REPLACE D
-  # who_val <- df$param == "HEADCM" |
-  #   df$agedays/365.25 < 2
-  # df[who_val | (smooth_val & is.na(df$cn.orig_cdc)),
-  #    cn.orig := df$cn.orig_who[who_val  | (smooth_val & is.na(df$cn.orig_cdc))]]
+  who_val <- df$param == "HEADCM" |
+    df$agedays/365.25 < 2
+  df[who_val | (smooth_val & is.na(df$cn.orig_cdc)),
+     cn.orig := df$cn.orig_who[who_val  | (smooth_val & is.na(df$cn.orig_cdc))]]
   
-  who_val <- df$param == "HEADCM" | df$agedays/365.25 < 2
-  df[who_val, cn.orig := df$cn.orig_who[who_val]]
-
-  cdc_val <- df$param != "HEADCM" | df$agedays/365.25 > 4
-  df[cdc_val, cn.orig := df$cn.orig_who[cdc_val]]
-
+  cdc_val <- df$param != "HEADCM" |
+    df$agedays/365.25 > 4
+  df[cdc_val | (smooth_val & is.na(df$cn.orig_who)),
+     cn.orig := df$cn.orig_cdc[cdc_val | (smooth_val & is.na(df$sd.orig_who))]]
   
-  # df[cdc_val | (smooth_val & is.na(df$cn.orig_who)), cn.orig := df$cn.orig_cdc[cdc_val | (smooth_val & is.na(df$sd.orig_who))]]
-
-
-     ### CP REPLACE U
   # now recenter -- already has the sd.median from the original recentering
   setkey(df, subjid, param, agedays)
-  
   df[, tbc.cn := cn.orig - sd.median]
   
   # rename ending column
@@ -2081,6 +2043,7 @@ cleanbatch_infants <- function(data.df,
   max.whoinc.1.ht <- max.whoinc.2.ht <- max.whoinc.3.ht <- max.whoinc.4.ht <- NULL
   max.whoinc.6.ht <- maxdiff.next.ht <- maxdiff.prev.ht <- median.other.sd <- NULL
   min.ht.vel <- mindiff.next.ht <- mindiff.prev.ht <- pair <- pair.next <- NULL
+  pair.prev <- param <- param.other <- prev.v <- sd.median <- sex <- subjid <- NULL
   swap.flag.1 <- swap.flag.2 <- tanner.months <- tbc.other.sd <- tbc.sd <- NULL
   tbc.sd.d <- tbc.sd.max <- tbc.sd.min <- tbc.sd.minus <- tbc.sd.next <- tbc.sd.plus <- NULL
   tbc.sd.prev <- tbc.sd.sw <- tbc.sd.t <- temp.diff <- temp.exclude <- v <- NULL
@@ -2160,12 +2123,11 @@ cleanbatch_infants <- function(data.df,
     # and non single values
     tmp <- table(paste0(data.df$subjid, "_", data.df$param))
     not_single <- paste0(data.df$subjid, "_", data.df$param) %in% names(tmp)[tmp > 1]
-    # CP TOGGLED TO FALSE but then back to true because nothing changed?
     valid_set <- valid(data.df, include.temporary.extraneous = TRUE) &
       !data.df$nnte_full &
       not_single
     data.sub <- data.df[valid_set,]
-    # CP TOGGLED UP TO OFF
+    
     # for ease, order by subject, parameter, and agedays
     data.sub <- data.sub[order(subjid, param, agedays)]
     
@@ -2176,82 +2138,20 @@ cleanbatch_infants <- function(data.df,
     data.sub[no_sde == TRUE, cf :=  (v.orig - shift(v.orig)) == 0, by = c("subjid", "param")]
     data.sub[is.na(cf), cf := FALSE]
     
- library(dplyr)
-library(purrr)
-
-    ### VERSION CP which switches out of data.table() to process/troubleshoot ### 
-    
-    data.temp <- as.data.frame(data.sub) %>%
-    arrange(subjid, param, agedays) %>%
-    group_by(subjid, param) %>%
-    mutate(
-      cf = map_lgl(
-        seq_along(agedays),
-        function(i) {
-          # first observation can't be carried forward
-          if (i == 1) return(FALSE)
-          # find the immediately previous unique ageday for this subject/param
-          prev_ages <- unique(agedays[agedays < agedays[i]])
-          if (length(prev_ages) == 0) return(FALSE)
-          prev_age <- max(prev_ages)
-          # get all values from that previous ageday
-          prev_vals <- v.orig[agedays == prev_age]
-          # if current value matches any of those (within tolerance), flag as CF
-          any(abs(v.orig[i] - prev_vals) < 1e-6)
+    # for values with sdes, compare to all values from the prior day
+    data.sub[no_sde == FALSE, cf := (function(df){
+      ages <- unique(agedays)
+      if (length(ages) > 1){
+        for (i in 2:length(ages)) {
+          # find the set of measurements from the previous age in days
+          all.prev.v <- df[agedays == ages[i - 1], v.orig]
+          # if a measurement for the current age is found in the set of measurements from the previous age, then mark it as carried forward
+          df[agedays == ages[i] &
+               v.orig %in% all.prev.v, cf := TRUE]
         }
-      )
-    ) %>%
-    ungroup()
-    data.sub <- data.table(data.temp)
-    data.sub <- data.sub[order(subjid, param, agedays)]
-
-#### CP Untested, replicate of above code in data.table() if that sequence of mods works. This will be way faster than dplyr.
-
-# data.temp <- as.data.frame(data.sub) %>%
-#   arrange(subjid, param, agedays) %>%
-#   group_by(subjid, param) %>%
-#   mutate(
-#     cf = map_lgl(
-#       seq_along(agedays),
-#       function(i) {
-#         # first observation can't be carried forward
-#         if (i == 1) return(FALSE)
-# 
-#         # find the immediately previous unique ageday for this subject/param
-#         prev_ages <- unique(agedays[agedays < agedays[i]])
-#         if (length(prev_ages) == 0) return(FALSE)
-#         prev_age <- max(prev_ages)
-# 
-#         # get all values from that previous ageday
-#         prev_vals <- v.orig[agedays == prev_age]
-# 
-#         # if current value matches any of those (within tolerance), flag as CF
-#         any(abs(v.orig[i] - prev_vals) < 1e-6)
-#       }
-#     )
-#   ) %>%
-#   ungroup()
-
-
-
+      }
+    })(copy(.SD)), .SDcols = c('agedays', 'cf', 'v.orig'), by = .(subjid, param)]
     
-   
-    
-    
-    # # for values with sdes, compare to all values from the prior day
-    # data.sub[no_sde == FALSE, cf := (function(df){
-    #   ages <- unique(agedays)
-    #   if (length(ages) > 1){
-    #     for (i in 2:length(ages)) {
-    #       # find the set of measurements from the previous age in days
-    #       all.prev.v <- df[agedays == ages[i - 1], v.orig]
-    #       # if a measurement for the current age is found in the set of measurements from the previous age, then mark it as carried forward
-    #       df[agedays == ages[i] &
-    #            v.orig %in% all.prev.v, cf := TRUE]
-    #     }
-    #   }
-    # })(copy(.SD)), .SDcols = c('agedays', 'cf', 'v.orig'), by = .(subjid, param)]
-    # 
     # merge in the carried forwards
     cf_idx <- data.sub$index[data.sub$cf]
     data.df[index %in% cf_idx, exclude := "Exclude-Carried-Forward"]
@@ -2263,43 +2163,18 @@ library(purrr)
     
     ### CP NOTE - Check closely - potential overwrite of carried forwar
     
-    ### CP DROP IN
+    
     # find out if values are whole or half imperial
-    # data.df[param == "WEIGHTKG",
-    #         wholehalfimp := (v.orig * 2.20462262)%%1 < 0.01]
-    # data.df[param == "HEIGHTCM",
-    #         wholehalfimp := (v.orig * 1.27)%%1 < 0.01]
-    # data.df[param == "HEIGHTCM",
-    #         wholehalfimp := (v.orig * 1.27 / 2)%%1 < 0.01]
-    # data.df[param == "HEADCM",
-    #         wholehalfimp := (v.orig * 1.27)%%1 < 0.01]
-    # data.df[param == "HEADCM",
-    #         wholehalfimp := (v.orig * 1.27 / 2)%%1 < 0.01]
-    # 
-   # determine if measurements are in whole or half imperial units
-
-    # Weight: whole pounds (within 0.01 lb of integer)
     data.df[param == "WEIGHTKG",
-          wholehalfimp := abs((v.orig * 2.20462262) %% 1) < 0.01]
-    
-    # Height: whole or half inches (within 0.01 inch tolerance)
-    data.df[param == "HEIGHTCM", ":="(
-    wholeinch = abs((v.orig / 2.54) %% 1) < 0.01,
-    halfinch  = abs((v.orig / 2.54) %% 0.5) < 0.01
-    )]
+            wholehalfimp := (v.orig * 2.20462262)%%1 < 0.01]
     data.df[param == "HEIGHTCM",
-          wholehalfimp := wholeinch | halfinch]
-    
-    # Head circumference: whole or half inches
-    data.df[param == "HEADCM", ":="(
-    wholeinch = abs((v.orig / 2.54) %% 1) < 0.01,
-    halfinch  = abs((v.orig / 2.54) %% 0.5) < 0.01
-    )]
+            wholehalfimp := (v.orig * 1.27)%%1 < 0.01]
+    data.df[param == "HEIGHTCM",
+            wholehalfimp := (v.orig * 1.27 / 2)%%1 < 0.01]
     data.df[param == "HEADCM",
-          wholehalfimp := wholeinch | halfinch]
-    
-      ### CP UP
-    
+            wholehalfimp := (v.orig * 1.27)%%1 < 0.01]
+    data.df[param == "HEADCM",
+            wholehalfimp := (v.orig * 1.27 / 2)%%1 < 0.01]
     # find string carried forward length
     data.df[, seq_win := sequence(rle(as.character(exclude))$lengths),
             by = c("subjid", "param")]
@@ -2318,15 +2193,10 @@ library(purrr)
       data.df[which(seq_win == 0)+1, "cs"]
     data.df[is.na(seq_win), cs := NA]
     
-    ## CP MOD DOWN
-    
     # find th diff between initial and cf
     data.df[!is.na(seq_win), absdiff :=
-              # abs(sd.orig_uncorr - sd.orig_uncorr[1]),
-            abs(sd.orig_uncorr - shift(sd.orig_uncorr, 1, type = "lag")),
+              abs(sd.orig_uncorr - sd.orig_uncorr[1]),
             by = c("subjid", "param", "cs")]
-    
-    ### CP MOD UP
     
     # handle CFs by case
     data.df[!is.na(seq_win), exclude := (function(df){
@@ -2339,7 +2209,6 @@ library(purrr)
         df[seq_win != 0 & absdiff < .1 & wholehalfimp,
            exclude := "Exclude-1-CF-deltaZ-<0.1-wholehalfimp"]
       } else if (max(seq_win) > 1){
-        
         df[seq_win != 0 & agedays/365.25 > 16 & sex == 1 & absdiff < 0.05,
            exclude := "Exclude-Teen-2-plus-CF-deltaZ-<0.05"]
         df[seq_win != 0 & agedays/365.25 > 17 & sex == 0 & absdiff < 0.05,
@@ -2351,18 +2220,7 @@ library(purrr)
         df[seq_win != 0 & agedays/365.25 > 17 & sex == 0 & absdiff < .1 &
              wholehalfimp,
            exclude := "Exclude-Teen-2-plus-CF-deltaZ-<0.1-wholehalfimp"]
-        ### CP ADD 
-        df[seq_win != 0 & absdiff < 0.05,
-           exclude := "Exclude-1-CF-deltaZ-<0.05"]
-        
-        # use short circuiting to have the lower end covered (>= 0.05)
-        df[seq_win != 0 & absdiff < .1 & wholehalfimp,
-           exclude := "Exclude-1-CF-deltaZ-<0.1-wholehalfimp"]
-        ### CP ADD UP
       }
-      
-      
-      
       
       return(df$exclude)
     })(copy(.SD)),
@@ -2403,9 +2261,9 @@ library(purrr)
             agedays == 0,
           exclude := exc_nam]
   # Max weight for <2y based on eval (see do-file from Oct 10 2022), highest plaus weight 29.5kg
-  # data.df[valid_set & param == "WEIGHTKG" & v < 1 &
-  #           agedays == 0,
-  #         exclude := exc_nam]
+  data.df[valid_set & param == "WEIGHTKG" & v < 1 &
+            agedays == 0,
+          exclude := exc_nam]
   # Max weight for <2y based on eval (see do-file from Oct 10 2022), highest plaus weight 29.5kg
   data.df[valid_set & param == "WEIGHTKG" & v > 35 &
             ageyears < 2,
@@ -2633,7 +2491,6 @@ library(purrr)
           c.dewma.all = ctbc.sd - c.ewma.all
         )]
         
-      
         
         # calculate potential exclusions
         df[valid_set, pot_excl :=
@@ -2701,291 +2558,316 @@ library(purrr)
       Sys.time()
     ))
   
-data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
-data.df[temporary_extraneous_infants(data.df), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
-# View(data.df)
-keep_cols_sde <- names(data.df)
-data.df <- data.df %>%
-  as.data.frame()  %>%
-  # subset(valid(data.df, include.temporary.extraneous = TRUE) & nnte_full == FALSE) %>% mutate(id = id) %>%
-  # select(subjid, id = id, agedays, param, v, tbc.sd, exclude, nnte_full) %>%
-  group_by(subjid, param, agedays) %>%
-  mutate(sde_this = case_when(
-             any(exclude == "Exclude-Temporary-Extraneous-Same-Day") ~ TRUE,
-             TRUE ~ FALSE
-           )) 
-data.sde <- data.df %>%
-  group_by(subjid) %>%
-  filter(valid(cur_data(), include.temporary.extraneous = TRUE) & !nnte_full) %>%
-  mutate(id = id) %>%
-  filter(any(sde_this == TRUE)) %>%
-  arrange(subjid, param, agedays, id) %>%
-  group_by(subjid, param, agedays) %>%
-  mutate(
-    exclude = case_when(
-      length(unique(v)) == 1 &
-        id != max(id, na.rm = TRUE) ~ "Exclude-SDE-Identical",
-      TRUE ~ exclude
-    )
-  ) %>%
-  group_by(subjid, param, agedays, v) %>%
-  mutate(
-    dup_count = n(),
-    exclude = case_when(
-      dup_count > 1 &
-        id != max(id, na.rm = TRUE) &
-        exclude != "Include" ~ "Exclude-SDE-Identical",
-      TRUE ~ exclude
-    )
-  ) 
-data.sde <- data.sde %>% data.table()
-setkey(data.sde, subjid, param, agedays)
-
-
-data.sde[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
-data.sde[temporary_extraneous_infants(data.sde), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
-data.sde <- data.sde %>% as.data.frame() %>% arrange(subjid, param, agedays, id)
-data.sde <- data.sde %>%
-  # -------------------------------------------
-  # Identify subject–parameter pairs eligible for "One-Day SDE" logic
-  # -------------------------------------------
-  group_by(subjid, param) %>%
-  mutate(
-    n_days_with_data = n_distinct(agedays[exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day")]),
-    has_sde_day = any(exclude == "Exclude-Temporary-Extraneous-Same-Day"),
-    one_day_sde_flag = (n_days_with_data == 1 & has_sde_day)
-  ) %>%
+  # prepare a list of valid rows and initialize variables for convenience
+  valid.rows <- valid(data.df, include.temporary.extraneous = TRUE) &
+    !data.df$nnte_full  # does not use the "other"
   
-  # -------------------------------------------
-  # Only run the following steps for one-day SDE subjects/params
-  # -------------------------------------------
-group_by(subjid, param, agedays) %>%
-  mutate(
-    
-    median_tbc = median(tbc.sd[exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day")], na.rm = TRUE),
-    
-    absdiff_rel_to_median = case_when(
-        exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") ~ abs(tbc.sd - median_tbc),
-      TRUE ~ NA
-    ),
-    
-    min_absdiff_rel_to_median = min(absdiff_rel_to_median, na.rm = TRUE),
-    
-    median_tbc_gt2 = ifelse(
-      one_day_sde_flag &
-        min(absdiff_rel_to_median, na.rm = TRUE) > 2,
-      TRUE,
-      FALSE
-    )
-  ) %>% 
-  ungroup() %>% 
-  mutate(
-    exclude = ifelse(
-    !is.na(
-      absdiff_rel_to_median) & min_absdiff_rel_to_median > 2,
-      "Exclude-SDE-All-Extreme",
-      exclude
-    ),
-    exclude = case_when(
-      one_day_sde_flag &
-        sum(
-          exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day"),
-          na.rm = TRUE
-        ) == 1 &
-        exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") &
-        absdiff_rel_to_median != suppressWarnings(min(absdiff_rel_to_median[exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day")], na.rm = TRUE)) ~ "Exclude-SDE-One-Day",
-      one_day_sde_flag &
-        sum(
-          exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day"),
-          na.rm = TRUE
-        ) == 1 &
-        exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") &
-        absdiff_rel_to_median == suppressWarnings(min(absdiff_rel_to_median[exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day")], na.rm = TRUE)) ~ "Include",
-      TRUE ~ exclude
+  data.df <- data.df[valid.rows, exclude := (function(subj_df) {
+    # keep the original indices and exclude to overwrite
+    orig_idx <- copy(subj_df$index)
+    exclude_all <- copy(subj_df$exclude)
+    if (nrow(subj_df) > 0 & any(subj_df$exclude == "Exclude-Temporary-Extraneous-Same-Day")){
+      # for convenience
+      subj_df[, extraneous := exclude == "Exclude-Temporary-Extraneous-Same-Day"]
       
-    )) %>%
-
-  # -------------------------------------------
-  # dop-median tie-breaking logic (applies only to one-day SDEs)
-  # -------------------------------------------
-  group_by(subjid, agedays) %>%
-  mutate(
-    HT_dop_med = ifelse(one_day_sde_flag & param == "HEIGHTCM",
-                        median(tbc.sd[exclude %in% c("Include") & param == "WEIGHTKG"], na.rm = TRUE), NA),
-    WT_dop_med = ifelse(one_day_sde_flag & param == "WEIGHTKG",
-                        median(tbc.sd[exclude %in% c("Include") & param == "HEIGHTCM"], na.rm = TRUE), NA),
-    absdiff_dop_med = case_when(
-      one_day_sde_flag &
-        exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") & param == "HEIGHTCM" ~ abs(tbc.sd - HT_dop_med),
-      one_day_sde_flag &
-        exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") & param == "WEIGHTKG" ~ abs(tbc.sd - WT_dop_med),
-      TRUE ~ NA
-    )
-  ) %>%
-  group_by(subjid, param, agedays) %>%
-  mutate(
-    tied_vals = sum(exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day"), na.rm = TRUE),
-    min_absdiff_dop_median = suppressWarnings(min(absdiff_dop_med, na.rm = TRUE)),
-    n_min_dop = sum(
-      exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") &
-        absdiff_dop_med == min_absdiff_dop_median,
-      na.rm = TRUE
-    ),
-    exclude = case_when(
-      one_day_sde_flag &
-        exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") &
-        tied_vals > 1 &
-        !is.na(absdiff_dop_med) &
-        absdiff_dop_med != min_absdiff_dop_median ~ "Exclude-SDE-One-Day",
-      one_day_sde_flag &
-        exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") &
-        tied_vals > 1 &
-        !is.na(absdiff_dop_med) &
-        absdiff_dop_med == min_absdiff_dop_median ~ "Include",
-      TRUE ~ exclude
-    ),
-    tied_vals = sum(exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day"), na.rm = TRUE),
-    exclude = case_when(
-      one_day_sde_flag &
-        tied_vals > 1 &
-        exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") &
-        id != max(id[exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day")], na.rm = TRUE) ~ "Exclude-SDE-One-Day",
-       one_day_sde_flag &
-        tied_vals > 1 &
-        exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day") &
-        id == max(id[exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day")], na.rm = TRUE) ~ "Include",
-      TRUE ~ exclude
-    )
-  ) %>%
-  ungroup()
-
-              # h. no need to calculate for R.
-
-              # D. SDE-EWMAs
-
-              # a. Calculate EWMA for full included vals
-              ewma_df <- as.data.table(data.sde %>% filter(exclude == "Include"))
-              setkey(ewma_df, subjid, param, agedays)
-              
-              # tmp <- data.frame(
-              #           "before" = abs(ewma_df$agedays - c(NA, ewma_df$agedays[1:(nrow(ewma_df)-1)])),
-              #           "after" = abs(ewma_df$agedays - c(ewma_df$agedays[2:(nrow(ewma_df))], NA))
-              #         )
-              # maxdiff <- pmax(tmp$before, tmp$after, na.rm = TRUE)
-              # # maxdiff <- sapply(1:nrow(tmp), function(x){max(tmp[x,], na.rm = TRUE)})
-              # # exp_vals <- rep(-1.5, nrow(tmp))
-              # # exp_vals[maxdiff > 365.25] <- -2.5
-              # # exp_vals[maxdiff > 730.5] <- -3.5
-              # # approximate continuous exponential decay equivalent to Stata's add(5)
-              # # convert each observation's mean time gap to a smooth exponent
-              # For each subject and parameter, calculate before/after gaps and assign exponent
-              ewma_df[, c("diff_before", "diff_after") :=
-              .(c(NA, diff(agedays)), c(diff(agedays), NA)),
-              by = .(subjid, param)]
-              
-              # Take the larger gap (the "Ba" value) and convert to years
-              ewma_df[, maxdiff := pmax(abs(diff_before), abs(diff_after), na.rm = TRUE)]
-              ewma_df[, ageyears := maxdiff / 365.25]
-              
-              # Apply the exact linear exponent rule from the specification
-              ewma_df[, exp_val := fcase(
-              ageyears <= 1, -1.5,
-              ageyears >= 3, -3.5,
-              default = -1.5 - (ageyears - 1)
-              )]
-
-# Compute EWMA using these exponents
-ewma.fields <- c("ewma.all", "ewma.before", "ewma.after")
-ewma_df[, (ewma.fields) := ewma(agedays, tbc.sd, exp_val, TRUE), by = .(subjid, param)]
-              # avg_gap <- rowMeans(tmp, na.rm = TRUE)
-              # exp_vals <- -1.5 * exp(-avg_gap / 365.25)
-              # ewma.fields <- c('ewma.all', 'ewma.before', 'ewma.after')
-              # ewma_df[, (ewma.fields) := ewma(agedays, tbc.sd, exp_vals, TRUE)] %>% as.data.frame()
-              data.sde <- merge(data.sde, ewma_df %>%
-                                 select(id, which(grepl("ewma", names(ewma_df)))), by = "id", all.x = TRUE)
-              data.sde <- data.sde %>%
-                group_by(subjid, param, agedays) %>%
-                # b. Assign EWMAs to partially included vals.
-                mutate(ewma.all = case_when(is.na(ewma.all) & exclude == "Exclude-Temporary-Extraneous-Same-Day" ~ max(ewma.all[exclude == "Include"], na.rm = TRUE),
-                                            TRUE ~ ewma.all),
-                                                                                 absdewma = abs(tbc.sd - ewma.all)) %>%
-                # c. If there's one fully or partially included value (n_min_absdewma == 1) with the lowest absdewma (absdewma == min_absdewma)
-                mutate(
-                  n_available = sum(exclude %in% c("Exclude-Temporary-Extraneous-Same-Day",
-                                                  "Include"), na.rm = TRUE),
-                  min_absdewma = suppressWarnings(min(absdewma[exclude %in% c("Exclude-Temporary-Extraneous-Same-Day",
-                                                  "Include")],
-                                                      na.rm = TRUE)),
-                  min_absdewma = ifelse(is.infinite(min_absdewma), NA_real_, min_absdewma)) %>% mutate(
-                  exclude = case_when(n() >= 2 & exclude %in% c("Exclude-Temporary-Extraneous-Same-Day",
-                                                  "Include") & !is.na(min_absdewma) & min_absdewma > 2 ~ "Exclude-SDE-EWMA-All-Extreme",
-                                   TRUE ~ exclude)) %>% group_by(subjid, param, agedays) %>% mutate(
-
-                  n_min_absdewma = sum(exclude %in% c("Exclude-Temporary-Extraneous-Same-Day",
-                                                  "Include") &
-                                         absdewma == min_absdewma, na.rm = TRUE),
-                  exclude_flag = NA,
-                   # Rule set 1: single min_absdewma
-    exclude = case_when(
-      n_available > 0 &
-        n_min_absdewma == 1 &
-        exclude %in% c("Exclude-Temporary-Extraneous-Same-Day", "Include") &
-        absdewma == min_absdewma ~ "Include",
-      n_available > 0 &
-        n_min_absdewma == 1 &
-        exclude %in% c("Exclude-Temporary-Extraneous-Same-Day", "Include") &
-        absdewma != min_absdewma ~ "Exclude-SDE-EWMA",
-      TRUE ~ exclude
-    ),
-    exclude_flag = case_when(
-      n_available > 0 &
-        n_min_absdewma == 1 &
-        exclude %in% c("Exclude-Temporary-Extraneous-Same-Day", "Include") ~ 1L,
-      TRUE ~ exclude_flag
-    )
-  ) %>%
-  mutate(
-    # Rule set 2: multiple tied min_absdewma values
-    exclude = case_when(
-      n_available > 0 &
-        n_min_absdewma > 1 &
-        exclude %in% c("Exclude-Temporary-Extraneous-Same-Day", "Include") &
-        absdewma == min_absdewma &
-        id == max(id[absdewma == min_absdewma &
-                       exclude %in% c("Exclude-Temporary-Extraneous-Same-Day", "Include")],
-                  na.rm = TRUE) ~ "Include",
-      n_available > 0 &
-        n_min_absdewma > 1 &
-        exclude %in% c("Exclude-Temporary-Extraneous-Same-Day", "Include") &
-        absdewma == min_absdewma &
-        id != max(id[absdewma == min_absdewma &
-                       exclude %in% c("Exclude-Temporary-Extraneous-Same-Day", "Include")],
-                  na.rm = TRUE) ~ "Exclude-SDE-EWMA",
-      TRUE ~ exclude
-    ),
-    exclude_flag = case_when(
-      n_available > 0 &
-        n_min_absdewma > 1 &
-        exclude %in% c("Exclude-Temporary-Extraneous-Same-Day", "Include") ~ 2L,
-      TRUE ~ exclude_flag
-    )
-  ) %>%
-  ungroup()
+      step <- "Exclude-SDE-Identical"
+      
+      # identify duplicate days
+      dup_days <- unique(subj_df$agedays[subj_df$extraneous])
+      
+      # first, exclude identical measurements on the same day
+      ide_ids <- c() # where we keep the identical ones
+      for (dd in dup_days){
+        # count amount of unique values
+        s_df <- copy(subj_df[subj_df$agedays == dd,])
+        ide_tab <- table(s_df$v)
+        if (any(ide_tab > 1)){
+          # for each identical, keep only the first one, by id
+          # (ordered initially)
+          ide_ids <- c(ide_ids, s_df$index[
+            as.character(s_df$v) %in% names(ide_tab[ide_tab > 1])
+          ][duplicated(
+            s_df$v[
+              as.character(s_df$v) %in% names(ide_tab[ide_tab > 1])
+            ]
+          )])
+        }
+      }
+      criteria <- subj_df$index %in% ide_ids
+      
+      # we're going to update excludes before moving on to the rest of this
+      # subject
+      exclude_all[criteria] <- step
+      
+      subj_df <- subj_df[!criteria,]
+      
+      if (any(criteria)){
+        # reevaluate temp same day
+        subj_df[, extraneous := temporary_extraneous_infants(subj_df)]
+        
+        # identify duplicate days
+        dup_days <- unique(subj_df$agedays[subj_df$extraneous])
+      }
+      
+      # 13B: identify similar groups
+      similar_ids <- c()
+      for (dd in dup_days){
+        # first, calculate if all SDEs on a single day are similar
+        s_df <- copy(subj_df[subj_df$agedays == dd,])
+        
+        similar <- if (subj_df$param[1] == "WEIGHTKG"){
+          max(s_df$v)/min(s_df$v) <= 1.03 & max(s_df$v) - min(s_df$v) <= 2.5
+        } else if (subj_df$param[1] == "HEIGHTCM"){
+          (max(s_df$v) - min(s_df$v) <  2.541 & min(s_df$v) < 127) |
+            (max(s_df$v) - min(s_df$v) <  5.081 & min(s_df$v) >= 127)
+        } else { # head circumference
+          max(s_df$v) - min(s_df$v) <  1.271
+        }
+        
+        if (similar){
+          similar_ids <- c(similar_ids, s_df$index)
+        }
+      }
+      
+      # 13C: exclude non similar groups
+      
+      step <- "Exclude-SDE-All-Exclude"
+      # now the rest!
+      
+      # next, calculate the duplicate ratio -- what proportion of days are
+      # duplicated
+      dup_ratio <-
+        length(unique(subj_df$agedays[duplicated(subj_df$agedays)]))/
+        length(unique(subj_df$agedays))
+      # also check whether or not any same-days are adjacent -- need 4 at least
+      # rolling windows of day differences -- we are looking for 0,x,0
+      if (nrow(subj_df) > 3){
+        roll <- embed(diff(subj_df$agedays), 3)
+        adjacent <- sapply(1:nrow(roll), function(x){
+          all(c(roll[x,1] == 0, roll[x,2] != 0, roll[x,3] == 0))
+        })
+        
+        # get age days & rows that had adjacent
+        idx_roll <- c(embed(1:nrow(subj_df),4)[adjacent,, drop = FALSE])
+        idx_adj <- which(subj_df$agedays %in% subj_df$agedays[idx_roll])
+      } else {
+        adjacent <- FALSE
+        idx_adj <- idx_roll <- c()
+      }
+      
+      # if dup ratio is too high, we exclude all
+      # if adjacent, we exclude only those relevant sdes
+      # same day extraneous -- for strict (default)
+      criteria <-
+        # looser criteria:
+        # 1.	Exclude for ratio if ratio >1/3
+        # 2.	Exclude for adjacent if 2 are adjacent AND ratio >1/4
+        # 3.	Exclude for adjacent if 2 are adjacent AND those 2 are the first 2 or last 2 measurements for the subject/parameter
+        #   note: if the first or last is sde and it's adjacent, by default
+        #   that means it's the first or last two that are adjacent
+        # 4.	Exclude for adjacent if 3 or more are adjacent
+        if (dup_ratio > (1/3)){
+          subj_df$extraneous
+        } else if (
+          (sum(adjacent) == 1 & dup_ratio > (1/4)) |
+          (sum(adjacent) == 1 & c(1) %in% idx_adj) |
+          (sum(adjacent) == 1 &
+           c(nrow(subj_df)) %in% idx_adj) |
+          (sum(adjacent) >= 2)
+        ){
+          # adjacent sum == 1 means 2 are adjacent
+          # only exclude sdes that are adjacent
+          subj_df$agedays %in% subj_df$agedays[idx_roll]
+        } else {
+          rep(FALSE, nrow(subj_df))
+        }
+      # re-include similar groups
+      criteria[subj_df$index %in% similar_ids] <- FALSE
+      
+      # we're going to update excludes before moving on to the rest of this
+      # subject
+      exclude_all[orig_idx %in% subj_df$index[criteria]] <- step
+      
+      subj_df <- subj_df[!criteria,]
+      
+      if (any(criteria)){
+        # reevaluate temp same day
+        subj_df[, extraneous := temporary_extraneous_infants(subj_df)]
+        
+        # identify duplicate days
+        dup_days <- unique(subj_df$agedays[subj_df$extraneous])
+      }
+      
+      step_extreme <- "Exclude-SDE-All-Extreme"
+      step <- "Exclude-SDE-EWMA"
+      # next, check for trivial differences for SDEs on the same day
+      # this only works if there are non-sde days
+      
+      if (any(subj_df$extraneous)){
+        # 13D: calculating ewmas
+        
+        # check for SDEs by EWMA -- alternate calculate excluding other SDEs
+        all_sdes <- duplicated(subj_df$agedays) |
+          duplicated(subj_df$agedays, fromLast = TRUE)
+        
+        # first, calculate which exponent we want to put through (pass a different
+        # on for each exp)
+        tmp <- data.frame(
+          "before" = abs(subj_df$agedays - c(NA, subj_df$agedays[1:(nrow(subj_df)-1)])),
+          "after" = abs(subj_df$agedays - c(subj_df$agedays[2:(nrow(subj_df))], NA))
+        )
+        maxdiff <- sapply(1:nrow(tmp), function(x){max(tmp[x,], na.rm = TRUE)})
+        exp_vals <- rep(-1.5, nrow(tmp))
+        exp_vals[maxdiff > 365.25] <- -2.5
+        exp_vals[maxdiff > 730.5] <- -3.5
+        subj_df[, exp_vals := exp_vals]
+        
+        # calculate the time difference for all values, as well as exponential
+        delta <- as_matrix_delta(subj_df$agedays)
+        delta <- ifelse(delta == 0, 0, (delta) ^ subj_df$exp_vals)
+        
+        rem_ids_extreme <- c()
+        rem_ids <- c()
+        for (dd in dup_days){
+          # first, calculate if all SDEs on a single day are similar
+          s_df <- copy(subj_df[subj_df$agedays == dd,])
+          
+          similar <- if (subj_df$param[1] == "WEIGHTKG"){
+            max(s_df$v)/min(s_df$v) <= 1.03 & max(s_df$v) - min(s_df$v) <= 2.5
+          } else if (subj_df$param[1] == "HEIGHTCM"){
+            (max(s_df$v) - min(s_df$v) <  2.541 & min(s_df$v) < 127) |
+              (max(s_df$v) - min(s_df$v) <  5.081 & min(s_df$v) >= 127)
+          } else { # head circumference
+            max(s_df$v) - min(s_df$v) <  1.271
+          }
+          
+          if (!similar){
+            # 13E
             
-# 
-# print(data.sde)      
-data.df <- merge(data.df, data.sde %>% select(id, sde_exclude = exclude),by = "id", all.x = TRUE) %>% mutate(exclude = case_when(!is.na(sde_exclude) ~ sde_exclude,
-                                                                                                          TRUE ~ exclude))
-# write.csv(data.sde, "../data/testoutsdeneww.csv")              
-print("AAA")
-data.df <- data.df %>% select(which(names(data.df) %in% keep_cols_sde))
-    data.df <- as.data.table(data.df)
-    setkey(data.df, subjid, param, agedays)
-
-                   
-
-
+            # calculate dewma for each SDE on this day
+            dewma <- sapply(1:nrow(s_df), function(x){
+              ind <- subj_df$index == s_df[[x, "index"]]
+              
+              ewma_res <- sum(subj_df$tbc.sd[!all_sdes]*delta[ind,!all_sdes])/
+                sum(delta[ind, !all_sdes])
+              
+              # delta ewma
+              return(s_df$tbc.sd[x] - ewma_res)
+            })
+            absdewma <- abs(dewma)
             
+            if (min(absdewma) > 1){
+              rem_ids_extreme <- c(rem_ids_extreme, s_df$index)
+            } else {
+              de_day <- which.min(abs(dewma))
+              
+              # keep the value with the lowest EWMA -- do not keep rest
+              rem_ids <- c(rem_ids, s_df$index[-de_day])
+            }
+          }
+          # re-include similar groups
+          criteria_extreme <- subj_df$index %in% rem_ids_extreme
+          criteria <- subj_df$index %in% rem_ids
+        }
+        # we're going to update excludes before moving on to the rest of this
+        # subject
+        exclude_all[orig_idx %in% subj_df$index[criteria_extreme]] <- step_extreme
+        exclude_all[orig_idx %in% subj_df$index[criteria]] <- step
+        
+        subj_df <- subj_df[!(criteria | criteria_extreme),]
+        
+        if (any(c(criteria, criteria_extreme))){
+          # reevaluate temp same day
+          subj_df[, extraneous := temporary_extraneous_infants(subj_df)]
+          
+          # identify duplicate days
+          dup_days <- unique(subj_df$agedays[subj_df$extraneous])
+        }
+      }
+      
+      # all remaining are similar
+      step_extreme <- "Exclude-SDE-All-Extreme"
+      step <- "Exclude-SDE-One-Day"
+      if (any(subj_df$extraneous)){
+        # check for SDEs
+        all_sdes <- duplicated(subj_df$agedays) |
+          duplicated(subj_df$agedays, fromLast = TRUE)
+        
+        rem_ids <- c()
+        rem_ids_extreme <- c()
+        for (dd in dup_days){
+          # first, calculate if all SDEs on a single day are similar
+          s_df <- copy(subj_df[subj_df$agedays == dd,])
+          
+          # find the DOP (designated other parameter)
+          dop <-
+            data.df[subjid == s_df$subjid[1] & param == get_dop(s_df$param[1]) &
+                      agedays == s_df$agedays[1],]
+          
+          if (nrow(dop) > 0){
+            # 13F
+            med_diff <- abs(median(dop$tbc.sd)-s_df$tbc.sd)
+            
+            if (min(med_diff) > 2){
+              rem_ids_extreme <- c(rem_ids_extreme, s_df$index)
+            } else {
+              de_day <- which.min(med_diff)
+              
+              # keep the value with the lowest median diff -- do not keep rest
+              rem_ids <- c(rem_ids, s_df$index[-de_day])
+            }
+          } else if (nrow(s_df) > 3){
+            #13G
+            med_diff <- abs(median(s_df$tbc.sd)-s_df$tbc.sd)
+            
+            # if even and the middle two values are equidistant
+            if (nrow(s_df)%%2 == 0 &
+                diff(sort(med_diff)[1:2]) < 1e-8){
+              # if the ageday is even, keep the lower z score; otherwise,
+              # keep higher
+              keep_val <-
+                if (s_df$agedays[1]%%2 == 0){
+                  which(s_df$v == min(s_df$v[order(med_diff)[1:2]]))
+                } else {
+                  which(s_df$v == max(s_df$v[order(med_diff)[1:2]]))
+                }
+              rem_ids <- c(rem_ids, s_df$index[-keep_val])
+            }
+            
+            de_day <- which.min(med_diff)
+            # keep the value with the lowest median diff -- do not keep rest
+            rem_ids <- c(rem_ids, s_df$index[-de_day])
+          } else {
+            # 13H
+            
+            # 2 values, keep based on the age days
+            keep_val <-
+              if (s_df$agedays[1]%%2 == 0){
+                which.min(s_df$v)
+              } else {
+                which.max(s_df$v)
+              }
+            rem_ids <- c(rem_ids, s_df$index[-keep_val])
+          }
+        }
+        
+        # re-include similar groups
+        criteria_extreme <- subj_df$index %in% rem_ids_extreme
+        criteria <- subj_df$index %in% rem_ids
+        # we're going to update excludes before moving on to the rest of this
+        # subject
+        exclude_all[orig_idx %in% subj_df$index[criteria_extreme]] <- step_extreme
+        exclude_all[orig_idx %in% subj_df$index[criteria]] <- step
+      }
+    }
+    
+    # replace all the "exclude temp extraneous" with includes -- other SDEs
+    # were removed
+    exclude_all[exclude_all == "Exclude-Temporary-Extraneous-Same-Day"] <-
+      "Include"
+    
+    return(exclude_all)
+  })(copy(.SD)), by = .(subjid, param), .SDcols = colnames(data.df)]
   
   # 15: moderate EWMA ----
   
@@ -3007,7 +2889,8 @@ data.df <- data.df %>% select(which(names(data.df) %in% keep_cols_sde))
   # work in an a function order to encapsulate and not keep all the additional
   # columns
   
-
+  # calculate plus/minus values
+  
   # order just for ease later
   data.df <- data.df[order(subjid, param, agedays),]
   data.df <- data.df[valid_set, exclude := (function(df) {
@@ -3027,19 +2910,13 @@ data.df <- data.df %>% select(which(names(data.df) %in% keep_cols_sde))
     
     #15c: exclude agedays = 0 for ht, hc
     #15d: calculate ewma -- run within a subject/parameter
-
-    i <- 1
-    df[!((param == "HEIGHTCM" | param == "HEADCM") & agedays == 0),
+    df[(param != "HEIGHTCM" | param != "HEADCM") & agedays != 0,
        exclude := (function(df_sub) {
          # save initial exclusions to keep track
          ind_all <- copy(df_sub$index)
          exclude_all <- copy(df_sub$exclude)
          
          testing <- TRUE
-          df_sub[, first_meas := FALSE]
-          df_sub[agedays != 0 & seq_len(.N) == which.min(agedays[agedays > 0]), 
-                 first_meas := TRUE, 
-       by = .(subjid, param)]  
          
          while (testing & nrow(df_sub) >= 3){
            df_sub[, (ewma.fields) := as.double(NaN)]
@@ -3053,26 +2930,10 @@ data.df <- data.df %>% select(which(names(data.df) %in% keep_cols_sde))
              "after" = abs(df_sub$agedays - c(df_sub$agedays[2:(nrow(df_sub))], NA))
            )
            maxdiff <- sapply(1:nrow(tmp), function(x){max(tmp[x,], na.rm = TRUE)})
-           # exp_vals <- rep(-1.5, nrow(tmp))
-           # exp_vals[maxdiff > 365.25] <- -2.5
-           # exp_vals[maxdiff > 730.5] <- -3.5
-           # df_sub[, exp_vals := exp_vals]
-           
-           
-           df_sub[, c("diff_before", "diff_after") :=
-              .(c(NA, diff(agedays)), c(diff(agedays), NA)),
-              by = .(subjid, param)]
-              
-              # Take the larger gap (the "Ba" value) and convert to years
-              df_sub[, maxdiff := pmax(abs(diff_before), abs(diff_after), na.rm = TRUE)]
-              df_sub[, ageyears := maxdiff / 365.25]
-              
-              # Apply the exact linear exponent rule from the specification
-              df_sub[, exp_vals := fcase(
-              ageyears <= 1, -1.5,
-              ageyears >= 3, -3.5,
-              default = -1.5 - (ageyears - 1)
-              )]
+           exp_vals <- rep(-1.5, nrow(tmp))
+           exp_vals[maxdiff > 365.25] <- -2.5
+           exp_vals[maxdiff > 730.5] <- -3.5
+           df_sub[, exp_vals := exp_vals]
            
            # calculate ewma
            df_sub[, (ewma.fields) := ewma(agedays, tbc.sd, exp_vals, TRUE)]
@@ -3112,7 +2973,7 @@ data.df <- data.df %>% select(which(names(data.df) %in% keep_cols_sde))
                     ((tbc_diff_next < -1 & tbc_diff_plus_next < -1 & tbc_diff_minus_next < -1) | is.na(tbc_diff_next)) &
                     ((tbc_diff_prior < -1 & tbc_diff_plus_prior < -1 & tbc_diff_minus_prior < -1) | is.na(tbc_diff_prior))
            ]
-
+           
            #15G: find all the values for the DOP
            # find the comparison -- making sure to keep only valid rows
            compare_df <- data.df[subjid == df_sub$subjid[1] &
@@ -3129,80 +2990,53 @@ data.df <- data.df %>% select(which(names(data.df) %in% keep_cols_sde))
            #15H: all exclusions
            df_sub$rowind <- 1:nrow(df_sub)
            
-            df_sub[
-            dewma.all > 1 &
-            (c.dewma.all > 1| is.na(c.dewma.all)) &
-            addcrithigh == TRUE &
-            !(seq_len(.N) %in% c(1, .N)),
-            exclude := "Exclude-EWMA2-middle"
-            ]
-            
-            df_sub[
-            dewma.all < -1 &
-            (c.dewma.all < -1 | is.na(c.dewma.all)) &
-            addcritlow == TRUE &
-            !(seq_len(.N) %in% c(1, .N)),
-            exclude := "Exclude-EWMA2-middle"
-            ]
-
-if(unique(df_sub$subjid) == "13023"){
-  # fwrite(df_sub, paste("../data/EWMA2MiddleTest",i, Sys.Date(), ".csv", sep = ""))
-  i <- i + 1
-  
-}
+           #a
+           df_sub[-c(1, nrow(df_sub)),][
+             dewma.all > 1 & (c.dewma.all > 1 | is.na(c.dewma.all)) & addcrithigh,
+             exclude := "Exclude-EWMA2-middle"]
+           df_sub[-c(1, nrow(df_sub)),][
+             dewma.all < -1 & (c.dewma.all < -1 | is.na(c.dewma.all)) & addcritlow,
+             exclude := "Exclude-EWMA2-middle"]
            
            #b
-           df_sub[agedays == 0 & dplyr::lead(agedays) < 365.25 &
+           df_sub[agedays == 0 & agedays[2] < 365.25 &
                     dewma.all > 3 & (c.dewma.all > 3 | is.na(c.dewma.all)) &
                     addcrithigh
                   , exclude := "Exclude-EWMA2-birth-WT"]
-           df_sub[agedays == 0 & dplyr::lead(agedays) < 365.25 &
+           df_sub[agedays == 0 & agedays[2] < 365.25 &
                     dewma.all < -3 & (c.dewma.all < -3 | is.na(c.dewma.all)) &
                     addcritlow
                   , exclude := "Exclude-EWMA2-birth-WT"]
            
            #c
-           df_sub[agedays == 0 & dplyr::lead(agedays) >= 365.25 &
+           df_sub[agedays == 0 & agedays[2] >= 365.25 &
                     dewma.all > 4 & (c.dewma.all > 4 | is.na(c.dewma.all)) &
                     addcrithigh
                   , exclude := "Exclude-EWMA2-birth-WT-ext"]
-           df_sub[agedays == 0 & dplyr::lead(agedays) >= 365.25 &
+           df_sub[agedays == 0 & agedays[2] >= 365.25 &
                     dewma.all < -4 & (c.dewma.all < -4 | is.na(c.dewma.all)) &
                     addcritlow
                   , exclude := "Exclude-EWMA2-birth-WT-ext"]
            
            #d
-           df_sub[first_meas & (dplyr::lead(agedays)-agedays < 365.25) &
+           df_sub[rowind == 1 & agedays[1] != 0 & agedays[2]-agedays[1] < 365.25 &
                     dewma.all > 2 & (c.dewma.all > 2 | is.na(c.dewma.all)) &
                     addcrithigh
                   , exclude := "Exclude-EWMA2-first"]
-           df_sub[first_meas & (dplyr::lead(agedays)-agedays < 365.25) &
+           df_sub[rowind == 1 & agedays[1] != 0 & agedays[2]-agedays[1] < 365.25 &
                     dewma.all < -2 & (c.dewma.all < -2 | is.na(c.dewma.all)) &
                     addcritlow
                   , exclude := "Exclude-EWMA2-first"]
            
            # e
-           df_sub[first_meas & (dplyr::lead(agedays)-agedays) >= 365.25 &
+           df_sub[rowind == 1 & agedays[1] != 0 & agedays[2]-agedays[1] >= 365.25 &
                     dewma.all > 3 & (c.dewma.all > 3 | is.na(c.dewma.all)) &
                     addcrithigh
                   , exclude := "Exclude-EWMA2-first-ext"]
-           df_sub[first_meas & (dplyr::lead(agedays)-agedays) >= 365.25 &
+           df_sub[rowind == 1 & agedays[1] != 0 & agedays[2]-agedays[1] >= 365.25 &
                     dewma.all < -3 & (c.dewma.all < -3 | is.na(c.dewma.all)) &
                     addcritlow
                   , exclude := "Exclude-EWMA2-first-ext"]
-           # CP
-           # df_sub[, check_d_agedays := dplyr::lead(agedays)-agedays]
-           # df_sub[, check_d_agedays_calc := dplyr::lead(agedays)-agedays >= 365.25 ]
-           # df_sub[, check_dewma.all := dewma.all < -3]
-           # df_sub[, check_c.dewma.all := c.dewma.all < -3]
-           # df_sub[, check_addcritlow := addcritlow]           
-           # df_sub[, first_meas := first_meas]
-           # 
-           # 
-           #   if(unique(df_sub$subjid) == "3688" & unique(df_sub$param) == "WEIGHTKG"){
-           #     fwrite(df_sub, "../data/first-ext-diagnostics.csv")
-           #   }
-           # CP 
            
            # f
            df_sub[rowind == nrow(df_sub) &
@@ -3270,8 +3104,6 @@ if(unique(df_sub$subjid) == "13023"){
                     addcritlow
                   , exclude := "Exclude-EWMA2-last-ext-high"]
            
-
-
            # figure out if any of the exclusions hit
            count_exclude <- sum(df_sub$exclude != "Include")
            if (count_exclude > 0){
@@ -3311,19 +3143,10 @@ if(unique(df_sub$subjid) == "13023"){
   # and non single values, and non weight
   tmp <- table(paste0(data.df$subjid, "_", data.df$param))
   not_single <- paste0(data.df$subjid, "_", data.df$param) %in% names(tmp)[tmp > 1]
-  
-  valid_vec <- valid(data.df, include.temporary.extraneous = FALSE)
-  if (length(valid_vec) == 0) stop("valid() returned length 0")
-  
-  valid_set <- valid_vec &
-  !data.df$nnte_full &
-  not_single &
-  data.df$param != "WEIGHTKG"
-  
-  # valid_set <- valid(data.df, include.temporary.extraneous = FALSE) &
-  #   !data.df$nnte_full & # does not use the "other"
-  #   not_single &
-  #   data.df$param != "WEIGHTKG" # do not run on weight
+  valid_set <- valid(data.df, include.temporary.extraneous = FALSE) &
+    !data.df$nnte_full & # does not use the "other"
+    not_single &
+    data.df$param != "WEIGHTKG" # do not run on weight
   
   # work in an a function order to encapsulate and not keep all the additional
   # columns
@@ -3367,25 +3190,11 @@ if(unique(df_sub$subjid) == "13023"){
                    "before" = abs(df_sub$agedays - c(NA, df_sub$agedays[1:(nrow(df_sub)-1)])),
                    "after" = abs(df_sub$agedays - c(df_sub$agedays[2:(nrow(df_sub))], NA))
                  )
-                 # maxdiff <- sapply(1:nrow(tmp), function(x){max(tmp[x,], na.rm = TRUE)})
-                 # exp_vals <- rep(-1.5, nrow(tmp))
-                 # exp_vals[maxdiff > 365.25] <- -2.5
-                 # exp_vals[maxdiff > 730.5] <- -3.5
-                 # df_sub[, exp_vals := exp_vals]
-                  df_sub[, c("diff_before", "diff_after") :=
-              .(c(NA, diff(agedays)), c(diff(agedays), NA)),
-              by = .(subjid, param)]
-                 # Take the larger gap (the "Ba" value) and convert to years
-                  df_sub[, maxdiff := pmax(abs(diff_before), abs(diff_after), na.rm = TRUE)]
-                  df_sub[, ageyears := maxdiff / 365.25]
-                  
-                  # Apply the exact linear exponent rule from the specification
-                  df_sub[, exp_vals := fcase(
-                  ageyears <= 1, -1.5,
-                  ageyears >= 3, -3.5,
-                  default = -1.5 - (ageyears - 1)
-                  )]
-           
+                 maxdiff <- sapply(1:nrow(tmp), function(x){max(tmp[x,], na.rm = TRUE)})
+                 exp_vals <- rep(-1.5, nrow(tmp))
+                 exp_vals[maxdiff > 365.25] <- -2.5
+                 exp_vals[maxdiff > 730.5] <- -3.5
+                 df_sub[, exp_vals := exp_vals]
                  
                  # calculate ewma
                  df_sub[, (ewma.fields) := ewma(agedays, tbc.sd, exp_vals, TRUE)]
@@ -3426,7 +3235,7 @@ if(unique(df_sub$subjid) == "13023"){
                           ((tbc_diff_prior < -1 & tbc_diff_plus_prior < -1 & tbc_diff_minus_prior < -1) | is.na(tbc_diff_prior))
                  ]
                  
-                 #16D: all exclusions=
+                 #16D: all exclusions
                  df_sub$rowind <- 1:nrow(df_sub)
                  
                  #a
@@ -3519,21 +3328,6 @@ if(unique(df_sub$subjid) == "13023"){
   setnames(who.ht.vel, colnames(who.ht.vel), gsub('_', '.', colnames(who.ht.vel)))
   setkey(who.ht.vel, sex, whoagegrp.ht)
   
-  ### CP ADD SECTION ###
-  # ---- FIX: enforce Stata-style WHO binning ----
-  # Convert ages to WHO monthly bins using floor() to match Stata
-  # who.ht.vel[, whoagegrp_ht := as.integer(whoagegrp_ht)]
-  # setkey(who.ht.vel, sex, whoagegrp_ht)
-
-  # When merging into data.df later, derive the same floor-binned variable
-  # data.df[, whoagegrp_ht := floor(agedays / 30.4375)]
-  # setkey(data.df, sex, whoagegrp_ht)
-
-  # Merge using roll=TRUE so values carry forward correctly
-  # data.df <- who.ht.vel[data.df, roll = TRUE]
-  # ---- END FIX ----
-  ### CP ADD SECTION ###
-  
   # read in who hc data
   who_max_hc_vel_path <- ifelse(
     ref.data.path == "",
@@ -3574,16 +3368,11 @@ if(unique(df_sub$subjid) == "13023"){
     
     # save initial exclusions to keep track
     ind_all <- copy(df$index)
-    id_all <- copy(df$id)
-
     exclude_all <- copy(df$exclude)
     
     testing <- TRUE
-    iter_count <- 0
-
+    
     while (testing & nrow(df) > 1){
-        iter_count <- iter_count + 1
-
       # sort df since it got reordered with keys
       df <- df[order(agedays),]
       
@@ -3609,27 +3398,17 @@ if(unique(df_sub$subjid) == "13023"){
         df[d_agedays > .5*365.25 & max.ht.vel < 4*2.54, max.ht.vel := 4*2.54]
         df[d_agedays > 365.25 & max.ht.vel < 8*2.54, max.ht.vel := 8*2.54]
         
-        ### CP ADJUST THIS BLOCK D
-        
         # b
-        df[d_agedays < 365.25, mindiff := .5*min.ht.vel*(d_agedays/365.25)^2-3 ]
+        df[d_agedays < 365.25, mindiff := .5*min.ht.vel*(d_agedays/365.25)-3 ]
         df[d_agedays > 365.25, mindiff := .5*min.ht.vel-3 ]
         df[d_agedays < 365.25,
-           maxdiff := 2*max.ht.vel*(d_agedays/365.25)^1.5 + 5.5 ]
+           maxdiff := 2*min.ht.vel*(d_agedays/365.25)^1.5 + 5.5 ]
         df[d_agedays > 365.25,
-           maxdiff := 2*max.ht.vel*(d_agedays/365.25)^0.33 + 5.5 ]
-        
-        #### CP ADJUST UP
+           maxdiff := 2*min.ht.vel*(d_agedays/365.25)^0.33 + 5.5 ]
         
         # 17D
         # generate the who age group variable
-        # CP change to floor from round
-        ### CP MODIFY THIS to conditional change
-        # df[, whoagegrp.ht := round(agedays/30.4375)]
-        df[agedays/30.4375 <= 24, whoagegrp.ht := round(agedays/30.4375)]
-        ### CP MOdify up to conditional change
-        
-        # CP change to floor from round
+        df[, whoagegrp.ht := round(agedays/30.4375)]
         df[whoagegrp.ht > 24 | dplyr::lead(whoagegrp.ht) > 24,
            whoagegrp.ht := NA]
         
@@ -3641,13 +3420,11 @@ if(unique(df_sub$subjid) == "13023"){
         df[d_agedays >= 107 & d_agedays < 153, whoinc.age.ht := 4]
         df[d_agedays >= 153 & d_agedays < 199, whoinc.age.ht := 6]
         
-        
-        # Chris updated this to >= from ==
         # update the edge intervals
         df[d_agedays < 20, whoinc.age.ht := 1]
-        df[d_agedays == 200, d_agedays := 200]
-        df[d_agedays >= 200, whoinc.age.ht := 6]
-        # Chris updated this to >= from ==
+        df[d_agedays > 199, d_agedays := 200]
+        df[d_agedays == 200, whoinc.age.ht := 6]
+        
         # 17F
         # merge with WHO
         # add the column name we want to grab
@@ -3673,29 +3450,24 @@ if(unique(df_sub$subjid) == "13023"){
         df[, who_mindiff_ht := as.numeric(who_mindiff_ht)]
         df[, who_maxdiff_ht := as.numeric(who_maxdiff_ht)]
         
-        # CP ADD IN OR EQUAL TO FROM < or > 
         # 17G
         df[d_agedays < whoinc.age.ht*30.4375, who_mindiff_ht :=
              who_mindiff_ht * d_agedays/(whoinc.age.ht*30.4375)]
         df[d_agedays > whoinc.age.ht*30.4375, who_maxdiff_ht :=
              who_maxdiff_ht * d_agedays/(whoinc.age.ht*30.4375)]
-         # CP ADD IN OR EQUAL TO FROM < or > 
+        
         df[d_agedays < 9*30.4375, who_mindiff_ht := who_mindiff_ht*.5-3]
         df[d_agedays < 9*30.4375, who_maxdiff_ht := who_maxdiff_ht*2+3]
         
         # 17H
-        ### WAS an error CP below where it said whomindiff for the second on einstead of maxdiff##
         # tanner is implicit
         # greater than 9 months, use tanner if available, otherwise who
         df[(d_agedays < 9*30.4375 | is.na(min.ht.vel)) &
              !is.na(who_mindiff_ht), mindiff := who_mindiff_ht]
         df[(d_agedays < 9*30.4375 | is.na(min.ht.vel)) &
-             !is.na(who_maxdiff_ht), maxdiff := who_maxdiff_ht]
-        
-        ### CP change to -3 from 3
+             !is.na(who_mindiff_ht), maxdiff := who_maxdiff_ht]
         # otherwise, fill in
-        df[is.na(mindiff), mindiff := -3]
-        ### CP change up to -3 from 3
+        df[is.na(mindiff), mindiff := 3]
         # for birth measurements, add allowance of 1.5cm
         df[agedays == 0, mindiff := mindiff - 1.5]
         df[agedays == 0, maxdiff := maxdiff + 1.5]
@@ -3773,9 +3545,9 @@ if(unique(df_sub$subjid) == "13023"){
         df[, maxdiff_prev := dplyr::lag(maxdiff)]
       }
       
-     # 17O: generate ewma
+      # 17O: generate ewma
       df[, (ewma.fields) := as.double(NaN)]
-
+      
       # first, calculate which exponent we want to put through (pass a different
       # on for each exp)
       # subset df to only valid rows
@@ -3788,7 +3560,7 @@ if(unique(df_sub$subjid) == "13023"){
       exp_vals[maxdiff_e > 365.25] <- -2.5
       exp_vals[maxdiff_e > 730.5] <- -3.5
       df[, exp_vals := exp_vals]
-
+      
       # calculate ewma
       df[, (ewma.fields) := ewma(agedays, tbc.sd, exp_vals, TRUE)]
       
@@ -3798,38 +3570,33 @@ if(unique(df_sub$subjid) == "13023"){
         dewma.before = tbc.sd - ewma.before,
         dewma.after = tbc.sd - ewma.after
       )]
-
+      
       # add differences for convenience
       df[, diff_prev := (v-dplyr::lag(v))]
       df[, diff_next := (dplyr::lead(v)-v)]
-      
-      
       
       if (nrow(df) > 2){
         # 17P/R: identify pairs and calculate exclusions
         df[, pair := (v-dplyr::lag(v)) < mindiff_prev |
              (dplyr::lead(v)-v) < mindiff |
-             (v-dplyr::lag(v)) > maxdiff_prev | 
-             (dplyr::lead(v)-v) > maxdiff
+             (v-dplyr::lag(v)) > maxdiff_prev | (dplyr::lead(v)-v) > maxdiff
         ]
         df[is.na(pair), pair := FALSE]
-        df[(pair & dplyr::lag(pair)) & abs(dewma.before) > dplyr::lag(abs(dewma.after)),
+        df[pair & abs(dewma.before) > dplyr::lag(abs(dewma.after)),
            bef.g.aftm1 := TRUE]
-        df[(pair & dplyr::lead(pair)) & abs(dewma.after) > dplyr::lead(abs(dewma.before)),
+        df[pair & abs(dewma.after) > dplyr::lead(abs(dewma.before)),
            aft.g.aftm1 := TRUE]
         
-
         # Q
         df[, val_excl := exclude]
         df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
         df[diff_next < mindiff & aft.g.aftm1, val_excl := "Exclude-Min-diff"]
         df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
         df[diff_next > maxdiff & aft.g.aftm1, val_excl := "Exclude-Max-diff"]
-        df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl_code := "1"]
-        df[diff_next < mindiff & aft.g.aftm1, val_excl_code := "2"]
-        df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl_code := "3"]
-        df[diff_next > maxdiff & aft.g.aftm1, val_excl_code := "4"]
-      }else { # only 2 values
+        
+        
+        
+      } else { # only 2 values
         # 17Q/R -- exclusions for pairs
         df[, val_excl := exclude]
         df[diff_prev < mindiff_prev & abs(tbc.sd) > dplyr::lag(abs(tbc.sd)),
@@ -3840,19 +3607,8 @@ if(unique(df_sub$subjid) == "13023"){
            val_excl := "Exclude-Max-diff"]
         df[diff_next > maxdiff &  abs(tbc.sd) > dplyr::lead(abs(tbc.sd)),
            val_excl := "Exclude-Max-diff"]
-         df[diff_prev < mindiff_prev & abs(tbc.sd) > dplyr::lag(abs(tbc.sd)),
-           val_excl_code := "5"]
-        df[diff_next < mindiff & abs(tbc.sd) > dplyr::lead(abs(tbc.sd)),
-           val_excl_code := "6"]
-        df[diff_prev > maxdiff_prev & abs(tbc.sd) > dplyr::lag(abs(tbc.sd)),
-           val_excl_code := "7"]
-        df[diff_next > maxdiff &  abs(tbc.sd) > dplyr::lead(abs(tbc.sd)),
-           val_excl_code := "8"]
-        } 
+      }
       
-  
-      
-        
       # figure out if any of the exclusions hit
       count_exclude <- sum(df$val_excl != "Include")
       if (count_exclude > 0){
@@ -3861,41 +3617,17 @@ if(unique(df_sub$subjid) == "13023"){
         } else {
           df[, absval := abs(tbc.sd)]
         }
-
+        
         # choose the highest abssum for exclusion
-        # idx <- df$index[which.max(df[df$val_excl != "Include",
-        #                              absval])]
-        idx <- df[val_excl != "Include", .SD[which.max(absval), index]]
-
-
+        idx <- df$index[which.max(df[df$val_excl != "Include",
+                                     absval])]
+        
         exclude_all[ind_all == idx] <- df[index == idx, val_excl]
-        if (unique(df$subjid) == "76234") {
-  print(paste("idx:", idx))
-  print(paste("index in df:", paste(df$index, collapse=", ")))
-  print(paste("ind_all:", paste(ind_all, collapse=", ")))
-  print(paste("id_all", id_all))
-}
-    
-        # if (unique(df$subjid) == "76234") {
-  # print("AAAA")
-
-  # Add loop ID column (optional, helps track iterations)
-  # df[, loop_iter := iter_count]
-
-  # Define output path
-  # out_path <- "../data/mindiff_subjid_76234_id_20275.csv"
-
-  # Append if file exists, otherwise write with header
-#   if (!file.exists(out_path)) {
-#     write.table(df, out_path, sep = ",", row.names = FALSE, col.names = FALSE, append = TRUE)
-#   } else {
-#     write.table(df, out_path, sep = ",", row.names = FALSE, col.names = TRUE)
-#   }
-# }
+        
         #set up to continue on
         if (count_exclude > 1){
           testing <- TRUE
-
+          
           df <- df[index != idx, ]
         } else {
           testing <- FALSE
@@ -3904,43 +3636,12 @@ if(unique(df_sub$subjid) == "13023"){
         testing <- FALSE
       }
     }
-      
-#       if (count_exclude > 0){
-#   if (nrow(df) > 2){
-#     # Use the appropriate DEWMA based on exclusion type
-#     df[, absval := NA_real_]
-#     df[val_excl == "Exclude-Min-diff" & diff_prev < mindiff_prev, 
-#        absval := abs(dewma.before)]
-#     df[val_excl == "Exclude-Min-diff" & diff_next < mindiff, 
-#        absval := abs(dewma.after)]
-#     df[val_excl == "Exclude-Max-diff" & diff_prev > maxdiff_prev, 
-#        absval := abs(dewma.before)]
-#     df[val_excl == "Exclude-Max-diff" & diff_next > maxdiff, 
-#        absval := abs(dewma.after)]
-#   } else {
-#     df[, absval := abs(tbc.sd)]
-#   }
-#   
-#   # Choose the highest absval for exclusion
-#   idx <- df$index[which.max(df[df$val_excl != "Include", absval])]
-#   exclude_all[ind_all == idx] <- df[index == idx, val_excl]
-#   
-#   # Set up to continue on
-#   if (count_exclude > 1){
-#     testing <- TRUE
-#     df <- df[index != idx, ]
-#   } else {
-#     testing <- FALSE
-#   }
-# } else {
-#   testing <- FALSE
-# }}
-
+    
     return(exclude_all)
   })(copy(.SD)), by = .(subjid, param), .SDcols = colnames(data.df)]
-
   
   # 19: 1 or 2 measurements ----
+  
   if (!quietly)
     cat(sprintf(
       "[%s] Exclude 1 or 2 measurements...\n",
@@ -4082,58 +3783,3 @@ if(unique(df_sub$subjid) == "13023"){
   
   return(data.df[j = .(line, exclude, tbc.sd, param)]) #debugging
 }
-```
-
-
-### Load in additional helper functions:
-
-- Valid()
-```{r}
-# Oriignal Valid Toggled off
-# Supporting pediatric growthcleanr functions
-# Supporting functions for pediatric piece of algorithm
-
-#' Helper function for cleanbatch to identify subset of observations that are either "included" or a "temporary extraneous"
-#'
-#' @keywords internal
-#' @noRd
-# valid <- function(df,
-#                   include.temporary.extraneous = FALSE,
-#                   include.extraneous = FALSE,
-#                   include.carryforward = FALSE) {
-#   exclude <- if (is.data.frame(df))
-#     df$exclude
-#   else
-#     df
-#   return(
-#     exclude < 'Exclude'
-#     |
-#       include.temporary.extraneous &
-#       exclude == 'Exclude-Temporary-Extraneous-Same-Day'
-#     | include.extraneous & exclude == 'Exclude-Extraneous-Same-Day'
-#     |
-#       include.carryforward &
-#       exclude == 'Exclude-Carried-Forward'
-#   )
-# }
-
-valid <- function(df,
-                  include.temporary.extraneous = FALSE,
-                  include.extraneous = FALSE,
-                  include.carryforward = FALSE) {
-  exclude <- if (is.data.frame(df)) df$exclude else df
-  exclude <- as.character(exclude)
-
-  keep <- !grepl("^Exclude", exclude)
-
-  if (include.temporary.extraneous)
-    keep <- keep | exclude == "Exclude-Temporary-Extraneous-Same-Day"
-  if (include.extraneous)
-    keep <- keep | exclude == "Exclude-Extraneous-Same-Day"
-  if (include.carryforward)
-    keep <- keep | exclude == "Exclude-Carried-Forward"
-
-  return(keep)
-}
-
-```

@@ -33,7 +33,7 @@ data_in <- fread(
 
 
 # Arrange.
-data_in_subs <- data_in %>% select(subjid) %>% distinct() 
+data_in_subs <- data_in %>% select(subjid) %>% distinct() %>% slice_sample(n=50)
 
 data.work <- data_in %>% arrange(subjid, param, agedays, obsid) %>% as.data.table() %>% filter(subjid %in% data_in_subs$subjid)
 # Source our modified code.
