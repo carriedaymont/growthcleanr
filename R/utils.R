@@ -1,3 +1,6 @@
+# Avoid "no visible binding for global variable" notes from R CMD check
+utils::globalVariables("id")
+
 #' Split input data into multiple files
 #'
 #' \code{splitinput} Splits input based on keepcol specified, yielding csv files each with at least the mininum
