@@ -13,16 +13,21 @@ valid <- function(df,
     df$exclude
   else
     df
-  return(
-    exclude < 'Exclude'
-    |
-      include.temporary.extraneous &
-      exclude == 'Exclude-Temporary-Extraneous-Same-Day'
-    | include.extraneous & exclude == 'Exclude-Extraneous-Same-Day'
-    |
-      include.carryforward &
-      exclude == 'Exclude-Carried-Forward'
-  )
+  exclude <- as.character(exclude)
+
+  # CLAUDE EDIT 2025-12-11-2115 - R Issue 5: Fixed string comparison bug
+  # Original: exclude < 'Exclude' - WRONG because "Include" > "Exclude" lexicographically
+  # Fix: Use regex to check if string starts with "Exclude"
+  keep <- !grepl("^Exclude", exclude)
+
+  if (include.temporary.extraneous)
+    keep <- keep | exclude == "Exclude-Temporary-Extraneous-Same-Day"
+  if (include.extraneous)
+    keep <- keep | exclude == "Exclude-Extraneous-Same-Day"
+  if (include.carryforward)
+    keep <- keep | exclude == "Exclude-Carried-Forward"
+
+  return(keep)
 }
 
 #' Helper function to treat NA values as FALSE
