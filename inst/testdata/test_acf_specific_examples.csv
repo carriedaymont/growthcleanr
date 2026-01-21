@@ -1,0 +1,13 @@
+subjid,param,agedays,sex,measurement
+example_1,HEIGHTCM,5297,1,155
+example_1,HEIGHTCM,5357,1,155
+example_1,HEIGHTCM,5477,1,155
+example_1,HEIGHTCM,5846,1,155
+example_1,HEIGHTCM,5966,1,155
+example_1,HEIGHTCM,6026,1,165
+example_2,LENGTHCM,31,0,50
+example_2,LENGTHCM,41,0,50
+example_2,LENGTHCM,91,0,50
+example_2,LENGTHCM,154,0,50
+example_2,LENGTHCM,197,0,50
+example_2,LENGTHCM,275,0,72
