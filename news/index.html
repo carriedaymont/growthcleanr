@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">growthcleanr</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.1</span>
       </span>
     </div>
 
@@ -91,6 +91,18 @@
       <small>Source: <a href="https://github.com/carriedaymont/growthcleanr/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="2.2.1" id="growthcleanr-221---2026-02-18">growthcleanr 2.2.1 - 2026-02-18<a class="anchor" aria-label="anchor" href="#growthcleanr-221---2026-02-18"></a></h2>
+<div class="section level3">
+<h3 id="changed-2-2-1">Changed<a class="anchor" aria-label="anchor" href="#changed-2-2-1"></a></h3>
+<ul><li>Updated internal dplyr code to use <code>.data$</code> pronoun notation for CRAN compatibility with recent dplyr versions, resolving “no visible binding for global variable” notes</li>
+<li>Added explicit <code>rlang</code> dependency for <code>.data</code> pronoun support</li>
+<li>Fixed recentering table that had previously erroneously caused birth measurements to be excluded in small datasets</li>
+<li>Updated test expectations to reflect corrected recentering behavior</li>
+<li>Resolved remaining “no visible binding” note for <code>id</code> variable in data.table operations</li>
+<li>Updated broken CDC SAS program URL to current location</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="2.2.0" id="growthcleanr-220-prelim-infants---2023-09-13">growthcleanr 2.2.0-prelim-infants - 2023-09-13<small>2024-02-26</small><a class="anchor" aria-label="anchor" href="#growthcleanr-220-prelim-infants---2023-09-13"></a></h2>
 <div class="section level3">
@@ -345,7 +357,7 @@
 </div>
 
 <div class="pkgdown">
-  <p></p><p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.3.</p>
+  <p></p><p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
       </footer></div>
