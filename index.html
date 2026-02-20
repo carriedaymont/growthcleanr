@@ -126,20 +126,11 @@
 </blockquote>
 <p>This package also includes an R version of the <a href="https://www.cdc.gov/growth-chart-training/hcp/computer-programs/sas.html" class="external-link">SAS macro published by the CDC</a> for calculating percentiles and Z-scores of pediatric growth observations and utilities for working with both functions. As of summer 2021, it also supports cleaning anthropometric measurements for adults up to age 65. The adult algorithm has not yet been published in a peer-reviewed publication, but is described in detail at <a href="https://carriedaymont.github.io/growthcleanr/articles/adult-algorithm.html" class="external-link">Adult algorithm</a>.</p>
 <div class="section level2">
-<h2 id="bug-and-current-fix">Bug and current fix<a class="anchor" aria-label="anchor" href="#bug-and-current-fix"></a>
-</h2>
-<p>There is an error in the recentering tables in the current CRAN version that will causes the algorithm to inappropriately exclude birth observations in datasets with &lt;5K observations. Until we are able to make changes on CRAN, we recommend using devtools to install growthcleanr from GitHub. We are working on updates as soon as possible.</p>
-</div>
-<div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
 <p>To install the stable version from CRAN:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"growthcleanr"</span><span class="op">)</span></span></code></pre></div>
-<p>Or from Github directly:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://devtools.r-lib.org/" class="external-link">devtools</a></span><span class="op">)</span></span>
-<span><span class="fu">install_github</span><span class="op">(</span><span class="st">"carriedaymont/growthcleanr"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="summary">Summary<a class="anchor" aria-label="anchor" href="#summary"></a>
