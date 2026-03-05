@@ -837,8 +837,7 @@ acf_answers <- function(subjid,
   who.ht.vel <- fread(who_ht_vel_3sd_path)
   setkey(who.max.ht.vel, sex, whoagegrp_ht)
   setkey(who.ht.vel, sex, whoagegrp_ht)
-  who.ht.vel <- as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel, by =
-                                                 c('sex', 'whoagegrp_ht')))
+  who.ht.vel <- merge(who.ht.vel, who.max.ht.vel, by = c('sex', 'whoagegrp_ht'), all = TRUE)
 
   setnames(who.ht.vel, colnames(who.ht.vel), gsub('_', '.', colnames(who.ht.vel)))
   setkey(who.ht.vel, sex, whoagegrp.ht)
@@ -883,9 +882,7 @@ acf_answers <- function(subjid,
   who.ht.vel.2sd <- fread(who_ht_vel_2sd_path)
   setkey(who.max.ht.vel.2sd, sex, whoagegrp_ht)
   setkey(who.ht.vel.2sd, sex, whoagegrp_ht)
-  who.ht.vel.2sd <-
-    as.data.table(dplyr::full_join(who.ht.vel.2sd, who.max.ht.vel.2sd, by =
-                                     c('sex', 'whoagegrp_ht')))
+  who.ht.vel.2sd <- merge(who.ht.vel.2sd, who.max.ht.vel.2sd, by = c('sex', 'whoagegrp_ht'), all = TRUE)
 
   setnames(who.ht.vel.2sd,
            colnames(who.ht.vel.2sd),
@@ -1178,14 +1175,11 @@ adjustcarryforward <- function(subjid,
 
   # NEW EDIT --
   # remove all the weight measurements
-  data.all <- data.all %>%
-    filter(param %in% c("HEIGHTCM", "LENGTHCM"))
+  data.all <- data.all[param %in% c("HEIGHTCM", "LENGTHCM")]
 
   # filter to only subjects with possible carried forwards - n is here to merge back
   # if they have all includes, filter them out
-  data.all <- data.all %>%
-    filter(subjid %in% data.all$subjid[data.all$orig.exclude == "Exclude-Carried-Forward"]) %>%
-    as.data.table()
+  data.all <- data.all[subjid %in% data.all$subjid[data.all$orig.exclude == "Exclude-Carried-Forward"]]
 
   # here's what we want to filter out -- anything that's not carried forward/include
   # we're also going to include strings of carried forward
@@ -1218,9 +1212,7 @@ adjustcarryforward <- function(subjid,
   }
 
   # filter to only subjects with possible carried forwards again
-  data.all <- data.all %>%
-    filter(subjid %in% data.all$subjid[data.all$orig.exclude == "Exclude-Carried-Forward"]) %>%
-    as.data.table()
+  data.all <- data.all[subjid %in% data.all$subjid[data.all$orig.exclude == "Exclude-Carried-Forward"]]
 
   ### END EDIT ####
 
@@ -1259,8 +1251,7 @@ adjustcarryforward <- function(subjid,
   who.ht.vel <- fread(who_ht_vel_3sd_path)
   setkey(who.max.ht.vel, sex, whoagegrp_ht)
   setkey(who.ht.vel, sex, whoagegrp_ht)
-  who.ht.vel <- as.data.table(dplyr::full_join(who.ht.vel, who.max.ht.vel, by =
-                                                c('sex', 'whoagegrp_ht')))
+  who.ht.vel <- merge(who.ht.vel, who.max.ht.vel, by = c('sex', 'whoagegrp_ht'), all = TRUE)
 
   setnames(who.ht.vel, colnames(who.ht.vel), gsub('_', '.', colnames(who.ht.vel)))
   setkey(who.ht.vel, sex, whoagegrp.ht)
@@ -1801,7 +1792,7 @@ adjustcarryforward <- function(subjid,
   return(rbind(
     acf_df,
     data.frame(
-      filter(data.orig,!n %in% data.all$n) %>% mutate(adjustcarryforward = "Not Considered")  %>% select(adjustcarryforward, n)
+      data.orig[!n %in% data.all$n, .(adjustcarryforward = "Not Considered", n)]
     )
   ))
 }
