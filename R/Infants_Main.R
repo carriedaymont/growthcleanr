@@ -3877,7 +3877,9 @@ cleanbatch_infants <- function(data.df,
   # |dewma| is bounded by range(tbc.sd). If range <= 1, all |dewma| <= 1,
   # so addcrit can never be TRUE and no exclusion rule can fire.
   tbc_range_15 <- data.df[step15_filter & sp_key %in% sp_to_process,
-                           .(tbc_range = max(tbc.sd, na.rm = TRUE) - min(tbc.sd, na.rm = TRUE)),
+                           .(tbc_range = if (any(!is.na(tbc.sd)))
+                               max(tbc.sd, na.rm = TRUE) - min(tbc.sd, na.rm = TRUE)
+                             else 0),
                            by = sp_key]
   n_before_filter <- length(sp_to_process)
   sp_to_process <- tbc_range_15[tbc_range > 1, sp_key]
@@ -4112,7 +4114,9 @@ cleanbatch_infants <- function(data.df,
   # Pre-filter: same logic as Step 15 — all rules require addcrit (dewma > 1),
   # and |dewma| is bounded by tbc.sd range. Skip groups with range <= 1.
   tbc_range_16 <- data.df[step16_filter & sp_key %in% sp_to_process,
-                           .(tbc_range = max(tbc.sd, na.rm = TRUE) - min(tbc.sd, na.rm = TRUE)),
+                           .(tbc_range = if (any(!is.na(tbc.sd)))
+                               max(tbc.sd, na.rm = TRUE) - min(tbc.sd, na.rm = TRUE)
+                             else 0),
                            by = sp_key]
   n_before_filter_16 <- length(sp_to_process)
   sp_to_process <- tbc_range_16[tbc_range > 1, sp_key]
