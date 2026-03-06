@@ -307,8 +307,8 @@ cleangrowth <- function(subjid,
                         weight_cap = Inf,
                         adult_columns_filename = "",
                         prelim_infants = FALSE,
-                        id)
-                        { # id parameter is required
+                        id = NULL)
+                        {
   # avoid "no visible binding" warnings
   N <- age_years <- batch <- exclude <- index <- line <- NULL
   newbatch <- sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
