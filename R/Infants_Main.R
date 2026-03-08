@@ -307,8 +307,11 @@ cleangrowth <- function(subjid,
                         weight_cap = Inf,
                         adult_columns_filename = "",
                         prelim_infants = FALSE,
+                        ewma_window = 15,
                         id = NULL)
                         {
+  # ewma_window: number of neighbors on each side for EWMA weighting.
+  # Default 15 is the R design choice; set to 25 to match Stata behavior.
   # avoid "no visible binding" warnings
   N <- age_years <- batch <- exclude <- index <- line <- NULL
   newbatch <- sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
@@ -1310,7 +1313,8 @@ cleangrowth <- function(subjid,
           lt3.exclude.mode = lt3.exclude.mode,
           error.load.threshold = error.load.threshold,
           error.load.mincount = error.load.mincount,
-          ref.data.path = ref.data.path)
+          ref.data.path = ref.data.path,
+          ewma_window = ewma_window)
       }
     } else {
       # create log directory if necessary
@@ -1365,7 +1369,8 @@ cleangrowth <- function(subjid,
           lt3.exclude.mode = lt3.exclude.mode,
           error.load.threshold = error.load.threshold,
           error.load.mincount = error.load.mincount,
-          ref.data.path = ref.data.path
+          ref.data.path = ref.data.path,
+          ewma_window = ewma_window
         )
       }
       stopCluster(cl)
@@ -1865,9 +1870,9 @@ read_anthro <- function(path = "", cdc.only = FALSE, prelim_infants = FALSE) {
 #'
 #' # Calculate exponentially weighted moving average
 #' e_df <- ewma(df_stats$agedays, sd, ewma.exp = -1.5)
-ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 25, cache_env = NULL) {
-  # Added window parameter to limit EWMA to max window values on each side
-  # Changed default to 25 for better accuracy with minimal efficiency loss
+ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 15, cache_env = NULL) {
+  # window parameter limits EWMA to max window positions on each side.
+  # Default 15 is the R design choice; pass window = 25 to match Stata behavior.
   # Set window = Inf to disable windowing
   # cache_env: optional environment for sharing delta matrix between calls
   #   (e.g., between tbc.sd and ctbc.sd calls that use the same agedays/exponents)
@@ -1962,7 +1967,7 @@ ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 25, cache_
 #' Create initial EWMA cache for a group (O(n^2) — first iteration only)
 #' @keywords internal
 #' @noRd
-ewma_cache_init <- function(agedays, z_tbc, z_ctbc, exp_vals, ids, window = 25) {
+ewma_cache_init <- function(agedays, z_tbc, z_ctbc, exp_vals, ids, window = 15) {
   n <- length(agedays)
 
   # Check if ctbc == tbc (skip redundant ctbc computation for most groups)
@@ -2567,7 +2572,8 @@ cleanbatch_infants <- function(data.df,
                                lt3.exclude.mode,
                                error.load.threshold,
                                error.load.mincount,
-                               ref.data.path) {
+                               ref.data.path,
+                               ewma_window = 15) {
   # avoid "no visible binding" warnings
   abs.2ndlast.sd <- abs.tbc.sd <- abs.tbc.sd.next <- abs.tbc.sd.prev <- abssum2 <- NULL
   aft.g.befp1 <- agedays <- agedays.other <- bef.g.aftm1 <- delta <- NULL
@@ -3374,12 +3380,12 @@ cleanbatch_infants <- function(data.df,
                 # Calculate EWMA for Include values only (no temp SDEs)
                 # Share delta matrix between tbc.sd and ctbc.sd calls (same agedays/exponents)
                 ewma_cache <- new.env(parent = emptyenv())
-                df[include_set, (ewma.fields) := ewma(agedays, tbc.sd, exp_vals, TRUE, cache_env = ewma_cache)]
+                df[include_set, (ewma.fields) := ewma(agedays, tbc.sd, exp_vals, TRUE, window = ewma_window, cache_env = ewma_cache)]
                 # Skip ctbc EWMA if ctbc.sd == tbc.sd for this group (vast majority)
                 if (all(df$ctbc.sd[include_set] == df$tbc.sd[include_set])) {
                   df[include_set, paste0("c.",ewma.fields) := .SD, .SDcols = ewma.fields]
                 } else {
-                  df[include_set, paste0("c.",ewma.fields) := ewma(agedays, ctbc.sd, exp_vals, TRUE, cache_env = ewma_cache)]
+                  df[include_set, paste0("c.",ewma.fields) := ewma(agedays, ctbc.sd, exp_vals, TRUE, window = ewma_window, cache_env = ewma_cache)]
                 }
 
                 # Calculate dewma for Include values only
@@ -3712,7 +3718,7 @@ cleanbatch_infants <- function(data.df,
 
   # Compute EWMA using these exponents
   ewma.fields <- c("ewma.all", "ewma.before", "ewma.after")
-  ewma_df[, (ewma.fields) := ewma(agedays, tbc.sd, exp_val, TRUE), by = .(subjid, param)]
+  ewma_df[, (ewma.fields) := ewma(agedays, tbc.sd, exp_val, TRUE, window = ewma_window), by = .(subjid, param)]
 
   # Merge EWMA columns back to data.sde
   ewma_merge_cols <- c("id", grep("ewma", names(ewma_df), value = TRUE))
@@ -3959,7 +3965,7 @@ cleanbatch_infants <- function(data.df,
                 df[, ageyears := maxdiff / 365.25]
                 df[, exp_vals := fcase(ageyears <= 1, -1.5, ageyears >= 3, -3.5, default = -1.5 - (ageyears - 1))]
 
-                cache <- ewma_cache_init(df$agedays, df$tbc.sd, df$ctbc.sd, df$exp_vals, df$id)
+                cache <- ewma_cache_init(df$agedays, df$tbc.sd, df$ctbc.sd, df$exp_vals, df$id, window = ewma_window)
                 df[, `:=`(ewma.all = cache$ewma.all, ewma.before = cache$ewma.before,
                           ewma.after = cache$ewma.after, c.ewma.all = cache$c.ewma.all)]
               }
@@ -4173,7 +4179,7 @@ cleanbatch_infants <- function(data.df,
                 df[, ageyears := maxdiff / 365.25]
                 df[, exp_vals := fcase(ageyears <= 1, -1.5, ageyears >= 3, -3.5, default = -1.5 - (ageyears - 1))]
 
-                cache <- ewma_cache_init(df$agedays, df$tbc.sd, df$ctbc.sd, df$exp_vals, df$id)
+                cache <- ewma_cache_init(df$agedays, df$tbc.sd, df$ctbc.sd, df$exp_vals, df$id, window = ewma_window)
                 df[, `:=`(ewma.all = cache$ewma.all, ewma.before = cache$ewma.before,
                           ewma.after = cache$ewma.after, c.ewma.all = cache$c.ewma.all)]
               }
@@ -4467,13 +4473,81 @@ cleanbatch_infants <- function(data.df,
     }
 
     # ---- HEADCM thresholds ----
-    # HC threshold logic in the original code has whoagegrp.hc undefined,
-    # so WHO columns are never populated. mindiff defaults to -1.5 (or -2.0 at birth).
+    # HC uses WHO velocity tables only (no Tanner); starts at 2-month intervals.
+    # Tolerance: ±1.5 cm (vs ±3 cm for HT). Matches Stata Step 17 HC logic.
     hc_idx <- pf$param == "HEADCM"
     if (any(hc_idx)) {
-      pf[hc_idx, mindiff := -1.5]
-      pf[hc_idx & agedays == 0, mindiff := mindiff - .5]
-      pf[hc_idx & agedays == 0, maxdiff := maxdiff + .5]
+      # WHO age group (same floor-month formula as HT)
+      pf[, whoagegrp.hc := NA_integer_]
+      pf[hc_idx & agedays / 30.4375 <= 24,
+         whoagegrp.hc := as.integer(round(agedays / 30.4375))]
+
+      # Interval selection: HC has no 1-month interval; smallest available is 2-month
+      pf[, whoinc.age.hc := NA_integer_]
+      pf[hc_idx & !is.na(d_agedays) & d_agedays >= 46  & d_agedays < 76,  whoinc.age.hc := 2L]
+      pf[hc_idx & !is.na(d_agedays) & d_agedays >= 76  & d_agedays < 107, whoinc.age.hc := 3L]
+      pf[hc_idx & !is.na(d_agedays) & d_agedays >= 107 & d_agedays < 153, whoinc.age.hc := 4L]
+      pf[hc_idx & !is.na(d_agedays) & d_agedays >= 153 & d_agedays < 200, whoinc.age.hc := 6L]
+
+      # Rename HC velocity columns to avoid collision with already-merged HT columns
+      # (both tables use "whoinc.N.ht" naming after gsub; rename HC copies to "whoinc.N.hc")
+      who.hc.vel.r <- copy(who.hc.vel)
+      ht_suffix_cols <- grep("whoinc", names(who.hc.vel.r), value = TRUE)
+      setnames(who.hc.vel.r,
+        old = ht_suffix_cols,
+        new = gsub("\\.ht$", ".hc", ht_suffix_cols))
+      setnames(who.hc.vel.r, "whoagegrp.ht", "whoagegrp.hc")
+      setkey(who.hc.vel.r, sex, whoagegrp.hc)
+
+      # Merge HC reference — non-HC rows have whoagegrp.hc = NA so they are not matched
+      hc_vel_cols <- setdiff(names(who.hc.vel.r), c("sex", "whoagegrp.hc"))
+      pf[who.hc.vel.r, (hc_vel_cols) := mget(paste0("i.", hc_vel_cols)),
+         on = .(sex, whoagegrp.hc)]
+
+      # Extract interval-specific WHO mindiff/maxdiff for HC
+      pf[hc_idx & !is.na(whoinc.age.hc) & !is.na(whoagegrp.hc),
+         who_mindiff_hc := fcase(
+           whoinc.age.hc == 2L, whoinc.2.hc,
+           whoinc.age.hc == 3L, whoinc.3.hc,
+           whoinc.age.hc == 4L, whoinc.4.hc,
+           whoinc.age.hc == 6L, whoinc.6.hc,
+           default = NA_real_)]
+      pf[hc_idx & !is.na(whoinc.age.hc) & !is.na(whoagegrp.hc),
+         who_maxdiff_hc := fcase(
+           whoinc.age.hc == 2L, max.whoinc.2.hc,
+           whoinc.age.hc == 3L, max.whoinc.3.hc,
+           whoinc.age.hc == 4L, max.whoinc.4.hc,
+           whoinc.age.hc == 6L, max.whoinc.6.hc,
+           default = NA_real_)]
+
+      # Scale by d_agedays vs interval length (same logic as HT)
+      pf[hc_idx & !is.na(d_agedays) & !is.na(whoinc.age.hc) &
+           d_agedays < whoinc.age.hc * 30.4375,
+         who_mindiff_hc := who_mindiff_hc * d_agedays / (whoinc.age.hc * 30.4375)]
+      pf[hc_idx & !is.na(d_agedays) & !is.na(whoinc.age.hc) &
+           d_agedays > whoinc.age.hc * 30.4375,
+         who_maxdiff_hc := who_maxdiff_hc * d_agedays / (whoinc.age.hc * 30.4375)]
+
+      # Apply HC tolerance: ±1.5 cm (vs ±3 cm for HT)
+      # Matches Stata: applied whenever WHO data exists (not restricted by age)
+      pf[hc_idx & !is.na(who_mindiff_hc),
+         `:=`(who_mindiff_hc = who_mindiff_hc * .5 - 1.5,
+              who_maxdiff_hc = who_maxdiff_hc * 2 + 1.5)]
+
+      # Assign to mindiff/maxdiff (WHO only — no Tanner for HC)
+      pf[hc_idx & !is.na(d_agedays) & !is.na(who_mindiff_hc), mindiff := who_mindiff_hc]
+      pf[hc_idx & !is.na(d_agedays) & !is.na(who_maxdiff_hc), maxdiff := who_maxdiff_hc]
+
+      # Fallback: HC > 24 months or no WHO data → fixed -1.5 (matches Stata default)
+      pf[hc_idx & is.na(mindiff), mindiff := -1.5]
+
+      # Birth adjustments (matches Stata: ±0.5 cm for HC)
+      pf[hc_idx & agedays == 0, `:=`(mindiff = mindiff - .5, maxdiff = maxdiff + .5)]
+
+      # Clean up temporary HC columns
+      hc_tmp <- c("whoagegrp.hc", "whoinc.age.hc", "who_mindiff_hc", "who_maxdiff_hc",
+                  hc_vel_cols)
+      pf[, (intersect(hc_tmp, names(pf))) := NULL]
     }
 
     # Compute lagged thresholds (previous row's mindiff/maxdiff)
@@ -4506,13 +4580,24 @@ cleanbatch_infants <- function(data.df,
     
     exclude_all <- copy(df$exclude)
 
-    # For HEIGHTCM: pre-compute whoagegrp.ht (depends only on agedays — static across iterations)
-    # and pre-merge WHO velocity columns (eliminates per-iteration merge + for loop in 17F)
-    # Note: shift-based NA assignment is a NO-OP for HEIGHTCM (all set values are <=24,
-    # so whoagegrp.ht > 24 is always FALSE and shift(whoagegrp.ht) > 24 is always NA)
+    # Pre-merge WHO velocity columns BEFORE the while loop (once per group, not per iteration).
+    # This matches HT's pattern and avoids column-duplication on iteration 2+ when merge
+    # encounters columns already added in iteration 1 and creates .x/.y suffixes.
     if (df$param[1] == "HEIGHTCM") {
+      # For HEIGHTCM: pre-compute whoagegrp.ht (static across iterations; agedays don't change)
       df[agedays/30.4375 <= 24, whoagegrp.ht := round(agedays/30.4375)]
       df <- merge(df, who.ht.vel, by = c("sex", "whoagegrp.ht"), all.x = TRUE, sort = FALSE)
+    } else if (df$param[1] == "HEADCM") {
+      # For HEADCM: pre-compute whoagegrp.hc and pre-merge WHO HC velocity columns.
+      # whoinc.2.hc etc. are observation-level constants (based on agedays, not d_agedays)
+      # so they only need to be merged once before the while loop.
+      who.hc.vel.r <- copy(who.hc.vel)
+      hc_suffix_cols <- grep("whoinc|whoagegrp", names(who.hc.vel.r), value = TRUE)
+      setnames(who.hc.vel.r, old = hc_suffix_cols,
+               new = gsub("\\.ht$", ".hc", hc_suffix_cols))
+      df[, whoagegrp.hc := NA_real_]
+      df[agedays / 30.4375 <= 24, whoagegrp.hc := round(agedays / 30.4375)]
+      df <- merge(df, who.hc.vel.r, by = c("sex", "whoagegrp.hc"), all.x = TRUE, sort = FALSE)
     }
 
     testing <- TRUE
@@ -4635,68 +4720,53 @@ cleanbatch_infants <- function(data.df,
         df[, mindiff_prev := shift(mindiff, n = 1L, type = "lag")]
         df[, maxdiff_prev := shift(maxdiff, n = 1L, type = "lag")]
       } else { # head circumference
-        # 17D
-        # generate the who age group variable
-        df[, whoagegrp.ht := round(agedays/30.4375)]
-        df[whoagegrp.ht > 24 | shift(whoagegrp.ht, n = 1L, type = "lead") > 24,
-           whoagegrp.ht := NA]
-        
-        # 17J
-        df[d_agedays >= 46 & d_agedays < 76, whoinc.age.hc := 2]
-        df[d_agedays >= 76 & d_agedays < 107, whoinc.age.hc := 3]
-        df[d_agedays >= 107 & d_agedays < 153, whoinc.age.hc := 4]
-        df[d_agedays >= 153 & d_agedays < 199, whoinc.age.hc := 6]
-        
-        # update the edge intervals to missing
-        df[d_agedays < 46 | d_agedays > 199, whoinc.age.hc := NA]
-        
-        # 17K
-        # merge with WHO
-        # add the column name we want to grab
-        
-        m_who_hc_vel <- merge(df, who.hc.vel, by = c("sex", "whoagegrp.ht"),
-                              all.x = TRUE, sort = FALSE)
-        for (i in unique(df$whoinc.age.hc[!is.na(df$whoinc.age.hc) &
-                                          !is.na(df$whoagegrp.hc)])){
-          sub_m_who_hc_vel <- m_who_hc_vel[whoinc.age.ht == i,]
-          
-          cn <- paste0("whoinc.", i, ".ht")
-          df[whoinc.age.hc == i,
-             who_mindiff_hc := as.numeric(sub_m_who_ht_vel[, get(cn)])]
-          cn <- paste0("max.whoinc.", i, ".ht")
-          df[whoinc.age.hc == i,
-             who_maxdiff_hc := as.numeric(sub_m_who_ht_vel[, get(cn)])]
-        }
-        # if there are none, preallocate for ease
-        if (length(unique(df$whoinc.age.hc[!is.na(df$whoinc.age.hc) &
-                                           !is.na(df$whoagegrp.hc)])) < 1){
-          df[, who_mindiff_hc := NA_real_]
-          df[, who_maxdiff_hc := NA_real_]
-        }
-        df[, who_mindiff_hc := as.numeric(who_mindiff_hc)]
-        df[, who_maxdiff_hc := as.numeric(who_maxdiff_hc)]
-        
-        # 17L
-        df[d_agedays < whoinc.age.hc*30.4375, who_mindiff_hc :=
-             who_mindiff_hc * d_agedays/(whoinc.age.hc*30.4375)]
-        df[d_agedays > whoinc.age.hc*30.4375, who_maxdiff_hc :=
-             who_maxdiff_hc * d_agedays/(whoinc.age.hc*30.4375)]
-        
-        df[d_agedays < 9*30.4375, who_mindiff_hc := who_mindiff_hc*.5-1.5]
-        df[d_agedays < 9*30.4375, who_maxdiff_hc := who_maxdiff_hc*2+1.5]
-        
-        # 17M
-        # use who
+        # WHO HC velocity columns (whoinc.2.hc, max.whoinc.2.hc, etc.) were pre-merged
+        # before the while loop. Here we compute only per-iteration logic (depends on d_agedays).
+
+        # 17J: Interval selection — HC starts at 2-month (no 1-month interval; matches Stata)
+        df[, whoinc.age.hc := NA_integer_]
+        df[!is.na(d_agedays) & d_agedays >= 46  & d_agedays < 76,  whoinc.age.hc := 2L]
+        df[!is.na(d_agedays) & d_agedays >= 76  & d_agedays < 107, whoinc.age.hc := 3L]
+        df[!is.na(d_agedays) & d_agedays >= 107 & d_agedays < 153, whoinc.age.hc := 4L]
+        df[!is.na(d_agedays) & d_agedays >= 153 & d_agedays < 200, whoinc.age.hc := 6L]
+
+        # 17K: Extract interval-specific WHO mindiff/maxdiff using renamed columns
+        df[, who_mindiff_hc := fcase(
+          whoinc.age.hc == 2L, whoinc.2.hc,
+          whoinc.age.hc == 3L, whoinc.3.hc,
+          whoinc.age.hc == 4L, whoinc.4.hc,
+          whoinc.age.hc == 6L, whoinc.6.hc,
+          default = NA_real_)]
+        df[, who_maxdiff_hc := fcase(
+          whoinc.age.hc == 2L, max.whoinc.2.hc,
+          whoinc.age.hc == 3L, max.whoinc.3.hc,
+          whoinc.age.hc == 4L, max.whoinc.4.hc,
+          whoinc.age.hc == 6L, max.whoinc.6.hc,
+          default = NA_real_)]
+
+        # 17L: Scale by actual gap vs. reference interval length (same logic as HT)
+        df[!is.na(d_agedays) & !is.na(whoinc.age.hc) &
+             d_agedays < whoinc.age.hc * 30.4375,
+           who_mindiff_hc := who_mindiff_hc * d_agedays / (whoinc.age.hc * 30.4375)]
+        df[!is.na(d_agedays) & !is.na(whoinc.age.hc) &
+             d_agedays > whoinc.age.hc * 30.4375,
+           who_maxdiff_hc := who_maxdiff_hc * d_agedays / (whoinc.age.hc * 30.4375)]
+
+        # 17M: Apply HC tolerance +-1.5 cm whenever WHO data exists (matches Stata)
+        # Stata: replace mindiff = 0.5*who_mindiff - 1.5 if who_mindiff != .
+        df[!is.na(who_mindiff_hc),
+           `:=`(who_mindiff_hc = who_mindiff_hc * .5 - 1.5,
+                who_maxdiff_hc = who_maxdiff_hc * 2 + 1.5)]
+
         df[, mindiff := who_mindiff_hc]
         df[, maxdiff := who_maxdiff_hc]
-        # otherwise, fill in
+        # Fallback: HC > 24 months or no WHO data -> fixed -1.5 (matches Stata)
         df[is.na(mindiff), mindiff := -1.5]
-        # for birth measurements, add allowance of .5cm
-        df[agedays == 0, mindiff := mindiff - .5]
-        df[agedays == 0, maxdiff := maxdiff + .5]
-        
-        # 17N
-        # sort df since it got reordered with keys
+
+        # Birth adjustments (+-0.5 cm for HC; matches Stata)
+        df[agedays == 0, `:=`(mindiff = mindiff - .5, maxdiff = maxdiff + .5)]
+
+        # 17N: Sort and lag thresholds for pairwise violation check
         # Include id for deterministic SDE order
         df <- df[order(agedays, id),]
         df[, mindiff_prev := shift(mindiff, n = 1L, type = "lag")]
@@ -4720,7 +4790,7 @@ cleanbatch_infants <- function(data.df,
       df[, exp_vals := exp_vals]
       
       # calculate ewma
-      df[, (ewma.fields) := ewma(agedays, tbc.sd, exp_vals, TRUE)]
+      df[, (ewma.fields) := ewma(agedays, tbc.sd, exp_vals, TRUE, window = ewma_window)]
       
       # calculate dewma
       df[, `:=`(
