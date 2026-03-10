@@ -387,7 +387,35 @@ cleangrowth <- function(subjid,
     } else {
       adult_cutpoint
     }
-
+  ### BATCHING ###
+  print("Batching Begin AAA")
+  results_list <- list()
+  i <- 1
+  patients <- data.all.ages %>%
+    select(subjid) %>%
+    distinct()
+  
+  batches <- patients %>%
+    mutate(batch = (row_number() - 1) %/% 2000 + 1)
+  
+  ### Loop Begin ###
+  
+  for (id_batch in unique(batches$batch)) {
+    print(paste("Loop " , i, " start.", sep = ""))
+    ids <- batches$subjid[batches$batch == id_batch]
+    
+    data.all <- copy(
+      data.all.ages[
+        subjid %in% ids & agedays < adult_cutpoint * 365.25
+      ]
+    )
+    
+    data.adult <- copy(
+      data.all.ages[
+        subjid %in% ids & agedays >= adult_cutpoint * 365.25
+      ]
+    )
+    ### BATCHING ###
   # split by cutpoint
   # for ease, data.all will refer to pediatric data; data.adult will refer to
   # adult data -- copy to make sure they're separate
@@ -1519,9 +1547,7 @@ cleangrowth <- function(subjid,
       sort = FALSE
     )
     # Merge checkpoint diagnostics by ID
-    checkpoint_merge <- copy(checkpoint_data)
-    checkpoint_merge[, c("subjid", "param", "agedays") := NULL]
-    all_results <- merge(all_results, checkpoint_merge, by = "id", all.x = TRUE)
+    all_results <- merge(all_results, checkpoint_data %>% select(-c(subjid, param, agedays)), by = "id", all.x = TRUE)
     all_results <- all_results[match(data.all.ages$id, all_results$id)]
     
     # restore original row order
@@ -1531,13 +1557,25 @@ cleangrowth <- function(subjid,
     # (since it existed in the original input)
     
     # Return *everything* for downstream debugging
-    return(all_results)
+    # return(all_results)
+    results_list[[i]] <- all_results
+    print(paste("Loop ", i, " complete.", sep = "" ))
+    i <- i + 1
+    
     
   } else {
     # if there was no data at all, return an empty table with consistent structure
-    return(data.table())
+    results_list[[i]] <- data.table::data.table()
+    print(paste("Loop ", i, " complete.", sep = "" ))
+    i <- i + 1
   }
   
+  }
+  
+  all_results <- data.table::rbindlist(results_list, use.names = TRUE)
+  setorder(all_results, line)
+  
+  return(all_results)
 }
 
 #' Function to calculate z-scores and csd-scores based on anthro tables.
