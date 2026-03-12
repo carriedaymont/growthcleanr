@@ -18,7 +18,9 @@ Authors@R: c(
     person("Jessica", "Butts", role = "ctb"),
     person("Sheila", "Nguyen", role = "ctb"),
     person("Taraneh", "Soleymani", role = "ctb"),
-    person("Max", "Olivier", role = "ctb")
+    person("Max", "Olivier", role = "ctb"),
+    person("Chris", "Penney", role = "ctb")
+    
   )
 Description: Identifies implausible anthropometric (e.g., height,
     weight) measurements in irregularly spaced longitudinal datasets, such as those from electronic health records.
