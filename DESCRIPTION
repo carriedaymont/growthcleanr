@@ -1,7 +1,7 @@
 Package: growthcleanr
 Type: Package
 Title: Data Cleaner for Anthropometric Measurements
-Version: 2.2.0
+Version: 3.0.0
 Authors@R: c(
     person("Carrie", "Daymont", email = "cdaymont@pennstatehealth.psu.edu", role = c("ctb","cre")),
     person("Robert", "Grundmeier", role = "aut"),
@@ -20,7 +20,6 @@ Authors@R: c(
     person("Taraneh", "Soleymani", role = "ctb"),
     person("Max", "Olivier", role = "ctb"),
     person("Chris", "Penney", role = "ctb")
-    
   )
 Description: Identifies implausible anthropometric (e.g., height,
     weight) measurements in irregularly spaced longitudinal datasets, such as those from electronic health records.

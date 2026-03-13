@@ -1,5 +1,8 @@
-# Main pediatric growthcleanr function -- cleanbatch
-# internal supporting functions for pediatrics can be found in: pediatric_support.R
+# LEGACY pediatric algorithm. Retained for backward compatibility.
+# Use cleangrowth(use_legacy_algorithm = TRUE) to invoke.
+
+# Main pediatric growthcleanr function -- cleanbatch_legacy
+# internal supporting functions for pediatrics can be found in: pediatric_support_legacy.R
 
 #' Function to clean data (optionally in batches):
 #' 4.  Dataset split (optional)
@@ -16,7 +19,7 @@
 #' @import data.table
 #' @importFrom stats median
 #' @noRd
-cleanbatch <- function(data.df,
+cleanbatch_legacy <- function(data.df,
                        log.path,
                        quietly,
                        parallel,

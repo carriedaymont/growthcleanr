@@ -1,3 +1,5 @@
+# Support functions for legacy pediatric algorithm (pediatric_clean_legacy.R).
+
 # Supporting pediatric growthcleanr functions
 # Supporting functions for pediatric piece of algorithm
 
@@ -15,10 +17,14 @@ valid <- function(df,
     df
   exclude <- as.character(exclude)
 
-  # CLAUDE EDIT 2025-12-11-2115 - R Issue 5: Fixed string comparison bug
-  # Original: exclude < 'Exclude' - WRONG because "Include" > "Exclude" lexicographically
-  # Fix: Use regex to check if string starts with "Exclude"
-  keep <- !grepl("^Exclude", exclude)
+  # Base set: non-excluded rows that are not missing or uncleaned.
+  # "Missing" and "Not cleaned" rows must be excluded — their measurements
+  # are NA or out of scope, and processing them causes downstream errors.
+  # "Swapped-Measurements", "Unit-Error-*" etc. are kept because the legacy
+  # algorithm corrects those in-place and they remain valid for further steps.
+  keep <- !grepl("^Exclude", exclude) &
+          exclude != "Missing" &
+          exclude != "Not cleaned"
 
   if (include.temporary.extraneous)
     keep <- keep | exclude == "Exclude-Temporary-Extraneous-Same-Day"

@@ -1,5 +1,5 @@
 ################################################################################
-# GROWTHCLEANR INFANT ALGORITHM - R IMPLEMENTATION
+# GROWTHCLEANR CHILD ALGORITHM - R IMPLEMENTATION
 ################################################################################
 #
 # PURPOSE:
@@ -94,8 +94,8 @@
 # SUPPORTING FUNCTIONS
 ################################################################################
 #
-# This file contains the main cleanbatch() function and supporting utilities:
-#   - calc_oob_evil_twins(): Identifies Evil Twins (Step 9)
+# This file contains the main cleanbatch_child() function and supporting utilities:
+#   - calc_otl_evil_twins(): Identifies Evil Twins (Step 9)
 #   - temporary_extraneous_infants(): Temporary SDE resolution (Step 5)
 #   - clean_infants_with_sde(): Final SDE resolution (Step 13)
 #   - Various EWMA calculation helpers
@@ -232,7 +232,12 @@
 #' @param adult_columns_filename Name of file to save original adult data, with additional output columns to
 #' as CSV. Defaults to "", for which this data will not be saved. Useful
 #' for post-analysis. For more information on this output, please see README.
-#' @param prelim_infants TRUE/FALSE. Run the in-development release of the infants algorithm (expands pediatric algorithm to improve performance for children 0 - 2 years). Not recommended for use in research. For more information regarding the logic of the algorithm, see the vignette 'Preliminary Infants Algorithm.' Defaults to FALSE.
+#' @param prelim_infants Deprecated. Use `use_legacy_algorithm` instead.
+#'   Old mapping: `prelim_infants = TRUE` → child algorithm (use_legacy_algorithm = FALSE);
+#'   `prelim_infants = FALSE` → legacy algorithm (use_legacy_algorithm = TRUE).
+#' @param use_legacy_algorithm Logical. If TRUE, run the legacy pediatric algorithm
+#'   (`cleanbatch_legacy`, formerly `cleanbatch`). If FALSE (default), run the child
+#'   algorithm (`cleanbatch_child`), which includes enhanced methods for children 0-2 years.
 #'
 #' @return Vector of exclusion codes for each of the input measurements.
 #'
@@ -306,12 +311,28 @@ cleangrowth <- function(subjid,
                         adult_cutpoint = 20,
                         weight_cap = Inf,
                         adult_columns_filename = "",
-                        prelim_infants = FALSE,
+                        prelim_infants = NULL,
+                        use_legacy_algorithm = FALSE,
                         ewma_window = 15,
                         id = NULL)
                         {
   # ewma_window: number of neighbors on each side for EWMA weighting.
   # Default 15 is the R design choice; set to 25 to match Stata behavior.
+  # Handle prelim_infants deprecation: old param (TRUE = child, FALSE = legacy) is
+  # now inverted and replaced by use_legacy_algorithm (TRUE = legacy, FALSE = child).
+  if (!is.null(prelim_infants)) {
+    warning(
+      "The `prelim_infants` parameter is deprecated. ",
+      "Use `use_legacy_algorithm = TRUE` to run the legacy pediatric algorithm instead. ",
+      "Mapping: prelim_infants = TRUE → use_legacy_algorithm = FALSE (child algorithm); ",
+      "prelim_infants = FALSE → use_legacy_algorithm = TRUE (legacy algorithm).",
+      call. = FALSE
+    )
+    use_legacy_algorithm <- !prelim_infants
+  }
+  # Internal variable: TRUE means use child algorithm (new default)
+  use_child_algorithm <- !use_legacy_algorithm
+
   # avoid "no visible binding" warnings
   N <- age_years <- batch <- exclude <- index <- line <- NULL
   newbatch <- sd.median <- sd.orig <- tanner.months <- tbc.sd <- NULL
@@ -365,16 +386,16 @@ cleangrowth <- function(subjid,
   if (!is.numeric(weight_cap) | weight_cap < 0){
     stop("weight_cap not numeric. Please enter a positive number.")
   }
-  if (any(!param %in% c("LENGTHCM", "HEIGHTCM", "WEIGHTKG", "HEIGHIN",
+  if (any(!param %in% c("LENGTHCM", "HEIGHTCM", "WEIGHTKG", "HEIGHTIN",
                         "WEIGHTLBS", "HEADCM"))){
     cat(sprintf("[%s] Parameters included that do not match 'param' specifications. Marking as missing...\n", Sys.time()))
     data.all.ages <-
       data.all.ages[
-        !param %in% c("LENGTHCM", "HEIGHTCM", "WEIGHTKG", "HEIGHIN",
+        !param %in% c("LENGTHCM", "HEIGHTCM", "WEIGHTKG", "HEIGHTIN",
                       "WEIGHTLBS", "HEADCM"), v := NA]
     data.all.ages <-
       data.all.ages[
-        !param %in% c("LENGTHCM", "HEIGHTCM", "WEIGHTKG", "HEIGHIN",
+        !param %in% c("LENGTHCM", "HEIGHTCM", "WEIGHTKG", "HEIGHTIN",
                       "WEIGHTLBS", "HEADCM"), v_adult := NA]
   }
 
@@ -426,7 +447,7 @@ cleangrowth <- function(subjid,
 
   # constants for pediatric
   # enumerate the different exclusion levels
-  if (prelim_infants){
+  if (use_child_algorithm){
     # different for infants
     exclude.levels.peds <- c(
       'Include',
@@ -439,11 +460,8 @@ cleangrowth <- function(subjid,
       'Not cleaned',
       'Exclude-Temporary-Extraneous-Same-Day',
       'Exclude-Carried-Forward',
-      # added CF exclusions
-      "Exclude-1-CF-deltaZ-<0.05",
-      "Exclude-1-CF-deltaZ-<0.1-wholehalfimp",
-      "Exclude-Teen-2-plus-CF-deltaZ-<0.05",
-      "Exclude-Teen-2-plus-CF-deltaZ-<0.1-wholehalfimp",
+      # CF rescue codes removed from exclude.levels — rescued CFs are now
+      # set back to "Include" with rescue reason stored in cf_rescued column
       'Exclude-EWMA-Extreme',
       'Exclude-EWMA-Extreme-Pair',
       'Exclude-SDE-Identical',
@@ -572,14 +590,14 @@ cleangrowth <- function(subjid,
       if (is.na(num.batches)) {
         num.batches <- getDoParWorkers()
       }
-      if (prelim_infants){
+      if (use_child_algorithm){
         # variables needed for parallel workers
         var_for_par <- c("temporary_extraneous", "valid", "swap_parameters",
                          "na_as_false", "ewma", "read_anthro", "as_matrix_delta",
                          "sd_median",
                          
                          "temporary_extraneous_infants",
-                         "get_dop", "calc_oob_evil_twins",
+                         "get_dop", "calc_otl_evil_twins",
                          "calc_and_recenter_z_scores")
       } else {
         var_for_par <- c("temporary_extraneous", "valid", "swap_parameters",
@@ -626,7 +644,7 @@ cleangrowth <- function(subjid,
     tanner.fields <- colnames(tanner.ht.vel)
     tanner.fields <- tanner.fields[!tanner.fields %in% c('sex', 'tanner.months')]
     
-    if (!prelim_infants){
+    if (!use_child_algorithm){
       who_max_ht_vel_path <- ifelse(
         ref.data.path == "",
         system.file(file.path("extdata", "who_ht_maxvel_3sd.csv.gz"), package = "growthcleanr"),
@@ -709,7 +727,7 @@ cleangrowth <- function(subjid,
     data.all[param == 'LENGTHCM', param := 'HEIGHTCM']
     
     # calculate z/sd scores
-    if(prelim_infants){
+    if(use_child_algorithm){
       if (!quietly)
         cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
       # removing z calculations, as they are not used
@@ -798,8 +816,11 @@ cleangrowth <- function(subjid,
       # potcorr_wt: row-level flag for FIRST weight per subject (earliest agedays, not necessarily birth)
       #             that qualifies: Z<-2 AND age<10 months
       # After sort by agedays + id_sort, seq_len(.N)==1L selects first weight with age-dependent ID
+      # NA-safe: sd.orig is NA when measurement is NA (Missing rows)
       data.all[param == "WEIGHTKG",
-               potcorr_wt := (seq_len(.N) == 1L & sd.orig < -2 & agemonths < 10),
+               potcorr_wt := (seq_len(.N) == 1L &
+                              !is.na(sd.orig) & sd.orig < -2 &
+                              agemonths < 10),
                by = subjid]
 
       # Clean up sort key
@@ -807,13 +828,13 @@ cleangrowth <- function(subjid,
 
       # propagate that flag to all rows for that subject (subject-level)
       # Equivalent to Stata line 294: bysort subjid: egen potcorr=max(potcorr_wt)
-      data.all[, potcorr := any(potcorr_wt), by = subjid]
+      data.all[, potcorr := any(potcorr_wt, na.rm = TRUE), by = subjid]
 
       # ensure deterministic order
       setkey(data.all, subjid, param, agedays, id)
 
       # --- Potcorr optimization: skip all reference merges if no potcorr subjects ---
-      has_potcorr <- any(data.all$potcorr)
+      has_potcorr <- any(data.all$potcorr, na.rm = TRUE)
 
       if (has_potcorr) {
         # Read Fenton reference data (only when potcorr subjects exist)
@@ -830,8 +851,8 @@ cleangrowth <- function(subjid,
 
         # integer weight is in grams, rounded to the nearest 10
         pc[potcorr == TRUE, intwt := trunc(v*100)*10]
-        # replace to facilitate merging with fenton curves
-        pc[intwt >= 250 & intwt <=560, intwt := 570]
+        # replace to facilitate merging with fenton curves (floor at table minimum of 500g)
+        pc[intwt >= 250 & intwt < 500, intwt := 500]
 
         # Fenton merge 1: weight -> estimated gestational age
         pc <- merge(
@@ -1094,7 +1115,12 @@ cleangrowth <- function(subjid,
     ordered = TRUE)]
     # also mark certain measurements to not consider
     data.all[param == "HEADCM" & agedays > (3*365.25), exclude := "Not cleaned"]
-    
+
+    # Initialize cf_rescued column to track CF rescue status
+    # Populated in Step 6; rescued CFs get set back to "Include" but this column
+    # preserves which rescue category they matched
+    data.all[, cf_rescued := ""]
+
     # define field names needed by helper functions
     ewma.fields <- c('ewma.all', 'ewma.before', 'ewma.after')
     
@@ -1120,7 +1146,7 @@ cleangrowth <- function(subjid,
     if (!is.data.table(sd.recenter)) {
       # INFANTS CHANGES:
       # use recentering file derived from work, independent of sex
-      if (prelim_infants){
+      if (use_child_algorithm){
         infants_reference_medians_path <- ifelse(
           ref.data.path == "",
           system.file(file.path("extdata",
@@ -1200,7 +1226,7 @@ cleangrowth <- function(subjid,
     # Include id for deterministic order
     setkey(data.all, subjid, param, agedays, id)
     data.all[, tbc.sd := sd.orig - sd.median]
-    if (prelim_infants){
+    if (use_child_algorithm){
       # separate out corrected and noncorrected values
       data.all[, ctbc.sd := sd.corr - sd.median]
     }
@@ -1208,7 +1234,7 @@ cleangrowth <- function(subjid,
     # Round z-scores to 0.001
     # Use Stata-style rounding
     data.all[, tbc.sd := round_stata(tbc.sd, 3)]
-    if (prelim_infants) {
+    if (use_child_algorithm) {
       data.all[, ctbc.sd := round_stata(ctbc.sd, 3)]
     }
 
@@ -1274,7 +1300,7 @@ cleangrowth <- function(subjid,
     # WHO reference for HC only goes up to 5 years
     data.all[param == "HEADCM" & agedays >= 5*365.25, exclude := 'Missing']
 
-    if (prelim_infants){
+    if (use_child_algorithm){
       # Removed NNTE calculation - was not helpful for efficiency
       # NNTE tried to predict "won't need EWMA" based on trajectory smoothness, but:
       # 1. Prediction-based filtering is less effective than deterministic filtering
@@ -1305,8 +1331,8 @@ cleangrowth <- function(subjid,
         num.batches
       ))
     if (num.batches == 1) {
-      if (!prelim_infants){
-        ret.df <- cleanbatch(data.all,
+      if (!use_child_algorithm){
+        ret.df <- cleanbatch_legacy(data.all,
                              log.path = log.path,
                              quietly = quietly,
                              parallel = parallel,
@@ -1324,7 +1350,7 @@ cleangrowth <- function(subjid,
                              error.load.threshold = error.load.threshold,
                              error.load.mincount = error.load.mincount)
       } else {
-        ret.df <- cleanbatch_infants(
+        ret.df <- cleanbatch_child(
           data.all,
           log.path = log.path,
           quietly = quietly,
@@ -1351,11 +1377,11 @@ cleangrowth <- function(subjid,
         ifelse(!dir.exists(log.path), dir.create(log.path, recursive = TRUE), FALSE)
       }
       
-      if (!prelim_infants){
+      if (!use_child_algorithm){
         ret.df <- ddply(
           data.all,
           .(batch),
-          cleanbatch,
+          cleanbatch_legacy,
           .parallel = parallel,
           .paropts = list(.packages = "data.table"),
           log.path = log.path,
@@ -1379,7 +1405,7 @@ cleangrowth <- function(subjid,
         ret.df <- ddply(
           data.all,
           .(batch),
-          cleanbatch_infants,
+          cleanbatch_child,
           .parallel = parallel,
           .paropts = list(.packages = "data.table"),
           log.path = log.path,
@@ -1529,27 +1555,40 @@ cleangrowth <- function(subjid,
   if (any(nrow(data.all) > 0, nrow(data.adult) > 0)) {
     
     # join pediatric and adult outputs together
+    # cf_rescued only exists in the child algorithm; use empty strings for legacy path
+    cf_rescued_peds <- if (!is.null(ret.df$cf_rescued)) {
+      as.character(ret.df$cf_rescued)
+    } else {
+      rep("", nrow(ret.df))
+    }
     full_out <- data.table(
       line = c(ret.df$line, res$line),
-      exclude = c(as.character(ret.df$exclude), res$result)
+      exclude = c(as.character(ret.df$exclude), res$result),
+      cf_rescued = c(cf_rescued_peds, rep("", nrow(res)))
     )
-    
+
     # preserve original exclude levels
     full_out[, exclude := factor(exclude, levels = exclude.levels)]
-    
+
     # join back to original input data to preserve all columns
     # this assumes data.all.ages was the original full input
     all_results <- merge(
       data.all.ages,           # original dataset (with id, param, etc.)
-      full_out, 
+      full_out,
       by = "line",
       all.x = TRUE,
       sort = FALSE
     )
-    # Merge checkpoint diagnostics by ID
-    all_results <- merge(all_results, checkpoint_data %>% select(-c(subjid, param, agedays)), by = "id", all.x = TRUE)
+
+    # Merge checkpoint diagnostics by ID (only when child algorithm was used)
+    if (exists("checkpoint_data") && nrow(checkpoint_data) > 0) {
+      drop_cols <- intersect(c("subjid", "param", "agedays"), names(checkpoint_data))
+      cp_merge <- checkpoint_data[, !..drop_cols]
+      all_results <- merge(all_results, cp_merge, by = "id", all.x = TRUE)
+    }
+
     all_results <- all_results[match(data.all.ages$id, all_results$id)]
-    
+
     # restore original row order
     setorder(all_results, line)
     
@@ -2094,12 +2133,21 @@ ewma_cache_update <- function(cache, excluded_id) {
   exp_vals <- cache$exp_vals[keep]
   window <- cache$window
 
-  # Check if neighbors' exponents changed
-  # In old ordering: pos_j-1 and pos_j+1 were neighbors
-  # In new ordering (after removal): pos_j-1 and pos_j
+  # Check if neighbors' exponents changed after removal.
+  # Must check up to 2 positions on each side in the new index:
+  # removing pos_j changes the max-gap for pos_j-1 (now adjacent
+  # to pos_j-2 and pos_j) AND for pos_j-2 (whose gap-after is
+  # now to pos_j instead of pos_j-1). Same logic applies on the
+  # other side.
+  # Bug fix: was only checking 1 position on each side; extended
+  # to 2 positions on each side.
   neighbors <- integer(0)
-  if (pos_j > 1L) neighbors <- c(neighbors, pos_j - 1L)
+  if (pos_j > 2L)     neighbors <- c(neighbors, pos_j - 2L)
+  if (pos_j > 1L)     neighbors <- c(neighbors, pos_j - 1L)
   if (pos_j <= new_n) neighbors <- c(neighbors, pos_j)
+  if (pos_j < new_n)  neighbors <- c(neighbors, pos_j + 1L)
+  neighbors <- unique(
+    neighbors[neighbors >= 1L & neighbors <= new_n])
 
   for (nb in neighbors) {
     # Recompute max gap for this neighbor
@@ -2454,19 +2502,19 @@ temporary_extraneous_infants <- function(df, exclude_from_dop_ids = NULL) {
 
 # evil twins ----
 
-#' Function to calculate out of bounds (OOB) measurements for Evil Twins step
+#' Function to calculate over-the-limit (OTL) measurements for Evil Twins step
 #'
 #' @param df data table with all parameters
 #'
 #' @keywords internal
 #' @noRd
-calc_oob_evil_twins <- function(df){
-  # # start by determining if a measurement is out of bounds (oob)
+calc_otl_evil_twins <- function(df){
+  # # start by determining if a measurement is over the limit (otl)
 
   # Handle minimal datasets with < 2 rows
   # When there are 0 or 1 rows, there are no adjacent pairs to compare for evil twins
   if (nrow(df) < 2) {
-    df[, "oob" := FALSE]
+    df[, "otl" := FALSE]
     return(df)
   }
 
@@ -2489,10 +2537,10 @@ calc_oob_evil_twins <- function(df){
   ctbc_next_diff_rounded <- ctbc_next_diff
   ctbc_prev_diff_rounded <- ctbc_prev_diff
 
-  oob <- (tbc_next_diff_rounded > 5 & ctbc_next_diff_rounded > 5 & same_sp_next) |
+  otl <- (tbc_next_diff_rounded > 5 & ctbc_next_diff_rounded > 5 & same_sp_next) |
          (tbc_prev_diff_rounded > 5 & ctbc_prev_diff_rounded > 5 & same_sp_prev)
 
-  df[, "oob" := oob]
+  df[, "otl" := otl]
 
   return(df)
 }
@@ -2594,7 +2642,7 @@ calc_and_recenter_z_scores <- function(df, cn, ref.data.path,
 #' @import data.table
 #' @importFrom stats median embed
 #' @noRd
-cleanbatch_infants <- function(data.df,
+cleanbatch_child <- function(data.df,
                                log.path,
                                quietly,
                                parallel,
@@ -2633,8 +2681,9 @@ cleanbatch_infants <- function(data.df,
   whoagegrp.ht <- whoinc.1.ht <- whoinc.2.ht <- whoinc.3.ht <- whoinc.4.ht <- NULL
   whoinc.6.ht <- whoinc.age.ht <- z.orig <- NULL
   
-  oob <- sd_med <- med_diff <- max_diff <- sum_oob <- i.exclude <- NULL
-  
+  cf_rescued <- NULL
+  otl <- sd_med <- med_diff <- max_diff <- sum_otl <- i.exclude <- NULL
+
   
   # avoid no visible warning errors
   sum_sde <- no_sde <- cf <- wholehalfimp <- seq_win <- cs <- absdiff <-
@@ -2646,7 +2695,7 @@ cleanbatch_infants <- function(data.df,
     tbc_diff_minus_next <- tbc.p_minus <- tbc_diff_minus_prior <- addcrithigh <-
     addcritlow <- tbc_dop <- i.tbc.sd <- rowind <- abssum <- c.dewma.all <-
     whoagegrp_ht <- d_agedays <- mindiff <- maxdiff <- who_mindiff_ht <-
-    who_maxdiff_ht <- mindiff_prev <- maxdiff_prev <- whoinc.age.hc <-
+    who_maxdiff_ht <- mindiff_prior <- maxdiff_prior <- whoinc.age.hc <-
     who_maxdiff_hc <- who_mindiff_hc <- diff_prev <-
     diff_next <- aft.g.aftm1 <- val_excl <-
     absval <- comp_diff <- err_ratio <-
@@ -3094,6 +3143,20 @@ cleanbatch_infants <- function(data.df,
                 "exclude"),
     by = c("subjid", "param", "cs")]
 
+    # Store rescue codes in cf_rescued column, then re-include rescued CFs
+    # Rescued CFs participate in all downstream steps but are flagged for users
+    rescue_codes <- c("Exclude-1-CF-deltaZ-<0.05",
+                      "Exclude-1-CF-deltaZ-<0.1-wholehalfimp",
+                      "Exclude-Teen-2-plus-CF-deltaZ-<0.05",
+                      "Exclude-Teen-2-plus-CF-deltaZ-<0.1-wholehalfimp")
+    rescued_mask <- data.df$exclude %in% rescue_codes
+    if (any(rescued_mask)) {
+      data.df[rescued_mask, cf_rescued := as.character(exclude)]
+      data.df[rescued_mask, exclude := "Include"]
+      if (!quietly)
+        cat(sprintf("  CF rescue: %d measurements re-included\n", sum(rescued_mask)))
+    }
+
     } # End if (any_cf)
   }
 
@@ -3246,7 +3309,7 @@ cleanbatch_infants <- function(data.df,
   # If we reorder AFTER computing valid_set, the boolean indices no longer match
   # the correct rows, causing temp SDEs to be included and non-temp-SDEs excluded.
   # Must include agedays and id for consistent order
-  # Without agedays, calc_oob_evil_twins compares non-adjacent-in-time values
+  # Without agedays, calc_otl_evil_twins compares non-adjacent-in-time values
   # Without id, SDE rows (same ageday) have undefined order, causing parallel inconsistency
   data.df <- data.df[order(subjid, param, agedays, id),]
 
@@ -3261,28 +3324,28 @@ cleanbatch_infants <- function(data.df,
 
   # 9A/B/C
   # first, find out if any possible evil twins exist at all (cheap vectorized check)
-  start_df <- calc_oob_evil_twins(data.df[valid_set,])
+  start_df <- calc_otl_evil_twins(data.df[valid_set,])
 
-  if (any(start_df$oob)) {
+  if (any(start_df$otl, na.rm = TRUE)) {
     if (!quietly)
       cat(sprintf(
         "[%s] Exclude evil twins...\n",
         Sys.time()
       ))
 
-    # Identify which subject-params have OOB values — only process those groups
-    sp_with_oob <- unique(start_df[oob == TRUE, .(subjid, param)])
+    # Identify which subject-params have OTL values — only process those groups
+    sp_with_otl <- unique(start_df[otl == TRUE, .(subjid, param)])
 
     if (!quietly)
-      cat(sprintf("  Evil twins pre-filter: %d subject-params have OOB values\n",
-                  nrow(sp_with_oob)))
+      cat(sprintf("  Evil twins pre-filter: %d subject-params have OTL values\n",
+                  nrow(sp_with_otl)))
 
     # Process each subject-param group independently via for loop
     # (Avoids data.table by+:= closure mechanics; groups are small, typically 3-30 rows)
     et_excl_lines <- integer(0)
-    for (sp_i in seq_len(nrow(sp_with_oob))) {
-      s <- sp_with_oob$subjid[sp_i]
-      p <- sp_with_oob$param[sp_i]
+    for (sp_i in seq_len(nrow(sp_with_otl))) {
+      s <- sp_with_otl$subjid[sp_i]
+      p <- sp_with_otl$param[sp_i]
 
       # Extract this group's valid rows
       grp_idx <- which(data.df$subjid == s & data.df$param == p & valid_set)
@@ -3291,39 +3354,39 @@ cleanbatch_infants <- function(data.df,
       df <- data.df[grp_idx, .(line, id, subjid, param, agedays, tbc.sd, ctbc.sd, exclude)]
       df <- copy(df)
 
-      # calc_oob for this group
-      df <- calc_oob_evil_twins(df)
+      # calc_otl for this group
+      df <- calc_otl_evil_twins(df)
 
-      while (any(df$oob, na.rm = TRUE)) {
+      while (any(df$otl, na.rm = TRUE)) {
         # 9D: median and distance from median (for included values only)
         incl_tbc <- df$tbc.sd[df$exclude == "Include"]
         sd_med <- median(incl_tbc, na.rm = TRUE)
         df[exclude == "Include", med_diff := abs(tbc.sd - sd_med)]
 
-        # Find worst OOB value using tiebreaker hierarchy:
+        # Find worst OTL value using tiebreaker hierarchy:
         #   1. Furthest from median (highest med_diff)
         #   2. Most extreme overall (highest abs(tbc.sd))
         #   3. Lowest id (deterministic)
-        oob_rows <- df[oob == TRUE]
-        if (nrow(oob_rows) == 0L) break
-        ord <- order(-oob_rows$med_diff, -abs(oob_rows$tbc.sd), oob_rows$id)
-        worst_line <- oob_rows$line[ord[1L]]
+        otl_rows <- df[otl == TRUE]
+        if (nrow(otl_rows) == 0L) break
+        ord <- order(-otl_rows$med_diff, -abs(otl_rows$tbc.sd), otl_rows$id)
+        worst_line <- otl_rows$line[ord[1L]]
 
         # Mark exactly one exclusion per iteration
         df[line == worst_line, exclude := exc_nam]
 
-        # Recalculate OOB on remaining Include values
+        # Recalculate OTL on remaining Include values
         incl <- df[exclude == "Include"]
         if (nrow(incl) < 2L) break
-        # Must remove oob column before calling calc_oob_evil_twins, because
-        # df[, "oob" := oob] inside that function self-assigns from the existing
+        # Must remove otl column before calling calc_otl_evil_twins, because
+        # df[, "otl" := otl] inside that function self-assigns from the existing
         # column (data.table scope resolution) instead of using the local variable.
-        if ("oob" %in% names(incl)) incl[, oob := NULL]
-        incl <- calc_oob_evil_twins(incl)
-        # Map oob back to df (reset all, then set TRUE for OOB rows)
-        df[, oob := FALSE]
-        if (any(incl$oob)) {
-          df[incl[oob == TRUE], oob := TRUE, on = .(line)]
+        if ("otl" %in% names(incl)) incl[, otl := NULL]
+        incl <- calc_otl_evil_twins(incl)
+        # Map otl back to df (reset all, then set TRUE for OTL rows)
+        df[, otl := FALSE]
+        if (any(incl$otl)) {
+          df[incl[otl == TRUE], otl := TRUE, on = .(line)]
         }
       }
 
@@ -3826,7 +3889,14 @@ cleanbatch_infants <- function(data.df,
   # -------------------------------------------
   sde_results <- data.sde[, .(id, sde_exclude = exclude)]
   data.df <- merge(data.df, sde_results, by = "id", all.x = TRUE)
-  data.df[!is.na(sde_exclude), exclude := sde_exclude]
+  # Only overwrite rows that were in scope for SDE processing
+  # (Include or Temp-SDE). Do not overwrite rows already carrying
+  # permanent exclusion codes assigned before this block (e.g., BIV,
+  # Evil Twins, early SDE-Identical).
+  data.df[!is.na(sde_exclude) &
+            exclude %in% c("Include",
+                           "Exclude-Temporary-Extraneous-Same-Day"),
+          exclude := sde_exclude]
   data.df[, sde_exclude := NULL]
   # Keep only original columns (drop any extras from SDE processing)
   extra_cols <- setdiff(names(data.df), keep_cols_sde)
@@ -4301,19 +4371,10 @@ cleanbatch_infants <- function(data.df,
       Sys.time()
     ))
   
-  # read in tanner data
-  tanner_ht_vel_rev_path <- ifelse(
-    ref.data.path == "",
-    system.file(file.path("extdata", "tanner_ht_vel.csv.gz"), package = "growthcleanr"),
-    file.path(ref.data.path, "tanner_ht_vel.csv.gz")
-  )
-  
-  tanner.ht.vel.rev <- fread(tanner_ht_vel_rev_path)
-  
-  setnames(tanner.ht.vel.rev,
-           colnames(tanner.ht.vel.rev),
-           gsub('_', '.', colnames(tanner.ht.vel.rev)))
-  setkey(tanner.ht.vel.rev, sex, tanner.months)
+  # tanner.ht.vel was already loaded (same file, same setnames/setkey)
+  # in cleangrowth() and is passed as a parameter to this function.
+  # Bug fix: was redundantly re-reading from disk each batch.
+  tanner.ht.vel.rev <- tanner.ht.vel
   
   # read in the who height data
   who_max_ht_vel_path <- ifelse(
@@ -4590,15 +4651,15 @@ cleanbatch_infants <- function(data.df,
 
     # Compute lagged thresholds (previous row's mindiff/maxdiff)
     pf[, `:=`(
-      mindiff_prev = shift(mindiff, n = 1L, type = "lag"),
-      maxdiff_prev = shift(maxdiff, n = 1L, type = "lag")
+      mindiff_prior = shift(mindiff, n = 1L, type = "lag"),
+      maxdiff_prior = shift(maxdiff, n = 1L, type = "lag")
     ), by = .(subjid, param)]
 
     # Check for any raw-diff violations per group
     pf[, has_violation :=
-      (!is.na(diff_prev) & !is.na(mindiff_prev) & diff_prev < mindiff_prev) |
+      (!is.na(diff_prev) & !is.na(mindiff_prior) & diff_prev < mindiff_prior) |
       (!is.na(diff_next) & !is.na(mindiff) & diff_next < mindiff) |
-      (!is.na(diff_prev) & !is.na(maxdiff_prev) & diff_prev > maxdiff_prev) |
+      (!is.na(diff_prev) & !is.na(maxdiff_prior) & diff_prev > maxdiff_prior) |
       (!is.na(diff_next) & !is.na(maxdiff) & diff_next > maxdiff)]
 
     sp17_to_process <- pf[has_violation == TRUE, unique(sp_key)]
@@ -4698,7 +4759,7 @@ cleanbatch_infants <- function(data.df,
         # Chris updated this to >= from ==
         # update the edge intervals
         df[d_agedays < 20, whoinc.age.ht := 1]
-        df[d_agedays == 200, d_agedays := 200]
+        # Note: d_agedays == 200 is covered by the >= 200 line below
         df[d_agedays >= 200, whoinc.age.ht := 6]
         # Chris updated this to >= from ==
         # 17F: WHO velocity lookup (columns pre-merged outside loop; fcase selects by whoinc.age.ht)
@@ -4755,8 +4816,8 @@ cleanbatch_infants <- function(data.df,
         # sort df since it got reordered with keys
         # Include id for deterministic SDE order
         df <- df[order(agedays, id),]
-        df[, mindiff_prev := shift(mindiff, n = 1L, type = "lag")]
-        df[, maxdiff_prev := shift(maxdiff, n = 1L, type = "lag")]
+        df[, mindiff_prior := shift(mindiff, n = 1L, type = "lag")]
+        df[, maxdiff_prior := shift(maxdiff, n = 1L, type = "lag")]
       } else { # head circumference
         # WHO HC velocity columns (whoinc.2.hc, max.whoinc.2.hc, etc.) were pre-merged
         # before the while loop. Here we compute only per-iteration logic (depends on d_agedays).
@@ -4807,8 +4868,8 @@ cleanbatch_infants <- function(data.df,
         # 17N: Sort and lag thresholds for pairwise violation check
         # Include id for deterministic SDE order
         df <- df[order(agedays, id),]
-        df[, mindiff_prev := shift(mindiff, n = 1L, type = "lag")]
-        df[, maxdiff_prev := shift(maxdiff, n = 1L, type = "lag")]
+        df[, mindiff_prior := shift(mindiff, n = 1L, type = "lag")]
+        df[, maxdiff_prior := shift(maxdiff, n = 1L, type = "lag")]
       }
 
       # 17O: generate ewma
@@ -4845,9 +4906,9 @@ cleanbatch_infants <- function(data.df,
 
       if (nrow(df) > 2){
         # 17P/R: identify pairs and calculate exclusions
-        df[, pair := diff_prev < mindiff_prev |
+        df[, pair := diff_prev < mindiff_prior |
              diff_next < mindiff |
-             diff_prev > maxdiff_prev |
+             diff_prev > maxdiff_prior |
              diff_next > maxdiff
         ]
         df[is.na(pair), pair := FALSE]
@@ -4861,30 +4922,30 @@ cleanbatch_infants <- function(data.df,
 
         # Q
         df[, val_excl := exclude]
-        df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
+        df[diff_prev < mindiff_prior & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
         df[diff_next < mindiff & aft.g.aftm1, val_excl := "Exclude-Min-diff"]
-        df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
+        df[diff_prev > maxdiff_prior & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
         df[diff_next > maxdiff & aft.g.aftm1, val_excl := "Exclude-Max-diff"]
-        df[diff_prev < mindiff_prev & bef.g.aftm1, val_excl_code := "1"]
+        df[diff_prev < mindiff_prior & bef.g.aftm1, val_excl_code := "1"]
         df[diff_next < mindiff & aft.g.aftm1, val_excl_code := "2"]
-        df[diff_prev > maxdiff_prev & bef.g.aftm1, val_excl_code := "3"]
+        df[diff_prev > maxdiff_prior & bef.g.aftm1, val_excl_code := "3"]
         df[diff_next > maxdiff & aft.g.aftm1, val_excl_code := "4"]
       }else { # only 2 values
         # 17Q/R -- exclusions for pairs
         df[, val_excl := exclude]
-        df[diff_prev < mindiff_prev & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lag"),
+        df[diff_prev < mindiff_prior & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lag"),
            val_excl := "Exclude-Min-diff"]
         df[diff_next < mindiff & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lead"),
            val_excl := "Exclude-Min-diff"]
-        df[diff_prev > maxdiff_prev & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lag"),
+        df[diff_prev > maxdiff_prior & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lag"),
            val_excl := "Exclude-Max-diff"]
         df[diff_next > maxdiff & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lead"),
            val_excl := "Exclude-Max-diff"]
-        df[diff_prev < mindiff_prev & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lag"),
+        df[diff_prev < mindiff_prior & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lag"),
            val_excl_code := "5"]
         df[diff_next < mindiff & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lead"),
            val_excl_code := "6"]
-        df[diff_prev > maxdiff_prev & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lag"),
+        df[diff_prev > maxdiff_prior & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lag"),
            val_excl_code := "7"]
         df[diff_next > maxdiff & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lead"),
            val_excl_code := "8"]
@@ -4952,11 +5013,11 @@ cleanbatch_infants <- function(data.df,
     #   if (nrow(df) > 2){
     #     # Use the appropriate DEWMA based on exclusion type
     #     df[, absval := NA_real_]
-    #     df[val_excl == "Exclude-Min-diff" & diff_prev < mindiff_prev, 
+    #     df[val_excl == "Exclude-Min-diff" & diff_prev < mindiff_prior, 
     #        absval := abs(dewma.before)]
     #     df[val_excl == "Exclude-Min-diff" & diff_next < mindiff, 
     #        absval := abs(dewma.after)]
-    #     df[val_excl == "Exclude-Max-diff" & diff_prev > maxdiff_prev, 
+    #     df[val_excl == "Exclude-Max-diff" & diff_prev > maxdiff_prior, 
     #        absval := abs(dewma.before)]
     #     df[val_excl == "Exclude-Max-diff" & diff_next > maxdiff, 
     #        absval := abs(dewma.after)]
@@ -5038,7 +5099,7 @@ cleanbatch_infants <- function(data.df,
     
     # 19D: calculate the voi comparison
     if (nrow(dop) > 0){
-      for (i in 1:nrow(df)){
+      for (i in seq_len(nrow(df))){
         comp_val <-
           if (df$agedays[i] %in% dop$agedays){
             abs(dop[dop$agedays == df$agedays[i], tbc.sd] - df[i, tbc.sd])
@@ -5088,13 +5149,14 @@ cleanbatch_infants <- function(data.df,
       # Use absolute difference to match Stata
       # Stata line 2778: absd_tbc`p'z=abs(tbc`p'z-tbc`p'z_other)
       # Stata line 2830: absd_tbc`p'z>2.5 (uses absolute value)
-      if (abs(diff_tbc.sd) > 4 &
+      # NA-safe: diff_tbc.sd can be NA if z-scores are NA (edge cases)
+      if (isTRUE(abs(diff_tbc.sd) > 4 &
           (abs(diff_ctbc.sd) > 4 | is.na(diff_ctbc.sd)) &
-          diff_agedays >=365.25){
+          diff_agedays >=365.25)){
         df[max_ind, exclude := "Exclude-2-meas->1-year"]
-      } else if (abs(diff_tbc.sd) > 2.5 &
+      } else if (isTRUE(abs(diff_tbc.sd) > 2.5 &
                  (abs(diff_ctbc.sd) > 2.5 | is.na(diff_ctbc.sd)) &
-                 diff_agedays < 365.25){
+                 diff_agedays < 365.25)){
         df[max_ind, exclude := "Exclude-2-meas-<1-year"]
       }
       
@@ -5108,8 +5170,11 @@ cleanbatch_infants <- function(data.df,
     
     if (nrow(df) == 1){
       # Check if 1-meas exclusion applies
-      one_meas_cond <- (abs(df$tbc.sd) > 3 & !is.na(df$comp_diff) & df$comp_diff > 5) |
-                       (abs(df$tbc.sd) > 5 & is.na(df$comp_diff))
+      # NA-safe: tbc.sd can be NA in edge cases
+      one_meas_cond <- isTRUE(
+        (abs(df$tbc.sd) > 3 & !is.na(df$comp_diff) & df$comp_diff > 5) |
+        (abs(df$tbc.sd) > 5 & is.na(df$comp_diff))
+      )
       if (one_meas_cond) {
         df[, exclude := "Exclude-1-meas"]
         # Only update exclude_all if 1-meas exclusion happens
@@ -5137,16 +5202,13 @@ cleanbatch_infants <- function(data.df,
   valid_set <- rep(TRUE, nrow(data.df))
 
   # Non-error codes that should be excluded from both numerator AND denominator
+  # CF rescue codes removed — rescued CFs are now "Include" (stored in cf_rescued column)
   non_error_codes <- c("Exclude-SDE-Identical",
                        "Exclude-SDE-All-Exclude",
                        "Exclude-SDE-All-Extreme",
                        "Exclude-SDE-EWMA",
                        "Exclude-SDE-One-Day",
                        "Exclude-Carried-Forward",
-                       "Exclude-1-CF-deltaZ-<0.05",
-                       "Exclude-1-CF-deltaZ-<0.1-wholehalfimp",
-                       "Exclude-Teen-2-plus-CF-deltaZ-<0.05",
-                       "Exclude-Teen-2-plus-CF-deltaZ-<0.1-wholehalfimp",
                        "Missing")
 
   data.df[valid_set,
@@ -5200,7 +5262,7 @@ cleanbatch_infants <- function(data.df,
 
   # Return z-scores and EWMA1 iteration 1 values for comparison
   # Build list of columns to return - start with essential columns
-  return_cols <- c("id", "line", "exclude", "param")
+  return_cols <- c("id", "line", "exclude", "param", "cf_rescued")
 
   # Add z-score columns if they exist
   zscore_cols <- c("sd.orig_who", "sd.orig_cdc", "sd.orig", "tbc.sd", "ctbc.sd")
@@ -5259,9 +5321,14 @@ valid <- function(df,
   exclude <- if (is.data.frame(df)) df$exclude else df
   exclude <- as.character(exclude)
 
-  # Use regex for string comparison (prefix matching)
-  # The string 'Include' sorts lexicographically after 'Exclude', so use grepl instead
-  keep <- !grepl("^Exclude", exclude)
+  # Base set: non-excluded rows that are not missing or uncleaned.
+  # "Missing" and "Not cleaned" rows must be excluded — their measurements
+  # are NA or out of scope, and processing them causes downstream errors.
+  # "Swapped-Measurements", "Unit-Error-*" etc. are kept because the legacy
+  # algorithm corrects those in-place and they remain valid for further steps.
+  keep <- !grepl("^Exclude", exclude) &
+          exclude != "Missing" &
+          exclude != "Not cleaned"
   
   if (include.temporary.extraneous)
     keep <- keep | exclude == "Exclude-Temporary-Extraneous-Same-Day"
