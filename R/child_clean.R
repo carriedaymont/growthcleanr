@@ -5,15 +5,12 @@
 # PURPOSE:
 #   Identifies and flags implausible pediatric growth measurements (weight,
 #   height, head circumference) from electronic health records for children
-#   ages 0-20 years, with enhanced methods for infants 0-2 years.
+#   ages 0-20 years.
 #
-# VERSION: 2026-01-09
+# VERSION: 2026-03-20
 #
 # AUTHOR: Carrie Daymont, Penn State College of Medicine
 #
-# PARALLEL IMPLEMENTATION:
-#   This R implementation is algorithmically equivalent to the Stata version
-#   but optimized for parallel processing of large datasets.
 #
 
 ################################################################################
@@ -415,35 +412,30 @@ cleangrowth <- function(subjid,
   patients <- data.all.ages %>%
     select(subjid) %>%
     distinct()
-  
+
   batches <- patients %>%
     mutate(batch = (row_number() - 1) %/% 2000 + 1)
-  
+
   ### Loop Begin ###
-  
+
   for (id_batch in unique(batches$batch)) {
     print(paste("Loop " , i, " start.", sep = ""))
     ids <- batches$subjid[batches$batch == id_batch]
-    
+
     data.all <- copy(
       data.all.ages[
         subjid %in% ids & agedays < adult_cutpoint * 365.25
       ]
     )
-    
+
     data.adult <- copy(
       data.all.ages[
         subjid %in% ids & agedays >= adult_cutpoint * 365.25
       ]
     )
     ### BATCHING ###
-  # split by cutpoint
-  # for ease, data.all will refer to pediatric data; data.adult will refer to
-  # adult data -- copy to make sure they're separate
-  data.all <- copy(data.all.ages[agedays < adult_cutpoint*365.25,])
-  data.adult <- copy(data.all.ages[agedays >= adult_cutpoint*365.25,])
-
-  # TODO: ADD PARALLEL FOR ADULTS
+  # Batch-level reference for result assembly (all ages for this batch's subjects)
+  data.batch <- copy(data.all.ages[subjid %in% ids])
 
   # constants for pediatric
   # enumerate the different exclusion levels
@@ -571,20 +563,20 @@ cleangrowth <- function(subjid,
     "Exclude-Adult-Distinct-Single",
     "Exclude-Adult-Too-Many-Errors"
   )
-  
+
   exclude.levels <- base::union(exclude.levels.peds, exclude.levels.adult)
-  
+
   # if there's no pediatric data, no need to go through this rigamarole
   if (nrow(data.all) > 0){
-    
+
     # pediatric: height velocity calculations and preprocessing ----
-    
+
     # for pediatric data, convert in and lbs to cm and kg (adult is done within algo)
     data.all[param == "HEIGHTIN", v := v*2.54]
     data.all[param == "HEIGHTIN", param := "HEIGHTCM"]
     data.all[param == "WEIGHTLBS", v := v/2.2046226]
     data.all[param == "WEIGHTLBS", param := "WEIGHTKG"]
-    
+
     # if parallel processing is desired, load additional modules
     if (parallel) {
       if (is.na(num.batches)) {
@@ -595,7 +587,7 @@ cleangrowth <- function(subjid,
         var_for_par <- c("temporary_extraneous", "valid", "swap_parameters",
                          "na_as_false", "ewma", "read_anthro", "as_matrix_delta",
                          "sd_median",
-                         
+
                          "temporary_extraneous_infants",
                          "get_dop", "calc_otl_evil_twins",
                          "calc_and_recenter_z_scores")
@@ -604,7 +596,7 @@ cleangrowth <- function(subjid,
                          "na_as_false", "ewma", "read_anthro", "as_matrix_delta",
                          "sd_median")
       }
-      
+
       cl <- makeCluster(num.batches)
       clusterExport(cl = cl, varlist = var_for_par, envir = environment())
       registerDoParallel(cl)
@@ -612,7 +604,7 @@ cleangrowth <- function(subjid,
       if (is.na(num.batches))
         num.batches <- 1
     }
-    
+
     setkey(data.all, subjid)
     subjid.unique <- data.all[j = unique(subjid)]
     batches.all <- data.table(
@@ -621,11 +613,11 @@ cleangrowth <- function(subjid,
       key = 'subjid'
     )
     data.all <- batches.all[data.all]
-    
+
     if (!quietly){
       cat(sprintf("[%s] Begin processing pediatric data...\n", Sys.time()))
     }
-    
+
     # load tanner height velocity data. sex variable is defined such that 0=male and 1=female
     # recode column names to match syntactic style ("." rather than "_" in variable names)
     tanner_ht_vel_path <- ifelse(
@@ -633,9 +625,9 @@ cleangrowth <- function(subjid,
       system.file(file.path("extdata", "tanner_ht_vel.csv.gz"), package = "growthcleanr"),
       file.path(ref.data.path, "tanner_ht_vel.csv.gz")
     )
-    
+
     tanner.ht.vel <- fread(tanner_ht_vel_path)
-    
+
     setnames(tanner.ht.vel,
              colnames(tanner.ht.vel),
              gsub('_', '.', colnames(tanner.ht.vel)))
@@ -643,14 +635,14 @@ cleangrowth <- function(subjid,
     # keep track of column names in the tanner data
     tanner.fields <- colnames(tanner.ht.vel)
     tanner.fields <- tanner.fields[!tanner.fields %in% c('sex', 'tanner.months')]
-    
+
     if (!use_child_algorithm){
       who_max_ht_vel_path <- ifelse(
         ref.data.path == "",
         system.file(file.path("extdata", "who_ht_maxvel_3sd.csv.gz"), package = "growthcleanr"),
         file.path(ref.data.path, "who_ht_maxvel_3sd.csv.gz")
       )
-      
+
       who_ht_vel_3sd_path <- ifelse(
         ref.data.path == "",
         system.file(file.path("extdata", "who_ht_vel_3sd.csv.gz"), package = "growthcleanr"),
@@ -662,7 +654,7 @@ cleangrowth <- function(subjid,
         system.file(file.path("extdata", "who_hc_maxvel_3sd_infants.csv.gz"), package = "growthcleanr"),
         file.path(ref.data.path, "who_hc_maxvel_3sd_infants.csv.gz")
       )
-      
+
       who_ht_vel_3sd_path <- ifelse(
         ref.data.path == "",
         system.file(file.path("extdata", "who_hc_vel_3sd_infants.csv.gz"), package = "growthcleanr"),
@@ -674,13 +666,13 @@ cleangrowth <- function(subjid,
     setkey(who.max.ht.vel, sex, whoagegrp_ht)
     setkey(who.ht.vel, sex, whoagegrp_ht)
     who.ht.vel <- merge(who.ht.vel, who.max.ht.vel, by = c('sex', 'whoagegrp_ht'), all = TRUE)
-    
+
     setnames(who.ht.vel, colnames(who.ht.vel), gsub('_', '.', colnames(who.ht.vel)))
     setkey(who.ht.vel, sex, whoagegrp.ht)
     # keep track of column names in the who growth velocity data
     who.fields <- colnames(who.ht.vel)
     who.fields <- who.fields[!who.fields %in% c('sex', 'whoagegrp.ht')]
-    
+
     # 1.  General principles
     # a.	All steps are done separately for each parameter unless otherwise noted
     # b.	All steps are done sorted by subject, parameter, and age (in days) for nonexcluded and nonmissing values only unless otherwise noted. This is very important.
@@ -698,13 +690,13 @@ cleangrowth <- function(subjid,
     #     subject, and the previous value refers to the nonexcluded nonmissing value with the next lowest age for the same parameter
     #     and the same subject.
     # g.  exc_* should only be replaced with a  higher value if exc_*==0 at the time of replacement, unless otherwise specified.
-    
-    
+
+
     # NOTE: in the R code below exclusion is documented as a series of factor levels, where all levels occuring before 'Exclude' in the sequence are considered
     # to be valid measurements.  We use the built in sorting of the data.table object and subsets rather than re-sorting at each step
     # to ensure that only valid measurements are used at the beginning of each step.
     # Also, unlike the Stata code, the measurement parameter (weight vs. height) is recorded as a factor in the data frame, rather than as a variable name
-    
+
     # 2.  Data set-up
     # a.	I always code sex as 0=Male, 1=Female, so I recoded the variable sex that way and left a variable sexorigcode the way the data was sent to me (1=Female 2=Male)
     # b.	Remove rows that are extraneous for subjid, param, and measurement from further analysis
@@ -721,11 +713,11 @@ cleangrowth <- function(subjid,
     #     changes in weight in subjects with low weights.  The score we will create can be called an SD-score (SDorig: WtSDorig and HtSDorig that is calculated by
     #     dividing the difference between the value and the median by the SD score (use csd_pos if the value is above the median, csd_neg if the value is below the
     #     median). These SD-scores, rather than z-scores, now form the basis for the algorithm.
-    
+
     # recategorize linear parameters as 'HEIGHTCM'
     # NOTE: this will be changed in future to consider this difference
     data.all[param == 'LENGTHCM', param := 'HEIGHTCM']
-    
+
     # calculate z/sd scores
     if(use_child_algorithm){
       if (!quietly)
@@ -736,7 +728,7 @@ cleangrowth <- function(subjid,
                                       prelim_infants = TRUE)
       measurement.to.z_who <- read_anthro(ref.data.path, cdc.only = FALSE,
                                           prelim_infants = TRUE)
-      
+
       # calculate "standard deviation" scores
       if (!quietly)
         cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
@@ -761,17 +753,17 @@ cleangrowth <- function(subjid,
       data.all[smooth_val,
                sd.orig := (data.all$sd.orig_cdc[smooth_val]*cdc_weight[smooth_val] +
                              data.all$sd.orig_who[smooth_val]*who_weight[smooth_val])/3]
-      # <- 
+      # <-
       # otherwise use WHO and CDC for older and younger, respectively
       who_val <- data.all$param == "HEADCM" |
         data.all$ageyears < 2
-      
+
       data.all[(who_val & !smooth_val) | (smooth_val & is.na(data.all$sd.orig_cdc)),
                sd.orig := data.all$sd.orig_who[(who_val & !smooth_val)  | (smooth_val & is.na(data.all$sd.orig_cdc))]]
-      
+
       cdc_val <- data.all$param != "HEADCM" &
         data.all$ageyears > 5
-      
+
       data.all[(cdc_val & !smooth_val) | (smooth_val & is.na(data.all$sd.orig_who)),
                sd.orig := data.all$sd.orig_cdc[(cdc_val & !smooth_val) | (smooth_val & is.na(data.all$sd.orig_who))]]
 
@@ -783,15 +775,15 @@ cleangrowth <- function(subjid,
 
       # keep the original, uncorrected, unrecentered zscores
       data.all[,sd.orig_uncorr := sd.orig]
-      
+
       # NOTE: MAY WANT TO SUBSET HERE
-      
+
       # 2b: corrected z scores ----
-      
+
       # keep the original column names -- we're adding a ton of columns that we
       # want to filter out after correction
       orig_colnames <- copy(colnames(data.all))
-      
+
       # start by reading in fenton data only if potcorr subjects exist (see below)
 
       # add age in months and years (ageyears_2b used throughout Step 2b)
@@ -1083,20 +1075,20 @@ cleangrowth <- function(subjid,
       data.all <- data.all[, colnames(data.all) %in% c(orig_colnames, id),
                            with = FALSE]
 
-      
+
     } else {
       # calculate z scores
       if (!quietly)
         cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
       measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE)
       data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
-      
+
       # calculate "standard deviation" scores
       if (!quietly)
         cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
       data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, TRUE)]
     }
-    
+
     # sort by subjid, param, agedays
     # Include id in setkey for deterministic SDE order
     # Without id, SDEs (same subjid/param/agedays) have undefined order, causing different
@@ -1105,7 +1097,7 @@ cleangrowth <- function(subjid,
 
     # add a new convenience index for bookkeeping
     data.all[, index := 1:.N]
-    
+
     # Mark missing values for exclusion
     data.all[, exclude := factor(with(data.all, ifelse(
       is.na(v) |
@@ -1123,7 +1115,7 @@ cleangrowth <- function(subjid,
 
     # define field names needed by helper functions
     ewma.fields <- c('ewma.all', 'ewma.before', 'ewma.after')
-    
+
     # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time, we need to account for the fact that
     #     the mean SD-score for the population changes with age.
     # a.	Determine the median cdc*sd for each parameter by year of age (with sexes combined): median*sd.
@@ -1136,10 +1128,10 @@ cleangrowth <- function(subjid,
     #     (stands for "to be cleaned") will be used for most of the rest of the analyses.
     # f.	In future steps I will sometimes refer to measprev and measnext which refer to the previous or next wt or ht measurement
     #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject, parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
-    
+
     if (!quietly)
       cat(sprintf("[%s] Re-centering data...\n", Sys.time()))
-    
+
     # see function definition below for explanation of the re-centering process
     # returns a data table indexed by param, sex, agedays. can use NHANES reference
     # data, derive from input, or use user-supplied data.
@@ -1166,10 +1158,10 @@ cleangrowth <- function(subjid,
                   tolower(sd.recenter) == "nhanes") |
                  (!(is.character(sd.recenter) &
                     tolower(sd.recenter) == "derive") & (data.all[, .N] < 5000))) {
-        
+
         # Use NHANES medians if the string "nhanes" is specified instead of a data.table
         # or if sd.recenter is not specified as "derive" and N < 5000.
-        
+
         nhanes_reference_medians_path <- ifelse(
           ref.data.path == "",
           system.file(file.path("extdata", "nhanes-reference-medians.csv.gz"), package = "growthcleanr"),
@@ -1215,14 +1207,14 @@ cleangrowth <- function(subjid,
           )
         )
     }
-    
+
     # ensure recentering medians are sorted correctly
     setkey(sd.recenter, param, sex, agedays)
-    
+
     # add sd.recenter to data, and recenter
     setkey(data.all, param, sex, agedays)
     data.all <- sd.recenter[data.all]
-    
+
     # Include id for deterministic order
     setkey(data.all, subjid, param, agedays, id)
     data.all[, tbc.sd := sd.orig - sd.median]
@@ -1279,7 +1271,7 @@ cleangrowth <- function(subjid,
           )
         )
     }
-    
+
     # notification: ensure awareness of small subsets in data
     if (!quietly) {
       year.counts <- data.all[, .N, floor(agedays / 365.25)]
@@ -1292,7 +1284,7 @@ cleangrowth <- function(subjid,
         )
       }
     }
-    
+
     # safety check: treat observations where tbc.sd cannot be calculated as missing
     data.all[is.na(tbc.sd), exclude := 'Missing']
 
@@ -1310,9 +1302,9 @@ cleangrowth <- function(subjid,
       data.all[, nnte := FALSE]
     }
     # pediatric: cleanbatch (most of steps) ----
-    
+
     # NOTE: the rest of cleangrowth's steps are done through cleanbatch().
-    
+
     # Store off vars for later - CP
     # --- capture key checkpoint columns for later diagnostics ---
     checkpoint_cols <- c("id", "subjid", "param", "agedays",
@@ -1321,8 +1313,8 @@ cleangrowth <- function(subjid,
     checkpoint_cols <- intersect(checkpoint_cols, names(data.all))
     checkpoint_data <- data.all[, ..checkpoint_cols]
     # Store off vars for later - CP
-    
-    
+
+
     # optionally process batches in parallel
     if (!quietly)
       cat(sprintf(
@@ -1376,7 +1368,7 @@ cleangrowth <- function(subjid,
         cat(sprintf("[%s] Writing batch logs to '%s'...\n", Sys.time(), log.path))
         ifelse(!dir.exists(log.path), dir.create(log.path, recursive = TRUE), FALSE)
       }
-      
+
       if (!use_child_algorithm){
         ret.df <- ddply(
           data.all,
@@ -1429,25 +1421,25 @@ cleangrowth <- function(subjid,
       }
       stopCluster(cl)
     }
-    
-    
+
+
     if (!quietly)
       cat(sprintf("[%s] Done with pediatric data!\n", Sys.time()))
   } else {
     ret.df <- data.table()
-    
+
     if (!quietly)
       cat(sprintf("[%s] No pediatric data. Moving to adult data...\n", Sys.time()))
   }
-  
+
   # adult: send to cleanadult to do most of the work ----
-  
+
   # no need to do this if there's no data
   if (nrow(data.adult) > 0){
     if (!quietly){
       cat(sprintf("[%s] Begin processing adult data...\n", Sys.time()))
     }
-    
+
     # if parallel processing is desired, load additional modules
     if (parallel) {
       if (is.na(num.batches)) {
@@ -1462,7 +1454,7 @@ cleangrowth <- function(subjid,
         "rem_transpositions", "ht_allow", "ht_change_groups",
         "ht_3d_growth_compare", "remove_ewma_wt", "remove_mod_ewma_wt"
       )
-      
+
       cl <- makeCluster(num.batches)
       clusterExport(cl = cl, varlist = var_for_par, envir = environment())
       registerDoParallel(cl)
@@ -1470,7 +1462,7 @@ cleangrowth <- function(subjid,
       if (is.na(num.batches))
         num.batches <- 1
     }
-    
+
     # this is where we do most of the adult work
     # is the randomness necessary here?
     subjid.unique <- data.adult[j = unique(subjid)]
@@ -1479,13 +1471,13 @@ cleangrowth <- function(subjid,
       newbatch = sample(num.batches, length(subjid.unique), replace = TRUE)
     )
     data.adult <- merge(data.adult, batches.adult, by = "subjid")
-    
+
     # add age in years
     data.adult[, age_years := agedays/365.25]
     # rename for ease of use
     data.adult[, measurement := v_adult]
     data.adult[, id := line]
-    
+
     if (num.batches == 1) {
       # do the cleaning
       res <- cleanadult(data.adult, weight_cap = weight_cap)
@@ -1498,17 +1490,17 @@ cleangrowth <- function(subjid,
         .paropts = list(.packages = "data.table"),
         weight_cap = weight_cap
       )
-      
+
       res <- as.data.table(res)
     }
-    
+
     # replace result with missing if measurement or agedays are missing
     res[is.na(measurement) | agedays < 0, result := "Missing"]
-    
+
     if (parallel){
       stopCluster(cl)
     }
-    
+
     if (adult_columns_filename != "") {
       write.csv(res, adult_columns_filename, row.names = FALSE, na = "")
       if (!quietly){
@@ -1521,17 +1513,17 @@ cleangrowth <- function(subjid,
         )
       }
     }
-    
+
     if (!quietly)
       cat(sprintf("[%s] Done with adult data!\n", Sys.time()))
   } else {
     res <- data.table()
-    
+
     if (!quietly){
       cat(sprintf("[%s] No adult data. Moving to postprocessing...\n", Sys.time()))
     }
   }
-  
+
   # if (any(nrow(data.all) > 0, nrow(data.adult) > 0)) {
   #   # join with pediatric data
   #   full_out <- data.table(
@@ -1543,17 +1535,17 @@ cleangrowth <- function(subjid,
   #   full_out <- full_out[order(line),]
   #   # remove column added for keeping track
   #   full_out[, line := NULL]
-  #   
+  #
   #   return(full_out$exclude)
   # } else {
   #   return(c())
   # }
-  
+
   # --- FINAL RETURN (modified to return all columns) ---
-  
+
   # combine pediatric and adult results if present
   if (any(nrow(data.all) > 0, nrow(data.adult) > 0)) {
-    
+
     # join pediatric and adult outputs together
     # cf_rescued only exists in the child algorithm; use empty strings for legacy path
     cf_rescued_peds <- if (!is.null(ret.df$cf_rescued)) {
@@ -1570,10 +1562,9 @@ cleangrowth <- function(subjid,
     # preserve original exclude levels
     full_out[, exclude := factor(exclude, levels = exclude.levels)]
 
-    # join back to original input data to preserve all columns
-    # this assumes data.all.ages was the original full input
+    # join back to batch-level reference to preserve all columns
     all_results <- merge(
-      data.all.ages,           # original dataset (with id, param, etc.)
+      data.batch,              # this batch's subjects (all ages)
       full_out,
       by = "line",
       all.x = TRUE,
@@ -1587,33 +1578,33 @@ cleangrowth <- function(subjid,
       all_results <- merge(all_results, cp_merge, by = "id", all.x = TRUE)
     }
 
-    all_results <- all_results[match(data.all.ages$id, all_results$id)]
+    all_results <- all_results[match(data.batch$id, all_results$id)]
 
     # restore original row order
     setorder(all_results, line)
-    
+
     # if you have an 'id' field in data.work, it will now be preserved automatically
     # (since it existed in the original input)
-    
+
     # Return *everything* for downstream debugging
     # return(all_results)
     results_list[[i]] <- all_results
     print(paste("Loop ", i, " complete.", sep = "" ))
     i <- i + 1
-    
-    
+
+
   } else {
     # if there was no data at all, return an empty table with consistent structure
     results_list[[i]] <- data.table::data.table()
     print(paste("Loop ", i, " complete.", sep = "" ))
     i <- i + 1
   }
-  
+
   }
-  
+
   all_results <- data.table::rbindlist(results_list, use.names = TRUE)
   setorder(all_results, line)
-  
+
   return(all_results)
 }
 
@@ -1640,7 +1631,7 @@ read_anthro <- function(path = "", cdc.only = FALSE, prelim_infants = FALSE) {
   # avoid "no visible bindings" warning
   src <- param <- sex <- age <- ret <- m <- NULL
   csdneg <- csdpos <- s <- NULL
-  
+
   # set correct path based on input reference table path (if any)
   if (!prelim_infants){
     weianthro_path <- ifelse(
@@ -1677,7 +1668,7 @@ read_anthro <- function(path = "", cdc.only = FALSE, prelim_infants = FALSE) {
     )
   }
   growth_cdc_ext <- read.csv(gzfile(growth_cdc_ext_path))
-  
+
   l <- if (!prelim_infants){
     list(
       with(
@@ -1881,21 +1872,21 @@ read_anthro <- function(path = "", cdc.only = FALSE, prelim_infants = FALSE) {
       )
     )
   }
-  
+
   anthro <- rbindlist(l)
-  
-  
+
+
   setkey(anthro, src, param, sex, age)
-  
+
   return(function(param, agedays, sex, measurement, csd = FALSE) {
     # Changed WHO cutoff from 3y to 5y for smoothing
     # WHO data available up to 5 years for height/weight, needed for 2-5y smoothing
     src <- ifelse(agedays < 5*365.25 & !cdc.only, 'WHO', 'CDC')
-    
+
     # keep column sequence the same fo efficient join
     dt <- data.table(src, param, sex, agedays, measurement)
     dt <- anthro[dt]
-    
+
     dt[, ret := as.double(NA)]
     if (csd) {
       dt[measurement < m, ret := (measurement - m) / csdneg]
@@ -1904,7 +1895,7 @@ read_anthro <- function(path = "", cdc.only = FALSE, prelim_infants = FALSE) {
       dt[l == 0, ret := log(measurement / m) / s]
       dt[l != 0, ret := (((measurement / m) ^ l) - 1) / (l * s)]
     }
-    
+
     return(dt$ret)
   })
 }
@@ -1973,7 +1964,7 @@ ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 15, cache_
   #     step where they are needed.
   # e.	For these calculations, use variables that allow for precise storage of numbers (in Stata this is called 'double') because otherwise rounding errors can cause
   #     problems in a few circumstances
-  
+
   n <- length(agedays)
   # initialize response variables
   ewma.all <- ewma.before <- ewma.after <- vector('numeric', 0)
@@ -2246,10 +2237,10 @@ sd_median <- function(param, sex, agedays, sd.orig) {
   #     (stands for "to be cleaned") will be used for most of the rest of the analyses.
   # f.	In future steps I will sometimes refer to measprev and measnext which refer to the previous or next wt or ht measurement
   #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject, parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
-  
+
   # avoid "no visible binding" warnings
   ageyears <- sd.median <- NULL
-  
+
   dt <- data.table(param, sex, agedays, ageyears = floor(agedays / 365.25), sd.orig)
   setkey(dt, param, sex, agedays)
   # determine ages (in days) we need to cover from min to max age in years
@@ -2292,7 +2283,7 @@ get_dop <- function(param_name){
   } else { # HEADCM
     "HEIGHTCM"
   }
-  
+
   return(dop)
 }
 
@@ -2468,7 +2459,6 @@ temporary_extraneous_infants <- function(df, exclude_from_dop_ids = NULL) {
   df[valid.rows & extraneous.this.day, extraneous := {
     # Sort by absdmedian.spz (asc), then absdmedian.dopz (asc), then id tiebreaker
     # Keep the first after sort, mark others as extraneous
-    # Round to 3 decimals to avoid floating point precision issues
     # Age-dependent id tiebreaker to match Stata
     # Stata uses obsid (observation ID) for tiebreaker, not row index
     # At agedays=0: pick lowest id (sort ascending)
@@ -2531,14 +2521,8 @@ calc_otl_evil_twins <- function(df){
   ctbc_next_diff <- abs(c(df$ctbc.sd[2:nrow(df)], Inf) - df$ctbc.sd)
   ctbc_prev_diff <- abs(c(Inf, df$ctbc.sd[1:(nrow(df)-1)]) - df$ctbc.sd)
 
-  # Handles floating-point noise from subtraction of rounded values
-  tbc_next_diff_rounded <- tbc_next_diff
-  tbc_prev_diff_rounded <- tbc_prev_diff
-  ctbc_next_diff_rounded <- ctbc_next_diff
-  ctbc_prev_diff_rounded <- ctbc_prev_diff
-
-  otl <- (tbc_next_diff_rounded > 5 & ctbc_next_diff_rounded > 5 & same_sp_next) |
-         (tbc_prev_diff_rounded > 5 & ctbc_prev_diff_rounded > 5 & same_sp_prev)
+  otl <- (tbc_next_diff > 5 & ctbc_next_diff > 5 & same_sp_next) |
+         (tbc_prev_diff > 5 & ctbc_prev_diff > 5 & same_sp_prev)
 
   df[, "otl" := otl]
 
@@ -2562,7 +2546,7 @@ calc_and_recenter_z_scores <- function(df, cn, ref.data.path,
   # avoid no visible warning errors
   cn.orig_cdc <- param <- agedays <- sex <- cn.orig_who <- cn.orig <- subjid <-
     tbc.cn <- sd.median <- NULL
-  
+
   # for infants, use z and who
   # Use pre-built closures if provided (avoids repeated disk reads from call sites)
   if (is.null(measurement.to.z))
@@ -2571,11 +2555,11 @@ calc_and_recenter_z_scores <- function(df, cn, ref.data.path,
   if (is.null(measurement.to.z_who))
     measurement.to.z_who <- read_anthro(ref.data.path, cdc.only = FALSE,
                                         prelim_infants = TRUE)
-  
+
   # calculate "standard deviation" scores
   df[, cn.orig_cdc := measurement.to.z(param, agedays, sex, get(cn), TRUE)]
   df[, cn.orig_who := measurement.to.z_who(param, agedays, sex, get(cn), TRUE)]
-  
+
   # Fix smoothing formula
   # Match base z-score smoothing: ages 2-5, who_weight = 5-age, divide by 3
   who_weight <- 5 - (df$agedays/365.25)
@@ -2590,36 +2574,35 @@ calc_and_recenter_z_scores <- function(df, cn, ref.data.path,
   df[smooth_val,
      cn.orig := (cn.orig_cdc * cdc_weight[smooth_val] +
                    cn.orig_who * who_weight[smooth_val])/3]
-  
+
   # otherwise use WHO and CDC for older and younger, respectively
   ### CP REPLACE D
   # who_val <- df$param == "HEADCM" |
   #   df$agedays/365.25 < 2
   # df[who_val | (smooth_val & is.na(df$cn.orig_cdc)),
   #    cn.orig := df$cn.orig_who[who_val  | (smooth_val & is.na(df$cn.orig_cdc))]]
-  
+
   who_val <- df$param == "HEADCM" | df$agedays/365.25 < 2
   df[who_val, cn.orig := df$cn.orig_who[who_val]]
-  
-  # Fix CDC z-score assignment for ages >= 4
-  # Match Stata behavior: use CDC z-scores for WT/HT at ages >= 4 years
-  # Changed | to & and cn.orig_who to cn.orig_cdc
-  cdc_val <- df$param != "HEADCM" & df$agedays/365.25 >= 4
+
+  # Use CDC z-scores for WT/HT at ages > 5 years
+  # Must match the main z-score blending window (2-5 years, line 773)
+  cdc_val <- df$param != "HEADCM" & df$agedays/365.25 > 5
   df[cdc_val, cn.orig := df$cn.orig_cdc[cdc_val]]
-  
-  
+
+
   # df[cdc_val | (smooth_val & is.na(df$cn.orig_who)), cn.orig := df$cn.orig_cdc[cdc_val | (smooth_val & is.na(df$sd.orig_who))]]
-  
-  
+
+
   ### CP REPLACE U
   # now recenter -- already has the sd.median from the original recentering
   setkey(df, subjid, param, agedays)
-  
+
   df[, tbc.cn := cn.orig - sd.median]
-  
+
   # rename ending column
   setnames(df, "tbc.cn", paste0("tbc.", cn))
-  
+
   return(df)
 }
 
@@ -2680,11 +2663,11 @@ cleanbatch_child <- function(data.df,
   valid.interior.measurement <- who.maxdiff.next.ht <- who.mindiff.next.ht <- NULL
   whoagegrp.ht <- whoinc.1.ht <- whoinc.2.ht <- whoinc.3.ht <- whoinc.4.ht <- NULL
   whoinc.6.ht <- whoinc.age.ht <- z.orig <- NULL
-  
+
   cf_rescued <- NULL
   otl <- sd_med <- med_diff <- max_diff <- sum_otl <- i.exclude <- NULL
 
-  
+
   # avoid no visible warning errors
   sum_sde <- no_sde <- cf <- wholehalfimp <- seq_win <- cs <- absdiff <-
     sd.orig_uncorr <- seq_win <- absdiff <- wholehalfimp <- ageyears <- ctbc.sd <-
@@ -2700,7 +2683,7 @@ cleanbatch_child <- function(data.df,
     diff_next <- aft.g.aftm1 <- val_excl <-
     absval <- comp_diff <- err_ratio <-
     NULL
-  
+
   # Use id instead of index for deterministic SDE order
   # index depends on input order, which can vary between batches
   # id is user-provided and deterministic
@@ -2720,14 +2703,14 @@ cleanbatch_child <- function(data.df,
       )
     )
   }
-  
+
   if (!quietly)
     cat(sprintf(
       "[%s] Processing Batch #%s...\n",
       Sys.time(),
       data.df$batch[1]
     ))
-  
+
   # NOTE: in each step, we redo temp SDEs
 
   # EARLY STEP 13: SDE-Identicals (before Steps 5/6) ----
@@ -2764,10 +2747,10 @@ cleanbatch_child <- function(data.df,
   setkey(data.df, subjid, param, agedays, id)
 
   # 5: temporary SDEs ----
-  
+
   # save a copy of all original measurement values before any transformation
   data.df[, v.orig := v]
-  
+
   if (!quietly)
     cat(sprintf(
       "[%s] Preliminarily identify potential extraneous...\n",
@@ -2778,17 +2761,12 @@ cleanbatch_child <- function(data.df,
   # capture a list of subjects with possible extraneous for efficiency later
   subj.dup <- data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', unique(subjid)]
 
-  # Debug check after Step 5 - stop if duplicates found
+  # Safety check after Step 5 - warn if duplicate Includes found
   step5_dupe_check <- data.df[exclude == "Include", .N, by = .(subjid, param, agedays)][N > 1]
   if (nrow(step5_dupe_check) > 0) {
-    message("DEBUG Step5: Found ", nrow(step5_dupe_check), " Include duplicates after Step 5 temp SDE")
-    fwrite(step5_dupe_check, "debug-step5-duplicates.csv")
-    # Save full rows for duplicates
-    dupe_rows <- data.df[exclude == "Include"][step5_dupe_check, on = .(subjid, param, agedays)]
-    fwrite(dupe_rows, "debug-step5-duplicate-rows.csv")
-    # Save ALL data at this point for full diagnostics
-    fwrite(data.df, "debug-step5-full-data.csv")
-    stop("DEBUG: Stopping after Step 5 - duplicate Includes found. See debug-step5-*.csv files")
+    warning("Step 5: Found ", nrow(step5_dupe_check),
+            " Include duplicates after temp SDE resolution. ",
+            "This may indicate a bug in temporary_extraneous_infants().")
   }
 
   # 6:  carried forwards ----
@@ -2802,16 +2780,10 @@ cleanbatch_child <- function(data.df,
         "[%s] Exclude measurements carried forward...\n",
         Sys.time()
       ))
-    
-    # save original column names
-    orig_colnames <- colnames(data.df)
-    
-    # we only running carried forwards on valid values, non NNTE values,
-    # and non single values
+
+    # Only run CF detection on valid values with >1 measurement per subject-param
     sp_multi <- data.df[, .(is_multi = .N > 1), by = .(subjid, param)]
     not_single <- sp_multi[data.df, on = .(subjid, param), is_multi]
-    # CP TOGGLED TO FALSE but then back to true because nothing changed?
-    # Removed nnte filter (nnte calculation removed)
     valid_set <- valid(data.df, include.temporary.extraneous = TRUE) &
       not_single
     data.sub <- data.df[valid_set,]
@@ -2876,54 +2848,7 @@ cleanbatch_child <- function(data.df,
     # Cleanup temp columns
     data.sub[, sp_key := NULL]
 
-    #### CP Untested, replicate of above code in data.table() if that sequence of mods works. This will be way faster than dplyr.
-    
-    # data.temp <- as.data.frame(data.sub) %>%
-    #   arrange(subjid, param, agedays) %>%
-    #   group_by(subjid, param) %>%
-    #   mutate(
-    #     cf = map_lgl(
-    #       seq_along(agedays),
-    #       function(i) {
-    #         # first observation can't be carried forward
-    #         if (i == 1) return(FALSE)
-    # 
-    #         # find the immediately previous unique ageday for this subject/param
-    #         prev_ages <- unique(agedays[agedays < agedays[i]])
-    #         if (length(prev_ages) == 0) return(FALSE)
-    #         prev_age <- max(prev_ages)
-    # 
-    #         # get all values from that previous ageday
-    #         prev_vals <- v.orig[agedays == prev_age]
-    # 
-    #         # if current value matches any of those (within tolerance), flag as CF
-    #         any(abs(v.orig[i] - prev_vals) < 1e-6)
-    #       }
-    #     )
-    #   ) %>%
-    #   ungroup()
-    
-    
-    
-    
-    
-    
-    
-    # # for values with sdes, compare to all values from the prior day
-    # data.sub[no_sde == FALSE, cf := (function(df){
-    #   ages <- unique(agedays)
-    #   if (length(ages) > 1){
-    #     for (i in 2:length(ages)) {
-    #       # find the set of measurements from the previous age in days
-    #       all.prev.v <- df[agedays == ages[i - 1], v.orig]
-    #       # if a measurement for the current age is found in the set of measurements from the previous age, then mark it as carried forward
-    #       df[agedays == ages[i] &
-    #            v.orig %in% all.prev.v, cf := TRUE]
-    #     }
-    #   }
-    # })(copy(.SD)), .SDcols = c('agedays', 'cf', 'v.orig'), by = .(subjid, param)]
-    # 
-    # merge in the carried forwards
+    # Merge CF flags back to data.df
     cf_idx <- data.sub$index[data.sub$cf]
     data.df[index %in% cf_idx, exclude := "Exclude-Carried-Forward"]
 
@@ -2952,46 +2877,16 @@ cleanbatch_child <- function(data.df,
       data.df$exclude[temporary_extraneous_infants(data.df[, .(id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-Temporary-Extraneous-Same-Day'
     }
 
-    ### CP DROP IN
-    # find out if values are whole or half imperial
-    # data.df[param == "WEIGHTKG",
-    #         wholehalfimp := (v.orig * 2.20462262)%%1 < 0.01]
-    # data.df[param == "HEIGHTCM",
-    #         wholehalfimp := (v.orig * 1.27)%%1 < 0.01]
-    # data.df[param == "HEIGHTCM",
-    #         wholehalfimp := (v.orig * 1.27 / 2)%%1 < 0.01]
-    # data.df[param == "HEADCM",
-    #         wholehalfimp := (v.orig * 1.27)%%1 < 0.01]
-    # data.df[param == "HEADCM",
-    #         wholehalfimp := (v.orig * 1.27 / 2)%%1 < 0.01]
-    #
-    # determine if measurements are in whole or half imperial units
-    
-    # wholehalfimp is ROW-LEVEL (not subject-level)
-    # Stata calculates wholehalfimp per-row based on that row's own parameter:
-    # - WEIGHTKG rows: TRUE if measurement is whole pounds
-    # - HEIGHTCM rows: TRUE if measurement is whole or half inches
-    # - HEADCM rows: TRUE if measurement is whole or half inches
-    # The flag does NOT propagate across parameters or across rows within a subject
-
-    # Initialize wholehalfimp to FALSE for all rows
+    # Determine if measurements are in whole or half imperial units (row-level flag)
+    # WEIGHTKG: whole pounds; HEIGHTCM/HEADCM: whole or half inches
+    # Tolerance: 0.01 of the imperial unit
     data.df[, wholehalfimp := FALSE]
-
-    # WEIGHTKG: check if whole pounds (measurement * 2.20462262 is near integer)
     data.df[param == "WEIGHTKG",
             wholehalfimp := abs((v.orig * 2.20462262) %% 1) < 0.01]
-
-    # HEIGHTCM: check if whole or half inches (measurement / 2.54 is near integer or .5)
     data.df[param == "HEIGHTCM",
-            wholehalfimp := abs((v.orig / 2.54) %% 1) < 0.01 |
-                            abs((v.orig / 2.54) %% 0.5) < 0.01]
-
-    # HEADCM: check if whole or half inches (measurement / 2.54 is near integer or .5)
+            wholehalfimp := abs((v.orig / 2.54) %% 0.5) < 0.01]
     data.df[param == "HEADCM",
-            wholehalfimp := abs((v.orig / 2.54) %% 1) < 0.01 |
-                            abs((v.orig / 2.54) %% 0.5) < 0.01]
-    
-    ### CP UP
+            wholehalfimp := abs((v.orig / 2.54) %% 0.5) < 0.01]
 
     # Fix: Exclude SDE-Identicals from entire CF string calculation
     # SDE-Identicals break multiple parts of the CF logic (rle, originator detection, cs assignment)
@@ -3073,9 +2968,6 @@ cleanbatch_child <- function(data.df,
       }
     }
 
-    # Calculate string length (number of CFs in each string, excluding originator)
-    data.df[, cf_string_length := sum(cf_binary == TRUE), by = c("subjid", "param", "cf_string_num")]
-
     # Create seq_win variable (position in string: 0 for originator, 1/2/3... for CFs)
     data.df[, seq_win := NA_integer_]
     data.df[originator == TRUE, seq_win := 0]
@@ -3091,8 +2983,8 @@ cleanbatch_child <- function(data.df,
 
     # Clean up temporary variables
     data.df[, c("cf_binary", "nextcf", "priorcf",
-                "originator", "originator_seq", "cf_string_num", "originator_z", "cf_string_length") := NULL]
-    
+                "originator", "originator_seq", "cf_string_num", "originator_z") := NULL]
+
     # Fix CF rescue logic
     # Fix 1: Add same-day include check - CFs on days with includes are not eligible for rescue
     # Fix 2: Changed > to >= for adolescent thresholds
@@ -3169,15 +3061,11 @@ cleanbatch_child <- function(data.df,
   # Drop columns no longer needed after Step 6
   # v.orig: only used for SDE tiebreaking and CF detection (Steps 5-6)
   # wholehalfimp: only used in CF exclusion logic (Step 6 closure; conditional on !include.carryforward)
-  cols_to_drop_6 <- intersect(c("v.orig", "wholehalfimp"), names(data.df))
+  cols_to_drop_6 <- intersect(
+    c("v.orig", "wholehalfimp", "seq_win", "cs", "absdiff", "ageday_has_include"),
+    names(data.df)
+  )
   if (length(cols_to_drop_6) > 0L) data.df[, (cols_to_drop_6) := NULL]
-
-  # Debug save point for Step 6 output
-#  if (!is.null(debug_step) && debug_step == 6) {
-#    saveRDS(data.df, paste0("R-step6-output-", format(Sys.time(), "%Y-%m-%d-%H%M"), ".rds"))
-#    message("DEBUG: Saved R-step6-output.rds - STOPPING EXECUTION")
-#    return(data.df[, .(line, exclude, tbc.sd, param)])
-#  }
 
   # Step 7: BIV ----
   # NOTE: Step numbers aligned with Stata 2025-12-10: BIV is Step 7, Evil Twins is Step 9
@@ -3195,27 +3083,21 @@ cleanbatch_child <- function(data.df,
   # add age in years
   data.df[, ageyears := agedays/365.25]
 
-  # calculate the valid step
-  # Removed nnte filter (nnte calculation removed)
   valid_set <- valid(data.df, include.temporary.extraneous = TRUE)
 
   exc_nam <- "Exclude-Absolute-BIV"
 
   # identify absolute cutoffs
-  # Min/max weight at birth based on published births
-  data.df[valid_set & param == "WEIGHTKG" & v < 0.2 & agedays == 0,
+  # Min weight: <0.2 kg for first year, <1 kg after
+  data.df[valid_set & param == "WEIGHTKG" & v < 0.2 & agedays <= 365,
           exclude := exc_nam]
-  data.df[valid_set & param == "WEIGHTKG" & v < 1 & agedays != 0,
+  data.df[valid_set & param == "WEIGHTKG" & v < 1 & agedays > 365,
           exclude := exc_nam]
-  # Min weight after birth based on rules about who can go home with alowance for significant weight loss -- this is for outpatient data only so very low weight babies would still be in NICU
+  # Max weight at birth
   data.df[valid_set & param == "WEIGHTKG" & v > 10.5 &
             agedays == 0,
           exclude := exc_nam]
-  # Max weight for <2y based on eval (see do-file from Oct 10 2022), highest plaus weight 29.5kg
-  # data.df[valid_set & param == "WEIGHTKG" & v < 1 &
-  #           agedays == 0,
-  #         exclude := exc_nam]
-  # Max weight for <2y based on eval (see do-file from Oct 10 2022), highest plaus weight 29.5kg
+  # Max weight for <2y
   data.df[valid_set & param == "WEIGHTKG" & v > 35 &
             ageyears < 2,
           exclude := exc_nam]
@@ -3313,12 +3195,9 @@ cleanbatch_child <- function(data.df,
   # Without id, SDE rows (same ageday) have undefined order, causing parallel inconsistency
   data.df <- data.df[order(subjid, param, agedays, id),]
 
-  # create the valid set
-  # we only running evil twins on valid values, non NNTE values,
-  # and non single values, and non pair (need >2 measurements)
+  # Evil Twins requires 3+ measurements per subject-param
   data.df[, sp_count_9 := .N, by = .(subjid, param)]
   not_single_pairs <- data.df$sp_count_9 > 2L
-  # Removed nnte filter (nnte calculation removed)
   valid_set <- valid(data.df, include.temporary.extraneous = FALSE) &
     not_single_pairs
 
@@ -3430,7 +3309,6 @@ cleanbatch_child <- function(data.df,
   # Pre-identify subject-params that need processing:
   # Count INCLUDE values only (not temp SDEs) - need >2 for EWMA processing
   data.df[, sp_key := paste0(subjid, "_", param)]
-  # Removed nnte filter (nnte calculation removed)
   include_mask <- valid(data.df, include.temporary.extraneous = FALSE)
   include_counts <- data.df[include_mask, .(n_include = .N), by = sp_key]
   sp_to_process <- include_counts[n_include > 2, sp_key]
@@ -3460,7 +3338,6 @@ cleanbatch_child <- function(data.df,
     data.df[sp_key %in% sp_to_process,
             exclude := (function(df) {
               # Only Include values participate (no temp SDEs)
-              # Removed nnte filter
               include_set <- valid(df, include.temporary.extraneous = FALSE)
 
               if (sum(include_set) > 2) {
@@ -3521,8 +3398,7 @@ cleanbatch_child <- function(data.df,
                 if (num.exclude == 1) {
                   df[pot_excl == TRUE, exclude := 'Exclude-EWMA1-Extreme']
                 } else if (num.exclude > 1) {
-                  # Round to 3 decimals to avoid floating point precision issues
-                  # Use id tie-breaker for deterministic selection
+                  # Select worst: highest abs(tbc.sd + dewma.all), lowest id as tiebreaker
                   worst.row <- with(df, order(pot_excl, abs(tbc.sd + dewma.all), -id, decreasing = TRUE))[1]
                   df[worst.row, exclude := 'Exclude-EWMA1-Extreme']
                 }
@@ -3531,7 +3407,7 @@ cleanbatch_child <- function(data.df,
               return(df$exclude)
             })(copy(.SD)),
             by = .(subjid, param),
-            .SDcols = c('index', 'id', 'sex', 'agedays', 'tbc.sd', 'ctbc.sd', 'nnte', 'exclude')]
+            .SDcols = c('index', 'id', 'sex', 'agedays', 'tbc.sd', 'ctbc.sd', 'exclude')]
 
     # Capture EWMA1 iteration 1 values for debugging
     if (iteration == 1) {
@@ -3581,45 +3457,23 @@ cleanbatch_child <- function(data.df,
   data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
   data.df[temporary_extraneous_infants(data.df[, .(id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
 
-  # Debug exit for step 11
-  # Fixed to check global environment like step 2
-#  if (exists("debug_step", envir = .GlobalEnv) && !is.null(get("debug_step", envir = .GlobalEnv)) && get("debug_step", envir = .GlobalEnv) == 11) {
-#    saveRDS(data.df, paste0("R-step11-output-", format(Sys.time(), "%Y-%m-%d-%H%M"), ".rds"))
-#    if (!quietly) cat(sprintf("[%s] DEBUG: Stopping after Step 11 (EWMA1 Extreme)\n", Sys.time()))
-#    if (!quietly) cat(sprintf("[%s] DEBUG: Output saved to R-step11-output-*.rds\n", Sys.time()))
-#    return(data.df[, .(id, exclude)])
-#  }
-
   # 13: SDEs ----
-
-  # Debug save point for Step 13 input
-  # Fixed to check global environment like step 11
-#  if (exists("debug_step", envir = .GlobalEnv) && !is.null(get("debug_step", envir = .GlobalEnv)) && get("debug_step", envir = .GlobalEnv) == 13) {
-#    saveRDS(data.df, paste0("R-step13-input-", format(Sys.time(), "%Y-%m-%d-%H%M"), ".rds"))
-#    message("DEBUG: Saved R-step13-input.rds")
-#  }
 
   if (!quietly)
     cat(sprintf(
       "[%s] Exclude same day extraneous...\n",
       Sys.time()
     ))
-  
+
   # Pass temp SDE ids to exclude from DOP median
   # This matches Stata Step 13 line 1516: DOP median uses only fully included values (exc==0)
   temp_sde_ids_step13 <- data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', id]
 
-  # Debug - check state BEFORE restoring temp SDEs
+  # Safety check: no Include duplicates should exist before restoring temp SDEs
   pre_dupe_check <- data.df[exclude == "Include", .N, by = .(subjid, param, agedays)][N > 1]
   if (nrow(pre_dupe_check) > 0) {
-    message("DEBUG Step13-PRE: Found ", nrow(pre_dupe_check), " Include duplicates BEFORE restoring temp SDEs")
-    fwrite(pre_dupe_check, "debug-step13-PRE-duplicates.csv")
-    # Save full rows for duplicates
-    dupe_rows <- data.df[exclude == "Include"][pre_dupe_check, on = .(subjid, param, agedays)]
-    fwrite(dupe_rows, "debug-step13-PRE-duplicate-rows.csv")
-    # Save ALL data at this point
-    fwrite(data.df, "debug-step13-PRE-full-data.csv")
-    stop("DEBUG: Stopping at Step 13-PRE - duplicate Includes found. See debug-step13-PRE-*.csv files")
+    warning("Step 13: Found ", nrow(pre_dupe_check),
+            " Include duplicates before restoring temp SDEs.")
   }
 
   data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
@@ -3627,17 +3481,11 @@ cleanbatch_child <- function(data.df,
                                         exclude_from_dop_ids = temp_sde_ids_step13),
           exclude := 'Exclude-Temporary-Extraneous-Same-Day']
 
-  # Debug - check state AFTER temp SDE marking
+  # Safety check: no Include duplicates after temp SDE marking
   post_dupe_check <- data.df[exclude == "Include", .N, by = .(subjid, param, agedays)][N > 1]
   if (nrow(post_dupe_check) > 0) {
-    message("DEBUG Step13-POST temp SDE: Found ", nrow(post_dupe_check), " Include duplicates AFTER temp SDE marking")
-    fwrite(post_dupe_check, "debug-step13-POST-tempSDE-duplicates.csv")
-    # Save full rows for duplicates
-    dupe_rows <- data.df[exclude == "Include"][post_dupe_check, on = .(subjid, param, agedays)]
-    fwrite(dupe_rows, "debug-step13-POST-tempSDE-duplicate-rows.csv")
-    # Save ALL data at this point
-    fwrite(data.df, "debug-step13-POST-tempSDE-full-data.csv")
-    stop("DEBUG: Stopping at Step 13-POST temp SDE - duplicate Includes found. See debug-step13-POST-tempSDE-*.csv files")
+    warning("Step 13: Found ", nrow(post_dupe_check),
+            " Include duplicates after temp SDE marking.")
   }
   keep_cols_sde <- names(data.df)
 
@@ -3729,7 +3577,7 @@ cleanbatch_child <- function(data.df,
   # SDE-All-Extreme: if closest value to median is still > 2 SD away (one-day only)
   data.sde[one_day_sde_flag & !is.na(absdiff_rel_to_median) &
              !is.na(min_absdiff_rel_to_median) &
-             
+
                min_absdiff_rel_to_median > 2,
            exclude := "Exclude-SDE-All-Extreme"]
 
@@ -3760,10 +3608,8 @@ cleanbatch_child <- function(data.df,
     default = NA_real_
   )]
 
-  data.sde[, absdiff_median_rounded := absdiff_rel_to_median]
-  data.sde[, absdiff_dop_rounded := absdiff_dop_med]
   data.sde[, absdiff_dop_for_sort := fifelse(
-    is.na(absdiff_dop_rounded), Inf, as.numeric(absdiff_dop_rounded))]
+    is.na(absdiff_dop_med), Inf, as.numeric(absdiff_dop_med))]
 
   # Age-dependent id tiebreaker: agedays==0 picks lowest internal_id, otherwise highest
   data.sde[, tiebreaker_oneday := fifelse(
@@ -3775,7 +3621,7 @@ cleanbatch_child <- function(data.df,
     if (sum(eligible_mask, na.rm = TRUE) < 2L) NA_integer_
     else {
       eligible_ids <- id[eligible_mask]
-      eligible_median <- absdiff_median_rounded[eligible_mask]
+      eligible_median <- absdiff_rel_to_median[eligible_mask]
       eligible_dop <- absdiff_dop_for_sort[eligible_mask]
       eligible_tiebreaker <- tiebreaker_oneday[eligible_mask]
       ord <- order(eligible_median, eligible_dop, eligible_tiebreaker)
@@ -3932,14 +3778,6 @@ cleanbatch_child <- function(data.df,
   data.df[param == "HEIGHTCM" & sp_key %in% sp_to_process_15, `:=`(p_plus = v+1, p_minus = v-1)]
   data.df[param == "HEADCM" & sp_key %in% sp_to_process_15, `:=`(p_plus = v+1, p_minus = v-1)]
 
-  # Debug save point for Step 13 output
-  # Fixed to check global environment like step 11
-#  if (exists("debug_step", envir = .GlobalEnv) && !is.null(get("debug_step", envir = .GlobalEnv)) && get("debug_step", envir = .GlobalEnv) == 13) {
-#    saveRDS(data.df, paste0("R-step13-output-", format(Sys.time(), "%Y-%m-%d-%H%M"), ".rds"))
-#    message("DEBUG: Saved R-step13-output.rds - STOPPING EXECUTION")
-#    return(data.df[, .(id, exclude)])
-#  }
-
   # 15B: Pre-calculate z-scores for p_plus/p_minus (once for all data)
   # This is expensive, so we do it once upfront
   # Build measurement.to.z_who once here (avoids 2 disk reads inside calc_and_recenter_z_scores)
@@ -3972,12 +3810,6 @@ cleanbatch_child <- function(data.df,
           by = .(subjid, param)]
 
   # Step 15: EWMA2 global iterations (excluding agedays=0 for HT/HC)
-
-  # Debug save point for Step 15 input
-#  if (!is.null(debug_step) && debug_step == 15) {
-#    saveRDS(data.df, paste0("R-step15-input-", format(Sys.time(), "%Y-%m-%d-%H%M"), ".rds"))
-#    message("DEBUG: Saved R-step15-input.rds")
-#  }
 
   # Get initial subject-params to process
   step15_filter <- data.df$sp_key %in% sp_to_process_15 &
@@ -4200,13 +4032,6 @@ cleanbatch_child <- function(data.df,
   }
   rm(ewma2_caches)  # free cache memory
 
-  # Debug save point for Step 15 output
-#  if (!is.null(debug_step) && debug_step == 15) {
-#    saveRDS(data.df, paste0("R-step15-output-", format(Sys.time(), "%Y-%m-%d-%H%M"), ".rds"))
-#    message("DEBUG: Saved R-step15-output.rds - STOPPING EXECUTION")
-#    return(data.df[, .(line, exclude, tbc.sd, param)])
-#  }
-
   # Step 16: Birth HT/HC ----
 
   if (!quietly)
@@ -4356,13 +4181,6 @@ cleanbatch_child <- function(data.df,
                                 names(data.df))
   if (length(cols_to_drop_15) > 0L) data.df[, (cols_to_drop_15) := NULL]
 
-  # Debug save point for Step 16 output
-#  if (!is.null(debug_step) && debug_step == 16) {
-#    saveRDS(data.df, paste0("R-step16-output-", format(Sys.time(), "%Y-%m-%d-%H%M"), ".rds"))
-#    message("DEBUG: Saved R-step16-output.rds - STOPPING EXECUTION")
-#    return(data.df[, .(line, exclude, tbc.sd, param)])
-#  }
-
   # 17: raw differences ----
 
   if (!quietly)
@@ -4370,71 +4188,56 @@ cleanbatch_child <- function(data.df,
       "[%s] Exclude raw differences...\n",
       Sys.time()
     ))
-  
+
   # tanner.ht.vel was already loaded (same file, same setnames/setkey)
   # in cleangrowth() and is passed as a parameter to this function.
   # Bug fix: was redundantly re-reading from disk each batch.
   tanner.ht.vel.rev <- tanner.ht.vel
-  
+
   # read in the who height data
   who_max_ht_vel_path <- ifelse(
     ref.data.path == "",
     system.file(file.path("extdata", "who_ht_maxvel_3sd.csv.gz"), package = "growthcleanr"),
     file.path(ref.data.path, "who_ht_maxvel_3sd.csv.gz")
   )
-  
+
   who_ht_vel_3sd_path <- ifelse(
     ref.data.path == "",
     system.file(file.path("extdata", "who_ht_vel_3sd.csv.gz"), package = "growthcleanr"),
     file.path(ref.data.path, "who_ht_vel_3sd.csv.gz")
   )
-  
+
   who.max.ht.vel <- fread(who_max_ht_vel_path)
   who.ht.vel <- fread(who_ht_vel_3sd_path)
   setkey(who.max.ht.vel, sex, whoagegrp_ht)
   setkey(who.ht.vel, sex, whoagegrp_ht)
   who.ht.vel <- merge(who.ht.vel, who.max.ht.vel, by = c('sex', 'whoagegrp_ht'), all = TRUE)
-  
+
   setnames(who.ht.vel, colnames(who.ht.vel), gsub('_', '.', colnames(who.ht.vel)))
   setkey(who.ht.vel, sex, whoagegrp.ht)
-  
-  ### CP ADD SECTION ###
-  # ---- FIX: enforce Stata-style WHO binning ----
-  # Convert ages to WHO monthly bins using floor() to match Stata
-  # who.ht.vel[, whoagegrp_ht := as.integer(whoagegrp_ht)]
-  # setkey(who.ht.vel, sex, whoagegrp_ht)
-  
-  # When merging into data.df later, derive the same floor-binned variable
-  # data.df[, whoagegrp_ht := floor(agedays / 30.4375)]
-  # setkey(data.df, sex, whoagegrp_ht)
-  
-  # Merge using roll=TRUE so values carry forward correctly
-  # data.df <- who.ht.vel[data.df, roll = TRUE]
-  # ---- END FIX ----
-  ### CP ADD SECTION ###
-  
+
   # read in who hc data
   who_max_hc_vel_path <- ifelse(
     ref.data.path == "",
     system.file(file.path("extdata", "who_hc_maxvel_3sd_infants.csv.gz"), package = "growthcleanr"),
     file.path(ref.data.path, "who_hc_maxvel_3sd_infants.csv.gz")
   )
-  
+
   who_hc_vel_3sd_path <- ifelse(
     ref.data.path == "",
     system.file(file.path("extdata", "who_hc_vel_3sd_infants.csv.gz"), package = "growthcleanr"),
     file.path(ref.data.path, "who_hc_vel_3sd_infants.csv.gz")
   )
-  
+
   who.max.hc.vel <- fread(who_max_hc_vel_path)
   who.hc.vel <- fread(who_hc_vel_3sd_path)
   setkey(who.max.hc.vel, sex, whoagegrp_ht)
   setkey(who.hc.vel, sex, whoagegrp_ht)
   who.hc.vel <- merge(who.hc.vel, who.max.hc.vel, by = c('sex', 'whoagegrp_ht'), all = TRUE)
-  
+
   setnames(who.hc.vel, colnames(who.hc.vel), gsub('_', '.', colnames(who.hc.vel)))
   setkey(who.hc.vel, sex, whoagegrp.ht)
-  
+
   # order just for ease later
   # Add id for consistent SDE order
   data.df <- data.df[order(subjid, param, agedays, id),]
@@ -4463,9 +4266,9 @@ cleanbatch_child <- function(data.df,
     # Compute gaps and raw value diffs within each group
     pf[, `:=`(
       d_agedays = shift(agedays, n = 1L, type = "lead") - agedays,
-      diff_prev = 
+      diff_prev =
         v - shift(v, n = 1L, type = "lag"),
-      diff_next = 
+      diff_next =
         shift(v, n = 1L, type = "lead") - v
     ), by = .(subjid, param)]
 
@@ -4672,11 +4475,11 @@ cleanbatch_child <- function(data.df,
   if (length(sp17_to_process) > 0)
   data.df[valid_set & sp_key %in% sp17_to_process, exclude := (function(df) {
     # work inside a closure to drop added column values
-    
+
     # save initial exclusions to keep track
     ind_all <- copy(df$index)
     id_all <- copy(df$id)
-    
+
     exclude_all <- copy(df$exclude)
 
     # Pre-merge WHO velocity columns BEFORE the while loop (once per group, not per iteration).
@@ -4701,38 +4504,36 @@ cleanbatch_child <- function(data.df,
 
     testing <- TRUE
     iter_count <- 0
-    
+
     while (testing & nrow(df) > 1){
       iter_count <- iter_count + 1
-      
+
       # sort df since it got reordered with keys
       # Include id for deterministic SDE order
       df <- df[order(agedays, id),]
-      
+
       # 17A
       df[, d_agedays := shift(agedays, n = 1L, type = "lead") - agedays]
-      
+
       # 17E -- only applies to height
       if (df$param[1] == "HEIGHTCM"){
         # 17B
         df[, tanner.months := 6+12*(round(.5*(agedays + shift(agedays, n = 1L, type = "lead"))/365.25))]
         # set tanner to missing for smaller values
         df[(agedays/30.4375) < 30, tanner.months := NA]
-        
+
         # merge with the tanner info
         setkey(df, sex, tanner.months)
         df <- tanner.ht.vel.rev[df]
-        
+
         # 17C
-        
+
         # a
         df[max.ht.vel < 2.54, max.ht.vel := 2.54]
         df[d_agedays > 2*30.4375 & max.ht.vel < 2*2.54, max.ht.vel := 2*2.54]
         df[d_agedays > .5*365.25 & max.ht.vel < 4*2.54, max.ht.vel := 4*2.54]
         df[d_agedays > 365.25 & max.ht.vel < 8*2.54, max.ht.vel := 8*2.54]
-        
-        ### CP ADJUST THIS BLOCK D
-        
+
         # b
         df[d_agedays < 365.25, mindiff := .5*min.ht.vel*(d_agedays/365.25)^2-3 ]
         df[d_agedays > 365.25, mindiff := .5*min.ht.vel-3 ]
@@ -4743,9 +4544,7 @@ cleanbatch_child <- function(data.df,
            maxdiff := 2*max.ht.vel*(d_agedays/365.25)^0.33 + 5.5 ]
         df[d_agedays > 365.25,
            maxdiff := 2*max.ht.vel*(d_agedays/365.25)^1.5 + 5.5 ]
-        
-        #### CP ADJUST UP
-        
+
         # 17D: whoagegrp.ht pre-computed outside loop (static for HEIGHTCM)
 
         # 17E
@@ -4754,8 +4553,8 @@ cleanbatch_child <- function(data.df,
         df[d_agedays >= 76 & d_agedays < 107, whoinc.age.ht := 3]
         df[d_agedays >= 107 & d_agedays < 153, whoinc.age.ht := 4]
         df[d_agedays >= 153 & d_agedays < 199, whoinc.age.ht := 6]
-        
-        
+
+
         # Chris updated this to >= from ==
         # update the edge intervals
         df[d_agedays < 20, whoinc.age.ht := 1]
@@ -4779,17 +4578,17 @@ cleanbatch_child <- function(data.df,
           !is.na(whoagegrp.ht) & whoinc.age.ht == 6, max.whoinc.6.ht,
           default = NA_real_
         )]
-        
-        # CP ADD IN OR EQUAL TO FROM < or > 
+
+        # CP ADD IN OR EQUAL TO FROM < or >
         # 17G
         df[d_agedays < whoinc.age.ht*30.4375, who_mindiff_ht :=
              who_mindiff_ht * d_agedays/(whoinc.age.ht*30.4375)]
         df[d_agedays > whoinc.age.ht*30.4375, who_maxdiff_ht :=
              who_maxdiff_ht * d_agedays/(whoinc.age.ht*30.4375)]
-        # CP ADD IN OR EQUAL TO FROM < or > 
+        # CP ADD IN OR EQUAL TO FROM < or >
         df[d_agedays < 9*30.4375, who_mindiff_ht := who_mindiff_ht*.5-3]
         df[d_agedays < 9*30.4375, who_maxdiff_ht := who_maxdiff_ht*2+3]
-        
+
         # 17H
         ### WAS an error CP below where it said whomindiff for the second on einstead of maxdiff##
         # tanner is implicit
@@ -4803,15 +4602,13 @@ cleanbatch_child <- function(data.df,
            mindiff := who_mindiff_ht*.5-3]
         df[d_agedays >= 9*30.4375 & is.na(min.ht.vel) & !is.na(who_maxdiff_ht),
            maxdiff := who_maxdiff_ht*2+3]
-        
-        ### CP change to -3 from 3
-        # otherwise, fill in
+
+        # Fallback mindiff default
         df[is.na(mindiff), mindiff := -3]
-        ### CP change up to -3 from 3
         # for birth measurements, add allowance of 1.5cm
         df[agedays == 0, mindiff := mindiff - 1.5]
         df[agedays == 0, maxdiff := maxdiff + 1.5]
-        
+
         # 17I
         # sort df since it got reordered with keys
         # Include id for deterministic SDE order
@@ -4874,7 +4671,7 @@ cleanbatch_child <- function(data.df,
 
       # 17O: generate ewma
       df[, (ewma.fields) := as.double(NaN)]
-      
+
       # Calculate exponent based on max age gap to nearest neighbor
       tmp <- data.frame(
         "before" = abs(df$agedays - c(NA, df$agedays[1:(nrow(df)-1)])),
@@ -4887,17 +4684,17 @@ cleanbatch_child <- function(data.df,
         -1.5 - (maxdiff_years[maxdiff_years > 1 & maxdiff_years < 3] - 1)
       exp_vals[maxdiff_years >= 3] <- -3.5
       df[, exp_vals := exp_vals]
-      
+
       # calculate ewma
       df[, (ewma.fields) := ewma(agedays, tbc.sd, exp_vals, TRUE, window = ewma_window)]
-      
+
       # calculate dewma
       df[, `:=`(
         dewma.all = tbc.sd - ewma.all,
         dewma.before = tbc.sd - ewma.before,
         dewma.after = tbc.sd - ewma.after
       )]
-      
+
       # add differences for convenience
       df[, diff_prev := v-shift(v, n = 1L, type = "lag")]
       df[, diff_next := shift(v, n = 1L, type = "lead")-v]
@@ -4949,11 +4746,11 @@ cleanbatch_child <- function(data.df,
            val_excl_code := "7"]
         df[diff_next > maxdiff & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lead"),
            val_excl_code := "8"]
-      } 
-      
-      
-      
-      
+      }
+
+
+
+
       # figure out if any of the exclusions hit
       count_exclude <- sum(df$val_excl != "Include")
 
@@ -4976,27 +4773,11 @@ cleanbatch_child <- function(data.df,
         candidates <- df[val_excl != "Include"]
         ord <- order(-candidates$absval, candidates$id)
         idx <- candidates$index[ord[1]]
-        
-        
+
+
         exclude_all[ind_all == idx] <- df[index == idx, val_excl]
 
-        # Add loop ID column (optional, helps track iterations)
-        # df[, loop_iter := iter_count]
-        
-        # Define output path
-        # out_path <- "../data/mindiff_subjid_76234_id_20275.csv"
-        
-        # Append if file exists, otherwise write with header
-        #   if (!file.exists(out_path)) {
-        #     write.table(df, out_path, sep = ",", row.names = FALSE, col.names = FALSE, append = TRUE)
-        #   } else {
-        #     write.table(df, out_path, sep = ",", row.names = FALSE, col.names = TRUE)
-        #   }
-        # }
-        #set up to continue on
-        # Fix iteration condition
-        # Continue iterating when count_exclude >= 1 (not > 1)
-        # After excluding 1 candidate and re-evaluating, NEW candidates may emerge
+        # Continue iterating — after excluding 1 candidate, new violations may emerge
         if (count_exclude >= 1){
           testing <- TRUE
 
@@ -5008,50 +4789,12 @@ cleanbatch_child <- function(data.df,
         testing <- FALSE
       }
     }
-    
-    #       if (count_exclude > 0){
-    #   if (nrow(df) > 2){
-    #     # Use the appropriate DEWMA based on exclusion type
-    #     df[, absval := NA_real_]
-    #     df[val_excl == "Exclude-Min-diff" & diff_prev < mindiff_prior, 
-    #        absval := abs(dewma.before)]
-    #     df[val_excl == "Exclude-Min-diff" & diff_next < mindiff, 
-    #        absval := abs(dewma.after)]
-    #     df[val_excl == "Exclude-Max-diff" & diff_prev > maxdiff_prior, 
-    #        absval := abs(dewma.before)]
-    #     df[val_excl == "Exclude-Max-diff" & diff_next > maxdiff, 
-    #        absval := abs(dewma.after)]
-    #   } else {
-    #     df[, absval := abs(tbc.sd)]
-    #   }
-    #   
-    #   # Choose the highest absval for exclusion
-    #   idx <- df$index[which.max(df[df$val_excl != "Include", absval])]
-    #   exclude_all[ind_all == idx] <- df[index == idx, val_excl]
-    #   
-    #   # Set up to continue on
-    #   if (count_exclude > 1){
-    #     testing <- TRUE
-    #     df <- df[index != idx, ]
-    #   } else {
-    #     testing <- FALSE
-    #   }
-    # } else {
-    #   testing <- FALSE
-    # }}
-    
+
     return(exclude_all)
   })(copy(.SD)), by = .(subjid, param),
   .SDcols = c('index', 'id', 'agedays', 'sex', 'param', 'v', 'tbc.sd', 'exclude')]
 
   data.df[, sp_key := NULL]
-
-  # Debug save point for Step 17 output
-#  if (!is.null(debug_step) && debug_step == 17) {
-#    saveRDS(data.df, paste0("R-step17-output-", format(Sys.time(), "%Y-%m-%d-%H%M"), ".rds"))
-#    message("DEBUG: Saved R-step17-output.rds - STOPPING EXECUTION")
-#    return(data.df[, .(line, exclude, tbc.sd, param)])
-#  }
 
   # 19: 1 or 2 measurements ----
   if (!quietly)
@@ -5059,7 +4802,7 @@ cleanbatch_child <- function(data.df,
       "[%s] Exclude 1 or 2 measurements...\n",
       Sys.time()
     ))
-  
+
   # order just for ease later
   # Add id for consistent SDE order
   data.df <- data.df[order(subjid, param, agedays, id),]
@@ -5096,7 +4839,7 @@ cleanbatch_child <- function(data.df,
     # find the DOP (designated other parameter) from pre-Step-19 snapshot
     # Use dop_snapshot instead of data.df for consistent results
     dop <- dop_snapshot[.(df$subjid[1], get_dop(df$param[1]))]
-    
+
     # 19D: calculate the voi comparison
     if (nrow(dop) > 0){
       for (i in seq_len(nrow(df))){
@@ -5112,29 +4855,13 @@ cleanbatch_child <- function(data.df,
     } else {
       df[, comp_diff := rep(NA, nrow(df))]
     }
-    
+
     # 19B/C: for pairs, calculate info
     if (!is_single){
       diff_tbc.sd <- df[2, tbc.sd] - df[1, tbc.sd]
       diff_ctbc.sd <- df[2, ctbc.sd] - df[1, ctbc.sd]
       diff_agedays <- df[2, agedays] - df[1, agedays]
-      
-      abs_tbd.sd <- abs(df[1, tbc.sd])
-      abs_ctbd.sd <- abs(df[1, ctbc.sd])
-      
-      med_dop <-
-        if (nrow(dop) > 0){
-          median(dop$tbc.sd)
-        } else {
-          NA
-        }
-      med_cdop <-
-        if (nrow(dop) > 0){
-          median(dop$ctbc.sd)
-        } else {
-          NA
-        }
-      
+
       # 19E: which is larger
       # Use id tie-breaker for deterministic selection
       max_ind <- if (!all(is.na(df$comp_diff))){
@@ -5144,7 +4871,7 @@ cleanbatch_child <- function(data.df,
         ord <- order(-abs(df$tbc.sd), df$id)
         ord[1]
       }
-      
+
       # 19F/G: which exclusion
       # Use absolute difference to match Stata
       # Stata line 2778: absd_tbc`p'z=abs(tbc`p'z-tbc`p'z_other)
@@ -5159,15 +4886,15 @@ cleanbatch_child <- function(data.df,
                  diff_agedays < 365.25)){
         df[max_ind, exclude := "Exclude-2-meas-<1-year"]
       }
-      
+
       # save the results
       exclude_all <- df$exclude
-      
+
       # 19H
       # if one needs to get removed, we want to reevaluate as a single
       df <- df[exclude == "Include",]
     }
-    
+
     if (nrow(df) == 1){
       # Check if 1-meas exclusion applies
       # NA-safe: tbc.sd can be NA in edge cases
@@ -5188,13 +4915,13 @@ cleanbatch_child <- function(data.df,
   .SDcols = c('index', 'id', 'agedays', 'subjid', 'param', 'tbc.sd', 'ctbc.sd', 'exclude')]
 
   # 21: error load ----
-  
+
   if (!quietly)
     cat(sprintf(
       "[%s] Exclude error load...\n",
       Sys.time()
     ))
-  
+
   # Removed nnte_full filter to match Stata (NNTE included in Step 21)
   # Fix error-load denominator to exclude SDE/CF
   # Stata formula: tot_exc / (tot_exc + tot_inc) - excludes SDE/CF from denominator
@@ -5232,10 +4959,10 @@ cleanbatch_child <- function(data.df,
 
   # Cleanup
   data.df[, c("err_ratio", "n_errors") := NULL]
-  
-  
+
+
   # end ----
-  
+
   if (!quietly)
     cat(sprintf("[%s] Completed Batch #%s...\n", Sys.time(), data.df$batch[1]))
   if (!quietly & parallel)
@@ -5329,14 +5056,14 @@ valid <- function(df,
   keep <- !grepl("^Exclude", exclude) &
           exclude != "Missing" &
           exclude != "Not cleaned"
-  
+
   if (include.temporary.extraneous)
     keep <- keep | exclude == "Exclude-Temporary-Extraneous-Same-Day"
   if (include.extraneous)
     keep <- keep | exclude == "Exclude-Extraneous-Same-Day"
   if (include.carryforward)
     keep <- keep | exclude == "Exclude-Carried-Forward"
-  
+
   return(keep)
 }
 

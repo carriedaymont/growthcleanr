@@ -330,3 +330,33 @@ test_that("prelim_infants = TRUE produces deprecation warning and runs child alg
 
   expect_equal(as.character(res_pi$exclude), as.character(res_default$exclude))
 })
+
+# ---------------------------------------------------------------------------
+# Test 8: Performance benchmark — catch major regressions
+#
+# Runs 100-subject subset and reports elapsed time. Fails if runtime
+# exceeds a generous ceiling (60 sec) that should only trigger if
+# something has gone seriously wrong. The reported time is the useful
+# signal — check it when making algorithm or batching changes.
+# ---------------------------------------------------------------------------
+test_that("child algorithm: 100-subject benchmark completes in reasonable time", {
+
+  t0 <- proc.time()
+  out <- run_child_subset(100)
+  elapsed <- (proc.time() - t0)[["elapsed"]]
+
+  # Report timing — this is the main value of this test
+  cat(sprintf(
+    "\n=== BENCHMARK: 100 subjects (%d rows) completed in %.1f sec ===\n",
+    nrow(out$result), elapsed
+  ), file = stderr())
+
+  # Sanity check that it actually ran
+  expect_equal(nrow(out$result), 832)
+
+  # Generous ceiling — not a tight benchmark, just catches catastrophic
+  # slowdowns (e.g., batching bug causing N^2 behavior). Normal runtime
+  # on this machine is ~2-5 sec for 100 subjects.
+  expect_lt(elapsed, 60,
+            label = sprintf("Runtime %.1f sec exceeded 60 sec ceiling", elapsed))
+})
