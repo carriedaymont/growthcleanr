@@ -345,14 +345,6 @@ cleangrowth <- function(subjid,
     sum_val <- no_dup_val <- no_outliers <- no_bigdiff <- nottoofar <- nnte <-
     nnte_full <- NULL
 
-  # Stata-style rounding (round half away from zero)
-  # R's default round() uses banker's rounding (round half to even)
-  # which can cause discrepancies at boundary cases
-  round_stata <- function(x, digits = 3) {
-    multiplier <- 10^digits
-    sign(x) * floor(abs(x) * multiplier + 0.5) / multiplier
-  }
-
   # preprocessing ----
 
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
@@ -734,10 +726,6 @@ cleangrowth <- function(subjid,
         cat(sprintf("[%s] Calculating SD-scores...\n", Sys.time()))
       data.all[, sd.orig_cdc := measurement.to.z(param, agedays, sex, v, TRUE)]
       data.all[, sd.orig_who := measurement.to.z_who(param, agedays, sex, v, TRUE)]
-      # Round z-scores to 0.001
-      # Use Stata-style rounding (round half away from zero)
-      data.all[, sd.orig_cdc := round_stata(sd.orig_cdc, 3)]
-      data.all[, sd.orig_who := round_stata(sd.orig_who, 3)]
 
       # Changed smoothing from 2-4y to 2-5y to match Stata
       # smooth z-scores/SD scores between ages 2-5yo using weighted scores
@@ -767,9 +755,6 @@ cleangrowth <- function(subjid,
       data.all[(cdc_val & !smooth_val) | (smooth_val & is.na(data.all$sd.orig_who)),
                sd.orig := data.all$sd.orig_cdc[(cdc_val & !smooth_val) | (smooth_val & is.na(data.all$sd.orig_who))]]
 
-      # Round z-scores to 0.001
-      # Use Stata-style rounding
-      data.all[, sd.orig := round_stata(sd.orig, 3)]
 
       # NOTE: SD SCORES IN CODE ARE Z IN INFANT DOCS -- USE sd.orig ONLY
 
@@ -1065,8 +1050,6 @@ cleangrowth <- function(subjid,
         data.all[, uncorr := 0L]
       }
 
-      # Round z-scores to 0.001 (Stata-style rounding)
-      data.all[, sd.corr := round_stata(sd.corr, 3)]
 
       # Add sd.corr, potcorr, uncorr to orig_colnames so they survive column cleanup
       orig_colnames <- c(orig_colnames, "sd.corr", "potcorr", "uncorr")
@@ -1223,12 +1206,6 @@ cleangrowth <- function(subjid,
       data.all[, ctbc.sd := sd.corr - sd.median]
     }
 
-    # Round z-scores to 0.001
-    # Use Stata-style rounding
-    data.all[, tbc.sd := round_stata(tbc.sd, 3)]
-    if (use_child_algorithm) {
-      data.all[, ctbc.sd := round_stata(ctbc.sd, 3)]
-    }
 
     # Debug save point for Step 2/3 (after z-score calc and recentering)
 #    if (exists("debug_step", envir = .GlobalEnv) && !is.null(get("debug_step", envir = .GlobalEnv)) && get("debug_step", envir = .GlobalEnv) == 2) {

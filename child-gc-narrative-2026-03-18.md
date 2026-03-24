@@ -183,7 +183,6 @@ Handles all data setup before the main cleaning loop:
 5. Z-score calculation:
    a. CSD z-scores from WHO and CDC references
    b. Age-dependent blending of WHO/CDC z-scores
-   c. Rounding to 0.001 (Stata-style)
 6. Gestational age correction (Step 2b) for potcorr subjects
 7. SD-score recentering to create tbc.sd and ctbc.sd
 8. Missing value identification
@@ -505,24 +504,26 @@ the algorithm detect implausible measurements.
 
 ### Z-score variants
 
-| Variable | Source | Rounding | Description |
-|----------|--------|----------|-------------|
-| `sd.orig_who` | WHO CSD | 0.001 | WHO-only CSD z-score |
-| `sd.orig_cdc` | CDC CSD | 0.001 | CDC-only CSD z-score |
-| `sd.orig` | Blended | 0.001 | Age-blended WHO/CDC CSD z-score (see below) |
-| `sd.orig_uncorr` | Copy | — | Copy of `sd.orig` before GA correction; used in CF rescue (Step 6) and BIV (Step 7) |
-| `sd.corr` | GA-corrected | 0.001 | Fenton-corrected z-score for potcorr subjects; equals `sd.orig` for others |
-| `tbc.sd` | Recentered | 0.001 | `sd.orig - sd.median`; primary score used by most algorithm steps |
-| `ctbc.sd` | Recentered corrected | 0.001 | `sd.corr - sd.median`; used alongside `tbc.sd` in Evil Twins and EWMA steps |
-| `final_tbc` | Output | — | `ctbc.sd` for potcorr subjects, `tbc.sd` for others |
+| Variable | Source | Description |
+|----------|--------|-------------|
+| `sd.orig_who` | WHO CSD | WHO-only CSD z-score |
+| `sd.orig_cdc` | CDC CSD | CDC-only CSD z-score |
+| `sd.orig` | Blended | Age-blended WHO/CDC CSD z-score (see below) |
+| `sd.orig_uncorr` | Copy | Copy of `sd.orig` before GA correction; used in CF rescue (Step 6) and BIV (Step 7) |
+| `sd.corr` | GA-corrected | Fenton-corrected z-score for potcorr subjects; equals `sd.orig` for others |
+| `tbc.sd` | Recentered | `sd.orig - sd.median`; primary score used by most algorithm steps |
+| `ctbc.sd` | Recentered corrected | `sd.corr - sd.median`; used alongside `tbc.sd` in Evil Twins and EWMA steps |
+| `final_tbc` | Output | `ctbc.sd` for potcorr subjects, `tbc.sd` for others |
 
-All rounding uses Stata-style (half away from zero), not
-R's default banker's rounding.
+Intermediate z-score rounding has been removed.
+Previously all z-score variables were rounded to 0.001
+using Stata-style rounding (half away from zero) for
+cross-platform validation; this is no longer needed.
 
 ### Age blending — main z-score (`sd.orig`)
 
-`sd.orig_who` and `sd.orig_cdc` are each rounded to 0.001
-before blending. The blended result is rounded again.
+No intermediate rounding is applied — `sd.orig_who` and
+`sd.orig_cdc` are blended at full precision.
 
 | Age range | Parameter | Formula |
 |-----------|-----------|---------|
@@ -862,7 +863,7 @@ Rescued CFs have their `exclude` column set back to
 
 | Step | Name | Brief description |
 |------|------|-------------------|
-| (preprocessing) | Z-score calculation | WHO/CDC CSD z-scores, blending, rounding |
+| (preprocessing) | Z-score calculation | WHO/CDC CSD z-scores, blending |
 | (preprocessing) | Step 2b: GA correction | Fenton-based correction for potcorr subjects |
 | (preprocessing) | Recentering | Subtract population medians to create tbc.sd/ctbc.sd |
 | Early 13 | SDE-Identicals | Remove same-day identical values before CF detection |
