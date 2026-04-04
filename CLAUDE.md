@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-github-latest (growthcleanr)
 
-**Last updated:** 2026-03-24 (edits: pitfalls section, valid() warning, v3.0.0 callout, test as-of date, Known Issues rename)
+**Last updated:** 2026-04-04 (growth.R removed → cleangrowth() now in child_clean.R; adjustcarryforward() deprecated/removed; gc_preload_refs() + ref_tables/cached_results/changed_subjids added)
 
 ## Overview
 
@@ -25,8 +25,9 @@ code**. For pipeline/Qual-AD context, see
 | Algorithm | Status | Default path | Notes |
 |-----------|--------|--------------|-------|
 | Child | Active, primary | `child_clean.R` | Default pediatric path in v3.0.0 |
-| Adult | Active | `adult_clean.R` + `02a_support.R` | Separate logic from child |
-| Legacy pediatric | Deprecated | `growth.R` | `use_legacy_algorithm = TRUE` |
+| Adult | Active, updated v3.0.0 | `adult_clean.R` + `adult_support.R` | Permissiveness framework, 4 exclusion levels |
+| Legacy pediatric | Deprecated | `pediatric_clean_legacy.R` | `use_legacy_algorithm = TRUE` |
+| `adjustcarryforward()` | Deprecated | removed in v3.0.0 | CF adjustment utility; present on Main/CRAN, removed from `efficiency-updates` |
 
 The child algorithm replaces the legacy pediatric algorithm.
 The legacy pediatric algorithm is maintained for backward
@@ -38,8 +39,7 @@ user-facing `prelim_infants` parameter has no other effect;
 internal `read_anthro(prelim_infants = TRUE)` calls are
 hardcoded and independent of the user-facing parameter.
 
-**This CLAUDE.md currently covers the child algorithm only.**
-Adult algorithm documentation will be added later.
+This CLAUDE.md covers both the child and adult algorithms.
 
 ---
 
@@ -49,17 +49,18 @@ Adult algorithm documentation will be added later.
 
 | File | What it contains |
 |------|------------------|
-| `R/growth.R` | `cleangrowth()` entry point, exports; also contains legacy pediatric algorithm |
-| `R/child_clean.R` | `cleanbatch_child()` main algorithm + support functions (`valid()`, `temporary_extraneous_infants()`, `calc_otl_evil_twins()`, `calc_and_recenter_z_scores()`, `ewma()`, `ewma_cache_init()`/`ewma_cache_update()`, `get_dop()`, `read_anthro()`) |
+| `R/child_clean.R` | `cleangrowth()` entry point + exports (top of file); `gc_preload_refs()` (pre-loads reference closures for repeated calls); `cleanbatch_child()` main algorithm + support functions (`valid()`, `temporary_extraneous_infants()`, `calc_otl_evil_twins()`, `calc_and_recenter_z_scores()`, `ewma()`, `ewma_cache_init()`/`ewma_cache_update()`, `get_dop()`, `read_anthro()`) |
+| `R/pediatric_clean_legacy.R` | Legacy pediatric algorithm (`use_legacy_algorithm = TRUE`); deprecated, retained for backward compatibility |
+| ~~`R/growth.R`~~ | Removed in v3.0.0 — `cleangrowth()` moved into `child_clean.R` |
 | `R/utils.R` | Shared utilities (does NOT contain `valid()` — see note below) |
-| `R/adult_clean.R` | Adult algorithm main |
-| `R/02a_support.R` | Adult support functions |
+| `R/adult_clean.R` | `cleanadult()` main algorithm — permissiveness framework, 14 steps |
+| `R/adult_support.R` | Adult support functions — permissiveness presets, EWMA, BIV, height groups, evil twins, error load, etc. |
 | `inst/extdata/` | Reference tables (growth charts, recentering file, velocity tables) |
 | `tests/testthat/` | Test suite (see Testing section) |
 
 ### Preprocessing → main algorithm split
 
-`cleangrowth()` (in `growth.R` / `child_clean.R`) handles:
+`cleangrowth()` (in `child_clean.R`) handles:
 - Input validation, data.table construction
 - Imperial → metric conversion (HEIGHTIN, WEIGHTLBS)
 - LENGTHCM → HEIGHTCM reclassification (param only,
@@ -133,6 +134,17 @@ it in the sort key, SDE resolution order is undefined.
 | `tbc.sd` | Recentered blended z-score |
 | `ctbc.sd` | Recentered corrected z-score |
 | `final_tbc` | ctbc.sd for potcorr, tbc.sd for others |
+
+**Adult-specific output columns** (NA for child rows):
+
+| Column | Description |
+|--------|-------------|
+| `mean_ht` | Subject mean included height (used in adult 2D WT step) |
+| `bin_result` | Binary `"Include"`/`"Exclude"` (adult rows only) |
+
+**Child-specific output columns** (NA for adult rows):
+`cf_rescued`, `sd.orig_who`, `sd.orig_cdc`, `sd.orig`,
+`tbc.sd`, `ctbc.sd`, `final_tbc`.
 
 **Breaking change from v2.2.0:** v3.0.0 returns a data.table
 with multiple columns (not a character vector of exclusion
@@ -226,7 +238,146 @@ do not exist or are handled within other steps.
 
 ---
 
-## Configurable Parameters
+## Adult Algorithm
+
+### Overview
+
+The adult algorithm (`cleanadult()`) uses a permissiveness
+framework with 4 preset levels (`loosest`, `looser`, `tighter`,
+`tightest`) that control all thresholds simultaneously. Default
+is `looser`. Individual parameters can override presets.
+Unlike the child algorithm, the adult algorithm does not compute
+z-scores — it works directly with raw measurements. It uses
+BMI (computed internally) for some threshold decisions.
+
+### cleanadult() Interface
+
+Called internally by `cleangrowth()`. Input: data.table with
+`id`, `subjid`, `sex`, `agedays`, `param`, `measurement`.
+Accepts HEIGHTCM/HEIGHTIN and WEIGHTKG/WEIGHTLBS (converts
+internally). Sex is not used by the algorithm but required by
+the package interface.
+
+**Output:** Returns input df plus `result` (exclusion code),
+`mean_ht`, and optionally `bin_result` (default ON),
+`extraneous`, `loss_groups`, `gain_groups`. Internal columns
+(`meas_m`, `ageyears`, `age_days`) are dropped. Original `id`
+type is preserved (converted to character internally, restored
+on output).
+
+### Adult Algorithm Steps
+
+1H/1W BIV → 2W RV markers → 3H/3W Temp SDE → 4W Weight Cap →
+9Wa Evil Twins → 9H HT SDE → 9Wb Extreme EWMA →
+10H HT Distinct → 10W WT SDE → 11H Mean HT →
+11Wa 2D Ord WT → 11Wa2 2D Non-Ord WT → 11Wb Moderate EWMA →
+13 Distinct 1D → 14 Error Load
+
+**There is no Step 12W.**
+
+| Step | Name | Brief description |
+|------|------|-------------------|
+| 1H/1W | BIV | Biologically implausible value exclusion (HT, WT, BMI) |
+| 2W | RV markers | Mark repeated values for linked mode |
+| 3H/3W | Temp SDE | Temporarily flag same-day duplicates |
+| 4W | Weight Cap | Exclude weights at physical scale maximum |
+| 9Wa | Evil Twins | Adjacent pair with implausible weight difference |
+| 9H | HT SDE | Same-day height resolution (identical + extraneous) |
+| 9Wb | Extreme EWMA | Extreme EWMA weight outliers |
+| 10H | HT Distinct | 2D height pairs and 3+D height windows |
+| 10W | WT SDE | Same-day weight resolution |
+| 11H | Mean HT | Compute subject mean height (used by 2D WT) |
+| 11Wa | 2D Ord WT | 2D ordered weight pairs (wtallow/perclimit) |
+| 11Wa2 | 2D Non-Ord WT | 2D non-ordered weight pairs |
+| 11Wb | Moderate EWMA | Moderate EWMA weight outliers + error load escalation |
+| 13 | Distinct 1D | Single-measurement exclusion (HT, WT, BMI limits) |
+| 14 | Error Load | Exclude all if error ratio exceeds threshold |
+
+### Adult Exclusion Codes
+
+#### Non-SDE Codes
+
+| Code | Step | Description |
+|------|------|-------------|
+| `Include` | — | Not excluded |
+| `Exclude-A-HT-BIV` | 1H | Biologically implausible height |
+| `Exclude-A-WT-BIV` | 1W | Biologically implausible weight |
+| `Exclude-A-WT-Scale-Max` | 4W | Weight at scale maximum |
+| `Exclude-A-WT-Scale-Max-Identical` | 4W | All weights identical at scale max |
+| `Exclude-A-WT-Scale-Max-RV-Propagated` | 4W | RV copy of scale-max exclusion (linked mode) |
+| `Exclude-A-Evil-Twins` | 9Wa | Adjacent pair with implausible weight difference |
+| `Exclude-A-WT-Traj-Ext-N` | 9Wb | Extreme EWMA outlier (independent mode) |
+| `Exclude-A-WT-Traj-Extreme-firstRV-N` | 9Wb | Extreme EWMA outlier (linked firstRV pass) |
+| `Exclude-A-WT-Traj-Extreme-allRV-N` | 9Wb | Extreme EWMA outlier (linked allRV pass) |
+| `Exclude-A-HT-Ord-Pair` | 10Ha | 2D height pair outside band (one excluded) |
+| `Exclude-A-HT-Ord-Pair-All` | 10Ha | 2D height pair outside band (all excluded) |
+| `Exclude-A-HT-Window` | 10Hb | 3+D height outside window (one excluded) |
+| `Exclude-A-HT-Window-All` | 10Hb | 3+D height outside window (all excluded) |
+| `Exclude-A-WT-2D-Ordered` | 11Wa | 2D ordered weight pair outside wtallow/perclimit |
+| `Exclude-A-WT-2D-Non-Ordered` | 11Wa2 | 2D non-ordered weight pair |
+| `Exclude-A-WT-Traj-Moderate-N` | 11Wb | Moderate EWMA outlier (independent or firstRV) |
+| `Exclude-A-WT-Traj-Moderate-allRV-N` | 11Wb | Moderate EWMA outlier (linked allRV pass) |
+| `Exclude-A-WT-Traj-Moderate-Error-Load-N` | 11Wb | 4+ consecutive moderate EWMA candidates |
+| `Exclude-A-WT-Traj-Moderate-Error-Load-RV-N` | 11Wb | Error load escalation to entire patient (linked) |
+| `Exclude-A-HT-Single` | 13 | 1D height outside limits |
+| `Exclude-A-WT-Single` | 13 | 1D weight outside limits |
+| `Exclude-A-HT-Too-Many-Errors` | 14 | Error ratio > threshold |
+| `Exclude-A-WT-Too-Many-Errors` | 14 | Error ratio > threshold |
+
+**Note:** N in trajectory (Traj) codes = the iteration of
+the EWMA exclusion loop in which the value was excluded.
+
+#### SDE Codes
+
+| Code | Steps | Description |
+|------|-------|-------------|
+| `Exclude-A-HT-Identical` | 9H | Same-day identical heights (keep one) |
+| `Exclude-A-HT-Extraneous` | 9H | Same-day non-identical height (SDE loser) |
+| `Exclude-A-WT-Identical` | 10W | Same-day identical weights (keep one) |
+| `Exclude-A-WT-Extraneous` | 10W | Same-day non-identical weight (SDE loser) |
+
+### Adult Permissiveness Presets
+
+Default: `"looser"`
+
+| Parameter | loosest | looser | tighter | tightest |
+|-----------|---------|--------|---------|----------|
+| BIV HT (cm) | 50–244 | 120–230 | 142–213 | 147–208 |
+| BIV WT (kg) | 20–500 | 30–270 | 36–159 | 39–136 |
+| BIV BMI | 5–300 | 12–65 | 16–45 | 18–40 |
+| 1D limits | split (BMI/no-BMI) | same as BIV | same as BIV | same as BIV |
+| wtallow formula | piecewise | piecewise | piecewise-lower | allofus15 |
+| wtallow scaling | +0.50×(maxwt−120)⁺ | +0.50×(maxwt−120)⁺ | none | none |
+| EWMA cap <6m | 50+0.70×scale | 50+0.70×scale | 40 | 40 |
+| EWMA cap ≥6m | 80+0.70×scale | 80+0.70×scale | 60 | 40 |
+| perclimit ≤45 kg | 0.5 | 0.5 | 0.7 | 0.7 |
+| perclimit 45–80 kg | 0.4 | 0.4 | 0.4 | 0.4 |
+| perclimit >80 kg | 0 (disabled) | 0 (disabled) | 0.4 | 0.4 |
+| error_load_threshold | 0.41 | 0.41 | 0.29 | 0.29 |
+| mod_ewma_f | 0.75 | 0.75 | 0.60 | 0.60 |
+| ht_band | 3" | 3" | 2" | 2" |
+| allow_ht_loss | TRUE | FALSE | FALSE | FALSE |
+| allow_ht_gain | TRUE | TRUE | TRUE | FALSE |
+| repval_handling | independent | independent | linked | linked |
+
+### Key Differences: Adult vs. Child
+
+| Aspect | Child | Adult |
+|--------|-------|-------|
+| Z-scores | CSD z-scores (WHO/CDC blend) | No z-scores — raw measurements |
+| Data structure | Single `data.df`, never removes rows | Copies rows into shrinking dataframes |
+| SDE tiebreaking at birth | Keep lowest `id` (pre-postnatal shift) | N/A (no births) — always keeps highest `id` |
+| Permissiveness levels | Not yet implemented (planned) | 4 levels: loosest/looser/tighter/tightest |
+| Parameters | param = HT, WT, HC | param = HT, WT only (no HC) |
+| Rounding tolerance | None (removed) | 0.12 cm/kg on all threshold comparisons |
+| Head circumference | Supported (WHO only, ≤3y cleaned) | Not applicable |
+| `perclimit` scope | N/A | 11Wa: subject-level max wt; 11Wb: observation-level |
+| Sort determinism | `setkey(data.df, subjid, param, agedays, id)` | All sorts include `id` as final tiebreaker |
+| Missing-as-infinity | N/A | `ifelse(is.na(...), Inf, ...)` for edge EWMA values |
+
+---
+
+## Configurable Parameters (child)
 
 | Parameter | Default | Used in | Description |
 |-----------|---------|---------|-------------|
@@ -244,6 +395,65 @@ do not exist or are handled within other steps.
 | `adult_cutpoint` | 20 | Preprocessing | Age (years) dividing pediatric/adult |
 | `use_legacy_algorithm` | FALSE | Dispatch | If TRUE, use legacy pediatric algorithm |
 | `quietly` | TRUE | All | Suppress progress messages |
+| `ref_tables` | NULL | All reads | Pre-loaded closures from `gc_preload_refs()`; skips disk reads |
+| `cached_results` | NULL | Partial run | data.table from prior `cleangrowth()` call; paired with `changed_subjids` |
+| `changed_subjids` | NULL | Partial run | Vector of subject IDs to re-run; unchanged subjects use `cached_results` |
+
+### gc_preload_refs()
+
+Exported function that pre-loads all three `read_anthro()` closures once
+and returns them as a named list. Avoids ~0.93 sec of disk reads per
+`cleangrowth()` call (replaces 3 `read_anthro()` calls, ~0.31 sec each) —
+significant savings across simulation loops (~50K calls × 0.93 sec =
+~13 hours). Benchmarked on 200 subjects: standard 4.46 sec → preloaded
+3.53 sec. Load time: 0.46 sec (paid once).
+
+```r
+refs <- gc_preload_refs()
+result <- cleangrowth(..., ref_tables = refs)
+```
+
+Returns: `list(mtz_cdc_prelim, mtz_who_prelim, mtz_cdc)`.
+
+### Partial run (changed_subjids)
+
+When measurements for only a subset of subjects have changed between
+runs, pass `cached_results` (full prior results) and `changed_subjids`
+(vector of subject IDs to re-run). Only those subjects are processed;
+the rest are taken from `cached_results`. Subjects are independent in
+all GC operations (by-group on subjid/param, fixed reference-based
+recentering), so this is safe.
+
+```r
+# First run
+res_baseline <- cleangrowth(..., ref_tables = refs)
+
+# Later run — only subjects 3, 7, 12 changed
+res_updated <- cleangrowth(...,
+  ref_tables = refs,
+  cached_results = res_baseline,
+  changed_subjids = c(3, 7, 12))
+```
+
+Notes:
+- Both `cached_results` and `changed_subjids` must be provided together
+- If `changed_subjids` contains subject IDs not present in the input
+  data, they are silently ignored
+- Output row order matches input order (sorted by `id`)
+- Primarily designed for Eric's secure-environment use case (Qual-AD)
+
+### Configurable Parameters (adult, via cleangrowth)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `adult_permissiveness` | `"looser"` | Sets defaults for all adult sub-parameters |
+| `adult_scale_max_lbs` | `Inf` | Physical scale upper limit in lbs (formerly `weight_cap`) |
+
+All adult sub-parameters (BIV limits, 1D limits, wtallow,
+EWMA caps, etc.) can be passed individually to `cleanadult()`
+to override the preset. See `adult_clean.R` roxygen for the
+full list. `cleangrowth()` currently exposes only
+`adult_permissiveness` and `adult_scale_max_lbs`.
 
 ---
 
@@ -321,7 +531,7 @@ accidentally modify copies or joined tables.
 
 ## Testing
 
-### testthat suite
+### testthat suite (child)
 
 4 test files in `tests/testthat/`:
 
@@ -332,8 +542,8 @@ accidentally modify copies or joined tables.
 | `test-child-parameters.R` | 10 | 24 | All configurable parameters |
 | `test-child-edge-cases.R` | 12 | 23 | Single subject, sparse data, all-NA, mixed NA, SDE-Identical, negative agedays, HEADCM >3yr, extreme values, density mix, CF, deterministic |
 
-Total (as of 2026-03-24): 33 tests, 150 assertions. Existing
-`test-cdc.R` and `test-utils.R` not modified.
+Total child (as of 2026-03-24): 33 tests, 150 assertions.
+Existing `test-cdc.R` and `test-utils.R` not modified.
 
 Run with:
 ```bash
@@ -341,31 +551,68 @@ NOT_CRAN=true Rscript -e \
   'testthat::test_file("tests/testthat/test-child-regression.R")'
 ```
 
+### testthat suite (adult)
+
+| File | Tests | Assertions | Coverage |
+|------|-------|------------|----------|
+| `test-adult-clean.R` | 210 | 210 | All 14 steps, all 4 permissiveness levels, edge cases |
+
+Regression test: `tests/test_harness.R` runs `cleanadult()`
+against `inst/testdata/adult-gc-test-ALL-PHASES.csv` — 1483
+rows at all 4 permissiveness levels.
+
+```bash
+# Unit tests
+NOT_CRAN=true Rscript -e \
+  'testthat::test_file("tests/testthat/test-adult-clean.R")'
+
+# Regression test (any permissiveness level)
+Rscript tests/test_harness.R [loosest|looser|tighter|tightest]
+```
+
+**Test CSV columns:** `id`, `subjid`, `param`, `agedays`,
+`sex`, `measurement`, plus `expected_loosest`,
+`expected_looser`, `expected_tighter`, `expected_tightest`,
+`test_description`, `test_category`, `precision_sensitive`.
+
+**Deferred test gaps:** Error load with -5 exponent, weight
+scaling at permissiveness levels.
+
 ### Runtime benchmarks
 
-| Dataset | Size | Time |
-|---------|------|------|
-| syn.csv (full) | 77,721 rows, 2,697 subjects | ~1.2–1.9 min |
-| syn.csv (1,036 subj subset) | 28,434 rows | ~18 sec |
-| 500-subject subsample | ~14K rows | ~9 sec |
+| Dataset | Size | Sequential | Parallel 2 | Parallel 4 |
+|---------|------|-----------|------------|------------|
+| syngrowth (full) | 77,721 rows, 2,697 subj | ~114 sec | ~65 sec (1.7×) | ~30 sec (3.9×) |
+| syn.csv (1,036 subj subset) | 28,434 rows | ~18 sec | — | — |
+| 500-subject subsample | ~14K rows | ~11 sec | ~8 sec | ~6 sec |
 
-Always use `parallel = FALSE`. Run in background from Claude
-Code (`run_in_background: true`).
+Parallel produces identical results to sequential (verified 77,721 rows, 0 mismatches).
+Requires installed package — see Known Issues. Run in background from Claude Code
+(`run_in_background: true`).
 
 ---
 
 ## Known Issues
 
-### Open
+### Open (child)
 
-- [ ] **Debug `stop()` in Step 5:** Lines 2783–2792 have a
-  hard stop on duplicate Include values after temp SDE.
-  Should be `warning()`. The check is useful but shouldn't
-  halt production runs.
-- [ ] **Parallel processing broken on macOS:** `parallel = TRUE`
-  produces incorrect results. Likely `data.table` + forked
-  process incompatibility. Potential fixes: PSOCK clusters,
-  `setDTthreads()`, or `future`/`furrr` framework.
+- [x] **`stop()` → `warning()` in Step 5:** Already resolved.
+  All duplicate-Include safety checks (Step 5 line ~2795,
+  Step 13 lines ~3502–3504 and ~3514) use `warning()`.
+  CLAUDE.md item was never ticked.
+- [x] **Parallel processing fixed (2026-04-04):** Three bugs
+  were causing failures:
+  1. `internal_id` not passed to `temporary_extraneous_infants()`
+     at 7 call sites — fixed by adding to column subset
+  2. `internal_id` dropped inside the function at line 2373
+     (small copy didn't include it) — fixed in keyby select
+  3. `ewma_cache_init`/`ewma_cache_update` missing from child
+     `var_for_par` — added. `.paropts` updated to load
+     `"growthcleanr"` on workers.
+  **Requirement:** Package must be installed (`devtools::install_local()`)
+  before using `parallel = TRUE`. Will not work with
+  `devtools::load_all()` only (workers need the installed
+  package to access extdata via `system.file()`).
 - [ ] **Batch size hard-coded at 2,000:** Should be a
   `batch_size` parameter on `cleangrowth()`.
 - [ ] **Batch-invariant operations inside loop:**
@@ -386,8 +633,22 @@ Code (`run_in_background: true`).
   never used. Leftover from refactoring. Harmless but
   should be cleaned up.
 
+### Open (adult)
+
+- [ ] **Deferred test gaps:** Error load with -5 exponent,
+  weight scaling at permissiveness levels.
+- [ ] **Performance:** `setkey(df, subjid)` optimization
+  deferred.
+- [ ] **Integration tests through `cleangrowth()`:** Need
+  to add tests that exercise the full `cleangrowth()` →
+  `cleanadult()` path, not just direct `cleanadult()` calls.
+
 ### Fixed (recent)
 
+- [x] **Character `id` breaks child algorithm sorting:**
+  `id_sort := ifelse(agedays == 0, id, -id)` failed when
+  `id` is character because `-id` is undefined for strings.
+  Fixed: all 4 locations now use `internal_id` (numeric).
 - [x] **Outer batching wrapper defeated:** Lines 440–441
   overwrote batch filter with all subjects. Fixed.
 - [x] **Missing data bug:** NA measurements coded as
@@ -406,6 +667,85 @@ Code (`run_in_background: true`).
   CDC-only cutoff was `>= 4 years` instead of `> 5 years`.
   Confirmed bug — confused WHO/CDC blending window with
   corrected/uncorrected smoothing window.
+
+---
+
+## Next Priorities
+
+1. **Adult integration into package (COMPLETE 2026-04-03):**
+   File cleanup, `cleangrowth()` dispatch update, output merge,
+   `weight_cap` deprecation, CRAN fixes (NULL decls,
+   cat→message). Smoke tests passing. Remaining: integration
+   tests through `cleangrowth()` (see Known Issues, adult).
+1b. **Adult algorithm walk-through:** Separate session to
+   review adult algorithm logic before clinician validation.
+   Will use a fresh conversation for a clean read-through.
+2. **Design extreme/clinical test patients from literature:**
+   Create synthetic patients based on real clinical scenarios
+   with literature-sourced growth values (e.g., hydrocephalus
+   with shunt placement, craniosynostosis, failure to thrive,
+   severe obesity, Turner syndrome, growth hormone deficiency).
+   Goal: verify gc handles physiologically real but extreme
+   trajectories correctly — not just random perturbations.
+
+---
+
+## CRAN Preparation Checklist
+
+Identified 2026-04-03. Items marked [x] are done.
+
+**Timeline note (updated 2026-04-04):** CRAN is not the immediate
+deadline. Priority order: (1) adult validation, (2) child
+validation, (3) CRAN cleanup (can overlap with validation as long
+as changes don't affect algorithm performance).
+
+### Critical (R CMD check ERRORs/WARNINGs)
+
+- [ ] **`parallel` not in DESCRIPTION Imports:** Imported in
+  NAMESPACE but not declared in DESCRIPTION. Add to Imports.
+  (~2 min)
+- [ ] **Vignettes excluded via `.Rbuildignore`:** `^vignettes$`
+  prevents vignette building. Either fix vignettes to build
+  cleanly or remove vignette files. (~1–4 hours depending on
+  vignette state)
+- [ ] **Package tarball > 5 MB:** `inst/extdata/` alone is
+  ~5.3 MB. `test_syngrowth_sas_output_compare.csv.gz` (1.8 MB)
+  is the largest — move to a companion data package or remove
+  if only needed for development. `stress_test_data.csv`
+  (4.4 MB) in `tests/testthat/` also ships. (~1–2 hours to
+  audit and reorganize)
+
+### High (R CMD check NOTEs)
+
+- [x] **Missing NULL declarations in `cleanadult()`:** Added
+  `result <- mean_ht <- ... <- NULL` for data.table `:=`
+  columns. (Fixed 2026-04-03)
+- [x] **`cat()`/`print()` in `cleanadult()`:** Changed to
+  `message()` for CRAN-preferred output handling. (Fixed
+  2026-04-03)
+- [ ] **`R/deprec/` and `R/modified_source_code/` not in
+  `.Rbuildignore`:** R doesn't load subdirectories, but they
+  bloat the tarball. Add `^R/deprec$` and
+  `^R/modified_source_code$`. (~2 min)
+- [ ] **`cat()`/`print()` in child algorithm:** Same issue as
+  adult — `child_clean.R` and legacy files use `cat()`
+  throughout. Convert to `message()`. (~30 min)
+
+### Medium (pre-submission polish)
+
+- [ ] **Verify `LICENSE` file exists:** DESCRIPTION says
+  `MIT + file LICENSE`. Confirm plain `LICENSE` file (not
+  just `LICENSE.md`) is at package root.
+- [ ] **Roxygen return value outdated for `cleangrowth()`:**
+  Still describes "Vector of exclusion codes" — should describe
+  the data.table with all columns including adult-specific
+  ones (`mean_ht`, `bin_result`). (~15 min)
+- [ ] **`plyr` dependency:** Only used for `ddply` in parallel
+  adult dispatch. Long-term: replace with
+  `data.table`/`foreach` equivalent. (~2 hours)
+- [ ] **Test runtime:** Ensure total test suite completes in
+  < 10 min. Long-running tests should use `skip_on_cran()`.
+  (~30 min to audit and add skips)
 
 ---
 
@@ -443,8 +783,9 @@ Things that have caused bugs before or fail silently:
   alphabetical load order made the wrong copy win). Child
   version is in `child_clean.R`; legacy version is in
   `pediatric_support_legacy.R`. Do not add a third.
-- **Do not use `parallel = TRUE`.** Produces incorrect results
-  on macOS due to `data.table` + forked process issues.
+- **`parallel = TRUE` requires installed package.** Will fail
+  with `load_all()` only — workers need `system.file()` access
+  to extdata. Install with `devtools::install_local(".")` first.
 - **Do not modify sort order without re-sorting.** Many steps
   assume `setkey(data.df, subjid, param, agedays, id)`. If
   you add/modify rows, call `setkey()` again.
@@ -457,6 +798,19 @@ Things that have caused bugs before or fail silently:
 - **No intermediate z-score rounding.** `round_stata()` has
   been removed from the child algorithm. Do not reintroduce
   rounding at intermediate z-score steps.
+- **Do not have duplicate support files in `R/`.** R loads
+  all `.R` files in `R/` alphabetically. If two files define
+  the same function, the later one wins silently. This caused
+  breakage when both `02a_support.R` (new) and
+  `adult_support.R` (old) coexisted — the old file's
+  `check_between`/`round_pt` overwrote the new versions.
+  **Rule:** Only one adult support file should exist in `R/`.
+- **Adult `result` vs child `exclude`:** The adult algorithm
+  uses `result` as its exclusion column name. `cleangrowth()`
+  maps `res$result` → `exclude` in the combined output.
+  Do not rename `result` to `exclude` inside `cleanadult()`.
+- **Adult rounding tolerance:** 0.12 cm/kg on all threshold
+  comparisons. This is intentional and should not be removed.
 
 ---
 

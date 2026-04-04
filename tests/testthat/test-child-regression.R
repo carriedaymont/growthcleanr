@@ -360,3 +360,92 @@ test_that("child algorithm: 100-subject benchmark completes in reasonable time",
   expect_lt(elapsed, 60,
             label = sprintf("Runtime %.1f sec exceeded 60 sec ceiling", elapsed))
 })
+
+# ---------------------------------------------------------------------------
+# Test 8: gc_preload_refs() + ref_tables produce identical results to full run
+# ---------------------------------------------------------------------------
+test_that("gc_preload_refs: ref_tables produces identical results to standard run", {
+
+  data("syngrowth", package = "growthcleanr", envir = environment())
+  dt <- data.table::as.data.table(syngrowth)
+  dt_peds <- dt[agedays < 20 * 365.25]
+  subjs <- unique(dt_peds$subjid)[seq_len(30)]
+  d <- dt_peds[subjid %in% subjs]
+
+  # Standard run (reads refs from disk)
+  res_standard <- cleangrowth(
+    subjid = d$subjid,
+    param  = d$param,
+    agedays = d$agedays,
+    sex = d$sex,
+    measurement = d$measurement,
+    id = d$id,
+    quietly = TRUE
+  )
+
+  # Pre-loaded refs run
+  refs <- gc_preload_refs()
+  res_preloaded <- cleangrowth(
+    subjid = d$subjid,
+    param  = d$param,
+    agedays = d$agedays,
+    sex = d$sex,
+    measurement = d$measurement,
+    id = d$id,
+    ref_tables = refs,
+    quietly = TRUE
+  )
+
+  # Results must be identical
+  expect_equal(nrow(res_preloaded), nrow(res_standard),
+               info = "Row counts must match")
+  expect_equal(
+    res_preloaded[order(id)]$exclude,
+    res_standard[order(id)]$exclude,
+    info = "Exclusion codes must be identical with and without ref_tables"
+  )
+})
+
+# ---------------------------------------------------------------------------
+# Test 9: changed_subjids partial run produces identical results to full run
+# ---------------------------------------------------------------------------
+test_that("changed_subjids: partial run produces identical results to full run", {
+
+  data("syngrowth", package = "growthcleanr", envir = environment())
+  dt <- data.table::as.data.table(syngrowth)
+  dt_peds <- dt[agedays < 20 * 365.25]
+  subjs <- unique(dt_peds$subjid)[seq_len(30)]
+  d <- dt_peds[subjid %in% subjs]
+
+  # Full run (baseline cached results)
+  res_full <- cleangrowth(
+    subjid = d$subjid,
+    param  = d$param,
+    agedays = d$agedays,
+    sex = d$sex,
+    measurement = d$measurement,
+    id = d$id,
+    quietly = TRUE
+  )
+
+  # Partial run: all subjects listed as "changed" — must equal full run
+  res_partial <- cleangrowth(
+    subjid = d$subjid,
+    param  = d$param,
+    agedays = d$agedays,
+    sex = d$sex,
+    measurement = d$measurement,
+    id = d$id,
+    cached_results = res_full,
+    changed_subjids = unique(d$subjid),
+    quietly = TRUE
+  )
+
+  expect_equal(nrow(res_partial), nrow(res_full),
+               info = "Row counts must match")
+  expect_equal(
+    res_partial[order(id)]$exclude,
+    res_full[order(id)]$exclude,
+    info = "Exclusion codes must be identical: full run vs partial run with all subjids changed"
+  )
+})

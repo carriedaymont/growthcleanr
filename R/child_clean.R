@@ -178,29 +178,28 @@
 #' considering excluding all measurements. Defaults to 2.
 #' @param error.load.threshold threshold of percentage of excluded measurement count to included measurement
 #' count that must be exceeded before excluding all measurements of either parameter. Defaults to 0.5.
-#' @param sd.recenter specifies how to recenter medians. May be a data frame or
-#' table w/median SD-scores per day of life by gender and parameter, or "NHANES"
-#' or "derive" as a character vector.
-#' \itemize{
-#'   \item If `sd.recenter` is specified as a data set, use the data set
-#'   \item If `sd.recenter` is specified as "`nhanes`", use NHANES reference medians
-#'   \item If `sd.recenter` is specified as "`derive`", derive from input
-#'   \item If `sd.recenter` is not specified or `NA`:
-#'     \itemize{
-#'       \item If the input set has at least 5,000 observations, derive medians from input
-#'       \item If the input set has fewer than 5,000 observations, use NHANES
-#'     }
-#' }
+#' @param sd.recenter specifies how to recenter medians.
 #'
-#' If specifying a data set, columns must include param, sex, agedays, and sd.median
-#' (referred to elsewhere as "modified Z-score"), and those medians will be used
-#' for recentering. A summary of how the NHANES reference medians were derived is
-#' available in README.md. Defaults to NA.
-#' @param sdmedian.filename Name of file to save sd.median data calculated on the input dataset to as CSV.
-#' Defaults to "", for which this data will not be saved. Use for extracting medians for parallel processing
-#' scenarios other than the built-in parallel option.
-#' @param sdrecentered.filename Name of file to save re-centered data to as CSV. Defaults to "", for which this
-#' data will not be saved. Useful for post-processing and debugging.
+#' \strong{Child algorithm (default, \code{use_legacy_algorithm = FALSE}):} This
+#' parameter is ignored. Recentering always uses the built-in reference file
+#' (\code{rcfile-2023-08-15_format.csv.gz}), which was derived independently of
+#' any input dataset.
+#'
+#' \strong{Legacy algorithm only (\code{use_legacy_algorithm = TRUE}):} May be a
+#' data frame or table with median SD-scores per day of life by gender and
+#' parameter, or \code{"NHANES"} or \code{"derive"} as a character vector.
+#' \itemize{
+#'   \item If a data set, columns must include param, sex, agedays, and sd.median
+#'   \item If \code{"nhanes"}, use NHANES reference medians
+#'   \item If \code{"derive"}, derive medians from input data
+#'   \item If \code{NA} (default): derive from input if N >= 5,000, otherwise use NHANES
+#' }
+#' @param sdmedian.filename Legacy algorithm only. Name of file to save sd.median
+#' data calculated on the input dataset to as CSV. Defaults to "", for which this
+#' data will not be saved.
+#' @param sdrecentered.filename Legacy algorithm only. Name of file to save
+#' re-centered data to as CSV. Defaults to "", for which this data will not be
+#' saved. Ignored by the child algorithm.
 #' @param include.carryforward Determines whether Carry-Forward values are kept in the output. Defaults to False.
 #' @param ewma.exp Exponent to use for weighting measurements in the
 #' exponentially weighted moving average calculations. Defaults to -1.5.
@@ -223,18 +222,32 @@
 #'  pediatric algorithm should not be applied (< adult_cutpoint), and the adult
 #'   algorithm should apply (>= adult_cutpoint). Numbers outside this range will be
 #'   changed to the closest number within the range. Defaults to 20.
-#' @param weight_cap Positive number, describing a weight cap in kg (rounded to the
-#' nearest .1, +/- .1) within the adult dataset. If there is no weight cap, set
-#'  to Inf. Defaults to Inf.
-#' @param adult_columns_filename Name of file to save original adult data, with additional output columns to
-#' as CSV. Defaults to "", for which this data will not be saved. Useful
-#' for post-analysis. For more information on this output, please see README.
+#' @param adult_permissiveness Permissiveness level for the adult algorithm:
+#'   "loosest", "looser" (default), "tighter", or "tightest". Sets defaults
+#'   for all adult BIV limits, EWMA caps, height bands, etc. See
+#'   `adult_clean.R` for sub-parameter details.
+#' @param adult_scale_max_lbs Physical scale upper limit in pounds for adult
+#'   weight data. Weights at or above this value are excluded. Defaults to Inf.
+#' @param weight_cap Deprecated. Use `adult_scale_max_lbs` instead.
 #' @param prelim_infants Deprecated. Use `use_legacy_algorithm` instead.
 #'   Old mapping: `prelim_infants = TRUE` → child algorithm (use_legacy_algorithm = FALSE);
 #'   `prelim_infants = FALSE` → legacy algorithm (use_legacy_algorithm = TRUE).
 #' @param use_legacy_algorithm Logical. If TRUE, run the legacy pediatric algorithm
 #'   (`cleanbatch_legacy`, formerly `cleanbatch`). If FALSE (default), run the child
 #'   algorithm (`cleanbatch_child`), which includes enhanced methods for children 0-2 years.
+#' @param ref_tables Optional. Pre-loaded reference closures from \code{\link{gc_preload_refs}}.
+#'   When provided, skips all \code{read_anthro()} file reads (~0.93 sec per call on 200
+#'   subjects; ~13 hours saved over 50K calls). Recommended for repeated calls (e.g.,
+#'   simulation loops). Defaults to NULL (reads files each call).
+#' @param cached_results Optional. A data.table of GC results from a prior \code{cleangrowth()}
+#'   call on the full dataset (e.g., a baseline run). Must be provided together with
+#'   \code{changed_subjids}. When both are supplied, only subjects in \code{changed_subjids}
+#'   are re-processed; all other subjects receive their cached results. Defaults to NULL
+#'   (process all subjects).
+#' @param changed_subjids Optional. Vector of subject IDs whose measurements have changed
+#'   since the cached baseline run. Must be provided together with \code{cached_results}.
+#'   Subjects not in this vector are taken from \code{cached_results} without re-processing.
+#'   Defaults to NULL (process all subjects).
 #'
 #' @return Vector of exclusion codes for each of the input measurements.
 #'
@@ -306,12 +319,16 @@ cleangrowth <- function(subjid,
                         num.batches = NA,
                         quietly = TRUE,
                         adult_cutpoint = 20,
-                        weight_cap = Inf,
-                        adult_columns_filename = "",
+                        adult_permissiveness = "looser",
+                        adult_scale_max_lbs = Inf,
+                        weight_cap,
                         prelim_infants = NULL,
                         use_legacy_algorithm = FALSE,
                         ewma_window = 15,
-                        id = NULL)
+                        id = NULL,
+                        ref_tables = NULL,
+                        cached_results = NULL,
+                        changed_subjids = NULL)
                         {
   # ewma_window: number of neighbors on each side for EWMA weighting.
   # Default 15 is the R design choice; set to 25 to match Stata behavior.
@@ -327,6 +344,15 @@ cleangrowth <- function(subjid,
     )
     use_legacy_algorithm <- !prelim_infants
   }
+  # Handle weight_cap deprecation → adult_scale_max_lbs
+  if (!missing(weight_cap)) {
+    warning(
+      "The `weight_cap` parameter is deprecated. Use `adult_scale_max_lbs` instead.",
+      call. = FALSE
+    )
+    adult_scale_max_lbs <- weight_cap
+  }
+
   # Internal variable: TRUE means use child algorithm (new default)
   use_child_algorithm <- !use_legacy_algorithm
 
@@ -346,6 +372,21 @@ cleangrowth <- function(subjid,
     nnte_full <- NULL
 
   # preprocessing ----
+
+  # Partial-run mode: filter input to changed subjects only.
+  # Both cached_results and changed_subjids must be provided together.
+  # This must happen before data.all.ages is built.
+  do_partial <- !is.null(changed_subjids) && !is.null(cached_results)
+  if (do_partial) {
+    keep <- as.character(subjid) %in% as.character(changed_subjids)
+    if (sum(keep) == 0) return(cached_results)  # nothing changed — return cache as-is
+    subjid      <- subjid[keep]
+    param       <- param[keep]
+    agedays     <- agedays[keep]
+    sex         <- sex[keep]
+    measurement <- measurement[keep]
+    id          <- id[keep]
+  }
 
   # organize data into a dataframe along with a line "index" so the original data order can be recovered
   data.all.ages <- data.table(
@@ -372,8 +413,8 @@ cleangrowth <- function(subjid,
   if (!is.numeric(adult_cutpoint)){
     stop("adult_cutpoint not numeric. Please enter a number between 18 and 20.")
   }
-  if (!is.numeric(weight_cap) | weight_cap < 0){
-    stop("weight_cap not numeric. Please enter a positive number.")
+  if (!is.numeric(adult_scale_max_lbs) | adult_scale_max_lbs < 0){
+    stop("adult_scale_max_lbs not numeric. Please enter a positive number.")
   }
   if (any(!param %in% c("LENGTHCM", "HEIGHTCM", "WEIGHTKG", "HEIGHTIN",
                         "WEIGHTLBS", "HEADCM"))){
@@ -576,17 +617,21 @@ cleangrowth <- function(subjid,
       }
       if (use_child_algorithm){
         # variables needed for parallel workers
+        # Note: "growthcleanr" is loaded on workers via .paropts, which covers
+        # exported functions and extdata access. var_for_par handles internal
+        # (non-exported) functions that workers still need directly.
         var_for_par <- c("temporary_extraneous", "valid", "swap_parameters",
                          "na_as_false", "ewma", "read_anthro", "as_matrix_delta",
-                         "sd_median",
 
                          "temporary_extraneous_infants",
                          "get_dop", "calc_otl_evil_twins",
-                         "calc_and_recenter_z_scores")
+                         "calc_and_recenter_z_scores",
+
+                         # EWMA cache (added v3.0.0 — required for cleanbatch_child)
+                         "ewma_cache_init", "ewma_cache_update")
       } else {
         var_for_par <- c("temporary_extraneous", "valid", "swap_parameters",
-                         "na_as_false", "ewma", "read_anthro", "as_matrix_delta",
-                         "sd_median")
+                         "na_as_false", "ewma", "read_anthro", "as_matrix_delta")
       }
 
       cl <- makeCluster(num.batches)
@@ -716,10 +761,10 @@ cleangrowth <- function(subjid,
         cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
       # removing z calculations, as they are not used
       # for infants, use z and who
-      measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE,
-                                      prelim_infants = TRUE)
-      measurement.to.z_who <- read_anthro(ref.data.path, cdc.only = FALSE,
-                                          prelim_infants = TRUE)
+      measurement.to.z <- if (!is.null(ref_tables)) ref_tables$mtz_cdc_prelim else
+        read_anthro(ref.data.path, cdc.only = TRUE, prelim_infants = TRUE)
+      measurement.to.z_who <- if (!is.null(ref_tables)) ref_tables$mtz_who_prelim else
+        read_anthro(ref.data.path, cdc.only = FALSE, prelim_infants = TRUE)
 
       # calculate "standard deviation" scores
       if (!quietly)
@@ -780,7 +825,7 @@ cleangrowth <- function(subjid,
       # At age 0: prefer LOWEST id (earliest measurement, before fluid/interventions)
       # At age > 0: prefer HIGHEST id (consistent with other SDE handling)
       # Create sort key: for age 0 use id ascending, for age > 0 use id descending
-      data.all[, id_sort := ifelse(agedays == 0, id, -id)]
+      data.all[, id_sort := ifelse(agedays == 0, internal_id, -internal_id)]
       setorder(data.all, subjid, param, agedays, id_sort)
 
       # initialize the column so it's always present
@@ -988,7 +1033,7 @@ cleangrowth <- function(subjid,
         # Age-dependent ID sorting for consistent sequence numbering:
         # At age 0: sort by id ascending (lowest first)
         # At age > 0: sort by id descending (highest first)
-        tmp[, id_sort := ifelse(agedays == 0, id, -id)]
+        tmp[, id_sort := ifelse(agedays == 0, internal_id, -internal_id)]
         tmp <- tmp[order(subjid, agedays, id_sort),]
         tmp[, id_sort := NULL]
 
@@ -1063,7 +1108,8 @@ cleangrowth <- function(subjid,
       # calculate z scores
       if (!quietly)
         cat(sprintf("[%s] Calculating z-scores...\n", Sys.time()))
-      measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE)
+      measurement.to.z <- if (!is.null(ref_tables)) ref_tables$mtz_cdc else
+        read_anthro(ref.data.path, cdc.only = TRUE)
       data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
 
       # calculate "standard deviation" scores
@@ -1337,7 +1383,8 @@ cleangrowth <- function(subjid,
           error.load.threshold = error.load.threshold,
           error.load.mincount = error.load.mincount,
           ref.data.path = ref.data.path,
-          ewma_window = ewma_window)
+          ewma_window = ewma_window,
+          ref_tables = ref_tables)
       }
     } else {
       # create log directory if necessary
@@ -1376,7 +1423,7 @@ cleangrowth <- function(subjid,
           .(batch),
           cleanbatch_child,
           .parallel = parallel,
-          .paropts = list(.packages = "data.table"),
+          .paropts = list(.packages = c("data.table", "growthcleanr")),
           log.path = log.path,
           quietly = quietly,
           parallel = parallel,
@@ -1393,7 +1440,8 @@ cleangrowth <- function(subjid,
           error.load.threshold = error.load.threshold,
           error.load.mincount = error.load.mincount,
           ref.data.path = ref.data.path,
-          ewma_window = ewma_window
+          ewma_window = ewma_window,
+          ref_tables = ref_tables
         )
       }
       stopCluster(cl)
@@ -1424,12 +1472,39 @@ cleangrowth <- function(subjid,
       }
       # variables needed for parallel workers
       var_for_par <- c(
-        "cleanadult", "check_between", "round_pt", "get_float_rem",
-        "as.matrix.delta_dn", "ewma_dn", "remove_biv", "remove_biv_high",
-        "remove_biv_low", "identify_rv", "temp_sde", "redo_identify_rv",
-        "rem_hundreds", "rem_unit_errors", "get_num_places", "switch_tens_ones",
-        "rem_transpositions", "ht_allow", "ht_change_groups",
-        "ht_3d_growth_compare", "remove_ewma_wt", "remove_mod_ewma_wt"
+        # Main function
+        "cleanadult",
+        # Permissiveness
+        "permissiveness_presets", "resolve_permissiveness",
+        # Convenience
+        "check_between", "round_pt",
+        # Dynamic threshold helpers
+        "compute_et_limit", "compute_perc_limit", "compute_wtallow",
+        # EWMA
+        "as.matrix.delta_dn", "ewma_dn",
+        "ewma_cache_init", "ewma_cache_update",
+        "adult_ewma_cache_init", "adult_ewma_cache_update",
+        # BIV / RV / SDE
+        "remove_biv", "remove_biv_high", "remove_biv_low",
+        "identify_rv", "temp_sde", "redo_identify_rv",
+        # Height
+        "ht_allow", "ht_change_groups", "ht_3d_growth_compare",
+        # Moderate EWMA support
+        "detect_runs", "compute_trajectory_fails",
+        # Evil Twins
+        "evil_twins",
+        # RV propagation (linked mode)
+        "propagate_to_rv",
+        # Extreme EWMA
+        "remove_ewma_wt",
+        # Moderate EWMA
+        "remove_mod_ewma_wt",
+        # 2D Non-Ordered
+        "eval_2d_nonord",
+        # 1D
+        "eval_1d",
+        # Error Load
+        "eval_error_load"
       )
 
       cl <- makeCluster(num.batches)
@@ -1457,15 +1532,20 @@ cleangrowth <- function(subjid,
 
     if (num.batches == 1) {
       # do the cleaning
-      res <- cleanadult(data.adult, weight_cap = weight_cap)
+      res <- cleanadult(data.adult,
+                        permissiveness = adult_permissiveness,
+                        scale_max_lbs = adult_scale_max_lbs,
+                        quietly = quietly)
     } else {
       res <- ddply(
         data.adult,
         .(newbatch),
         cleanadult,
         .parallel = parallel,
-        .paropts = list(.packages = "data.table"),
-        weight_cap = weight_cap
+        .paropts = list(.packages = c("data.table", "growthcleanr")),
+        permissiveness = adult_permissiveness,
+        scale_max_lbs = adult_scale_max_lbs,
+        quietly = quietly
       )
 
       res <- as.data.table(res)
@@ -1476,19 +1556,6 @@ cleangrowth <- function(subjid,
 
     if (parallel){
       stopCluster(cl)
-    }
-
-    if (adult_columns_filename != "") {
-      write.csv(res, adult_columns_filename, row.names = FALSE, na = "")
-      if (!quietly){
-        cat(
-          sprintf(
-            "[%s] Wrote adult data with additional columns to to %s...\n",
-            Sys.time(),
-            adult_columns_filename
-          )
-        )
-      }
     }
 
     if (!quietly)
@@ -1530,10 +1597,25 @@ cleangrowth <- function(subjid,
     } else {
       rep("", nrow(ret.df))
     }
+
+    # adult-specific columns: mean_ht and bin_result (NA for child rows)
+    adult_mean_ht <- if (nrow(res) > 0 && "mean_ht" %in% names(res)) {
+      res$mean_ht
+    } else {
+      rep(NA_real_, nrow(res))
+    }
+    adult_bin_result <- if (nrow(res) > 0 && "bin_result" %in% names(res)) {
+      res$bin_result
+    } else {
+      rep(NA_character_, nrow(res))
+    }
+
     full_out <- data.table(
       line = c(ret.df$line, res$line),
       exclude = c(as.character(ret.df$exclude), res$result),
-      cf_rescued = c(cf_rescued_peds, rep("", nrow(res)))
+      cf_rescued = c(cf_rescued_peds, rep("", nrow(res))),
+      mean_ht = c(rep(NA_real_, nrow(ret.df)), adult_mean_ht),
+      bin_result = c(rep(NA_character_, nrow(ret.df)), adult_bin_result)
     )
 
     # preserve original exclude levels
@@ -1581,6 +1663,18 @@ cleangrowth <- function(subjid,
 
   all_results <- data.table::rbindlist(results_list, use.names = TRUE)
   setorder(all_results, line)
+
+  # Partial-run mode: merge new results for changed subjects with cached results
+  # for unchanged subjects, then sort by id for a consistent output order.
+  if (do_partial) {
+    all_results <- rbind(
+      cached_results[!(as.character(cached_results$subjid) %in%
+                         as.character(changed_subjids))],
+      all_results,
+      fill = TRUE
+    )
+    setorder(all_results, id)
+  }
 
   return(all_results)
 }
@@ -1875,6 +1969,45 @@ read_anthro <- function(path = "", cdc.only = FALSE, prelim_infants = FALSE) {
 
     return(dt$ret)
   })
+}
+
+#' Pre-load growthcleanr reference closures
+#'
+#' \code{gc_preload_refs} loads all reference table closures used by
+#' \code{\link{cleangrowth}} once, avoiding repeated disk reads across
+#' repeated calls (e.g., simulation loops). Pass the result as the
+#' \code{ref_tables} argument to \code{\link{cleangrowth}}.
+#'
+#' @param path Path to the reference data directory. Defaults to the package
+#'   extdata directory. Pass an explicit path only if using custom reference
+#'   files.
+#'
+#' @return A named list with three \code{read_anthro} closures:
+#'   \describe{
+#'     \item{mtz_cdc_prelim}{CDC-only, prelim_infants = TRUE (used by child algorithm)}
+#'     \item{mtz_who_prelim}{WHO+CDC, prelim_infants = TRUE (used by child algorithm)}
+#'     \item{mtz_cdc}{CDC-only, prelim_infants = FALSE (used by legacy algorithm)}
+#'   }
+#'
+#' @export
+#' @examples
+#' \donttest{
+#' refs <- gc_preload_refs()
+#' result <- cleangrowth(
+#'   subjid = syngrowth$subjid,
+#'   param  = syngrowth$param,
+#'   agedays = syngrowth$agedays,
+#'   sex = syngrowth$sex,
+#'   measurement = syngrowth$measurement,
+#'   ref_tables = refs
+#' )
+#' }
+gc_preload_refs <- function(path = "") {
+  list(
+    mtz_cdc_prelim = read_anthro(path, cdc.only = TRUE,  prelim_infants = TRUE),
+    mtz_who_prelim = read_anthro(path, cdc.only = FALSE, prelim_infants = TRUE),
+    mtz_cdc        = read_anthro(path, cdc.only = TRUE,  prelim_infants = FALSE)
+  )
 }
 
 #' Exponentially Weighted Moving Average (EWMA)
@@ -2298,7 +2431,7 @@ temporary_extraneous_infants <- function(df, exclude_from_dop_ids = NULL) {
   # avoid "no visible binding" warnings
   agedays <- absdmedian.spz <- absdmedian.dopz <- extraneous <- NULL
   extraneous.this.day <- index <- median.spz <- median.dopz <- NULL
-  param <- subjid <- tbc.sd <- NULL
+  param <- subjid <- tbc.sd <- internal_id <- NULL
 
   # Make copy before modifying to avoid data.table alloccol error
   df <- copy(df)
@@ -2325,7 +2458,7 @@ temporary_extraneous_infants <- function(df, exclude_from_dop_ids = NULL) {
   # make a small copy of df with fields we need
   # Include id for age-dependent tiebreaker
   # Use id in keyby for deterministic SDE order
-  df <- df[j = .(tbc.sd, exclude, id, orig_row), keyby = .(subjid, param, agedays, id)]
+  df <- df[j = .(tbc.sd, exclude, id, internal_id, orig_row), keyby = .(subjid, param, agedays, id)]
 
   # Now compute valid.rows on the keyby-sorted data
   # Removed nnte filter (nnte calculation removed)
@@ -2439,9 +2572,9 @@ temporary_extraneous_infants <- function(df, exclude_from_dop_ids = NULL) {
     # Age-dependent id tiebreaker to match Stata
     # Stata uses obsid (observation ID) for tiebreaker, not row index
     # At agedays=0: pick lowest id (sort ascending)
-    # At agedays>0: pick highest id (sort descending via -id)
-    # Use id for selection, not index
-    tiebreaker <- if(agedays[1] == 0) id else -id
+    # At agedays>0: pick highest id (sort descending via -internal_id)
+    # Use internal_id for numeric sorting, not id (which may be character)
+    tiebreaker <- if(agedays[1] == 0) internal_id else -internal_id
     ord <- order(absdmedian.spz,
                  absdmedian.dopz, tiebreaker)
     keep_id <- id[ord[1]]
@@ -2619,7 +2752,8 @@ cleanbatch_child <- function(data.df,
                                error.load.threshold,
                                error.load.mincount,
                                ref.data.path,
-                               ewma_window = 15) {
+                               ewma_window = 15,
+                               ref_tables = NULL) {
   # avoid "no visible binding" warnings
   abs.2ndlast.sd <- abs.tbc.sd <- abs.tbc.sd.next <- abs.tbc.sd.prev <- abssum2 <- NULL
   aft.g.befp1 <- agedays <- agedays.other <- bef.g.aftm1 <- delta <- NULL
@@ -2733,7 +2867,7 @@ cleanbatch_child <- function(data.df,
       "[%s] Preliminarily identify potential extraneous...\n",
       Sys.time()
     ))
-  data.df$exclude[temporary_extraneous_infants(data.df[, .(id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-Temporary-Extraneous-Same-Day'
+  data.df$exclude[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-Temporary-Extraneous-Same-Day'
 
   # capture a list of subjects with possible extraneous for efficiency later
   subj.dup <- data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', unique(subjid)]
@@ -2851,7 +2985,7 @@ cleanbatch_child <- function(data.df,
       data.df[exclude == "Exclude-Temporary-Extraneous-Same-Day", exclude := "Include"]
 
       # Re-run temp SDE logic (now CFs are excluded, so SDE evaluation will differ)
-      data.df$exclude[temporary_extraneous_infants(data.df[, .(id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-Temporary-Extraneous-Same-Day'
+      data.df$exclude[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-Temporary-Extraneous-Same-Day'
     }
 
     # Determine if measurements are in whole or half imperial units (row-level flag)
@@ -3147,7 +3281,7 @@ cleanbatch_child <- function(data.df,
 
   # 7d.  Replace exc_*=0 if exc_*==2 & redo step 5 (temporary extraneous)
   data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
-  data.df[temporary_extraneous_infants(data.df[, .(id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
+  data.df[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
 
   # Drop column no longer needed after Step 7
   # ageyears: only used for BIV age-threshold checks (Step 7)
@@ -3260,7 +3394,7 @@ cleanbatch_child <- function(data.df,
 
   # 9F.  redo temp extraneous
   data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
-  data.df[temporary_extraneous_infants(data.df[, .(id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
+  data.df[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
 
   # Step 11: Extreme EWMA ----
   # Restructured to use global iterations for efficiency
@@ -3376,7 +3510,7 @@ cleanbatch_child <- function(data.df,
                   df[pot_excl == TRUE, exclude := 'Exclude-EWMA1-Extreme']
                 } else if (num.exclude > 1) {
                   # Select worst: highest abs(tbc.sd + dewma.all), lowest id as tiebreaker
-                  worst.row <- with(df, order(pot_excl, abs(tbc.sd + dewma.all), -id, decreasing = TRUE))[1]
+                  worst.row <- with(df, order(pot_excl, abs(tbc.sd + dewma.all), -internal_id, decreasing = TRUE))[1]
                   df[worst.row, exclude := 'Exclude-EWMA1-Extreme']
                 }
               }
@@ -3413,7 +3547,7 @@ cleanbatch_child <- function(data.df,
               exclude := 'Include']
       # Recalculate temp SDEs for subset
       sde_subset <- data.df[subjid %in% affected_sde_subj]
-      sde_result <- temporary_extraneous_infants(sde_subset[, .(id, subjid, param, agedays, tbc.sd, exclude)])
+      sde_result <- temporary_extraneous_infants(sde_subset[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])
       # Apply results back using index
       sde_indices_to_mark <- sde_subset$index[sde_result]
       data.df[index %in% sde_indices_to_mark, exclude := 'Exclude-Temporary-Extraneous-Same-Day']
@@ -3432,7 +3566,7 @@ cleanbatch_child <- function(data.df,
   # Final temp SDE recalculation (end of Step 11, before Step 13)
   # Note: Does NOT use exclude_from_dop_ids - that's only for Step 13
   data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
-  data.df[temporary_extraneous_infants(data.df[, .(id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
+  data.df[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
 
   # 13: SDEs ----
 
@@ -3454,7 +3588,7 @@ cleanbatch_child <- function(data.df,
   }
 
   data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
-  data.df[temporary_extraneous_infants(data.df[, .(id, subjid, param, agedays, tbc.sd, exclude)],
+  data.df[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)],
                                         exclude_from_dop_ids = temp_sde_ids_step13),
           exclude := 'Exclude-Temporary-Extraneous-Same-Day']
 
@@ -3758,7 +3892,8 @@ cleanbatch_child <- function(data.df,
   # 15B: Pre-calculate z-scores for p_plus/p_minus (once for all data)
   # This is expensive, so we do it once upfront
   # Build measurement.to.z_who once here (avoids 2 disk reads inside calc_and_recenter_z_scores)
-  measurement.to.z_who_15 <- read_anthro(ref.data.path, cdc.only = FALSE, prelim_infants = TRUE)
+  measurement.to.z_who_15 <- if (!is.null(ref_tables)) ref_tables$mtz_who_prelim else
+    read_anthro(ref.data.path, cdc.only = FALSE, prelim_infants = TRUE)
   valid_for_zscore <- data.df$sp_key %in% sp_to_process_15 & !is.na(data.df$p_plus)
   if (sum(valid_for_zscore) > 0) {
     zscore_subset <- data.df[valid_for_zscore]

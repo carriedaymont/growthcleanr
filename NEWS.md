@@ -1,3 +1,27 @@
+# growthcleanr 3.0.0
+
+## Added
+
+- New child algorithm (`child_clean.R`) is now the default pediatric path, replacing the legacy pediatric algorithm. The legacy algorithm is retained for backward compatibility via `use_legacy_algorithm = TRUE`.
+- Adult algorithm (`cleanadult()`) rewritten with permissiveness framework: four exclusion levels (`loosest`, `looser`, `tighter`, `tightest`), default `looser`.
+- Adult algorithm: Step 1B BMI BIV check (same-day ht+wt pairs forming implausible BMI; only active at `loosest` permissiveness).
+- Adult algorithm: dynamic while loop for evil twins exclusion (previously fixed 3 rounds).
+- Comprehensive test suite: 220 adult unit tests; 1483 adult regression tests at all 4 permissiveness levels; child regression and edge case tests.
+
+## Changed
+
+- `cleangrowth()` entry point moved from `growth.R` into `child_clean.R`; `growth.R` removed.
+- `prelim_infants` parameter deprecated — triggers a warning and maps to `use_legacy_algorithm`.
+- `weight_cap` parameter deprecated — renamed to `adult_scale_max_lbs`.
+- `cat()` → `message()` throughout for CRAN compliance.
+
+## Deprecated / Removed
+
+- `adjustcarryforward()` and associated helpers (`testacf_func.R`) removed.
+- `growth.R` removed (contents merged into `child_clean.R`).
+
+---
+
 # growthcleanr 2.2.0-prelim-infants - 2023-09-13
 
 ## Added
