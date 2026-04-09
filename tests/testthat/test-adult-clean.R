@@ -342,16 +342,17 @@ test_that("same-day identical weights are handled correctly", {
 # =============================================================================
 
 test_that("evil twins detected for implausibly large weight change", {
-  # Two weights 70kg apart at 3-day interval (< 12mo cap = 60kg)
+  # Two weights 90kg apart at 3-day interval — exceeds UW-adjusted ET cap
+  # (at UW=165: ET cap = 50 + 0.25*(165-120) + 20 = 81.25)
   # Need >= 3 included values for pairs guard
   df <- rbind(
     make_df("et", "WEIGHTKG", 10000, 75, id = 1),
-    make_df("et", "WEIGHTKG", 10003, 145, id = 2),  # +70kg in 3 days
+    make_df("et", "WEIGHTKG", 10003, 165, id = 2),  # +90kg in 3 days
     make_df("et", "WEIGHTKG", 10365, 78, id = 3),
     make_df("et", "WEIGHTKG", 10730, 76, id = 4)
   )
   out <- run_clean(df)
-  # The 145kg value should be excluded as evil twin (most deviant from median)
+  # The 165kg value should be excluded as evil twin (most deviant from median)
   expect_equal(res(out, 2), "Exclude-A-Evil-Twins")
 })
 
@@ -567,17 +568,11 @@ test_that("error load triggered when too many exclusions", {
 # 11. PARAMETER VALIDATION
 # =============================================================================
 
-test_that("invalid EWMA caps are rejected", {
+test_that("invalid wtallow_formula is rejected", {
   df <- make_df("val", "WEIGHTKG", 10000, 75)
 
-  # Caps must be positive
-  expect_error(run_clean(df, ewma_cap_short = 0))
-
-  # cap_short must be <= cap_long
-  expect_error(run_clean(df, ewma_cap_short = 90, ewma_cap_long = 60))
-
-  # Weight scaling factors must be non-negative
-  expect_error(run_clean(df, wt_scale_et = -1))
+  # Non-existent file path
+  expect_error(run_clean(df, wtallow_formula = "/nonexistent/path.csv"))
 })
 
 test_that("missing required columns are rejected", {
@@ -1021,9 +1016,7 @@ test_that("permissiveness presets have all required parameters", {
                  "single_ht_min_nobmi", "single_ht_max_nobmi",
                  "single_wt_min_nobmi", "single_wt_max_nobmi",
                  "single_bmi_min", "single_bmi_max",
-                 "wtallow_formula", "ewma_cap_short",
-                 "ewma_cap_long", "wt_scale_et",
-                 "wt_scale_wtallow", "wt_scale_threshold",
+                 "wtallow_formula",
                  "error_load_threshold", "mod_ewma_f",
                  "ht_band", "allow_ht_loss", "allow_ht_gain",
                  "repval_handling")

@@ -23,11 +23,6 @@
 #' @param wtallow_formula Formula for wtallow: "piecewise", "piecewise-lower",
 #'   "allofus15", or path to custom CSV (NULL = preset).
 #' @param error_load_threshold Error load ratio threshold (NULL = preset).
-#' @param ewma_cap_short EWMA cap baseline for intervals <6 months (NULL = preset).
-#' @param ewma_cap_long EWMA cap baseline for intervals >=6 months (NULL = preset).
-#' @param wt_scale_et Weight scaling factor for ET/EWMA caps (NULL = preset).
-#' @param wt_scale_wtallow Weight scaling factor for wtallow (NULL = preset).
-#' @param wt_scale_threshold Weight threshold for scaling (NULL = preset).
 #' @param mod_ewma_f Directional factor for Moderate EWMA (NULL = preset).
 #' @param perclimit_low,perclimit_mid,perclimit_high Percentage criterion limits
 #'   for wt <=45, 45-80, >80 kg (NULL = preset). 0 = disabled.
@@ -70,11 +65,6 @@ cleanadult <- function(df,
                        allow_ht_gain = NULL,
                        wtallow_formula = NULL,
                        error_load_threshold = NULL,
-                       ewma_cap_short = NULL,
-                       ewma_cap_long = NULL,
-                       wt_scale_et = NULL,
-                       wt_scale_wtallow = NULL,
-                       wt_scale_threshold = NULL,
                        mod_ewma_f = NULL,
                        perclimit_low = NULL,
                        perclimit_mid = NULL,
@@ -116,9 +106,7 @@ cleanadult <- function(df,
     allow_ht_loss = allow_ht_loss, allow_ht_gain = allow_ht_gain,
     wtallow_formula = wtallow_formula,
     error_load_threshold = error_load_threshold,
-    ewma_cap_short = ewma_cap_short, ewma_cap_long = ewma_cap_long,
-    wt_scale_et = wt_scale_et, wt_scale_wtallow = wt_scale_wtallow,
-    wt_scale_threshold = wt_scale_threshold, mod_ewma_f = mod_ewma_f,
+    mod_ewma_f = mod_ewma_f,
     perclimit_low = perclimit_low, perclimit_mid = perclimit_mid,
     perclimit_high = perclimit_high
   )
@@ -129,22 +117,12 @@ cleanadult <- function(df,
   # PARAMETER VALIDATION
   # =============================================================================
 
-  # Build cap_params list and validate
-  cap_params <- list(
-    cap_short = ewma_cap_short,
-    cap_long = ewma_cap_long,
-    wt_scale_et = wt_scale_et,
-    wt_scale_wtallow = wt_scale_wtallow,
-    wt_scale_threshold = wt_scale_threshold
-  )
-  if (cap_params$cap_short <= 0 || cap_params$cap_long <= 0) {
-    stop("ewma_cap_short and ewma_cap_long must be positive.")
-  }
-  if (cap_params$cap_short > cap_params$cap_long) {
-    stop("ewma_cap_short must be <= ewma_cap_long.")
-  }
-  if (cap_params$wt_scale_et < 0 || cap_params$wt_scale_wtallow < 0) {
-    stop("Weight scaling factors must be non-negative.")
+  # Validate wtallow_formula
+  builtin_formulas <- c("piecewise", "piecewise-lower", "allofus15")
+  if (!wtallow_formula %in% builtin_formulas && !file.exists(wtallow_formula)) {
+    stop(paste0("wtallow_formula '", wtallow_formula, "' is not a built-in formula (",
+                paste(builtin_formulas, collapse = ", "),
+                ") and file not found."))
   }
 
   # =============================================================================
@@ -471,15 +449,17 @@ cleanadult <- function(df,
     # plus 0.12 kg rounding tolerance. Both Inc and RV values participate
     # in OOB detection and median calculation. Plausibility guardrail: values
     # <38 kg or >180 kg are excluded first. Pairs guard: need >=3 values.
-    # Runs 3 fixed rounds. Pre-check: skip if max-min range <= smallest cap
+    # Iterates dynamically until no OOB pairs or <3 values. Pre-check: skip if max-min range <= smallest cap
     # (no pair could possibly exceed any interval-specific cap).
 
     if (nrow(w_subj_df) > 0) {
       et_df <- copy(w_subj_df[!w_subj_df$extraneous, ])
 
+      min_et_cap <- compute_et_limit(1, formula = wtallow_formula,
+                                     uw = min(et_df$meas_m))
       if (nrow(et_df) >= 3 &
-          (max(et_df$meas_m) - min(et_df$meas_m)) > (cap_params$cap_short + 0.12)) {
-        et_exc_ids <- evil_twins(et_df, cap_params = cap_params)
+          (max(et_df$meas_m) - min(et_df$meas_m)) > (min_et_cap + 0.12)) {
+        et_exc_ids <- evil_twins(et_df, wtallow_formula = wtallow_formula)
         if (length(et_exc_ids) > 0) {
           w_subj_keep[et_exc_ids] <- "Exclude-A-Evil-Twins"
           w_subj_df <- w_subj_df[!w_subj_df$id %in% et_exc_ids, ]
@@ -597,10 +577,12 @@ cleanadult <- function(df,
       if (nrow(inc_df) >= 3) {
         wt_range <- max(inc_df$meas_m) - min(inc_df$meas_m)
 
-        if (wt_range > (cap_params$cap_short + 0.12)) {
+        min_et_ewma <- compute_et_limit(1, formula = wtallow_formula,
+                                        uw = min(inc_df$meas_m))
+        if (wt_range > (min_et_ewma + 0.12)) {
           if (repval_handling == "independent") {
             # Independent: single pass, all values (including RVs) participate
-            ewma_result <- remove_ewma_wt(inc_df, cap_params = cap_params, ewma_window = ewma_window)
+            ewma_result <- remove_ewma_wt(inc_df, wtallow_formula = wtallow_formula, ewma_window = ewma_window)
             if (length(ewma_result) > 0) {
               w_subj_keep[names(ewma_result)] <- ewma_result
               w_subj_df <- w_subj_df[!w_subj_df$id %in% names(ewma_result), ]
@@ -613,8 +595,10 @@ cleanadult <- function(df,
 
             if (nrow(firstRV_df) >= 3) {
               fr_range <- max(firstRV_df$meas_m) - min(firstRV_df$meas_m)
-              if (fr_range > (cap_params$cap_short + 0.12)) {
-                fr_result <- remove_ewma_wt(firstRV_df, cap_params = cap_params,
+              min_et_fr <- compute_et_limit(1, formula = wtallow_formula,
+                                           uw = min(firstRV_df$meas_m))
+              if (fr_range > (min_et_fr + 0.12)) {
+                fr_result <- remove_ewma_wt(firstRV_df, wtallow_formula = wtallow_formula,
                                             exc_label = "Exclude-A-WT-Traj-Extreme-firstRV",
                                             ewma_window = ewma_window)
                 if (length(fr_result) > 0) {
@@ -637,8 +621,10 @@ cleanadult <- function(df,
             }
             if (nrow(inc_df_all) >= 3) {
               ar_range <- max(inc_df_all$meas_m) - min(inc_df_all$meas_m)
-              if (ar_range > (cap_params$cap_short + 0.12)) {
-                ar_result <- remove_ewma_wt(inc_df_all, cap_params = cap_params,
+              min_et_ar <- compute_et_limit(1, formula = wtallow_formula,
+                                           uw = min(inc_df_all$meas_m))
+              if (ar_range > (min_et_ar + 0.12)) {
+                ar_result <- remove_ewma_wt(inc_df_all, wtallow_formula = wtallow_formula,
                                             exc_label = "Exclude-A-WT-Traj-Extreme-allRV",
                                             ewma_window = ewma_window)
                 if (length(ar_result) > 0) {
@@ -1053,9 +1039,9 @@ cleanadult <- function(df,
         min(w_nonrv$ageyears[w_nonrv$meas_m == uvals[2]]) -
         max(w_nonrv$ageyears[w_nonrv$meas_m == uvals[1]])
 
-      maxwt_pair <- max(wt_first, wt_last)
+      uw_pair <- max(wt_first, wt_last)
       wta <- compute_wtallow(ageyears_diff * 12, formula = wtallow_formula,
-                             cap_params = cap_params, maxwt = maxwt_pair)
+                             uw = uw_pair)
 
       exc_pairs <- abs(wt_diff) > wta + 0.12  # rounding tolerance
 
@@ -1086,8 +1072,7 @@ cleanadult <- function(df,
 
       step <- "Exclude-A-WT-2D-Non-Ordered"
       nonord_exc_ids <- eval_2d_nonord(w_subj_df, w_subj_keep,
-                                       wtallow_formula = wtallow_formula,
-                                       cap_params = cap_params)
+                                       wtallow_formula = wtallow_formula)
       if (length(nonord_exc_ids) > 0) {
         w_subj_keep[nonord_exc_ids] <- step
         w_subj_df <- w_subj_df[!w_subj_df$id %in% nonord_exc_ids, ]
@@ -1105,7 +1090,7 @@ cleanadult <- function(df,
           sorted_ages <- sort(inc_df$age_days)
           min_gap_months <- min(diff(sorted_ages)) / 30.4375
           min_wta <- compute_wtallow(min_gap_months, formula = wtallow_formula,
-                                     cap_params = cap_params)
+                                     uw = min(inc_df$meas_m))
           wt_range_mod <- max(inc_df$meas_m) - min(inc_df$meas_m)
           min_perc_ratio <- min(inc_df$meas_m) / max(inc_df$meas_m)
           max_perc <- max(compute_perc_limit(inc_df$meas_m, perclimit_low, perclimit_mid, perclimit_high))
@@ -1115,7 +1100,6 @@ cleanadult <- function(df,
           mod_result <- if (can_trigger) {
             remove_mod_ewma_wt(inc_df, exc_label = "Exclude-A-WT-Traj-Moderate",
                                wtallow_formula = wtallow_formula,
-                               cap_params = cap_params,
                                ewma_window = ewma_window,
                                mod_ewma_f = mod_ewma_f,
                                perclimit_low = perclimit_low,
@@ -1138,7 +1122,7 @@ cleanadult <- function(df,
           sorted_ages_fr <- sort(firstRV_df$age_days)
           min_gap_fr <- min(diff(sorted_ages_fr)) / 30.4375
           min_wta_fr <- compute_wtallow(min_gap_fr, formula = wtallow_formula,
-                                        cap_params = cap_params)
+                                        uw = min(firstRV_df$meas_m))
           wt_range_fr <- max(firstRV_df$meas_m) - min(firstRV_df$meas_m)
           min_perc_fr <- min(firstRV_df$meas_m) / max(firstRV_df$meas_m)
           max_perc_limit_fr <- max(compute_perc_limit(firstRV_df$meas_m, perclimit_low, perclimit_mid, perclimit_high))
@@ -1149,7 +1133,6 @@ cleanadult <- function(df,
           fr_result <- if (can_trigger_fr) {
             remove_mod_ewma_wt(firstRV_df, exc_label = "Exclude-A-WT-Traj-Moderate",
                                wtallow_formula = wtallow_formula,
-                               cap_params = cap_params,
                                ewma_window = ewma_window,
                                mod_ewma_f = mod_ewma_f,
                                perclimit_low = perclimit_low,
@@ -1201,7 +1184,7 @@ cleanadult <- function(df,
           sorted_ages_all <- sort(inc_df_all$age_days)
           min_gap_all <- min(diff(sorted_ages_all)) / 30.4375
           min_wta_all <- compute_wtallow(min_gap_all, formula = wtallow_formula,
-                                         cap_params = cap_params)
+                                         uw = min(inc_df_all$meas_m))
           wt_range_all <- max(inc_df_all$meas_m) - min(inc_df_all$meas_m)
           min_perc_all <- min(inc_df_all$meas_m) / max(inc_df_all$meas_m)
           max_perc_limit_all <- max(compute_perc_limit(inc_df_all$meas_m, perclimit_low, perclimit_mid, perclimit_high))
@@ -1211,7 +1194,6 @@ cleanadult <- function(df,
           ar_result <- if (can_trigger_all) {
             remove_mod_ewma_wt(inc_df_all, exc_label = "Exclude-A-WT-Traj-Moderate-allRV",
                                wtallow_formula = wtallow_formula,
-                               cap_params = cap_params,
                                ewma_window = ewma_window,
                                mod_ewma_f = mod_ewma_f,
                                perclimit_low = perclimit_low,

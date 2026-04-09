@@ -21,9 +21,6 @@ permissiveness_presets <- function() {
       single_bmi_min = 10, single_bmi_max = 250,
       # Algorithm parameters
       wtallow_formula = "piecewise",
-      ewma_cap_short = 50, ewma_cap_long = 80,
-      wt_scale_et = 0.70, wt_scale_wtallow = 0.50,
-      wt_scale_threshold = 120,
       perclimit_low = 0.5, perclimit_mid = 0.4, perclimit_high = 0.0,
       error_load_threshold = 0.41,
       mod_ewma_f = 0.75,
@@ -41,9 +38,6 @@ permissiveness_presets <- function() {
       single_wt_min_nobmi = 30, single_wt_max_nobmi = 270,
       single_bmi_min = 12, single_bmi_max = 65,
       wtallow_formula = "piecewise",
-      ewma_cap_short = 50, ewma_cap_long = 80,
-      wt_scale_et = 0.70, wt_scale_wtallow = 0.50,
-      wt_scale_threshold = 120,
       perclimit_low = 0.5, perclimit_mid = 0.4, perclimit_high = 0.0,
       error_load_threshold = 0.41,
       mod_ewma_f = 0.75,
@@ -61,9 +55,6 @@ permissiveness_presets <- function() {
       single_wt_min_nobmi = 36, single_wt_max_nobmi = 159,
       single_bmi_min = 16, single_bmi_max = 45,
       wtallow_formula = "piecewise-lower",
-      ewma_cap_short = 40, ewma_cap_long = 60,
-      wt_scale_et = 0, wt_scale_wtallow = 0,
-      wt_scale_threshold = 120,
       perclimit_low = 0.7, perclimit_mid = 0.4, perclimit_high = 0.4,
       error_load_threshold = 0.29,
       mod_ewma_f = 0.60,
@@ -81,9 +72,6 @@ permissiveness_presets <- function() {
       single_wt_min_nobmi = 39, single_wt_max_nobmi = 136,
       single_bmi_min = 18, single_bmi_max = 40,
       wtallow_formula = "allofus15",
-      ewma_cap_short = 40, ewma_cap_long = 40,
-      wt_scale_et = 0, wt_scale_wtallow = 0,
-      wt_scale_threshold = 120,
       perclimit_low = 0.7, perclimit_mid = 0.4, perclimit_high = 0.4,
       error_load_threshold = 0.29,
       mod_ewma_f = 0.60,
@@ -143,22 +131,83 @@ round_pt <- function(val, pt) {
 
 # Dynamic ET/EWMA cap and perclimit helpers ----
 
-#' Compute the dynamic ET/EWMA cap for given intervals and weights.
-#' Vectorized: interval_months and maxwt can be vectors.
+#' Compute the Evil Twins / Extreme EWMA cap for given intervals and weights.
+#' Vectorized: interval_months and uw can be vectors.
+#'
+#' For built-in formulas (piecewise, piecewise-lower, allofus15), ET caps are
+#' derived from the formula's wtallow caps + 20 (for PW-H/PW-L) or equal to
+#' the allofus15 12m cap. For custom CSV formulas, fixed caps of 70/100 are used.
+#'
 #' @param interval_months Interval in months (minimum neighbor gap)
-#' @param maxwt Maximum of (weight, EWMA) for each observation/pair
-#' @param cap_short Baseline cap for intervals < 6 months
-#' @param cap_long Baseline cap for intervals >= 6 months
-#' @param wt_scale_et Scaling factor for weight (0 = no scaling)
-#' @param wt_scale_threshold Weight threshold above which scaling applies
+#' @param formula Character: "piecewise", "piecewise-lower", "allofus15", or
+#'   path to custom CSV
+#' @param uw Optional numeric vector of upper weights (higher of two adjacent
+#'   weights, or max(wt, ewma)). NULL = use base (UW=120) caps.
 #' @return Numeric vector of ET limits
 #' @keywords internal
-compute_et_limit <- function(interval_months, maxwt,
-                             cap_short, cap_long,
-                             wt_scale_et = 0, wt_scale_threshold = 120) {
-  baseline <- ifelse(interval_months < 6, cap_short, cap_long)
-  wt_addition <- wt_scale_et * pmax(0, maxwt - wt_scale_threshold)
-  baseline + wt_addition
+compute_et_limit <- function(interval_months, formula = "piecewise", uw = NULL) {
+  # Base caps for each formula
+  PWH_CAP_6M  <- 50
+  PWH_CAP_12M <- 80
+  PWL_CAP_6M  <- 100 / 3   # 33.33
+  PWL_CAP_12M <- 160 / 3   # 53.33
+  ET_OFFSET   <- 20
+
+  is_builtin <- formula %in% c("piecewise", "piecewise-lower", "allofus15")
+
+  if (!is_builtin) {
+    # Custom CSV: fixed 70/100
+    return(ifelse(interval_months <= 6, 70, 100))
+  }
+
+  if (formula == "piecewise") {
+    if (is.null(uw)) {
+      et_6m  <- PWH_CAP_6M + ET_OFFSET    # 70
+      et_12m <- PWH_CAP_12M + ET_OFFSET   # 100
+    } else {
+      uw_eff <- pmin(uw, 180)
+      # wtallow cap + 20 at each tier
+      et_6m <- ifelse(uw_eff > 120,
+                      PWH_CAP_6M + 0.25 * (uw_eff - 120) + ET_OFFSET,
+               ifelse(uw_eff < 120,
+                      (PWH_CAP_6M - 20) * (uw_eff / 120) + 20 + ET_OFFSET,
+                      PWH_CAP_6M + ET_OFFSET))
+      et_12m <- ifelse(uw_eff > 120,
+                       PWH_CAP_12M + 0.25 * (uw_eff - 120) + ET_OFFSET,
+                ifelse(uw_eff < 120,
+                       (PWH_CAP_12M - 20) * (uw_eff / 120) + 20 + ET_OFFSET,
+                       PWH_CAP_12M + ET_OFFSET))
+    }
+
+  } else if (formula == "piecewise-lower") {
+    if (is.null(uw)) {
+      et_6m  <- PWL_CAP_6M + ET_OFFSET    # 53.33
+      et_12m <- PWL_CAP_12M + ET_OFFSET   # 73.33
+    } else {
+      uw_eff <- pmin(uw, 180)
+      # PW-L: no highUW adjustment (UW >= 120 uses base caps)
+      et_6m <- ifelse(uw_eff < 120,
+                      (PWL_CAP_6M - 20) * (uw_eff / 120) + 20 + ET_OFFSET,
+                      PWL_CAP_6M + ET_OFFSET)
+      et_12m <- ifelse(uw_eff < 120,
+                       (PWL_CAP_12M - 20) * (uw_eff / 120) + 20 + ET_OFFSET,
+                       PWL_CAP_12M + ET_OFFSET)
+    }
+
+  } else {
+    # allofus15: ET cap = allofus15-cap-12m (flat across all intervals)
+    if (is.null(uw)) {
+      return(rep(40, length(interval_months)))
+    }
+    uw_eff <- pmin(uw, 180)
+    pwl_cap_12m <- (PWL_CAP_12M - 20) * (uw_eff / 120) + 20
+    pwl_eff <- pmin(pwl_cap_12m, uw_eff * 2 / 3)
+    cap_12m <- ifelse(uw_eff >= 120, 40, pmin(40, pwl_eff))
+    return(cap_12m)
+  }
+
+  # 2-tier: <=6m uses et_6m, >6m uses et_12m
+  ifelse(interval_months <= 6, et_6m, et_12m)
 }
 
 #' Compute observation-level percentage criterion limit.
@@ -550,60 +599,155 @@ ht_3d_growth_compare <- function(mean_ht, min_age, glist,
 
 #' Compute weight allowance from interval in months (vectorized)
 #'
-#' Built-in formulas: "piecewise" (default), "piecewise-lower", "allofus15".
-#' Custom: pass a file path to a CSV with columns 'months' and 'wtallow'.
-#' Values are linearly interpolated; months beyond the table are clamped to the
-#' nearest row.
+#' Built-in formulas: "piecewise" (PW-H, default), "piecewise-lower" (PW-L),
+#' "allofus15". Custom: pass a file path to a CSV with columns 'months' and
+#' 'wtallow'. Values are linearly interpolated; months beyond the table are
+#' clamped to the nearest row.
+#'
+#' UW (upper weight) scaling:
+#' - PW-H: scaled up for UW > 120 (slope 0.25/kg, UW capped at 180) and
+#'   down for UW < 120, with 2/3 ceiling.
+#' - PW-L: NOT scaled up for UW > 120. Scaled down for UW < 120, with 2/3
+#'   ceiling.
+#' - allofus15: not adjusted by UW, except its 12m cap is limited to never
+#'   exceed the effective PW-L at 12m for that UW.
+#' - Custom CSV: no UW adjustment.
 #'
 #' @param months Numeric vector of interval lengths in months
 #' @param formula Character: formula name or path to custom CSV
-#' @param cap_params List with cap_short, cap_long, wt_scale_et,
-#'   wt_scale_wtallow, wt_scale_threshold
-#' @param maxwt Optional numeric vector of max(wt, ewma) for weight scaling
+#' @param uw Optional numeric vector of upper weights (higher of two adjacent
+#'   weights, or max(wt, ewma)). NULL = use base (UW=120) formula.
 #' @return Numeric vector of weight allowances
 #' @keywords internal
-compute_wtallow <- function(months, formula = "piecewise",
-                            cap_params = list(cap_short = 50, cap_long = 80,
-                                              wt_scale_et = 0.70,
-                                              wt_scale_wtallow = 0.50,
-                                              wt_scale_threshold = 120),
-                            maxwt = NULL) {
-  cap_short <- cap_params$cap_short
-  cap_long  <- cap_params$cap_long
+compute_wtallow <- function(months, formula = "piecewise", uw = NULL) {
+
+  # Base caps for each formula family
+  PWH_CAP_6M  <- 50
+  PWH_CAP_12M <- 80
+  PWL_CAP_6M  <- 100 / 3   # 33.33
+  PWL_CAP_12M <- 160 / 3   # 53.33
+
+  # wtallow at 1 day (starting point for PW-H-highUW linear segment)
+  WTALLOW_1DAY <- 10 + 10 * log(1 + 5 / 30.4375) / log(6)  # ~10.85
 
   if (formula == "piecewise") {
-    # Breakpoints: 20 @ 1mo, cap_short @ 6mo, cap_long @ 12mo, flat after
-    slope_1_6  <- (cap_short - 20) / 5
-    slope_6_12 <- (cap_long - cap_short) / 6
-    wta <- ifelse(months <= 1, 10 + 10 * log(1 + 5 * months) / log(6),
-           ifelse(months <= 6, 20 + slope_1_6 * (months - 1),
-           ifelse(months <= 12, cap_short + slope_6_12 * (months - 6),
-                                cap_long)))
+    # ---------------------------------------------------------------
+    # PW-H (Piecewise-Higher): used by loosest/looser
+    # ---------------------------------------------------------------
+    if (is.null(uw)) {
+      # PW-H-Base (UW = 120, no adjustment)
+      wta <- ifelse(months <= 1, 10 + 10 * log(1 + 5 * months) / log(6),
+             ifelse(months <= 6, 20 + (PWH_CAP_6M - 20) / 5 * (months - 1),
+             ifelse(months <= 12,
+                    PWH_CAP_6M + (PWH_CAP_12M - PWH_CAP_6M) / 6 * (months - 6),
+                    PWH_CAP_12M)))
+    } else {
+      uw_eff <- pmin(uw, 180)
+
+      # Adjusted caps: depend on UW range
+      adj_6m <- ifelse(uw_eff > 120,
+                       PWH_CAP_6M + 0.25 * (uw_eff - 120),
+                ifelse(uw_eff < 120,
+                       (PWH_CAP_6M - 20) * (uw_eff / 120) + 20,
+                       PWH_CAP_6M))
+      adj_12m <- ifelse(uw_eff > 120,
+                        PWH_CAP_12M + 0.25 * (uw_eff - 120),
+                 ifelse(uw_eff < 120,
+                        (PWH_CAP_12M - 20) * (uw_eff / 120) + 20,
+                        PWH_CAP_12M))
+
+      # Value at 1 month: 25 for highUW, 20 for base/lowUW
+      val_1m <- ifelse(uw_eff > 120, 25, 20)
+
+      # 0-1m segment: linear for highUW, log curve for base/lowUW
+      val_0_1 <- ifelse(uw_eff > 120,
+                        WTALLOW_1DAY + (25 - WTALLOW_1DAY) * months,
+                        10 + 10 * log(1 + 5 * months) / log(6))
+
+      # Linear segments
+      val_1_6  <- val_1m + (adj_6m - val_1m) / 5 * (months - 1)
+      val_6_12 <- adj_6m + (adj_12m - adj_6m) / 6 * (months - 6)
+
+      # Assemble piecewise
+      wta <- ifelse(months <= 1, val_0_1,
+             ifelse(months <= 6, val_1_6,
+             ifelse(months <= 12, val_6_12,
+                                  adj_12m)))
+
+      # 2/3 ceiling for lowUW
+      wta <- ifelse(uw_eff < 120, pmin(wta, uw_eff * 2 / 3), wta)
+    }
+
   } else if (formula == "piecewise-lower") {
-    # Tighter variant: reaches 2/3*cap_short at 6mo, caps at cap_short for >12mo
-    target_6mo  <- cap_short * 2 / 3
-    target_12mo <- cap_short * 2 / 3 + (cap_long - cap_short) * 2 / 3
-    slope_1_6   <- (target_6mo - 20) / 5
-    slope_6_12  <- (target_12mo - target_6mo) / 6
-    wta <- ifelse(months <= 1, 10 + 10 * log(1 + 5 * months) / log(6),
-           ifelse(months <= 6, 20 + slope_1_6 * (months - 1),
-           ifelse(months <= 12, target_6mo + slope_6_12 * (months - 6),
-                                cap_short)))
+    # ---------------------------------------------------------------
+    # PW-L (Piecewise-Lower): used by tighter
+    # NOT scaled up for UW > 120. Scaled down for UW < 120.
+    # ---------------------------------------------------------------
+    if (is.null(uw)) {
+      # PW-L-Base (UW >= 120, no adjustment)
+      wta <- ifelse(months <= 1, 10 + 10 * log(1 + 5 * months) / log(6),
+             ifelse(months <= 6,
+                    20 + (PWL_CAP_6M - 20) / 5 * (months - 1),
+             ifelse(months <= 12,
+                    PWL_CAP_6M + (PWL_CAP_12M - PWL_CAP_6M) / 6 * (months - 6),
+                    PWL_CAP_12M)))
+    } else {
+      uw_eff <- pmin(uw, 180)
+
+      # PW-L: UW >= 120 uses base caps; UW < 120 scales down
+      adj_6m <- ifelse(uw_eff < 120,
+                       (PWL_CAP_6M - 20) * (uw_eff / 120) + 20,
+                       PWL_CAP_6M)
+      adj_12m <- ifelse(uw_eff < 120,
+                        (PWL_CAP_12M - 20) * (uw_eff / 120) + 20,
+                        PWL_CAP_12M)
+
+      # 0-1m: always log curve (no linear highUW variant for PW-L)
+      val_0_1 <- 10 + 10 * log(1 + 5 * months) / log(6)
+
+      val_1_6  <- 20 + (adj_6m - 20) / 5 * (months - 1)
+      val_6_12 <- adj_6m + (adj_12m - adj_6m) / 6 * (months - 6)
+
+      wta <- ifelse(months <= 1, val_0_1,
+             ifelse(months <= 6, val_1_6,
+             ifelse(months <= 12, val_6_12,
+                                  adj_12m)))
+
+      # 2/3 ceiling for lowUW
+      wta <- ifelse(uw_eff < 120, pmin(wta, uw_eff * 2 / 3), wta)
+    }
+
   } else if (formula == "allofus15") {
-    # Short-interval breakpoints: 5kg (1-2 days), 10kg (3-7 days),
-    # 15kg (8-180 days), then linear 15→cap_short from 180d–12mo, flat after
-    days_2  <- 2 / 30.4375    # ~0.0657 months
-    days_7  <- 7 / 30.4375    # ~0.230 months
-    days_180 <- 180 / 30.4375 # ~5.913 months
-    slope_180d_12mo <- (cap_short - 15) / (12 - days_180)
+    # ---------------------------------------------------------------
+    # allofus15: used by tightest. Not adjusted by UW except its
+    # 12m cap is limited to never exceed effective PW-L at 12m.
+    # ---------------------------------------------------------------
+    if (is.null(uw)) {
+      cap_12m <- 40
+    } else {
+      uw_eff <- pmin(uw, 180)
+      pwl_cap_12m <- (PWL_CAP_12M - 20) * (uw_eff / 120) + 20
+      pwl_eff <- pmin(pwl_cap_12m, uw_eff * 2 / 3)
+      cap_12m <- ifelse(uw_eff >= 120, 40, pmin(40, pwl_eff))
+    }
+
+    days_2   <- 2 / 30.4375    # ~0.0657 months
+    days_7   <- 7 / 30.4375    # ~0.230 months
+    days_180 <- 180 / 30.4375  # ~5.913 months
+    slope_180d_12mo <- (cap_12m - 15) / (12 - days_180)
+
     wta <- ifelse(months <= days_2, 5,
            ifelse(months <= days_7, 10,
            ifelse(months <= days_180, 15,
            ifelse(months <= 12,
                   15 + slope_180d_12mo * (months - days_180),
-                  cap_short))))
+                  cap_12m))))
+
   } else {
-    # Custom CSV: columns 'months' and 'wtallow', linearly interpolated
+    # ---------------------------------------------------------------
+    # Custom CSV: columns 'months' and 'wtallow', linearly interpolated.
+    # No UW adjustment.
+    # ---------------------------------------------------------------
     if (!exists(".wtallow_custom_cache", envir = .GlobalEnv) ||
         !identical(attr(get(".wtallow_custom_cache", envir = .GlobalEnv), "path"), formula)) {
       if (!file.exists(formula)) {
@@ -621,25 +765,6 @@ compute_wtallow <- function(months, formula = "piecewise",
     }
     custom <- get(".wtallow_custom_cache", envir = .GlobalEnv)
     wta <- approx(x = custom$months, y = custom$wtallow, xout = months, rule = 2)$y
-  }
-
-  # Weight-scaled addition (loosest/looser: wt_scale_wtallow > 0)
-  if (!is.null(maxwt) && cap_params$wt_scale_wtallow > 0) {
-    wt_addition <- cap_params$wt_scale_wtallow *
-                   pmax(0, maxwt - cap_params$wt_scale_threshold)
-    wta <- wta + wt_addition
-  }
-
-  # Ceiling: wtallow cannot exceed the ET limit for this interval/weight
-  if (!is.null(maxwt)) {
-    et_ceiling <- compute_et_limit(months, maxwt,
-                                   cap_short, cap_long,
-                                   cap_params$wt_scale_et,
-                                   cap_params$wt_scale_threshold)
-    wta <- pmin(wta, et_ceiling)
-  } else {
-    # Without maxwt, use the static cap_long as ceiling (conservative)
-    wta <- pmin(wta, cap_long)
   }
 
   wta
@@ -734,9 +859,10 @@ compute_trajectory_fails <- function(meas, age_days, err = 5) {
 #' Evil twins detection for one subject (independent mode)
 #' @param w_subj_df Weight data for one subject (data.table with meas_m, age_days, id, is_rv)
 #'   Must include all Inc values (including RVs in independent mode)
+#' @param wtallow_formula Formula for wtallow/ET caps
 #' @return Character vector of ids to exclude with "Evil twins" code
 #' @keywords internal
-evil_twins <- function(w_subj_df, cap_params) {
+evil_twins <- function(w_subj_df, wtallow_formula = "piecewise") {
   # Need at least 3 included values for pairs guard
   inc_df <- w_subj_df[order(w_subj_df$age_days, w_subj_df$id), ]
   exc_ids <- character(0)
@@ -754,14 +880,12 @@ evil_twins <- function(w_subj_df, cap_params) {
     months_next <- age_diff_days / 30.4375
     wt_diff <- abs(diff(working$meas_m))
 
-    # maxwt for each pair: max of the two weights (no EWMA in evil twins)
-    maxwt_pair <- pmax(working$meas_m[-n], working$meas_m[-1])
+    # UW for each pair: max of the two weights (no EWMA in evil twins)
+    uw_pair <- pmax(working$meas_m[-n], working$meas_m[-1])
 
-    # Dynamic cap by interval and weight, with 0.12 kg rounding tolerance
-    etcap <- compute_et_limit(months_next, maxwt_pair,
-                              cap_params$cap_short, cap_params$cap_long,
-                              cap_params$wt_scale_et,
-                              cap_params$wt_scale_threshold) + 0.12
+    # Dynamic cap by interval and UW, with 0.12 kg rounding tolerance
+    etcap <- compute_et_limit(months_next, formula = wtallow_formula,
+                              uw = uw_pair) + 0.12
 
     # Find out-of-bounds pairs
     oob_pairs <- which(wt_diff > etcap)
@@ -802,22 +926,22 @@ evil_twins <- function(w_subj_df, cap_params) {
 #' Remove EWMA weight outliers (used for both Extreme and Moderate EWMA)
 #'
 #' Iteratively excludes values whose EWMA deviation exceeds an interval-specific
-#' threshold. Each round removes the single worst outlier (largest |dewma|, with
-#' age then id as tiebreakers). Iterates until no candidates remain or <3 values.
+#' threshold (ET cap). Each round removes the single worst outlier (largest
+#' |dewma|, with age then id as tiebreakers). Iterates until no candidates
+#' remain or <3 values.
 #'
-#' Threshold: 2-tier (<6m: cap_short, ≥6m: cap_long) with optional weight
-#' scaling via compute_et_limit(). Per-observation threshold based on
-#' min neighbor gap and max(wt, ewma).
+#' Threshold: ET cap derived from wtallow formula and upper weight (UW).
+#' Per-observation threshold based on min neighbor gap and max(wt, ewma).
 #'
 #' 90% rule: directional dewma (before/after) must exceed 90% of threshold.
 #' Missing neighbors (edge values) are treated as Inf (confirming exclusion).
 #'
 #' @param subj_df Data frame with age_days, meas_m, id columns (pre-sorted)
-#' @param cap_params List with cap_short, cap_long, wt_scale_et, wt_scale_threshold.
+#' @param wtallow_formula Formula for ET cap computation
 #' @param exc_label Base label for exclusion codes. Round number is appended.
 #' @return Named character vector: id -> "<exc_label>-N" for excluded values
 #' @keywords internal
-remove_ewma_wt <- function(subj_df, cap_params,
+remove_ewma_wt <- function(subj_df, wtallow_formula = "piecewise",
                            exc_label = "Exclude-A-WT-Traj-Ext",
                            ewma_window = 15) {
   orig_subj_df <- subj_df
@@ -847,12 +971,10 @@ remove_ewma_wt <- function(subj_df, cap_params,
     dewma_bef <- subj_df$meas_m - cache$ewma_before
     dewma_aft <- subj_df$meas_m - cache$ewma_after
 
-    # Dynamic per-observation threshold: 2-tier + weight scaling
-    maxwt <- pmax(subj_df$meas_m, cache$ewma_all)
-    threshold <- compute_et_limit(min_gap_months, maxwt,
-                                  cap_params$cap_short, cap_params$cap_long,
-                                  cap_params$wt_scale_et,
-                                  cap_params$wt_scale_threshold)
+    # Dynamic per-observation threshold: ET cap based on formula and UW
+    uw_obs <- pmax(subj_df$meas_m, cache$ewma_all)
+    threshold <- compute_et_limit(min_gap_months, formula = wtallow_formula,
+                                  uw = uw_obs)
 
     # 90% rule: directional dewma must exceed 90% of threshold
     # NA → Inf for edge values (Stata missing-as-infinity: . > x is TRUE)
@@ -951,7 +1073,7 @@ propagate_to_rv <- function(exc_codes, w_subj_df, w_subj_keep) {
 #' @keywords internal
 remove_mod_ewma_wt <- function(full_inc_df, exc_label = "Exclude-A-WT-Traj-Moderate",
                                max_rounds = 100, wtallow_formula = "piecewise",
-                               cap_params = NULL, ewma_window = 15,
+                               ewma_window = 15,
                                mod_ewma_f = 0.75,
                                perclimit_low = 0.5, perclimit_mid = 0.4,
                                perclimit_high = 0.0) {
@@ -988,10 +1110,10 @@ remove_mod_ewma_wt <- function(full_inc_df, exc_label = "Exclude-A-WT-Traj-Moder
     dewma_bef <- meas - cache$ewma_before
     dewma_aft <- meas - cache$ewma_after
 
-    # wtallow (with weight scaling via maxwt)
-    maxwt_obs <- pmax(meas, cache$ewma_all)
-    wta <- compute_wtallow(months, formula = wtallow_formula,
-                           cap_params = cap_params, maxwt = maxwt_obs)
+    # wtallow: UW-adjusted and base (for prioritization scoring)
+    uw_obs <- pmax(meas, cache$ewma_all)
+    wta <- compute_wtallow(months, formula = wtallow_formula, uw = uw_obs)
+    wta_base <- compute_wtallow(months, formula = wtallow_formula, uw = NULL)
 
     # Observation-level perclimit (each observation's perclimit is based on
     # its own weight). This differs from 11Wa which uses subject-level (max).
@@ -1044,7 +1166,7 @@ remove_mod_ewma_wt <- function(full_inc_df, exc_label = "Exclude-A-WT-Traj-Moder
       minadiff_bef_rm[is.na(d_bef_rm)] <- d_bef_keep[is.na(d_bef_rm)]
       minadiff_bef_rm[is.na(d_bef_keep)] <- d_bef_rm[is.na(d_bef_keep)]
       wta_bef_unrel <- compute_wtallow(minadiff_bef_rm * 12, formula = wtallow_formula,
-                                     cap_params = cap_params, maxwt = maxwt_obs)
+                                     uw = uw_obs)
 
       # When after neighbor is a pair member, use gap to n2
       d_aft_rm <- (n2_age - adays) / 365.25
@@ -1054,7 +1176,7 @@ remove_mod_ewma_wt <- function(full_inc_df, exc_label = "Exclude-A-WT-Traj-Moder
       minadiff_aft_rm[is.na(d_aft_keep)] <- d_aft_rm[is.na(d_aft_keep)]
       minadiff_aft_rm[is.na(d_aft_rm)] <- d_aft_keep[is.na(d_aft_rm)]
       wta_aft_unrel <- compute_wtallow(minadiff_aft_rm * 12, formula = wtallow_formula,
-                                     cap_params = cap_params, maxwt = maxwt_obs)
+                                     uw = uw_obs)
 
       score_std <- rep(NA_real_, n)
       is_first <- is_pair_trio & runs$run_pos == 1
@@ -1115,7 +1237,7 @@ remove_mod_ewma_wt <- function(full_inc_df, exc_label = "Exclude-A-WT-Traj-Moder
       minadiff_bef2[is.na(d_bef_rm2)] <- d_bef_keep2[is.na(d_bef_rm2)]
       minadiff_bef2[is.na(d_bef_keep2)] <- d_bef_rm2[is.na(d_bef_keep2)]
       wta_bef_unrel2 <- compute_wtallow(minadiff_bef2 * 12, formula = wtallow_formula,
-                                      cap_params = cap_params, maxwt = maxwt_obs)
+                                      uw = uw_obs)
 
       d_aft_rm2 <- (n2_age - adays) / 365.25
       d_aft_keep2 <- ageyrs_bef
@@ -1124,7 +1246,7 @@ remove_mod_ewma_wt <- function(full_inc_df, exc_label = "Exclude-A-WT-Traj-Moder
       minadiff_aft2[is.na(d_aft_keep2)] <- d_aft_rm2[is.na(d_aft_keep2)]
       minadiff_aft2[is.na(d_aft_rm2)] <- d_aft_keep2[is.na(d_aft_rm2)]
       wta_aft_unrel2 <- compute_wtallow(minadiff_aft2 * 12, formula = wtallow_formula,
-                                      cap_params = cap_params, maxwt = maxwt_obs)
+                                      uw = uw_obs)
 
       score_alt <- rep(NA_real_, n)
       prior_committed <- c(FALSE, exc_wt_i[-n] & !exc_pair[-n])
@@ -1184,28 +1306,32 @@ remove_mod_ewma_wt <- function(full_inc_df, exc_label = "Exclude-A-WT-Traj-Moder
       next
     }
 
-    # Score each candidate using graduated multiplier
+    # Score each candidate: (|dewma| - adj_wta) / base_wta
+    # This prevents erroneous UW inflation from distorting the score.
+    # adj_wta (wta) absorbs UW; base_wta (wta_base) is UW-independent.
     score_final <- rep(NA_real_, n)
 
-    # Edge values: abs(dewma/wta)
+    # Edge values
     is_edge_first <- candidates & sn == 1
     is_edge_last  <- candidates & sn == n
-    score_final[is_edge_first] <- abs(dewma_all[is_edge_first] / wta[is_edge_first])
-    score_final[is_edge_last]  <- abs(dewma_all[is_edge_last] / wta[is_edge_last])
+    score_final[is_edge_first] <- pmax(0, abs(dewma_all[is_edge_first]) -
+                                       wta[is_edge_first]) / wta_base[is_edge_first]
+    score_final[is_edge_last]  <- pmax(0, abs(dewma_all[is_edge_last]) -
+                                       wta[is_edge_last]) / wta_base[is_edge_last]
 
     # Interior values: graduated multiplier
     is_middle <- candidates & sn > 1 & sn < n
     if (any(is_middle)) {
-      ratio_bef <- abs(dewma_bef[is_middle] / wta[is_middle])
-      ratio_aft <- abs(dewma_aft[is_middle] / wta[is_middle])
-      min_ratio <- pmin(ratio_bef, ratio_aft)
-      multiplier <- pmin(1.0, 0.6 + 0.4 * min_ratio)
-      score_final[is_middle] <- multiplier * abs(
-        dewma_bef[is_middle] / wta[is_middle] + dewma_aft[is_middle] / wta[is_middle]
-      )
+      excess_bef <- pmax(0, abs(dewma_bef[is_middle]) -
+                         wta[is_middle]) / wta_base[is_middle]
+      excess_aft <- pmax(0, abs(dewma_aft[is_middle]) -
+                         wta[is_middle]) / wta_base[is_middle]
+      min_excess <- pmin(excess_bef, excess_aft)
+      multiplier <- pmin(1.0, 0.6 + 0.4 * min_excess)
+      score_final[is_middle] <- multiplier * (excess_bef + excess_aft)
     }
 
-    # Tiebreakers: smallest wta → closest to median age → earliest position
+    # Tiebreakers: smallest adj_wta → closest to median age → earliest position
     median_age <- median(adays)
     absdiff_median <- abs(adays - median_age)
 
@@ -1235,8 +1361,7 @@ remove_mod_ewma_wt <- function(full_inc_df, exc_label = "Exclude-A-WT-Traj-Moder
 #' @param wtallow_formula Formula for wtallow
 #' @return Character vector of ids to exclude with "2D Non-Ord" code
 #' @keywords internal
-eval_2d_nonord <- function(w_subj_df, w_subj_keep, wtallow_formula = "piecewise",
-                           cap_params = NULL) {
+eval_2d_nonord <- function(w_subj_df, w_subj_keep, wtallow_formula = "piecewise") {
   exc_ids <- character(0)
   if (nrow(w_subj_df) < 2) return(exc_ids)
 
@@ -1263,9 +1388,9 @@ eval_2d_nonord <- function(w_subj_df, w_subj_keep, wtallow_formula = "piecewise"
   for (i in 1:(n - 1)) {
     if (w_sorted$meas_m[i] != w_sorted$meas_m[i + 1]) {
       age_diff_months <- abs(w_sorted$age_days[i + 1] - w_sorted$age_days[i]) / 30.4375
-      maxwt_pair <- max(w_sorted$meas_m[i], w_sorted$meas_m[i + 1])
+      uw_pair <- max(w_sorted$meas_m[i], w_sorted$meas_m[i + 1])
       wta <- compute_wtallow(age_diff_months, formula = wtallow_formula,
-                             cap_params = cap_params, maxwt = maxwt_pair)
+                             uw = uw_pair)
       if (abs(w_sorted$meas_m[i + 1] - w_sorted$meas_m[i]) > wta + 0.12) {
         any_outside <- TRUE
         break

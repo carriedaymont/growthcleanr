@@ -346,10 +346,9 @@ Default: `"looser"`
 | BIV WT (kg) | 20–500 | 30–270 | 36–159 | 39–136 |
 | BIV BMI | 5–300 | 12–65 | 16–45 | 18–40 |
 | 1D limits | split (BMI/no-BMI) | same as BIV | same as BIV | same as BIV |
-| wtallow formula | piecewise | piecewise | piecewise-lower | allofus15 |
-| wtallow scaling | +0.50×(maxwt−120)⁺ | +0.50×(maxwt−120)⁺ | none | none |
-| EWMA cap <6m | 50+0.70×scale | 50+0.70×scale | 40 | 40 |
-| EWMA cap ≥6m | 80+0.70×scale | 80+0.70×scale | 60 | 40 |
+| wtallow formula | PW-H (piecewise) | PW-H (piecewise) | PW-L (piecewise-lower) | allofus15 |
+| UW scaling | UW-based (see wtallow-formulas.md) | UW-based | UW-based | cap limited by PW-L |
+| ET caps | wtallow cap + 20 | wtallow cap + 20 | wtallow cap + 20 | allofus15-cap-12m |
 | perclimit ≤45 kg | 0.5 | 0.5 | 0.7 | 0.7 |
 | perclimit 45–80 kg | 0.4 | 0.4 | 0.4 | 0.4 |
 | perclimit >80 kg | 0 (disabled) | 0 (disabled) | 0.4 | 0.4 |
@@ -403,10 +402,21 @@ Default: `"looser"`
 
 Exported function that pre-loads all three `read_anthro()` closures once
 and returns them as a named list. Avoids ~0.93 sec of disk reads per
-`cleangrowth()` call (replaces 3 `read_anthro()` calls, ~0.31 sec each) —
-significant savings across simulation loops (~50K calls × 0.93 sec =
-~13 hours). Benchmarked on 200 subjects: standard 4.46 sec → preloaded
-3.53 sec. Load time: 0.46 sec (paid once).
+`cleangrowth()` call (replaces 3 `read_anthro()` calls, ~0.31 sec each).
+Benchmarked on 200 subjects: standard 4.46 sec → preloaded 3.40 sec
+(1.06 sec saved/call, ~15 hours over 50K reps). Load time: 0.46 sec (once).
+
+Combined with `changed_subjids` partial run (50K reps, 200 subjects):
+
+| % subjects changed | Time/rep | vs standard | 50K saving |
+|---|---|---|---|
+| 100% (full run, refs only) | 3.40 sec | 1.3× | 15 hrs |
+| 50% changed | 1.93 sec | 2.3× | 35 hrs |
+| 25% changed | 1.16 sec | 3.8× | 46 hrs |
+| 10% changed | 0.58 sec | 7.7× | 54 hrs |
+| 5% changed | 0.40 sec | 11.1× | 56 hrs |
+
+~0.2–0.3 sec fixed overhead per partial call (batching setup + merge).
 
 ```r
 refs <- gc_preload_refs()
@@ -449,8 +459,8 @@ Notes:
 | `adult_permissiveness` | `"looser"` | Sets defaults for all adult sub-parameters |
 | `adult_scale_max_lbs` | `Inf` | Physical scale upper limit in lbs (formerly `weight_cap`) |
 
-All adult sub-parameters (BIV limits, 1D limits, wtallow,
-EWMA caps, etc.) can be passed individually to `cleanadult()`
+All adult sub-parameters (BIV limits, 1D limits, wtallow
+formula, etc.) can be passed individually to `cleanadult()`
 to override the preset. See `adult_clean.R` roxygen for the
 full list. `cleangrowth()` currently exposes only
 `adult_permissiveness` and `adult_scale_max_lbs`.
@@ -636,7 +646,7 @@ Requires installed package — see Known Issues. Run in background from Claude C
 ### Open (adult)
 
 - [ ] **Deferred test gaps:** Error load with -5 exponent,
-  weight scaling at permissiveness levels.
+  UW scaling edge cases (very low/high UW).
 - [ ] **Performance:** `setkey(df, subjid)` optimization
   deferred.
 - [ ] **Integration tests through `cleangrowth()`:** Need
