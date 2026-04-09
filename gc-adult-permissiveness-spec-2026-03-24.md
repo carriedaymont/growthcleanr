@@ -82,169 +82,118 @@ height and weight are available.
 
 ## wtallow
 
+### Overview
+
+wtallow is a derived value representing the threshold above which an absolute weight difference between two adjacent measurements may result in exclusion. It depends on the time interval between measurements and the Upper Weight (UW) — the higher of the two weights being compared. A base UW of 120 kg receives no adjustment; UW > 120 scales up (PW-H only), UW < 120 scales down (PW-H and PW-L).
+
+The complete specification including all formulas, caps, ET caps, and ceilings is in **`wtallow-formulas.md`**.
+
 ### Base formulas
 
-| Level | wtallow formula | scaled for high weight |
-|-------|----------------------|
-| `loosest` | piecewise (current default) | scaled as below |
-| `looser` | piecewise (current default) | scaled as below |
-| `tighter` | piecewise-lower | not scaled |
-| `tightest` | allofus15 (see below) | not scaled |
+| Level | wtallow formula | UW scaling |
+|-------|-----------------|------------|
+| `loosest` | PW-H (piecewise) | Scales up for UW>120 (capped at 180); scales down for UW<120 |
+| `looser` | PW-H (piecewise) | Same as loosest |
+| `tighter` | PW-L (piecewise-lower) | NOT scaled up for UW>120; scales down for UW<120 |
+| `tightest` | allofus15 | Cap = min(40, effective PW-L at 12m for that UW) |
 
-allofus 15 definition
-1–2 days: 5 kg
-3–7 days: 10 kg
-8d to <6m: 15 kg
->=6m: linear increase from 15kg @ 6m to 40kg at 12m
->=12m: 40kg
+### UW-based wtallow scaling
 
-### Weight-scaled wtallow (loosest and looser only)
+**UW = 120 (base, no adjustment):** All formulas use their base values.
 
-For patients above 120 kg, the base wtallow is augmented
-with a weight-scaled addition:
+**UW > 120 (PW-H only, capped at UW=180):**
+- Caps increase: `adj_cap = base_cap + 0.25 × (UW − 120)`
+- 1m value = 25 (vs 20 at base)
+- PW-L is NOT adjusted for UW > 120
 
-```
-wtallow = base_formula(interval)
-          + 0.50 * max(0, max(wt, ewma) - 120)
-```
+**UW < 120 (PW-H and PW-L):**
+- Caps scale down: `adj_cap = (base_cap − 20) × (UW / 120) + 20`
+- Hard ceiling: wtallow ≤ UW × 2/3
+- Ensures lighter patients get tighter limits
 
-This accommodates the larger absolute weight changes that
-are plausible for very heavy patients (e.g., bariatric
-surgery, GLP-1 medications, fluid shifts). The 120 kg
-threshold corresponds to BMI ~40–44 (class III obesity),
-where bariatric surgery is standard of care and large
-absolute weight changes become expected.
+**allofus15:** Not directly UW-adjusted, but its 12m cap is limited to never exceed the effective PW-L value at 12m for that UW.
 
-The 0.50 scaling factor is lower than the 0.70 factor
-used for EWMA caps (see below), ensuring wtallow stays
-below the ET cap.
+### ET caps (Evil Twins and Extreme EWMA thresholds)
 
-Weight scaling is not applied at tighter or tightest
-because those levels intentionally exclude extreme weight
-changes associated with bariatric surgery, severe
-cachexia, and rapid fluid status changes.
-
-### Effective wtallow ceiling
-
-At all permissiveness levels, the EWMA cap serves as a
-ceiling on wtallow. That is:
-
-```
-effective_wtallow = min(wtallow, ewma_cap)
-```
-
-This is already implemented in the code. It ensures that
-wtallow never exceeds the ET/extreme EWMA cap, which
-would create a zone where moderate EWMA could flag a
-value that evil twins and extreme EWMA would miss.
+ET caps are derived from the wtallow formula's caps:
+- **PW-H and PW-L:** ET cap = wtallow cap at 6m/12m + 20 (UW-adjusted)
+- **allofus15:** ET cap = allofus15-cap-12m (flat, regardless of interval)
+- **Custom CSV:** ET caps fixed at 70/100
 
 ### wtallow tables
 
-**Loosest** (piecewise + weight scaling):
+**PW-H (loosest/looser)** at selected UW values:
 ```
-Months   Base    @80    @120    @160    @200
-  1      20.0   20.0    20.0    40.0    60.0
-  3      32.0   32.0    32.0    52.0    72.0
-  6      50.0   50.0    50.0    70.0    90.0
- 12      80.0   80.0    80.0    100.0   120.0
- 18      80.0   80.0    80.0    100.0   120.0
- 24      80.0   80.0    80.0    100.0   120.0
+Months   @60     @120(base)  @160    @180(cap)
+  1      20.0    20.0        25.0    25.0
+  6      35.0    50.0        60.0    65.0
+ 12      50.0    80.0        90.0    95.0
+ 24      50.0    80.0        90.0    95.0
 ```
+
+**PW-L (tighter)** at selected UW values:
+```
+Months   @60     @120(base)  @160
+  1      20.0    20.0        20.0
+  6      26.67   33.33       33.33
+ 12      36.67   53.33       53.33
+ 24      36.67   53.33       53.33
+```
+Note: PW-L is not scaled up for UW > 120.
 
 
 ---
 
-## EWMA Caps
+## ET Caps (Evil Twins and Extreme EWMA Thresholds)
 
-EWMA caps control the thresholds used by Evil Twins
-(Step 9Wa) and Extreme EWMA (Step 9Wb). EWMA caps also
-serve as the ceiling for wtallow (see above).
+ET caps control the thresholds used by Evil Twins
+(Step 9Wa) and Extreme EWMA (Step 9Wb). They are
+derived from the wtallow formula's caps, not set
+independently.
 
-### Loosest and Looser: Weight-scaled caps
+### Derivation from wtallow
 
-A 2-tier structure (<6m, ≥6m) with weight-dependent
-scaling for heavy patients:
+For PW-H and PW-L formulas:
+- ET cap ≤6m = wtallow-cap-6m + 20
+- ET cap >6m = wtallow-cap-12m + 20
 
+Both wtallow caps and ET caps are UW-adjusted:
+- UW > 120 (PW-H only): caps increase by 0.25×(UW−120), capped at UW=180
+- UW < 120 (PW-H and PW-L): caps scale down; ceiling of UW × 2/3
+
+For allofus15: ET cap = allofus15-cap-12m (flat, regardless of interval).
+For custom CSV: ET caps fixed at 70/100.
+
+### ET cap tables
+
+**PW-H (loosest/looser)** at selected UW values:
 ```
-et_limit = baseline + 0.70 * max(0, maxwt - 120)
-
-where baseline = 50  (if interval < 6 months)
-                 80  (if interval >= 6 months)
-      maxwt    = max(wt, ewma)
-```
-
-For patients ≤120 kg, this gives fixed caps of 50/80.
-For heavier patients, caps scale:
-
-```
-MaxWt    <6m     ≥6m
- 60 kg   50.0    80.0
-100 kg   50.0    80.0
-120 kg   50.0    80.0
-140 kg   64.0    94.0
-160 kg   78.0   108.0
-180 kg   92.0   122.0
-200 kg  106.0   136.0
+UW       ET ≤6m   ET >6m
+ 60 kg   55.0     70.0
+120 kg   70.0     100.0
+160 kg   80.0     110.0
+180 kg   85.0     115.0
 ```
 
-Both loosest and looser use the same cap formula. The
-differentiation between loosest and looser is handled
-by wtallow and other parameters.
-
-**Rationale for 2-tier structure:** The split at 6 months
-reflects that peak weight loss from surgery and medication
-typically occurs within the first year. A higher cap at
-≥6m (80 vs 50) accommodates this period of large real
-changes while keeping the short-interval cap tighter for
-normal-weight patients.
-
-### Tighter and Tightest: Fixed 2-tier caps
-
-Fixed caps without weight scaling:
-
-| Level | <6m cap | ≥6m cap |
-|-------|---------|---------|
-| `tighter` | 40 | 60 |
-| `tightest` | 40 | 40 |
-
-For tighter, the ≥6m cap (60) is higher than the <6m
-cap (40). This is intentional: peak bariatric weight
-loss occurs at 9–15 months, and a higher cap at longer
-intervals accommodates patients with moderate obesity
-who have real weight changes in this period. At the
-tighter level, the goal is to exclude values reflecting
-severe illness, not moderate-to-large real changes.
-
-For tightest, both tiers are 40 kg.
-
-No weight scaling is applied at tighter or tightest
-because these levels intentionally do not accommodate
-extreme bariatric-surgery-scale changes.
-
-### Gap between wtallow and EWMA cap
-
-For the system to work correctly, wtallow must remain
-below the EWMA cap. At the extreme (loosest, 200 kg):
-
+**PW-L (tighter)** at selected UW values:
 ```
-Months  wtallow  ET cap  Gap
-  1      60.0    106.0   46.0
-  3      76.0    106.0   30.0
-  6     100.0    136.0   36.0
- 12     110.0    136.0   26.0
- 18     120.0    136.0   16.0
- 24     120.0    136.0   16.0
+UW       ET ≤6m   ET >6m
+ 60 kg   51.11    56.67
+120 kg   53.33    73.33
+160 kg   53.33    73.33
 ```
+Note: PW-L is not scaled up for UW > 120.
 
-The gap narrows to 16 kg at long intervals for very
-heavy patients. This is adequate — if a 200 kg patient
-has a dewma of 120–136 kg, they are flagged as moderate
-(Step 11Wb) but not as extreme (Step 9). Values above
-136 kg are flagged as extreme.
+### Gap between wtallow and ET cap
 
-If a custom formula is used that grows past 80 at long
-intervals, the EWMA cap ceiling prevents wtallow from
-exceeding the ET cap.
+The ET cap always exceeds wtallow by exactly 20 at the
+cap points (6m and 12m) for PW-H and PW-L formulas.
+This 20 kg gap ensures that moderate EWMA outliers
+(wtallow < dewma < ET cap) are caught by Step 11Wb,
+while extreme outliers (dewma > ET cap) are caught
+earlier by Step 9.
+
+See `wtallow-formulas.md` for the complete specification.
 
 ---
 
@@ -312,25 +261,21 @@ In the code, "disabled" is implemented as perclimit = 0,
 meaning the check `percewma < perclimit` is never TRUE
 (no ratio can be < 0). This is distinct from Inf, which
 would incorrectly trigger on every observation.
-For weights above 80 kg, wtallow always catches any
-value that would also be caught by perclimit = 0.4.
-The mathematical reason: perclimit = 0.4 fires when
-dewma > 1.5 × wt. For wt > 80, this requires
-dewma > 120. Even with weight-scaled wtallow, the
-formula (base + 0.50 × (maxwt − 120)) catches these
-values first because the wtallow scaling grows with
-maxwt while the perclimit threshold grows only with wt.
-The gap is at most a few kg wide in a narrow band for
-wt 60–80 with very high EWMAs, and in those edge cases
-the directional EWMA checks and trajectory criteria
-provide additional redundant coverage. Above 80 kg the
-gap vanishes entirely.
+For weights above 80 kg, UW-adjusted wtallow always
+catches any value that would also be caught by
+perclimit = 0.4. The mathematical reason: perclimit =
+0.4 fires when dewma > 1.5 × wt. For wt > 80, this
+requires dewma > 120. The UW-adjusted wtallow catches
+these values first because wtallow scales with UW (the
+upper weight of the pair) while the perclimit threshold
+grows only with the observation's own weight. Above
+80 kg the coverage gap vanishes entirely.
 
 **Tighter/tightest: perclimit 0.4 for all wt > 45 kg:**
-Without weight-scaled wtallow, the base wtallow caps
-at 80 (piecewise) or 60 (piecewise-lower) or 40
-(tightest). In this case, wtallow always catches
-values that perclimit = 0.4 would catch for wt > 45.
+With PW-L or allofus15 wtallow (not scaled up for high
+UW), the base caps are lower (53.33 for PW-L, 40 for
+allofus15). wtallow still catches values that
+perclimit = 0.4 would catch for wt > 45.
 However, the 0.4 threshold is retained at tighter and
 tightest as a belt-and-suspenders safeguard with
 negligible cost.
@@ -491,10 +436,9 @@ path if users need a fully custom weight allowance table.
 | Parameter | loosest | looser | tighter | tightest |
 |-----------|---------|--------|---------|----------|
 | BIV thresholds | current defaults | metric (wide) | metric (medium) | metric (narrow) |
-| wtallow base | piecewise | piecewise | piecewise-lower | allofus15 |
-| wtallow scaling | + 0.50×(maxwt−120)⁺ | + 0.50×(maxwt−120)⁺ | none | none |
-| ewma_cap <6m | 50 + 0.70×(maxwt−120)⁺ | 50 + 0.70×(maxwt−120)⁺ | 40 | 40 |
-| ewma_cap ≥6m | 80 + 0.70×(maxwt−120)⁺ | 80 + 0.70×(maxwt−120)⁺ | 60 | 40 |
+| wtallow formula | PW-H (piecewise) | PW-H (piecewise) | PW-L (piecewise-lower) | allofus15 |
+| UW scaling | UW-based (see wtallow-formulas.md) | UW-based | UW-based (down only) | cap limited by PW-L |
+| ET caps | wtallow cap + 20 | wtallow cap + 20 | wtallow cap + 20 | allofus15-cap-12m |
 | perclimit ≤45 kg | 0.5 | 0.5 | 0.7 | 0.7 |
 | perclimit 45–80 kg | 0.4 | 0.4 | 0.4 | 0.4 |
 | perclimit >80 kg | 0 (disabled) | 0 (disabled) | 0.4 | 0.4 |

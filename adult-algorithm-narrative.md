@@ -57,10 +57,9 @@ The algorithm's aggressiveness is controlled by a `permissiveness` parameter wit
 | Overall (BIV) WT limits | 20–500 kg | 30–270 kg | 36–159 kg | 39–136 kg |
 | Overall (BIV) BMI limits | 5–300 | 12–65 | 16–45 | 18–40 |
 | Single (1D) limits | wider BMI-dependent split (see spec) | same as BIV | same as BIV | same as BIV |
-| `wtallow_formula` | piecewise | piecewise | piecewise-lower | allofus15 |
-| `wtallow_scaling` | + 0.50×(maxwt−120)⁺ | + 0.50×(maxwt−120)⁺ | none | none |
-| EWMA cap <6m | 50 + 0.70×(maxwt−120)⁺ | 50 + 0.70×(maxwt−120)⁺ | 40 | 40 |
-| EWMA cap ≥6m | 80 + 0.70×(maxwt−120)⁺ | 80 + 0.70×(maxwt−120)⁺ | 60 | 40 |
+| `wtallow_formula` | PW-H (piecewise) | PW-H (piecewise) | PW-L (piecewise-lower) | allofus15 |
+| UW scaling | UW-based (see wtallow-formulas.md) | UW-based | UW-based | cap limited by PW-L |
+| ET caps | wtallow cap + 20 | wtallow cap + 20 | wtallow cap + 20 | allofus15-cap-12m |
 | `perclimit_low` (wt ≤45 kg) | 0.5 | 0.5 | 0.7 | 0.7 |
 | `perclimit_mid` (45<wt≤80 kg) | 0.4 | 0.4 | 0.4 | 0.4 |
 | `perclimit_high` (wt >80 kg) | 0 (disabled) | 0 (disabled) | 0.4 | 0.4 |
@@ -354,7 +353,7 @@ The cap detection range is: `round(scale_max_lbs / 2.2046226, 1) ± 0.1` kg, usi
 | Next Step | 9H: Final SDE Height Resolution; 9Wb: Extreme EWMA |
 | Distinct/RVs | Both Inc and RV values participate in OOB detection, median, and pairs guard |
 | Exclusion Code | `Exclude-A-Evil-Twins` |
-| Configurable parameter names | `ewma_cap_short`, `ewma_cap_long`, `wt_scale_et`, `wt_scale_threshold` (shared with EWMA steps) |
+| Configurable parameter names | `wtallow_formula` (shared with EWMA steps) |
 
 ***Overview:***
 
@@ -366,30 +365,33 @@ The step iterates, each time re-evaluating the remaining values, until no OOB pa
 
 - **Evil twin pair:** Two adjacent weight values (sorted by age) whose absolute difference exceeds an interval-specific threshold
 - **OOB (out of bounds):** Flag marking both members of an evil twin pair
+- **Upper weight (UW):** The larger of the two weights in a pair, used for UW-based ET cap scaling. See `wtallow-formulas.md` for full specification.
 - **Plausibility guardrail:** Values <38 kg or >180 kg that are in OOB pairs get maximum deviation score (99999), ensuring they are excluded first
 - **Pairs guard:** Requires ≥3 included values to exclude; with only 2 values, it's ambiguous which is wrong
-- `evil_twins()` — support function implementing the iterative detection and exclusion logic
-- `cap_params` — list containing `cap_short`, `cap_long`, `wt_scale_et`, `wt_scale_threshold`. Shared with EWMA steps.
+- `evil_twins()` — support function implementing the iterative detection and exclusion logic. Signature: `evil_twins(w_subj_df, wtallow_formula)`
+- `compute_et_limit()` — computes the ET cap for a given interval and formula. Signature: `compute_et_limit(interval_months, formula, uw)`. The ET cap is derived from the wtallow formula's 6m and 12m caps + 20.
 
 ***Configurable parameter defaults and options:***
 
-| Parameter | loosest/looser | tighter | tightest | Unit | Notes |
-|-----------|------|------|------|------|------|
-| `ewma_cap_short` | 50 | 40 | 40 | kg | Baseline threshold for short intervals (< 6 months) |
-| `ewma_cap_long` | 80 | 60 | 40 | kg | Baseline threshold for long intervals (≥ 6 months) |
-| `wt_scale_et` | 0.70 | 0 | 0 | — | Weight scaling factor (0 = no scaling) |
-| `wt_scale_threshold` | 120 | 120 | 120 | kg | Weight above which scaling applies |
+The ET cap is derived from the wtallow formula and UW (upper weight of the pair). For PW-H and PW-L formulas, ET cap = wtallow cap at 6m or 12m + 20. For allofus15, ET cap = allofus15-cap-12m (flat). For custom CSV, ET caps are fixed at 70/100.
 
-Dynamic ET limit per pair: `cap_short/cap_long + wt_scale_et × max(0, maxwt − 120)`, where `maxwt` is the larger of the two weights in the pair. For tightest, `cap_long = cap_short = 40` so the threshold is the same regardless of interval length. All thresholds include the standard 0.12 kg rounding tolerance (see Rounding Tolerance section). These parameters are shared with the EWMA steps (9Wb, 11Wb).
+| Formula | ET cap ≤6m (UW=120) | ET cap >6m (UW=120) | UW scaling |
+|---------|---------------------|---------------------|------------|
+| PW-H (loosest/looser) | 70 | 100 | Yes — caps scale with UW; see `wtallow-formulas.md` |
+| PW-L (tighter) | 53.33 | 73.33 | Yes for UW<120 (scales down); No for UW>120 |
+| allofus15 (tightest) | allofus15-cap-12m | allofus15-cap-12m | Cap limited by PW-L effective cap at 12m |
+| Custom CSV | 70 | 100 | No |
+
+All thresholds include the standard 0.12 kg rounding tolerance (see Rounding Tolerance section). See `wtallow-formulas.md` for full formula details including UW adjustment for high and low UW.
 
 ***Logic and implementation:***
 
-1. **Pre-check:** Skip if <3 non-extraneous values, or if max-min range ≤ smallest cap + 0.12 (no pair could exceed any interval-specific cap)
+1. **Pre-check:** Skip if <3 non-extraneous values, or if max-min range ≤ minimum possible ET cap + 0.12 (computed via `compute_et_limit(1, formula, uw = min(weights))`, no pair could exceed any interval-specific cap)
 2. **Repeat until no OOB pairs found or <3 values remain:**
    a. Remove previously excluded values; break if <3 remain
    b. Sort by age (id tiebreaker)
    c. Compute adjacent weight differences and age intervals (in months, using 30.4375 days/month)
-   d. Compute dynamic cap per pair: `compute_et_limit(interval, maxwt_pair, ...)` + 0.12 rounding tolerance. For patients ≤120 kg: <6m → 50.12, ≥6m → 80.12. For heavier patients, caps scale up.
+   d. Compute dynamic ET cap per pair: `compute_et_limit(interval, formula, uw = uw_pair)` + 0.12 rounding tolerance. `uw_pair` is the larger of the two weights in the pair. ET caps scale with UW (see wtallow-formulas.md).
    e. Flag OOB pairs: both members of any pair where diff > cap
    f. If no OOB pairs, break (done)
    g. Compute subject median from all remaining values (Inc + RV)
@@ -402,7 +404,7 @@ Dynamic ET limit per pair: `cap_short/cap_long + wt_scale_et × max(0, maxwt −
 
 ***Rationale for selected decisions:***
 
-- Two-tier interval thresholds (<6m / ≥6m) reflect that larger weight changes are more plausible over longer time periods. Weight scaling for patients >120 kg accommodates the larger absolute changes expected in bariatric surgery and extreme obesity.
+- Two-tier interval thresholds (≤6m / >6m) reflect that larger weight changes are more plausible over longer time periods. UW-based scaling accommodates larger absolute changes for heavier patients and applies tighter limits for lighter patients (see wtallow-formulas.md).
 - The plausibility guardrail ensures that biologically extreme values (<38 or >180 kg) are excluded first when they are part of an OOB pair, regardless of which value is closer to the median.
 - The pairs guard prevents excluding values when there are only 2 included weights — with only a pair, there is no reference to determine which is correct.
 - Both Inc and RV values participate fully in all aspects (OOB detection, median, pairs guard) because in the algorithm's default independent mode, RVs are treated as real measurements.
@@ -488,48 +490,47 @@ None. This step has no configurable parameters.
 | Next Step | 10W: Final SDE Weight Resolution |
 | Distinct/RVs | Independent: all values participate. Linked: firstRV pass (non-RV only), then propagate, then allRV pass. |
 | Exclusion Codes | `Exclude-A-WT-Traj-Ext-N` (independent), `Exclude-A-WT-Traj-Extreme-firstRV-N` (linked), `Exclude-A-WT-Traj-Extreme-allRV-N` (linked) |
-| Configurable parameter names | `ewma_cap_short`, `ewma_cap_long`, `wt_scale_et`, `repval_handling` |
+| Configurable parameter names | `wtallow_formula`, `repval_handling` |
 
 ***Overview:***
 
 This step uses Exponentially Weighted Moving Averages to identify weight values that deviate far from the patient's expected trajectory. The EWMA gives exponentially more weight to measurements closest in time — with the exponent e=-5, the nearest neighbor almost completely dominates, making this a near-neighbor comparison rather than a traditional moving average.
 
-A value is excluded when its EWMA deviation exceeds an interval-specific cap AND both directional deviations (before/after) confirm. The step iterates, removing one value per round (the worst outlier), until no candidates remain or fewer than 3 values are left.
+A value is excluded when its EWMA deviation exceeds an interval-specific ET cap AND both directional deviations (before/after) confirm. The step iterates, removing one value per round (the worst outlier), until no candidates remain or fewer than 3 values are left.
 
 ***Key terms and variable names:***
 
 - **EWMA (Exponentially Weighted Moving Average):** Weighted average of other measurements, with weights proportional to |age difference|^e. With e=-5, nearest neighbor dominates.
 - **dewma_all:** EWMA deviation using all other values
 - **dewma_before / dewma_after:** EWMA deviation excluding the immediately prior / next measurement. Used for the 90% confirmation rule.
-- **min_gap_months:** Minimum gap (in months) to either chronological neighbor. Determines which tier (<6m or ≥6m) applies.
-- **cap_params:** List with `cap_short`, `cap_long`, `wt_scale_et`, `wt_scale_threshold` (loosest/looser defaults: 50, 80, 0.70, 120). Shared with Evil Twins. Dynamic per-observation threshold computed via `compute_et_limit()`.
-- `remove_ewma_wt()` — support function implementing the iterative exclusion logic (shared with Moderate EWMA, Step 11Wb)
+- **min_gap_months:** Minimum gap (in months) to either chronological neighbor. Determines which tier (≤6m or >6m) applies.
+- **Upper weight (UW):** `max(wt, ewma)` for each observation. Used for UW-based ET cap scaling.
+- `remove_ewma_wt()` — support function implementing the iterative exclusion logic (shared with Moderate EWMA, Step 11Wb). Signature: `remove_ewma_wt(subj_df, wtallow_formula, ...)`
+- `compute_et_limit()` — computes the ET cap per observation: `compute_et_limit(min_gap_months, formula, uw)`. See `wtallow-formulas.md` for full specification.
 - `adult_ewma_cache_init()` — EWMA computation with position-based window (default 15 on each side)
 
 ***Configurable parameter defaults and options:***
 
 | Parameter | loosest/looser | tighter | tightest | Unit | Notes |
 |-----------|------|------|------|------|------|
-| `ewma_cap_short` | 50 | 40 | 40 | kg | Baseline cap when min neighbor gap < 6 months |
-| `ewma_cap_long` | 80 | 60 | 40 | kg | Baseline cap when min neighbor gap ≥ 6 months |
-| `wt_scale_et` | 0.70 | 0 | 0 | — | Weight scaling factor for caps (0 = no scaling) |
+| `wtallow_formula` | `"piecewise"` | `"piecewise-lower"` | `"allofus15"` | — | Determines ET cap structure (ET cap = wtallow cap + 20 for PW-H/PW-L; see wtallow-formulas.md) |
 | `repval_handling` | `"independent"` | `"linked"` | `"linked"` | — | `"independent"` or `"linked"` (controls single vs two-pass) |
 | `ewma_window` | 15 | 15 | 15 | observations | Max observations on each side for EWMA (not permissiveness-controlled) |
 
-The threshold is computed dynamically per observation: `compute_et_limit(min_gap_months, maxwt, ...)` where `maxwt = max(wt, ewma)`. For patients ≤120 kg at loosest/looser this gives fixed caps of 50/80; for heavier patients, caps scale up. At tighter/tightest, weight scaling is disabled and caps are lower.
+The threshold is computed dynamically per observation: `compute_et_limit(min_gap_months, formula, uw)` where `uw = max(wt, ewma)`. ET caps scale with UW — for higher UW they increase (PW-H only, capped at UW=180), for lower UW they decrease (PW-H and PW-L, with 2/3×UW ceiling). See `wtallow-formulas.md` for complete formula details.
 
 ***Logic and implementation:***
 
 **Guards:**
 1. Skip if no weight values remain
 2. Skip if <3 non-extraneous values
-3. **Range gate:** Skip if max-min of included values ≤ cap_short + 0.12 (50.12 kg at loosest/looser). If the entire range is within the smallest possible cap plus rounding tolerance, no value can exceed any cap.
+3. **Range gate:** Skip if max-min of included values ≤ minimum possible ET cap + 0.12 (computed via `compute_et_limit(1, formula, uw = min(weights))`). If the entire range is within the smallest possible cap plus rounding tolerance, no value can exceed any cap.
 
 **Independent mode (single pass):**
 1. Call `remove_ewma_wt()` with all non-extraneous values (including RVs)
 2. Each round:
    a. Compute minimum neighbor gap in months for each value. Missing gaps (edge values) → Inf (Stata missing-as-infinity convention).
-   b. Compute per-observation threshold: `compute_et_limit(min_gap_months, maxwt, cap_short, cap_long, wt_scale_et, wt_scale_threshold)` where `maxwt = max(wt, ewma_all)`
+   b. Compute per-observation threshold: `compute_et_limit(min_gap_months, formula, uw)` where `uw = max(wt, ewma_all)`
    c. Compute EWMA (exponent e=-5, anchor a=0, window = ewma_window observations on each side)
    d. **Positive outlier:** dewma_all > threshold + 0.12 AND dewma_before > 0.9×threshold + 0.12 AND dewma_after > 0.9×threshold + 0.12
    e. **Negative outlier:** dewma_all < -(threshold + 0.12) AND dewma_before < -(0.9×threshold + 0.12) AND dewma_after < -(0.9×threshold + 0.12)
@@ -544,7 +545,7 @@ The threshold is computed dynamically per observation: `compute_et_limit(min_gap
 1. **firstRV pass:** Run `remove_ewma_wt()` on non-RV values only, with label `"Exclude-A-WT-Traj-Extreme-firstRV"`. Apply same range gate (cap_short + 0.12) to firstRV subset.
 2. Propagate firstRV exclusions to their RV copies via `propagate_to_rv()`
 3. Re-identify RVs on remaining values
-4. **allRV pass:** Run `remove_ewma_wt()` on all remaining non-extraneous values (RVs now participate), with label `"Exclude-A-WT-Traj-Extreme-allRV"`. Apply range gate (cap_short + 0.12) to remaining subset.
+4. **allRV pass:** Run `remove_ewma_wt()` on all remaining non-extraneous values (RVs now participate), with label `"Exclude-A-WT-Traj-Extreme-allRV"`. Apply range gate (minimum ET cap + 0.12) to remaining subset.
 5. Re-identify RVs after allRV exclusions
 
 ***Rationale for selected decisions:***
@@ -552,7 +553,7 @@ The threshold is computed dynamically per observation: `compute_et_limit(min_gap
 - **No round limit:** Unlike the original Stata implementation (capped at 3 rounds), R iterates until convergence. In practice, extreme EWMA rarely exceeds 3 rounds, but removing the artificial cap ensures all genuine outliers are caught.
 - **90% rule:** The directional confirmation (before/after must exceed 90% of threshold) prevents excluding values that are outliers in one direction but consistent with the trend in the other. With e=-5, the 90% rule is effectively unreachable (nearest neighbor dominates so heavily that dewma_before/after are nearly equal to dewma_all), but it is retained at zero cost for consistency with the algorithm's theoretical framework.
 - **Missing-as-infinity for edge values:** When a value has no prior or next neighbor, the missing directional dewma is treated as confirming exclusion. An extreme outlier at the edge of a patient's data should still be excludable based on the neighbors that do exist.
-- **Two-tier structure:** Both Evil Twins and Extreme EWMA use the same 2-tier (<6m / ≥6m) structure with weight scaling. The distinction between ET and Extreme EWMA is the detection method (adjacent pairs vs EWMA deviation), not the cap structure.
+- **Two-tier structure:** Both Evil Twins and Extreme EWMA use the same ET cap structure derived from the wtallow formula (ET cap = wtallow cap + 20 for PW-H/PW-L). The distinction between ET and Extreme EWMA is the detection method (adjacent pairs vs EWMA deviation), not the cap structure.
 - **Sort tiebreaker:** The R implementation includes `id` as a final tiebreaker in all passes for deterministic sort order.
 
 ---
@@ -776,7 +777,7 @@ See Step 9H for full details on categories, sorting, and tiebreakers.
 | Next Step | 11Wa2: 2D Non-Ordered Weight Pairs |
 | Distinct/RVs | Routing uses firstRV (non-RV) numdistinct and ordering; allRV override for non-ordered detection; evaluation uses firstRV values |
 | Exclusion Codes | `Exclude-A-WT-2D-Ordered` |
-| Configurable parameter names | `wtallow_formula`, `cap_params` |
+| Configurable parameter names | `wtallow_formula` |
 
 ***Overview:***
 
@@ -792,54 +793,39 @@ This step also performs the routing that determines whether subjects go to 2D or
 - **wt_first / wt_last** — first and last weight values (by age) among firstRV observations
 - **wt_diff** — `wt_last - wt_first`
 - **ageyears_diff** — time gap between the two value groups: `min age of value 2 - max age of value 1` (in years)
-- **wtallow (wta)** — maximum allowed weight change for the given time interval, computed by `compute_wtallow()`
+- **wtallow (wta)** — maximum allowed weight change for the given time interval, computed by `compute_wtallow(months, formula, uw)`. UW is the upper weight of the pair (`max(wt_first, wt_last)`).
 - **wt_perc** — ratio of smaller to larger weight: `min(wt_first, wt_last) / max(wt_first, wt_last)`
 - **perclimit** — threshold for wt_perc; subject-level, max of `compute_perc_limit()` across observations. Weight-dependent and permissiveness-dependent (see permissiveness table above).
 
 ***Configurable parameter defaults and options:***
 
-- **`wtallow_formula`** (default `"piecewise"`): Selects the formula for computing weight allowance from the time interval between measurements. Options:
+- **`wtallow_formula`** (default `"piecewise"`): Selects the formula for computing weight allowance from the time interval between measurements. All formulas are UW-adjusted (scaled by the upper weight of the pair). Options:
 
-  - **`"piecewise"`** — Three-segment curve. Default for loosest/looser (cap_short=50, cap_long=80).
-    - 0–1 month: log-curved from 10 kg to 20 kg (`10 + 10 × log(1 + 5×months) / log(6)`)
-    - 1–6 months: linear from 20 kg to `cap_short`
-    - 6–12 months: linear from `cap_short` to `cap_long`
-    - >12 months: flat at `cap_long`
+  - **`"piecewise"` (PW-H)** — Three-segment curve. Default for loosest/looser. At UW=120 (base):
+    - 0–1 month: log-curved from ~10.85 kg to 20 kg (`10 + 10 × log(1 + 5×months) / log(6)`)
+    - 1–6 months: linear from 20 kg to 50 kg
+    - 6–12 months: linear from 50 kg to 80 kg
+    - >12 months: flat at 80 kg
+    - UW > 120: caps increase by 0.25×(UW−120), capped at UW=180; 1m value = 25
+    - UW < 120: caps scale as `(base_cap − 20) × (UW/120) + 20`; ceiling of UW × 2/3
 
-    | Interval | wtallow (loosest/looser) |
-    |---|---|
-    | 0 months | 10 kg |
-    | 1 month | 20 kg |
-    | 6 months | 50 kg |
-    | 12 months | 80 kg |
-    | >12 months | 80 kg |
+  - **`"piecewise-lower"` (PW-L)** — Same shape as PW-H but with lower caps. Default for tighter. At UW=120 (base):
+    - 0–1 month: same log curve as PW-H
+    - 1–6 months: linear from 20 kg to 33.33 kg
+    - 6–12 months: linear from 33.33 kg to 53.33 kg
+    - >12 months: flat at 53.33 kg
+    - UW > 120: NOT scaled up (same as base formula)
+    - UW < 120: caps scale as `(base_cap − 20) × (UW/120) + 20`; ceiling of UW × 2/3
 
-  - **`"piecewise-lower"`** — Same shape as piecewise but scaled down: same log-curved 0–1m segment, then linear to `cap_short×2/3` at 6 months, then linear to `cap_short×2/3 + (cap_long−cap_short)×2/3` at 12 months, flat at `cap_short` after. Default for tighter (cap_short=40, cap_long=60).
+  - **`"allofus15"`** — Step function for short intervals, linear ramp for long intervals. Default for tightest.
+    - 0–2 days: 5 kg; 3–7 days: 10 kg; 8 days–<6 months: 15 kg
+    - 6–12 months: linear from 15 kg to allofus15-cap-12m
+    - >12 months: flat at allofus15-cap-12m
+    - allofus15-cap-12m = min(40, effective PW-L at 12m for that UW)
 
-    | Interval | wtallow (tighter) |
-    |---|---|
-    | 0 months | 10 kg |
-    | 1 month | 20 kg |
-    | 6 months | ~26.7 kg (= 40 × 2/3) |
-    | 12 months | 40 kg (= 26.7 + (60−40) × 2/3) |
-    | >12 months | 40 kg |
+  - Custom CSV path with columns `months` and `wtallow` (linearly interpolated, no UW adjustment).
 
-  - **`"allofus15"`** — Step function for short intervals, linear ramp for long intervals. Default for tightest (cap_short=40).
-    - 0–2 days: 5 kg; 3–7 days: 10 kg; 8 days–~6 months (180 days): 15 kg
-    - ~6–12 months: linear from 15 kg to `cap_short`
-    - >12 months: flat at `cap_short`
-
-    | Interval | wtallow (tightest) |
-    |---|---|
-    | 0–2 days | 5 kg |
-    | 3–7 days | 10 kg |
-    | 8 days–~6 months | 15 kg |
-    | 6–12 months | 15→40 kg (linear) |
-    | >12 months | 40 kg |
-
-  - Custom CSV path with columns `months` and `wtallow` (linearly interpolated).
-- **Weight-scaled wtallow** (loosest/looser only): After the base formula, adds `0.50 × max(0, max(wt, ewma) − 120)` for patients >120 kg. The result is then capped at the ET limit (`compute_et_limit()`) so wtallow never exceeds the EWMA cap.
-- **`cap_params`**: List containing `cap_short`, `cap_long`, `wt_scale_et`, `wt_scale_wtallow`, `wt_scale_threshold` (loosest/looser defaults: 50, 80, 0.70, 0.50, 120; tighter/tightest use lower caps with no scaling). Shared by Evil Twins and EWMA steps.
+See `wtallow-formulas.md` for the complete specification of all formulas, UW adjustments, ET caps, and ceilings.
 
 ***Logic and implementation:***
 
@@ -859,7 +845,7 @@ This step also performs the routing that determines whether subjects go to 2D or
 
 1. Compute `wt_first` (earliest weight) and `wt_last` (latest weight) from firstRV observations
 2. Compute `ageyears_diff` = `min age of value 2 - max age of value 1` (gap between the two groups)
-3. Compute `wtallow` using `compute_wtallow(ageyears_diff * 12, formula, caps)`
+3. Compute `wtallow` using `compute_wtallow(ageyears_diff * 12, formula, uw = max(wt_first, wt_last))`
 4. Test 1 (wtallow): `abs(wt_diff) > wtallow + 0.12` (with rounding tolerance)
 5. Compute `wt_perc` = `min(wt_first, wt_last) / max(wt_first, wt_last)`
 6. Determine `perclimit`: subject-level, max of `compute_perc_limit()` across all observations. At loosest/looser: ≤45 kg → 0.5, 45–80 kg → 0.4, >80 kg → 0 (disabled). At tighter/tightest: ≤45 kg → 0.7, >45 kg → 0.4.
@@ -886,7 +872,7 @@ This step also performs the routing that determines whether subjects go to 2D or
 | Next Step | 11Wb: Moderate EWMA |
 | Distinct/RVs | Uses allRV (all included values) for both detection and evaluation |
 | Exclusion Codes | `Exclude-A-WT-2D-Non-Ordered` |
-| Configurable parameter names | `wtallow_formula`, `cap_params` |
+| Configurable parameter names | `wtallow_formula` |
 
 ***Overview:***
 
@@ -903,7 +889,7 @@ The step applies a four-rule decision tree: (1) if all adjacent different-value 
 
 ***Configurable parameter defaults and options:***
 
-Same as Step 11Wa — uses `compute_wtallow()` with `wtallow_formula` and `cap_params` parameters.
+Same as Step 11Wa — uses `compute_wtallow()` with `wtallow_formula`. UW for each adjacent pair is the larger of the two weights in the pair (`uw_pair`).
 
 ***Logic and implementation:***
 
@@ -943,7 +929,7 @@ Checks the full subject weight history (`w_subj_keep`), not just currently inclu
 | Next Step | 13: Distinct Single (1D) |
 | Distinct/RVs | Independent: single pass, RVs as full participants. Linked: firstRV pass (non-RV only) with RV propagation, then allRV pass. |
 | Exclusion Codes | `Exclude-A-WT-Traj-Moderate-N`, `Exclude-A-WT-Traj-Moderate-allRV-N`, `Exclude-A-WT-Traj-Moderate-Error-Load-N`, `Exclude-A-WT-Traj-Moderate-Error-Load-RV-N` |
-| Configurable parameter names | `wtallow_formula`, `cap_params`, `ewma_window`, `repval_handling`, `mod_ewma_f`, `perclimit_low`, `perclimit_mid`, `perclimit_high` |
+| Configurable parameter names | `wtallow_formula`, `ewma_window`, `repval_handling`, `mod_ewma_f`, `perclimit_low`, `perclimit_mid`, `perclimit_high` |
 
 ***Overview:***
 
@@ -961,7 +947,8 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
 ***Key terms and variable names:***
 
 - **dewma_all / dewma_bef / dewma_aft** — EWMA deviation using all, all-except-predecessor, all-except-successor
-- **wtallow (wta)** — time-interval-dependent weight allowance, computed from `compute_wtallow()` using the minimum of the before and after age gaps
+- **wtallow (wta)** — time-interval-dependent weight allowance, computed from `compute_wtallow(months, formula, uw)` using the minimum of the before and after age gaps. UW = `max(wt, ewma)` for the observation.
+- **wta_base** — wtallow at UW=120 (no UW adjustment), used as the denominator in prioritization scoring. This ensures scoring is not distorted by UW-dependent wtallow.
 - **minagediff** — minimum of before and after age gaps (years), used to determine wtallow
 - **perclimit** — observation-level ratio threshold via `compute_perc_limit(meas, permissiveness)`. Weight-dependent and permissiveness-dependent (see permissiveness table). Note: observation-level here, unlike Step 11Wa which uses subject-level max.
 - **exc_stand** — standard pathway candidates (Step 1)
@@ -975,8 +962,7 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
 
 | Parameter | Default | Unit | Notes |
 |-----------|---------|------|-------|
-| `wtallow_formula` | `"piecewise"` | — | Formula for wtallow (see Step 11Wa) |
-| `cap_params` | list (varies by level) | — | `cap_short`, `cap_long`, `wt_scale_et`, `wt_scale_wtallow`, `wt_scale_threshold`; see Step 9Wb for defaults by permissiveness level |
+| `wtallow_formula` | `"piecewise"` | — | Formula for wtallow (see Step 11Wa and wtallow-formulas.md) |
 | `mod_ewma_f` | 0.75 | — | Directional factor: loosest/looser = 0.75; tighter/tightest = 0.60 |
 | `perclimit_low` | 0.5 | — | % criterion for wt ≤45 kg (loosest/looser); 0.7 (tighter/tightest) |
 | `perclimit_mid` | 0.4 | — | % criterion for 45<wt≤80 kg (all levels) |
@@ -1044,11 +1030,12 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
 **Step 7 — Final prioritization:**
 - **Error load values:** All excluded immediately with code `"...-Error-Load round N"`
 - **Non-error-load candidates:** Score each and exclude only the single highest-scoring:
-  - Edge (first/last in subject): `|dewma_all / wtallow|`
-  - Interior: graduated multiplier × `|dewma_bef/wtallow + dewma_aft/wtallow|`
-    - `min_ratio = min(|dewma_bef/wtallow|, |dewma_aft/wtallow|)`
+  - Edge (first/last in subject): `pmax(0, |dewma_all| - wta) / wta_base` where `wta` is UW-adjusted wtallow and `wta_base` is wtallow at UW=120 (no adjustment)
+  - Interior: graduated multiplier × `(pmax(0, |dewma_bef| - wta) + pmax(0, |dewma_aft| - wta)) / wta_base`
+    - `min_ratio = min(|dewma_bef/wta|, |dewma_aft/wta|)`
     - `multiplier = min(1.0, 0.6 + 0.4 × min_ratio)`
     - Full score when both directions independently exceed wtallow; 0.6× discount when only one direction is bad
+  - Scoring uses excess above UW-adjusted wtallow divided by base wtallow, so a 10 kg excess at any UW always scores the same
   - Tiebreakers: smallest wtallow → closest to median age → earliest position → lowest id
 
 **Mode handling:**
@@ -1232,4 +1219,4 @@ This is the final step. It evaluates whether a subject has too many errors relat
 - The R `remove_biv` support functions (`remove_biv_low`, `remove_biv_high`) have an `include` parameter (default `FALSE`) that switches between strict (`<`/`>`) and non-strict (`<=`/`>=`) inequalities. Step 1 BIV always uses `include=FALSE`. `include=TRUE` is never used — Step 13 does not call `remove_biv`; it uses `eval_1d` with direct strict comparisons. The `include` parameter is dead code. **RESOLVED.**
 
 ***To implement after all steps reviewed:***
-- **Stringency parameter:** Add a `stringency` parameter (name TBD) that provides preset less-permissive defaults for multiple limits (BIV, 1D, possibly others). Explicit parameter values override stringency presets. Carrie to determine specific tighter limits.
+- **Stringency parameter:** Add a `stringency` parameter (name TBD) that provides preset less-permissive defaults for multiple limits (BIV, 1D, possibly others). Explicit parameter values override stringency presets. Carrie to determine specific tighter limits. **RESOLVED — implemented as the `permissiveness` parameter with 4 levels (loosest/looser/tighter/tightest). See Permissiveness Framework section.**

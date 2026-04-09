@@ -1482,3 +1482,28 @@ id,subjid,param,agedays,sex,measurement,expected_exc_wt,expected_exc_ht,expected
 2435,PERM_ht_gain,HEIGHTCM,8130,0,176,"","","","",ht_gain: companion,Permissiveness,0,,"",Include,Include,Include,Exclude-A-HT-Ord-Pair-All
 2436,PERM_ht_gain,WEIGHTKG,7300,0,70,"","","","",ht_gain: normal wt,Permissiveness,0,,"",Include,Include,Include,Include
 2437,PERM_ht_gain,WEIGHTKG,8130,0,72,"","","","",ht_gain: normal wt,Permissiveness,0,,"",Include,Include,Include,Include
+2438,UW_light_large_error,WEIGHTKG,8000,1,44,,,,,"UW scaling: 45kg patient, 145kg error — caught by ET or EWMA",UW_scaling,,,,Include,Include,Include,Include
+2439,UW_light_large_error,WEIGHTKG,8100,1,46,,,,,"UW scaling: 45kg patient, 145kg error — caught by ET or EWMA",UW_scaling,,,,Include,Include,Include,Include
+2440,UW_light_large_error,WEIGHTKG,8200,1,145,,,,,"UW scaling: 45kg patient, 145kg error — caught by ET or EWMA",UW_scaling,,,,Exclude-A-Evil-Twins,Exclude-A-Evil-Twins,Exclude-A-Evil-Twins,Exclude-A-WT-BIV
+2441,UW_light_large_error,WEIGHTKG,8300,1,45,,,,,"UW scaling: 45kg patient, 145kg error — caught by ET or EWMA",UW_scaling,,,,Include,Include,Include,Include
+2442,UW_light_large_error,WEIGHTKG,8400,1,44,,,,,"UW scaling: 45kg patient, 145kg error — caught by ET or EWMA",UW_scaling,,,,Include,Include,Include,Include
+2443,UW_heavy_mod_error,WEIGHTKG,10000,0,128,,,,,"UW scaling: 130kg patient, 180kg error — caught by moderate EWMA",UW_scaling,,,,Include,Include,Include,Include
+2444,UW_heavy_mod_error,WEIGHTKG,10100,0,132,,,,,"UW scaling: 130kg patient, 180kg error — caught by moderate EWMA",UW_scaling,,,,Include,Include,Include,Include
+2445,UW_heavy_mod_error,WEIGHTKG,10200,0,180,,,,,"UW scaling: 130kg patient, 180kg error — caught by moderate EWMA",UW_scaling,,,,Exclude-A-WT-Traj-Moderate-1,Exclude-A-WT-Traj-Moderate-1,Exclude-A-WT-BIV,Exclude-A-WT-BIV
+2446,UW_heavy_mod_error,WEIGHTKG,10300,0,130,,,,,"UW scaling: 130kg patient, 180kg error — caught by moderate EWMA",UW_scaling,,,,Include,Include,Include,Include
+2447,UW_heavy_mod_error,WEIGHTKG,10400,0,131,,,,,"UW scaling: 130kg patient, 180kg error — caught by moderate EWMA",UW_scaling,,,,Include,Include,Include,Include
+2448,UW_verylight_ceiling,WEIGHTKG,9000,1,34,,,,,"UW scaling: 35kg patient, 60kg error — 2/3 ceiling active",UW_scaling,,,,Include,Include,Exclude-A-WT-BIV,Exclude-A-WT-BIV
+2449,UW_verylight_ceiling,WEIGHTKG,9030,1,36,,,,,"UW scaling: 35kg patient, 60kg error — 2/3 ceiling active",UW_scaling,,,,Include,Include,Exclude-A-WT-2D-Ordered,Exclude-A-WT-BIV
+2450,UW_verylight_ceiling,WEIGHTKG,9060,1,60,,,,,"UW scaling: 35kg patient, 60kg error — 2/3 ceiling active",UW_scaling,,,,Exclude-A-WT-Traj-Moderate-1,Exclude-A-WT-Traj-Moderate-1,Exclude-A-WT-2D-Ordered,Exclude-A-WT-Too-Many-Errors
+2451,UW_verylight_ceiling,WEIGHTKG,9090,1,35,,,,,"UW scaling: 35kg patient, 60kg error — 2/3 ceiling active",UW_scaling,,,,Include,Include,Exclude-A-WT-BIV,Exclude-A-WT-BIV
+2452,UW_verylight_ceiling,WEIGHTKG,9120,1,34,,,,,"UW scaling: 35kg patient, 60kg error — 2/3 ceiling active",UW_scaling,,,,Include,Include,Exclude-A-WT-BIV,Exclude-A-WT-BIV
+2453,UW_legit_change,WEIGHTKG,10000,1,80,,,,,UW scaling: 80kg→60kg gradual loss over 1yr — all included,UW_scaling,,,,Include,Include,Include,Include
+2454,UW_legit_change,WEIGHTKG,10090,1,78,,,,,UW scaling: 80kg→60kg gradual loss over 1yr — all included,UW_scaling,,,,Include,Include,Include,Include
+2455,UW_legit_change,WEIGHTKG,10180,1,65,,,,,UW scaling: 80kg→60kg gradual loss over 1yr — all included,UW_scaling,,,,Include,Include,Include,Include
+2456,UW_legit_change,WEIGHTKG,10270,1,62,,,,,UW scaling: 80kg→60kg gradual loss over 1yr — all included,UW_scaling,,,,Include,Include,Include,Include
+2457,UW_legit_change,WEIGHTKG,10365,1,60,,,,,UW scaling: 80kg→60kg gradual loss over 1yr — all included,UW_scaling,,,,Include,Include,Include,Include
+2458,UW_pwl_light,WEIGHTKG,9000,0,42,,,,,"UW scaling PW-L: 43kg patient, 110kg error at tighter",UW_scaling,,,,Include,Include,Include,Include
+2459,UW_pwl_light,WEIGHTKG,9100,0,44,,,,,"UW scaling PW-L: 43kg patient, 110kg error at tighter",UW_scaling,,,,Include,Include,Include,Include
+2460,UW_pwl_light,WEIGHTKG,9200,0,110,,,,,"UW scaling PW-L: 43kg patient, 110kg error at tighter",UW_scaling,,,,Exclude-A-WT-Traj-Moderate-1,Exclude-A-WT-Traj-Moderate-1,Exclude-A-Evil-Twins,Exclude-A-Evil-Twins
+2461,UW_pwl_light,WEIGHTKG,9300,0,43,,,,,"UW scaling PW-L: 43kg patient, 110kg error at tighter",UW_scaling,,,,Include,Include,Include,Include
+2462,UW_pwl_light,WEIGHTKG,9400,0,42,,,,,"UW scaling PW-L: 43kg patient, 110kg error at tighter",UW_scaling,,,,Include,Include,Include,Include
