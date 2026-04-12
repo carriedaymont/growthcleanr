@@ -388,40 +388,32 @@ adult_ewma_cache_update <- function(cache, pos_j) {
 #' function to remove BIVs, based on cutoffs for the given method
 #' @keywords internal
 #' @noRd
-remove_biv <- function(subj_df, type, biv_df, include = FALSE) {
-  too_low <- remove_biv_low(subj_df, type, biv_df, include)
-  too_high <- remove_biv_high(subj_df, type, biv_df, include)
+remove_biv <- function(subj_df, type, biv_df) {
+  too_low <- remove_biv_low(subj_df, type, biv_df)
+  too_high <- remove_biv_high(subj_df, type, biv_df)
   return(too_low | too_high)
 }
 
 #' @keywords internal
 #' @noRd
-remove_biv_low <- function(subj_df, type, biv_df, include = FALSE) {
+remove_biv_low <- function(subj_df, type, biv_df) {
   # 0.12 tolerance for rounding (0.1 cm/kg rounding + float precision)
-  if (!include) {
-    too_low <- subj_df$meas_m < biv_df[type, "low"] - 0.12
-  } else {
-    too_low <- subj_df$meas_m <= biv_df[type, "low"] - 0.12
-  }
+  too_low <- subj_df$meas_m < biv_df[type, "low"] - 0.12
   return(too_low)
 }
 
 #' @keywords internal
 #' @noRd
-remove_biv_high <- function(subj_df, type, biv_df, include = FALSE) {
+remove_biv_high <- function(subj_df, type, biv_df) {
   # 0.12 tolerance for rounding (0.1 cm/kg rounding + float precision)
-  if (!include) {
-    too_high <- subj_df$meas_m > biv_df[type, "high"] + 0.12
-  } else {
-    too_high <- subj_df$meas_m >= biv_df[type, "high"] + 0.12
-  }
+  too_high <- subj_df$meas_m > biv_df[type, "high"] + 0.12
   return(too_high)
 }
 
 # step 2w, W repeated values ----
 
 #' Identify repeated weight values within a subject.
-#' Marks the first occurrence (earliest age, id tiebreaker) as is_first_rv=TRUE
+#' Marks the first occurrence (earliest age, internal_id tiebreaker) as is_first_rv=TRUE
 #' and all subsequent identical values as is_rv=TRUE. Unique values get both FALSE.
 #' Relies on w_subj_df being pre-sorted by age/id. Exact numeric match only
 #' (78.1 != 78.101). Does not filter by extraneous status; caller is responsible
@@ -445,7 +437,7 @@ identify_rv <- function(w_subj_df) {
 #' For weight (ptype="weight"): median of non-RV values (all included, not
 #' filtered by same-day status). For height (ptype="height"): median of all
 #' included values. On each same-day group, the value closest to median
-#' survives (id tiebreaker); others are marked extraneous=TRUE.
+#' survives (internal_id tiebreaker); others are marked extraneous=TRUE.
 #' @keywords internal
 #' @noRd
 temp_sde <- function(subj_df, ptype = "height") {
@@ -468,8 +460,8 @@ temp_sde <- function(subj_df, ptype = "height") {
     subj_df$extraneous <- FALSE
     for (dd in dup_days) {
       day_diffs <- subj_df$diff[as.character(subj_df$age_days) == dd]
-      # Keep highest id among ties (last position with min diff, matching
-      # final SDE resolution which keeps highest id)
+      # Keep highest internal_id among ties (last position with min diff, matching
+      # final SDE resolution which keeps highest internal_id)
       keeper <- max(which(day_diffs == min(day_diffs)))
       subj_df$extraneous[as.character(subj_df$age_days) == dd][-keeper] <- TRUE
     }
@@ -496,8 +488,8 @@ redo_identify_rv <- function(w_subj_df) {
     inc_df <- copy(w_subj_df[!w_subj_df$extraneous, ])
     inc_df <- identify_rv(inc_df)
     w_subj_df$is_first_rv <- w_subj_df$is_rv <- FALSE
-    w_subj_df$is_rv[w_subj_df$id %in% inc_df$id] <- inc_df$is_rv
-    w_subj_df$is_first_rv[w_subj_df$id %in% inc_df$id] <- inc_df$is_first_rv
+    w_subj_df$is_rv[w_subj_df$internal_id %in% inc_df$internal_id] <- inc_df$is_rv
+    w_subj_df$is_first_rv[w_subj_df$internal_id %in% inc_df$internal_id] <- inc_df$is_first_rv
   }
   return(w_subj_df)
 }
@@ -519,7 +511,7 @@ ht_allow <- function(velocity, ageyears1, ageyears2) {
 ht_change_groups <- function(h_subj_df, cutoff, type = "loss") {
   glist <- galist <- list()
   cg <- 1
-  glist[[cg]] <- setNames(h_subj_df$meas_m[1], h_subj_df$id[1])
+  glist[[cg]] <- setNames(h_subj_df$meas_m[1], h_subj_df$internal_id[1])
   galist[[cg]] <- h_subj_df$ageyears[1]
   for (m in 2:nrow(h_subj_df)) {
     cm <- h_subj_df$meas_m[m]
@@ -529,11 +521,11 @@ ht_change_groups <- function(h_subj_df, cutoff, type = "loss") {
 
     if (crng < (5.08 + 0.12)) {
       glist[[cg]] <- setNames(c(glist[[cg]], cm),
-                              c(names(glist[[cg]]), h_subj_df$id[m]))
+                              c(names(glist[[cg]]), h_subj_df$internal_id[m]))
       galist[[cg]] <- c(galist[[cg]], h_subj_df$ageyears[m])
     } else {
       cg <- cg + 1
-      glist[[cg]] <- setNames(cm, h_subj_df$id[m])
+      glist[[cg]] <- setNames(cm, h_subj_df$internal_id[m])
       galist[[cg]] <- h_subj_df$ageyears[m]
     }
 
@@ -864,16 +856,16 @@ compute_trajectory_fails <- function(meas, age_days, err = 5) {
 #' @keywords internal
 evil_twins <- function(w_subj_df, wtallow_formula = "piecewise") {
   # Need at least 3 included values for pairs guard
-  inc_df <- w_subj_df[order(w_subj_df$age_days, w_subj_df$id), ]
+  inc_df <- w_subj_df[order(w_subj_df$age_days, w_subj_df$internal_id), ]
   exc_ids <- character(0)
 
   while (TRUE) {
     # Work with currently non-excluded values
-    working <- inc_df[!inc_df$id %in% exc_ids, ]
+    working <- inc_df[!inc_df$internal_id %in% exc_ids, ]
     n <- nrow(working)
     if (n < 3) break
 
-    working <- working[order(working$age_days, working$id), ]
+    working <- working[order(working$age_days, working$internal_id), ]
 
     # Compute interval-based caps (etcap) between adjacent values
     age_diff_days <- diff(working$age_days)
@@ -911,11 +903,11 @@ evil_twins <- function(w_subj_df, wtallow_formula = "piecewise") {
 
     # Among OOB observations, find the most deviant
     oob_working <- working[working$oob, ]
-    # Sort: most deviant first, then highest weight, then lowest id
-    oob_working <- oob_working[order(-oob_working$absd_med, -oob_working$meas_m, oob_working$id), ]
+    # Sort: most deviant first, then highest weight, then lowest internal_id
+    oob_working <- oob_working[order(-oob_working$absd_med, -oob_working$meas_m, oob_working$internal_id), ]
 
     # Exclude the most deviant one
-    exc_ids <- c(exc_ids, as.character(oob_working$id[1]))
+    exc_ids <- c(exc_ids, as.character(oob_working$internal_id[1]))
   }
 
   exc_ids
@@ -927,7 +919,7 @@ evil_twins <- function(w_subj_df, wtallow_formula = "piecewise") {
 #'
 #' Iteratively excludes values whose EWMA deviation exceeds an interval-specific
 #' threshold (ET cap). Each round removes the single worst outlier (largest
-#' |dewma|, with age then id as tiebreakers). Iterates until no candidates
+#' |dewma|, with age then internal_id as tiebreakers). Iterates until no candidates
 #' remain or <3 values.
 #'
 #' Threshold: ET cap derived from wtallow formula and upper weight (UW).
@@ -977,19 +969,18 @@ remove_ewma_wt <- function(subj_df, wtallow_formula = "piecewise",
                                   uw = uw_obs)
 
     # 90% rule: directional dewma must exceed 90% of threshold
-    # NA → Inf for edge values (Stata missing-as-infinity: . > x is TRUE)
-    dewma_bef_safe <- ifelse(is.na(dewma_bef), Inf, dewma_bef)
-    dewma_aft_safe <- ifelse(is.na(dewma_aft), Inf, dewma_aft)
+    # Edge values: ewma_before/ewma_after fall back to ewma_all via
+    # adult_ewma_cache_init(), so dewma_bef/dewma_aft are never NA.
 
     # Positive direction
     # 0.12 kg rounding tolerance on all threshold comparisons
     criteria_pos <- !is.na(dewma_all) & dewma_all > threshold + 0.12 &
-                    dewma_bef_safe > 0.9 * threshold + 0.12 &
-                    dewma_aft_safe > 0.9 * threshold + 0.12
+                    dewma_bef > 0.9 * threshold + 0.12 &
+                    dewma_aft > 0.9 * threshold + 0.12
     # Negative direction
     criteria_neg <- !is.na(dewma_all) & dewma_all < -(threshold + 0.12) &
-                    dewma_bef_safe < -(0.9 * threshold + 0.12) &
-                    dewma_aft_safe < -(0.9 * threshold + 0.12)
+                    dewma_bef < -(0.9 * threshold + 0.12) &
+                    dewma_aft < -(0.9 * threshold + 0.12)
 
     criteria_new <- criteria_pos | criteria_neg
 
@@ -998,12 +989,12 @@ remove_ewma_wt <- function(subj_df, wtallow_formula = "piecewise",
     } else {
       absdewma <- abs(dewma_all)
       cand_idx <- which(criteria_new)
-      # id tiebreaker for sort determinism
+      # internal_id tiebreaker for sort determinism
       ord <- order(-absdewma[cand_idx], subj_df$age_days[cand_idx],
-                   as.numeric(subj_df$id[cand_idx]))
+                   as.numeric(subj_df$internal_id[cand_idx]))
       to_rem <- cand_idx[ord[1]]
 
-      rem_ids <- c(rem_ids, as.character(subj_df$id[to_rem]))
+      rem_ids <- c(rem_ids, as.character(subj_df$internal_id[to_rem]))
       round_codes <- c(round_codes, paste0(exc_label, "-", round_num))
       subj_df <- subj_df[-to_rem, ]
       round_num <- round_num + 1
@@ -1039,16 +1030,16 @@ propagate_to_rv <- function(exc_codes, w_subj_df, w_subj_keep) {
   }
 
   for (exc_id in names(exc_codes)) {
-    idx <- which(as.character(w_subj_df$id) == exc_id)
+    idx <- which(as.character(w_subj_df$internal_id) == exc_id)
     if (length(idx) == 0) next
     exc_meas <- w_subj_df$meas_m[idx[1]]
 
     # Find all values with same meas_m (RV copies + extraneous with same value)
     match_idx <- which(w_subj_df$meas_m == exc_meas &
-                       as.character(w_subj_df$id) != exc_id)
+                       as.character(w_subj_df$internal_id) != exc_id)
     if (length(match_idx) == 0) next
 
-    match_ids <- as.character(w_subj_df$id[match_idx])
+    match_ids <- as.character(w_subj_df$internal_id[match_idx])
     match_ids <- match_ids[w_subj_keep[match_ids] == "Include"]
 
     if (length(match_ids) > 0) {
@@ -1077,14 +1068,14 @@ remove_mod_ewma_wt <- function(full_inc_df, exc_label = "Exclude-A-WT-Traj-Moder
                                mod_ewma_f = 0.75,
                                perclimit_low = 0.5, perclimit_mid = 0.4,
                                perclimit_high = 0.0) {
-  inc_df <- full_inc_df[order(full_inc_df$ageyears, as.numeric(full_inc_df$id)), ]
+  inc_df <- full_inc_df[order(full_inc_df$ageyears, as.numeric(full_inc_df$internal_id)), ]
   exclusions <- character(0)
 
   for (round_num in seq_len(max_rounds)) {
     n <- nrow(inc_df)
     if (n < 3) break
 
-    ids   <- as.character(inc_df$id)
+    ids   <- as.character(inc_df$internal_id)
     meas  <- inc_df$meas_m
     adays <- inc_df$age_days
     ayrs  <- inc_df$ageyears
@@ -1366,7 +1357,7 @@ eval_2d_nonord <- function(w_subj_df, w_subj_keep, wtallow_formula = "piecewise"
   if (nrow(w_subj_df) < 2) return(exc_ids)
 
   vals <- w_subj_df$meas_m
-  ids <- as.character(w_subj_df$id)
+  ids <- as.character(w_subj_df$internal_id)
 
   # Check: exactly 2 distinct values
   uvals <- unique(vals)
@@ -1381,7 +1372,7 @@ eval_2d_nonord <- function(w_subj_df, w_subj_keep, wtallow_formula = "piecewise"
   }
 
   # Compute wtallow for each adjacent pair
-  w_sorted <- w_subj_df[order(w_subj_df$age_days, as.numeric(w_subj_df$id)), ]
+  w_sorted <- w_subj_df[order(w_subj_df$age_days, as.numeric(w_subj_df$internal_id)), ]
   n <- nrow(w_sorted)
   any_outside <- FALSE
 
@@ -1457,10 +1448,10 @@ eval_1d <- function(subj_results, params) {
     # Get currently included heights and weights (excluding pass-1 exclusions)
     ht_inc <- subj_results[subj_results$param %in% c("HEIGHTCM", "HEIGHTIN") &
                            subj_results$result == "Include" &
-                           !subj_results$id %in% exc_ids, ]
+                           !subj_results$internal_id %in% exc_ids, ]
     wt_inc <- subj_results[subj_results$param %in% c("WEIGHTKG", "WEIGHTLBS") &
                            subj_results$result == "Include" &
-                           !subj_results$id %in% exc_ids, ]
+                           !subj_results$internal_id %in% exc_ids, ]
 
     ht_1d <- length(unique(ht_inc$meas_m)) == 1 & nrow(ht_inc) > 0
     wt_1d <- length(unique(wt_inc$meas_m)) == 1 & nrow(wt_inc) > 0
@@ -1482,20 +1473,20 @@ eval_1d <- function(subj_results, params) {
       bmi_extreme <- bmi < params$bmi_min | bmi > params$bmi_max
 
       if (bmi_extreme) {
-        if (ht_1d) exc_ids <- c(exc_ids, as.character(ht_inc$id))
-        if (wt_1d) exc_ids <- c(exc_ids, as.character(wt_inc$id))
+        if (ht_1d) exc_ids <- c(exc_ids, as.character(ht_inc$internal_id))
+        if (wt_1d) exc_ids <- c(exc_ids, as.character(wt_inc$internal_id))
       } else {
         # 0.12 tolerance for rounding (0.1 cm/kg rounding + float precision)
         if (ht_1d) {
           ht_val_check <- unique(ht_inc$meas_m)
           if (ht_val_check < params$ht_min_bmi - 0.12 | ht_val_check > params$ht_max_bmi + 0.12) {
-            exc_ids <- c(exc_ids, as.character(ht_inc$id))
+            exc_ids <- c(exc_ids, as.character(ht_inc$internal_id))
           }
         }
         if (wt_1d) {
           wt_val_check <- unique(wt_inc$meas_m)
           if (wt_val_check < params$wt_min_bmi - 0.12 | wt_val_check > params$wt_max_bmi + 0.12) {
-            exc_ids <- c(exc_ids, as.character(wt_inc$id))
+            exc_ids <- c(exc_ids, as.character(wt_inc$internal_id))
           }
         }
       }
@@ -1504,13 +1495,13 @@ eval_1d <- function(subj_results, params) {
       if (ht_1d) {
         ht_val_check <- unique(ht_inc$meas_m)
         if (ht_val_check < params$ht_min_nobmi - 0.12 | ht_val_check > params$ht_max_nobmi + 0.12) {
-          exc_ids <- c(exc_ids, as.character(ht_inc$id))
+          exc_ids <- c(exc_ids, as.character(ht_inc$internal_id))
         }
       }
       if (wt_1d) {
         wt_val_check <- unique(wt_inc$meas_m)
         if (wt_val_check < params$wt_min_nobmi - 0.12 | wt_val_check > params$wt_max_nobmi + 0.12) {
-          exc_ids <- c(exc_ids, as.character(wt_inc$id))
+          exc_ids <- c(exc_ids, as.character(wt_inc$internal_id))
         }
       }
     }
@@ -1578,7 +1569,7 @@ eval_error_load <- function(subj_results, error_threshold = 0.41) {
     ratio <- n_errors / denom
     if (ratio > error_threshold) {
       # Exclude all remaining Include values
-      inc_ids <- as.character(non_sde$id[non_sde$result == "Include"])
+      inc_ids <- as.character(non_sde$internal_id[non_sde$result == "Include"])
       exc_ids <- c(exc_ids, inc_ids)
     }
   }

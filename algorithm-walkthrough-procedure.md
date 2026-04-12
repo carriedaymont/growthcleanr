@@ -68,6 +68,7 @@ Items identified during the YYYY-MM-DD walk-through that are deferred for later 
 - `R/adult_support.R` — support functions
 - `adult-algorithm-narrative.md` — step-by-step documentation
 - `gc-adult-permissiveness-spec-YYYY-MM-DD.md` — permissiveness framework
+- `wtallow-formulas.md` — canonical specification for wtallow base formulas, UW adjustment, ET caps, and ceilings. Must be reconciled with code and narrative for every step that uses wtallow, ET caps, or related limits (Steps 9Wa, 9Wb, 11Wa, 11Wa2, 11Wb).
 
 **Child:**
 - `R/child_clean.R` — main algorithm + support functions
@@ -96,9 +97,10 @@ For adult, the main loop in `adult_clean.R` dispatches to support functions in
 For each step, systematically check:
 
 1. **Sort order determinism** — Every `order()` or sort call that could have ties
-   must include an `id` tiebreaker. For adult, `id` is stored as character, so
-   use `as.numeric(id)` not `id`. Look for any call like `order(ageyears)` or
-   `order(age_days)` without an id tiebreaker.
+   must include an `internal_id` tiebreaker. For adult, `internal_id` is stored
+   as character inside `cleanadult()`, so use `as.numeric(internal_id)` not
+   `internal_id`. Look for any call like `order(ageyears)` or
+   `order(age_days)` without an internal_id tiebreaker.
 
 2. **Rounding tolerance** — All threshold comparisons should include the standard
    tolerance (`+ 0.12` for adult ht/wt; none for child z-scores). Check for
@@ -134,6 +136,16 @@ For each step, systematically check:
 10. **Stale content** — References to prior versions, edit dates ("as of v2.1"),
     author attributions, "TODO" comments, and "check whether" notes that have
     already been checked.
+
+11. **wtallow/limit reconciliation** — For any step that uses `wtallow`,
+    `compute_wtallow()`, `compute_et_limit()`, ET caps, or UW-based scaling,
+    verify that the code implementation matches the canonical specification in
+    `wtallow-formulas.md`. Check: base formula values, UW adjustment logic
+    (highUW, lowUW, ceiling), cap values at 6m/12m, ET cap derivation, and
+    the allofus15 cap-limiting rule. Also verify the narrative description of
+    these limits matches both code and spec. Relevant steps: 9Wa (Evil Twins),
+    9Wb (Extreme EWMA), 11Wa (2D Ordered), 11Wa2 (2D Non-Ordered), 11Wb
+    (Moderate EWMA).
 
 ### Step D: Classify findings
 
@@ -220,7 +232,7 @@ The child algorithm has different conventions from adult:
 - **`valid()` gatekeeper** — understand `include.temporary.extraneous`, `include.extraneous`, `include.carryforward` flags before reading any step
 - **Z-scores not raw measurements** — comparisons use `tbc.sd`/`ctbc.sd`, not `meas_m`
 - **Single `data.df`** — rows never removed; exclusions set `exclude` column
-- **Age-dependent id tiebreaking** — at birth (agedays == 0): keep lowest id; all other ages: keep highest id
+- **Age-dependent internal_id tiebreaking** — at birth (agedays == 0): keep lowest internal_id; all other ages: keep highest internal_id
 - **No permissiveness levels yet** — parameter table review is simpler
 - **DOP (Designated Other Parameter)** — weight's DOP is height, and vice versa; HC's DOP is height. Many steps use DOP for cross-parameter plausibility
 

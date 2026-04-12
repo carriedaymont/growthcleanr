@@ -300,9 +300,9 @@ stopifnot(all(result$exclude == "Include"))
 - **Rounding tolerance:** 0.12 cm/kg on all threshold comparisons. See algorithm narrative Rounding Tolerance section.
 - **perclimit scope:** 11Wa uses subject-level (max across obs). 11Wb uses observation-level.
 - **sex variable:** Not used by adult algorithm but required by package. Arbitrary value OK.
-- **Sort determinism:** All sorts include `id` as final tiebreaker.
+- **Sort determinism:** All sorts include `internal_id` as final tiebreaker.
 - **Missing-as-infinity:** R uses `ifelse(is.na(...), Inf, ...)` for edge EWMA values.
-- **ID handling:** Converts to character internally, restores original type on output.
+- **ID handling:** `internal_id` (sequential integer from `cleangrowth()`) is used for all internal processing. Converted to character inside `cleanadult()` for named vector indexing. User's original `id` is preserved and restored on output.
 
 ---
 

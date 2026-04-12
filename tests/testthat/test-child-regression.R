@@ -99,7 +99,7 @@ test_that("child algorithm: exclusion counts match expected on 100 subjects", {
 
   # Frozen expected counts (100 subjects, 832 rows, sd.recenter = "NHANES")
   expect_equal(nrow(res), 832)
-  expect_equal(catcount("Include"), 597)
+  expect_equal(catcount("Include"), 599)
   expect_equal(catcount("Exclude-SDE-EWMA"), 127)
   expect_equal(catcount("Exclude-Carried-Forward"), 75)
   expect_equal(catcount("Exclude-SDE-Identical"), 13)
@@ -107,12 +107,12 @@ test_that("child algorithm: exclusion counts match expected on 100 subjects", {
   expect_equal(catcount("Exclude-EWMA2-middle"), 3)
   expect_equal(catcount("Exclude-Absolute-BIV"), 3)
   expect_equal(catcount("Exclude-Min-diff"), 3)
-  expect_equal(catcount("Exclude-Error-load"), 2)
   expect_equal(catcount("Exclude-Standardized-BIV"), 2)
   expect_equal(catcount("Exclude-Evil-Twins"), 1)
 
-  # Exactly 11 distinct categories present
-  expect_equal(length(unique(as.character(res$exclude))), 11)
+  # Exactly 10 distinct categories present (Error-load no longer triggers
+  # at default threshold=0.5; previously triggered at hardcoded 0.4)
+  expect_equal(length(unique(as.character(res$exclude))), 10)
 })
 
 # ---------------------------------------------------------------------------
@@ -153,8 +153,9 @@ test_that("child algorithm: spot-check individual records", {
   # Exclude-Min-diff — minimum height difference violation
   expect_equal(gcr_result(res, 38718), "Exclude-Min-diff")
 
-  # Exclude-Error-load — too many errors for subject
-  expect_equal(gcr_result(res, 25251), "Exclude-Error-load")
+  # ID 25251 was Exclude-Error-load when threshold was hardcoded at 0.4;
+  # now Include at default threshold=0.5
+  expect_equal(gcr_result(res, 25251), "Include")
 
   # Exclude-Standardized-BIV — standardized biologically implausible
   expect_equal(gcr_result(res, 25257), "Exclude-Standardized-BIV")

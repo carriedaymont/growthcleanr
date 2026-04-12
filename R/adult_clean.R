@@ -4,7 +4,7 @@
 
 #' Clean height and weight data for adults
 #'
-#' @param df data.table with columns: id, subjid, sex, agedays, param, measurement
+#' @param df data.table with columns: id, internal_id, subjid, sex, agedays, param, measurement
 #' @param permissiveness Permissiveness level: "loosest" (default), "looser",
 #'   "tighter", "tightest". Sets defaults for all sub-parameters below.
 #'   Explicit sub-parameter values override the preset.
@@ -79,7 +79,7 @@ cleanadult <- function(df,
                        quietly = FALSE) {
 
   # avoid "no visible binding for global variable" notes in R CMD check
-  ageyears <- id_as_entered <- result <- mean_ht <- loss_groups <- NULL
+  ageyears <- internal_id <- result <- mean_ht <- loss_groups <- NULL
   gain_groups <- extraneous <- meas_m <- age_days <- bin_result <- NULL
   param <- measurement <- i.keep <- i.mean_ht <- i.loss_grp <- NULL
   i.gain_grp <- i.extraneous <- NULL
@@ -161,7 +161,7 @@ cleanadult <- function(df,
   }
 
   # Ensure required columns exist
-  required_cols <- c("id", "subjid", "param", "agedays", "sex", "measurement")
+  required_cols <- c("id", "internal_id", "subjid", "param", "agedays", "sex", "measurement")
   missing_cols <- setdiff(required_cols, names(df))
   if (length(missing_cols) > 0) {
     stop(paste("Missing required columns:", paste(missing_cols, collapse = ", ")))
@@ -178,8 +178,12 @@ cleanadult <- function(df,
     added_cols <- c(added_cols, "ageyears")
   }
 
-  df[, id_as_entered := id]
-  df[, id := as.character(id)]
+  # internal_id is a sequential numeric created by cleangrowth() for
+  # deterministic sorting and tiebreaking. The user's original id is
+  # preserved untouched in the id column throughout.
+  # Convert to character so named vector indexing works correctly
+  # (integer keys do positional indexing; character keys do named indexing).
+  df[, internal_id := as.character(internal_id)]
   df[, result := "Include"]
   df[, mean_ht := as.numeric(NA)]
   df[, loss_groups := as.numeric(NA)]
@@ -216,11 +220,11 @@ cleanadult <- function(df,
     # =========================================================================
 
     h_subj_df <- copy(df[param %in% c("HEIGHTCM", "HEIGHTIN") & slog, ])
-    h_subj_df <- h_subj_df[order(ageyears, as.numeric(id)), ]
+    h_subj_df <- h_subj_df[order(ageyears, as.numeric(internal_id)), ]
 
     h_subj_keep <- rep("Include", nrow(h_subj_df))
     h_extraneous <- rep(FALSE, nrow(h_subj_df))
-    names(h_subj_keep) <- names(h_extraneous) <- h_subj_df$id
+    names(h_subj_keep) <- names(h_extraneous) <- h_subj_df$internal_id
 
     # --- 1H: BIV (Biologically Implausible Values) ---
     # Exclude heights outside BIV limits (overall_ht_min / overall_ht_max).
@@ -239,7 +243,7 @@ cleanadult <- function(df,
     # resolution happens later in Step 9H.
     if (nrow(h_subj_df) > 0) {
       h_subj_df <- temp_sde(h_subj_df)
-      h_extraneous[h_subj_df$id[h_subj_df$extraneous]] <- TRUE
+      h_extraneous[h_subj_df$internal_id[h_subj_df$extraneous]] <- TRUE
     }
 
     # =========================================================================
@@ -247,11 +251,11 @@ cleanadult <- function(df,
     # =========================================================================
 
     w_subj_df <- copy(df[param %in% c("WEIGHTKG", "WEIGHTLBS") & slog, ])
-    w_subj_df <- w_subj_df[order(ageyears, as.numeric(id)), ]
+    w_subj_df <- w_subj_df[order(ageyears, as.numeric(internal_id)), ]
 
     w_subj_keep <- rep("Include", nrow(w_subj_df))
     w_extraneous <- rep(FALSE, nrow(w_subj_df))
-    names(w_subj_keep) <- names(w_extraneous) <- w_subj_df$id
+    names(w_subj_keep) <- names(w_extraneous) <- w_subj_df$internal_id
 
     # --- 1W: BIV (Biologically Implausible Values) ---
     # Exclude weights outside BIV limits (overall_wt_min / overall_wt_max).
@@ -267,7 +271,7 @@ cleanadult <- function(df,
     # if BMI is outside [overall_bmi_min, overall_bmi_max]. No rounding tolerance
     # is added to the BMI comparison: tolerance is already embedded in the
     # measurement-level BIV checks above, and BMI is a derived value.
-    # Pairing: first ht and first wt on each shared ageday (by id order, already sorted).
+    # Pairing: first ht and first wt on each shared ageday (by internal_id order, already sorted).
     # Guard: only run when overall_bmi limits are wider than single_bmi limits (i.e., when
     # the check provides coverage beyond what Step 13 already handles). In practice this
     # means loosest only — at other levels overall_bmi == single_bmi, so the check would
@@ -284,23 +288,23 @@ cleanadult <- function(df,
         wt_val <- wt_day$meas_m[1]
         bmi_val <- wt_val / ((ht_val / 100)^2)
         if (bmi_val < overall_bmi_min || bmi_val > overall_bmi_max) {
-          exc_ht_bmi <- c(exc_ht_bmi, as.character(ht_day$id[1]))
-          exc_wt_bmi <- c(exc_wt_bmi, as.character(wt_day$id[1]))
+          exc_ht_bmi <- c(exc_ht_bmi, as.character(ht_day$internal_id[1]))
+          exc_wt_bmi <- c(exc_wt_bmi, as.character(wt_day$internal_id[1]))
         }
       }
       if (length(exc_ht_bmi) > 0) {
         h_subj_keep[exc_ht_bmi] <- "Exclude-A-HT-BIV"
-        h_subj_df <- h_subj_df[!h_subj_df$id %in% exc_ht_bmi, ]
+        h_subj_df <- h_subj_df[!h_subj_df$internal_id %in% exc_ht_bmi, ]
       }
       if (length(exc_wt_bmi) > 0) {
         w_subj_keep[exc_wt_bmi] <- "Exclude-A-WT-BIV"
-        w_subj_df <- w_subj_df[!w_subj_df$id %in% exc_wt_bmi, ]
+        w_subj_df <- w_subj_df[!w_subj_df$internal_id %in% exc_wt_bmi, ]
       }
     }
 
     # --- 2W: Repeated Values (Weight only) ---
     # Identify groups of identical weight values (by meas_m) within a subject.
-    # The first occurrence (earliest age, id tiebreaker) is marked is_first_rv=TRUE;
+    # The first occurrence (earliest age, internal_id tiebreaker) is marked is_first_rv=TRUE;
     # subsequent identical values are marked is_rv=TRUE. Unique values have both FALSE.
     # RVs are NOT excluded here — they are flagged for differential handling in
     # later steps (e.g., EWMA). RV identification is weight-only; height does not
@@ -316,7 +320,7 @@ cleanadult <- function(df,
     if (nrow(w_subj_df) > 0) {
       w_subj_df <- temp_sde(w_subj_df, ptype = "weight")
       w_subj_df <- redo_identify_rv(w_subj_df)
-      w_extraneous[w_subj_df$id[w_subj_df$extraneous]] <- TRUE
+      w_extraneous[w_subj_df$internal_id[w_subj_df$extraneous]] <- TRUE
     }
 
     # --- 4W: Scale Max (Weight Cap) ---
@@ -404,15 +408,15 @@ cleanadult <- function(df,
       # get the scale-max code. This differs from EWMA RV propagation which
       # only goes firstRV → later RVs.
       if (all_wc) {
-        impl_ids <- as.character(w_subj_df$id)
+        impl_ids <- as.character(w_subj_df$internal_id)
       } else {
-        nonrv_exc_ids <- as.character(nonrv_df$id[criteria_nonrv])
+        nonrv_exc_ids <- as.character(nonrv_df$internal_id[criteria_nonrv])
         exc_meas <- unique(nonrv_df$meas_m[criteria_nonrv])
         rv_exc_ids <- character(0)
         if (length(nonrv_exc_ids) > 0) {
-          rv_exc_ids <- as.character(w_subj_df$id[
+          rv_exc_ids <- as.character(w_subj_df$internal_id[
             w_subj_df$meas_m %in% exc_meas &
-            !w_subj_df$id %in% nonrv_exc_ids])
+            !w_subj_df$internal_id %in% nonrv_exc_ids])
         }
         impl_ids <- c(nonrv_exc_ids, rv_exc_ids)
       }
@@ -432,7 +436,7 @@ cleanadult <- function(df,
         }
       }
 
-      w_subj_df <- w_subj_df[!w_subj_df$id %in% impl_ids, ]
+      w_subj_df <- w_subj_df[!w_subj_df$internal_id %in% impl_ids, ]
 
       if (length(impl_ids) > 0 & nrow(w_subj_df) > 0) {
         w_subj_df <- identify_rv(w_subj_df)
@@ -462,7 +466,7 @@ cleanadult <- function(df,
         et_exc_ids <- evil_twins(et_df, wtallow_formula = wtallow_formula)
         if (length(et_exc_ids) > 0) {
           w_subj_keep[et_exc_ids] <- "Exclude-A-Evil-Twins"
-          w_subj_df <- w_subj_df[!w_subj_df$id %in% et_exc_ids, ]
+          w_subj_df <- w_subj_df[!w_subj_df$internal_id %in% et_exc_ids, ]
           if (nrow(w_subj_df) > 0) {
             w_subj_df <- identify_rv(w_subj_df)
             w_subj_df <- temp_sde(w_subj_df, ptype = "weight")
@@ -476,14 +480,14 @@ cleanadult <- function(df,
     # STEP 9H: FINAL SDE HEIGHT RESOLUTION
     # =========================================================================
     # Final resolution of same-day height duplicates flagged in Step 3H.
-    # Part A: Exclude identical same-day values (keep lowest id).
+    # Part A: Exclude identical same-day values (keep lowest internal_id).
     # Part B: For remaining non-identical SDEs, categorize subject by
     #   number of distinct days and SDE prevalence, then choose keeper
     #   using category-specific median comparisons.
     # Categories: (1) one day total, (2) >=4 days & <50% SDE,
     #   (3) 2-3 days or >=50% SDE.
     # Keeper retains its original meas_m (no averaging).
-    # Tiebreaker for non-identical: highest id (later measurement).
+    # Tiebreaker for non-identical: highest internal_id (later measurement).
 
     if (nrow(h_subj_df) > 0 & any(h_subj_df$extraneous)) {
       step <- "Exclude-A-HT-Identical"
@@ -495,7 +499,7 @@ cleanadult <- function(df,
         s_df <- copy(h_subj_df[h_subj_df$age_days == dd, ])
         ide_tab <- table(s_df$meas_m)
         if (any(ide_tab > 1)) {
-          ide_ids <- c(ide_ids, s_df$id[
+          ide_ids <- c(ide_ids, s_df$internal_id[
             as.character(s_df$meas_m) %in% names(ide_tab[ide_tab > 1])
           ][duplicated(
             s_df$meas_m[
@@ -504,8 +508,8 @@ cleanadult <- function(df,
           )])
         }
       }
-      criteria <- h_subj_df$id %in% ide_ids
-      h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
+      criteria <- h_subj_df$internal_id %in% ide_ids
+      h_subj_keep[as.character(h_subj_df$internal_id)][criteria] <- step
       h_subj_df <- h_subj_df[!criteria, ]
 
       if (any(criteria)) {
@@ -542,21 +546,21 @@ cleanadult <- function(df,
           s_df$absdiff_medmed <- abs(s_df$meas_m - medmed)
 
           if (daystot == 1) {
-            s_df <- s_df[order(s_df$absdiff_daymed, -as.numeric(s_df$id)), ]
+            s_df <- s_df[order(s_df$absdiff_daymed, -as.numeric(s_df$internal_id)), ]
           } else if (daystot >= 4 & sderatio < 0.5) {
             s_df <- s_df[order(s_df$absdiff_nonsdemed, s_df$absdiff_daymed,
-                               -as.numeric(s_df$id)), ]
+                               -as.numeric(s_df$internal_id)), ]
           } else {
             s_df <- s_df[order(s_df$absdiff_medmed, s_df$absdiff_nonsdemed,
-                               s_df$absdiff_daymed, -as.numeric(s_df$id)), ]
+                               s_df$absdiff_daymed, -as.numeric(s_df$internal_id)), ]
           }
 
-          keeper_id <- s_df$id[1]
-          rem_ids <- c(rem_ids, s_df$id[-1])
+          keeper_id <- s_df$internal_id[1]
+          rem_ids <- c(rem_ids, s_df$internal_id[-1])
         }
 
-        criteria <- h_subj_df$id %in% rem_ids
-        h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
+        criteria <- h_subj_df$internal_id %in% rem_ids
+        h_subj_keep[as.character(h_subj_df$internal_id)][criteria] <- step
         h_subj_df <- h_subj_df[!criteria, ]
       }
     }
@@ -585,7 +589,7 @@ cleanadult <- function(df,
             ewma_result <- remove_ewma_wt(inc_df, wtallow_formula = wtallow_formula, ewma_window = ewma_window)
             if (length(ewma_result) > 0) {
               w_subj_keep[names(ewma_result)] <- ewma_result
-              w_subj_df <- w_subj_df[!w_subj_df$id %in% names(ewma_result), ]
+              w_subj_df <- w_subj_df[!w_subj_df$internal_id %in% names(ewma_result), ]
               if (nrow(w_subj_df) > 0) w_subj_df <- identify_rv(w_subj_df)
             }
           } else {
@@ -607,7 +611,7 @@ cleanadult <- function(df,
                   prop <- propagate_to_rv(fr_result, w_subj_df, w_subj_keep)
                   w_subj_keep <- prop$w_subj_keep
                   all_exc <- c(names(fr_result), prop$propagated_ids)
-                  w_subj_df <- w_subj_df[!w_subj_df$id %in% all_exc, ]
+                  w_subj_df <- w_subj_df[!w_subj_df$internal_id %in% all_exc, ]
                   if (nrow(w_subj_df) > 0) w_subj_df <- identify_rv(w_subj_df)
                 }
               }
@@ -629,7 +633,7 @@ cleanadult <- function(df,
                                             ewma_window = ewma_window)
                 if (length(ar_result) > 0) {
                   w_subj_keep[names(ar_result)] <- ar_result
-                  w_subj_df <- w_subj_df[!w_subj_df$id %in% names(ar_result), ]
+                  w_subj_df <- w_subj_df[!w_subj_df$internal_id %in% names(ar_result), ]
                   if (nrow(w_subj_df) > 0) w_subj_df <- identify_rv(w_subj_df)
                 }
               }
@@ -729,7 +733,7 @@ cleanadult <- function(df,
       # loss/gain group rescue.
       # Codes: Height-Window-All (no viable w2) or Height-Window (outside w2)
 
-      h_subj_df <- h_subj_df[order(h_subj_df$ageyears, as.numeric(h_subj_df$id)), ]
+      h_subj_df <- h_subj_df[order(h_subj_df$ageyears, as.numeric(h_subj_df$internal_id)), ]
 
       w2_window <- ht_band * 2.54 + 0.12
       w2_groups <- lapply(unique(h_subj_df$meas_m), function(x) {
@@ -873,7 +877,7 @@ cleanadult <- function(df,
       }
     gain_groups[names(hold_groups)] <- hold_groups
 
-    h_subj_keep[as.character(h_subj_df$id)][criteria] <- step
+    h_subj_keep[as.character(h_subj_df$internal_id)][criteria] <- step
     h_subj_df <- h_subj_df[!criteria, ]
 
     # =========================================================================
@@ -890,7 +894,7 @@ cleanadult <- function(df,
         s_df <- copy(w_subj_df[w_subj_df$age_days == dd, ])
         ide_tab <- table(s_df$meas_m)
         if (any(ide_tab > 1)) {
-          ide_ids <- c(ide_ids, s_df$id[
+          ide_ids <- c(ide_ids, s_df$internal_id[
             as.character(s_df$meas_m) %in% names(ide_tab[ide_tab > 1])
           ][duplicated(
             s_df$meas_m[
@@ -899,8 +903,8 @@ cleanadult <- function(df,
           )])
         }
       }
-      criteria <- w_subj_df$id %in% ide_ids
-      w_subj_keep[as.character(w_subj_df$id)][criteria] <- step
+      criteria <- w_subj_df$internal_id %in% ide_ids
+      w_subj_keep[as.character(w_subj_df$internal_id)][criteria] <- step
       w_subj_df <- w_subj_df[!criteria, ]
 
       if (any(criteria)) {
@@ -939,21 +943,21 @@ cleanadult <- function(df,
           s_df$absdiff_medmed <- abs(s_df$meas_m - medmed)
 
           if (daystot == 1) {
-            s_df <- s_df[order(s_df$absdiff_daymed, -as.numeric(s_df$id)), ]
+            s_df <- s_df[order(s_df$absdiff_daymed, -as.numeric(s_df$internal_id)), ]
           } else if (daystot >= 4 & sderatio < 0.5) {
             s_df <- s_df[order(s_df$absdiff_nonsdemed, s_df$absdiff_daymed,
-                               -as.numeric(s_df$id)), ]
+                               -as.numeric(s_df$internal_id)), ]
           } else {
             s_df <- s_df[order(s_df$absdiff_medmed, s_df$absdiff_nonsdemed,
-                               s_df$absdiff_daymed, -as.numeric(s_df$id)), ]
+                               s_df$absdiff_daymed, -as.numeric(s_df$internal_id)), ]
           }
 
-          keeper_id <- s_df$id[1]
-          rem_ids <- c(rem_ids, s_df$id[-1])
+          keeper_id <- s_df$internal_id[1]
+          rem_ids <- c(rem_ids, s_df$internal_id[-1])
         }
 
-        criteria <- w_subj_df$id %in% rem_ids
-        w_subj_keep[as.character(w_subj_df$id)][criteria] <- step
+        criteria <- w_subj_df$internal_id %in% rem_ids
+        w_subj_keep[as.character(w_subj_df$internal_id)][criteria] <- step
         w_subj_df <- w_subj_df[!criteria, ]
 
         if (any(criteria) & nrow(w_subj_df) > 0) {
@@ -978,18 +982,18 @@ cleanadult <- function(df,
         } else if (length(glist_loss) > 0 &
                    all(!c(g3_g2_check, g3_g1_check, g2_g1_check))) {
           unlist(lapply(glist_loss, function(x) {
-            rep(mean(h_subj_df$meas_m[h_subj_df$id %in% names(x)]),
+            rep(mean(h_subj_df$meas_m[h_subj_df$internal_id %in% names(x)]),
                 length(x))
           }))
         } else if (length(glist_gain) > 0 & !origexc) {
           unlist(lapply(glist_gain, function(x) {
-            rep(mean(h_subj_df$meas_m[h_subj_df$id %in% names(x)]),
+            rep(mean(h_subj_df$meas_m[h_subj_df$internal_id %in% names(x)]),
                 length(x))
           }))
         } else {
           rep(mean(h_subj_df$meas_m), nrow(h_subj_df))
         }
-      names(hold_meanht) <- h_subj_df$id
+      names(hold_meanht) <- h_subj_df$internal_id
       meanht[names(hold_meanht)] <- hold_meanht
     }
 
@@ -1061,9 +1065,9 @@ cleanadult <- function(df,
       exc_pairs <- exc_pairs | wt_perc < perc_limit
       criteria <- exc_pairs
 
-      impl_ids <- as.character(w_subj_df$id)[criteria]
+      impl_ids <- as.character(w_subj_df$internal_id)[criteria]
       w_subj_keep[c(impl_ids)] <- step
-      w_subj_df <- w_subj_df[!w_subj_df$id %in% c(impl_ids), ]
+      w_subj_df <- w_subj_df[!w_subj_df$internal_id %in% c(impl_ids), ]
 
     } else if (is_2d_nonord) {
       # =========================================================================
@@ -1075,7 +1079,7 @@ cleanadult <- function(df,
                                        wtallow_formula = wtallow_formula)
       if (length(nonord_exc_ids) > 0) {
         w_subj_keep[nonord_exc_ids] <- step
-        w_subj_df <- w_subj_df[!w_subj_df$id %in% nonord_exc_ids, ]
+        w_subj_df <- w_subj_df[!w_subj_df$internal_id %in% nonord_exc_ids, ]
       }
 
     } else if (length(unique(w_subj_df$meas_m)) >= 3) {
@@ -1110,7 +1114,7 @@ cleanadult <- function(df,
           }
           if (length(mod_result) > 0) {
             w_subj_keep[names(mod_result)] <- mod_result
-            w_subj_df <- w_subj_df[!w_subj_df$id %in% names(mod_result), ]
+            w_subj_df <- w_subj_df[!w_subj_df$internal_id %in% names(mod_result), ]
           }
         }
       } else {
@@ -1149,11 +1153,11 @@ cleanadult <- function(df,
             # If any error load value has RV copies, escalate entire patient
             el_codes <- fr_result[grepl("-Error-Load", fr_result)]
             if (length(el_codes) > 0 && has_rv) {
-              el_meas <- unique(w_subj_df$meas_m[w_subj_df$id %in% names(el_codes)])
-              rv_of_el <- as.character(w_subj_df$id[
+              el_meas <- unique(w_subj_df$meas_m[w_subj_df$internal_id %in% names(el_codes)])
+              rv_of_el <- as.character(w_subj_df$internal_id[
                 w_subj_df$meas_m %in% el_meas &
                 w_subj_df$is_rv &
-                !w_subj_df$id %in% names(el_codes)])
+                !w_subj_df$internal_id %in% names(el_codes)])
               rv_of_el <- rv_of_el[w_subj_keep[rv_of_el] == "Include"]
 
               if (length(rv_of_el) > 0) {
@@ -1173,7 +1177,7 @@ cleanadult <- function(df,
 
             # Remove all newly excluded from w_subj_df
             exc_ids_all <- names(w_subj_keep)[w_subj_keep != "Include"]
-            w_subj_df <- w_subj_df[!w_subj_df$id %in% exc_ids_all, ]
+            w_subj_df <- w_subj_df[!w_subj_df$internal_id %in% exc_ids_all, ]
             if (nrow(w_subj_df) > 0) w_subj_df <- identify_rv(w_subj_df)
           }
         }
@@ -1204,7 +1208,7 @@ cleanadult <- function(df,
           }
           if (length(ar_result) > 0) {
             w_subj_keep[names(ar_result)] <- ar_result
-            w_subj_df <- w_subj_df[!w_subj_df$id %in% names(ar_result), ]
+            w_subj_df <- w_subj_df[!w_subj_df$internal_id %in% names(ar_result), ]
           }
         }
       }
@@ -1216,27 +1220,27 @@ cleanadult <- function(df,
 
     if (length(h_subj_keep) > 0) {
       h_out <- data.table(
-        id = names(h_subj_keep),
+        internal_id = names(h_subj_keep),
         keep = h_subj_keep,
         mean_ht = meanht,
         loss_grp = loss_groups,
         gain_grp = gain_groups,
         extraneous = h_extraneous
       )
-      df[h_out, result := i.keep, on = .(id)]
-      df[h_out, mean_ht := i.mean_ht, on = .(id)]
-      df[h_out, loss_groups := i.loss_grp, on = .(id)]
-      df[h_out, gain_groups := i.gain_grp, on = .(id)]
-      df[h_out, extraneous := i.extraneous, on = .(id)]
+      df[h_out, result := i.keep, on = .(internal_id)]
+      df[h_out, mean_ht := i.mean_ht, on = .(internal_id)]
+      df[h_out, loss_groups := i.loss_grp, on = .(internal_id)]
+      df[h_out, gain_groups := i.gain_grp, on = .(internal_id)]
+      df[h_out, extraneous := i.extraneous, on = .(internal_id)]
     }
     if (length(w_subj_keep) > 0) {
       w_out <- data.table(
-        id = names(w_subj_keep),
+        internal_id = names(w_subj_keep),
         keep = w_subj_keep,
         extraneous = w_extraneous
       )
-      df[w_out, result := i.keep, on = .(id)]
-      df[w_out, extraneous := i.extraneous, on = .(id)]
+      df[w_out, result := i.keep, on = .(internal_id)]
+      df[w_out, extraneous := i.extraneous, on = .(internal_id)]
     }
   }
 
@@ -1251,10 +1255,10 @@ cleanadult <- function(df,
     subj_data <- df[df$subjid == i, ]
     exc_1d_ids <- eval_1d(subj_data, params_1d)
     if (length(exc_1d_ids) > 0) {
-      df[df$id %in% exc_1d_ids & df$result == "Include" &
+      df[df$internal_id %in% exc_1d_ids & df$result == "Include" &
            param %in% c("HEIGHTCM", "HEIGHTIN"),
          result := "Exclude-A-HT-Single"]
-      df[df$id %in% exc_1d_ids & df$result == "Include" &
+      df[df$internal_id %in% exc_1d_ids & df$result == "Include" &
            param %in% c("WEIGHTKG", "WEIGHTLBS"),
          result := "Exclude-A-WT-Single"]
     }
@@ -1265,10 +1269,10 @@ cleanadult <- function(df,
     subj_data <- df[df$subjid == i, ]
     exc_el_ids <- eval_error_load(subj_data, error_threshold = error_load_threshold)
     if (length(exc_el_ids) > 0) {
-      df[df$id %in% exc_el_ids & df$result == "Include" &
+      df[df$internal_id %in% exc_el_ids & df$result == "Include" &
            param %in% c("HEIGHTCM", "HEIGHTIN"),
          result := "Exclude-A-HT-Too-Many-Errors"]
-      df[df$id %in% exc_el_ids & df$result == "Include" &
+      df[df$internal_id %in% exc_el_ids & df$result == "Include" &
            param %in% c("WEIGHTKG", "WEIGHTLBS"),
          result := "Exclude-A-WT-Too-Many-Errors"]
     }
@@ -1284,9 +1288,7 @@ cleanadult <- function(df,
   # OUTPUT CLEANUP
   # =============================================================================
 
-  # Restore original id type
-  df[, id := id_as_entered]
-  df[, id_as_entered := NULL]
+  # id is the user's original — untouched throughout
 
   # Remove internal working columns (meas_m always internal;
   # ageyears and age_days only if we added them)

@@ -193,7 +193,7 @@ Height does not use RV tracking. While height does identify same-day duplicates 
 ***Key terms and variable names:***
 
 - **Repeated value (RV):** A weight measurement value that appears more than once for a subject (exact match; 78.1 and 78.101 are not identical)
-- **First RV:** The earliest occurrence (by age, with id as tiebreaker) of a repeated value
+- **First RV:** The earliest occurrence (by age, with internal_id as tiebreaker) of a repeated value
 - `is_rv` — logical flag: TRUE for non-first occurrences of a repeated value
 - `is_first_rv` — logical flag: TRUE for the first occurrence of a repeated value
 - Unique values have both `is_rv = FALSE` and `is_first_rv = FALSE`
@@ -214,9 +214,9 @@ Height does not use RV tracking. While height does identify same-day duplicates 
 1. For each included weight value (in `meas_m`), count how many times it appears for the subject
 2. Values appearing only once: `is_first_rv = FALSE`, `is_rv = FALSE`
 3. Values appearing more than once:
-   - The first occurrence (earliest age, id tiebreaker): `is_first_rv = TRUE`
+   - The first occurrence (earliest age, internal_id tiebreaker): `is_first_rv = TRUE`
    - All subsequent occurrences: `is_rv = TRUE`
-4. RV identification depends on the dataframe being pre-sorted by age and id
+4. RV identification depends on the dataframe being pre-sorted by age and internal_id
 5. After later exclusion steps (weight cap, evil twins), RVs are re-identified on the remaining values:
    - `identify_rv()` is called fresh on the remaining rows
    - `temp_sde()` is re-run
@@ -265,7 +265,7 @@ None. This step has no configurable parameters.
    - **Weight:** Median of all included non-RV weight values
    - **Height:** Median of all included height values
 3. For each value on a same-day group, compute `diff = abs(measurement - median)`
-4. Within each same-day group, keep the value with the smallest diff (highest id tiebreaker); mark all others as `extraneous = TRUE`
+4. Within each same-day group, keep the value with the smallest diff (highest internal_id tiebreaker); mark all others as `extraneous = TRUE`
 5. **Weight only:** After flagging, call `redo_identify_rv()` to update RV identification in case a first_rv was flagged extraneous
 6. Store extraneous flags in the subject-level tracking vector (`h_extraneous` or `w_extraneous`)
 
@@ -389,7 +389,7 @@ All thresholds include the standard 0.12 kg rounding tolerance (see Rounding Tol
 1. **Pre-check:** Skip if <3 non-extraneous values, or if max-min range ≤ minimum possible ET cap + 0.12 (computed via `compute_et_limit(1, formula, uw = min(weights))`, no pair could exceed any interval-specific cap)
 2. **Repeat until no OOB pairs found or <3 values remain:**
    a. Remove previously excluded values; break if <3 remain
-   b. Sort by age (id tiebreaker)
+   b. Sort by age (internal_id tiebreaker)
    c. Compute adjacent weight differences and age intervals (in months, using 30.4375 days/month)
    d. Compute dynamic ET cap per pair: `compute_et_limit(interval, formula, uw = uw_pair)` + 0.12 rounding tolerance. `uw_pair` is the larger of the two weights in the pair. ET caps scale with UW (see wtallow-formulas.md).
    e. Flag OOB pairs: both members of any pair where diff > cap
@@ -554,7 +554,7 @@ The threshold is computed dynamically per observation: `compute_et_limit(min_gap
 - **90% rule:** The directional confirmation (before/after must exceed 90% of threshold) prevents excluding values that are outliers in one direction but consistent with the trend in the other. With e=-5, the 90% rule is effectively unreachable (nearest neighbor dominates so heavily that dewma_before/after are nearly equal to dewma_all), but it is retained at zero cost for consistency with the algorithm's theoretical framework.
 - **Missing-as-infinity for edge values:** When a value has no prior or next neighbor, the missing directional dewma is treated as confirming exclusion. An extreme outlier at the edge of a patient's data should still be excludable based on the neighbors that do exist.
 - **Two-tier structure:** Both Evil Twins and Extreme EWMA use the same ET cap structure derived from the wtallow formula (ET cap = wtallow cap + 20 for PW-H/PW-L). The distinction between ET and Extreme EWMA is the detection method (adjacent pairs vs EWMA deviation), not the cap structure.
-- **Sort tiebreaker:** The R implementation includes `id` as a final tiebreaker in all passes for deterministic sort order.
+- **Sort tiebreaker:** The R implementation includes `internal_id` as a final tiebreaker in all passes for deterministic sort order.
 
 ---
 
@@ -696,7 +696,7 @@ This step computes a representative mean height for each subject, used later for
 ***Key terms and variable names:***
 
 - `mean_ht` — output column: the calculated mean height for each observation
-- `meas_orig` — the original, unmodified measurement value (used for mean calculation)
+- `meas_m` — the metric measurement value (used for mean calculation)
 - `loss_groups` / `gain_groups` — group assignments from Step 10H
 - `pairhtloss` / `pairhtgain` — flags from Step 10Ha indicating pair rescue type
 
@@ -976,7 +976,7 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
 **Guards:**
 1. Only subjects with 3+ distinct weight values enter this step (others went to 11Wa, 11Wa2, or 13)
 2. Must have ≥ 3 included observations
-3. **Trigger check:** Skip if weight range ≤ min wtallow AND min percent ratio ≥ 0.7 (impossible to trigger any exclusion)
+3. **Trigger check:** Skip if weight range ≤ min wtallow AND (perclimit disabled OR min percent ratio ≥ max perclimit) — impossible to trigger any exclusion
 
 **EWMA computation:**
 - Exponent e = -5, anchor a = 0 (same as Extreme EWMA)
@@ -1031,9 +1031,9 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
 - **Error load values:** All excluded immediately with code `"...-Error-Load round N"`
 - **Non-error-load candidates:** Score each and exclude only the single highest-scoring:
   - Edge (first/last in subject): `pmax(0, |dewma_all| - wta) / wta_base` where `wta` is UW-adjusted wtallow and `wta_base` is wtallow at UW=120 (no adjustment)
-  - Interior: graduated multiplier × `(pmax(0, |dewma_bef| - wta) + pmax(0, |dewma_aft| - wta)) / wta_base`
-    - `min_ratio = min(|dewma_bef/wta|, |dewma_aft/wta|)`
-    - `multiplier = min(1.0, 0.6 + 0.4 × min_ratio)`
+  - Interior: graduated multiplier × `(excess_bef + excess_aft)` where each `excess = pmax(0, |dewma| - wta) / wta_base`
+    - `min_excess = min(excess_bef, excess_aft)`
+    - `multiplier = min(1.0, 0.6 + 0.4 × min_excess)`
     - Full score when both directions independently exceed wtallow; 0.6× discount when only one direction is bad
   - Scoring uses excess above UW-adjusted wtallow divided by base wtallow, so a 10 kg excess at any UW always scores the same
   - Tiebreakers: smallest wtallow → closest to median age → earliest position → lowest id
@@ -1209,14 +1209,3 @@ This is the final step. It evaluates whether a subject has too many errors relat
 - **Scale-Max-RV-propagated IS counted:** Unlike EWMA-RV-propagated, scale-max RV copies represent independent observations at the scale ceiling. Each contributes evidence of a data quality pattern.
 - **Height and weight evaluated independently:** A subject with many height errors but good weights should only lose the heights, not the weights.
 
----
-
-## Issues to resolve after working through all steps
-
-***Potential variables to remove:***
-
-***Other items to check:***
-- The R `remove_biv` support functions (`remove_biv_low`, `remove_biv_high`) have an `include` parameter (default `FALSE`) that switches between strict (`<`/`>`) and non-strict (`<=`/`>=`) inequalities. Step 1 BIV always uses `include=FALSE`. `include=TRUE` is never used — Step 13 does not call `remove_biv`; it uses `eval_1d` with direct strict comparisons. The `include` parameter is dead code. **RESOLVED.**
-
-***To implement after all steps reviewed:***
-- **Stringency parameter:** Add a `stringency` parameter (name TBD) that provides preset less-permissive defaults for multiple limits (BIV, 1D, possibly others). Explicit parameter values override stringency presets. Carrie to determine specific tighter limits. **RESOLVED — implemented as the `permissiveness` parameter with 4 levels (loosest/looser/tighter/tightest). See Permissiveness Framework section.**

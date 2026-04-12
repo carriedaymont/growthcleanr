@@ -1665,7 +1665,7 @@ cleangrowth <- function(subjid,
   setorder(all_results, line)
 
   # Partial-run mode: merge new results for changed subjects with cached results
-  # for unchanged subjects, then sort by id for a consistent output order.
+  # for unchanged subjects, then sort by internal_id for a consistent output order.
   if (do_partial) {
     all_results <- rbind(
       cached_results[!(as.character(cached_results$subjid) %in%
@@ -1673,7 +1673,7 @@ cleangrowth <- function(subjid,
       all_results,
       fill = TRUE
     )
-    setorder(all_results, id)
+    setorder(all_results, internal_id)
   }
 
   return(all_results)
@@ -2456,9 +2456,9 @@ temporary_extraneous_infants <- function(df, exclude_from_dop_ids = NULL) {
   original_rows <- df$orig_row
 
   # make a small copy of df with fields we need
-  # Include id for age-dependent tiebreaker
-  # Use id in keyby for deterministic SDE order
-  df <- df[j = .(tbc.sd, exclude, id, internal_id, orig_row), keyby = .(subjid, param, agedays, id)]
+  # Include internal_id for age-dependent tiebreaker
+  # Use internal_id in keyby for deterministic SDE order
+  df <- df[j = .(tbc.sd, exclude, id, internal_id, orig_row), keyby = .(subjid, param, agedays, internal_id)]
 
   # Now compute valid.rows on the keyby-sorted data
   # Removed nnte filter (nnte calculation removed)
@@ -2840,7 +2840,7 @@ cleanbatch_child <- function(data.df,
   # SDE-Identical handles partial identicals - duplicates are marked even when
   # mixed with non-duplicates. Groups by subjid/param/agedays/v to find
   # duplicates of each specific value.
-  setorder(data.df, subjid, param, agedays, id)
+  setorder(data.df, subjid, param, agedays, internal_id)
 
   # Count included values with same measurement on same day
   data.df[, n_same_value := sum(exclude == "Include"), by = .(subjid, param, agedays, v)]
@@ -2918,7 +2918,7 @@ cleanbatch_child <- function(data.df,
     if (length(sp_with_potential_cf) > 0) {
       cf_subset <- data.sub[sp_key %in% sp_with_potential_cf]
       # Add id for consistent SDE order
-      setorder(cf_subset, subjid, param, agedays, id)
+      setorder(cf_subset, subjid, param, agedays, internal_id)
 
       # CF logic updated to match Stata
       # Replaced dplyr/map_lgl with data.table for CF detection
@@ -3166,7 +3166,7 @@ cleanbatch_child <- function(data.df,
   # Add SDE-Identical rows back after CF rescue
   if (nrow(sde_identical_rows) > 0) {
     data.df <- rbind(data.df, sde_identical_rows, fill = TRUE)
-    data.df <- data.df[order(subjid, param, agedays, id)]
+    data.df <- data.df[order(subjid, param, agedays, internal_id)]
   }
 
   # Drop columns no longer needed after Step 6
@@ -3304,7 +3304,7 @@ cleanbatch_child <- function(data.df,
   # Must include agedays and id for consistent order
   # Without agedays, calc_otl_evil_twins compares non-adjacent-in-time values
   # Without id, SDE rows (same ageday) have undefined order, causing parallel inconsistency
-  data.df <- data.df[order(subjid, param, agedays, id),]
+  data.df <- data.df[order(subjid, param, agedays, internal_id),]
 
   # Evil Twins requires 3+ measurements per subject-param
   data.df[, sp_count_9 := .N, by = .(subjid, param)]
@@ -3341,7 +3341,7 @@ cleanbatch_child <- function(data.df,
       grp_idx <- which(data.df$subjid == s & data.df$param == p & valid_set)
       if (length(grp_idx) < 2L) next
 
-      df <- data.df[grp_idx, .(line, id, subjid, param, agedays, tbc.sd, ctbc.sd, exclude)]
+      df <- data.df[grp_idx, .(line, id, internal_id, subjid, param, agedays, tbc.sd, ctbc.sd, exclude)]
       df <- copy(df)
 
       # calc_otl for this group
@@ -3359,7 +3359,7 @@ cleanbatch_child <- function(data.df,
         #   3. Lowest id (deterministic)
         otl_rows <- df[otl == TRUE]
         if (nrow(otl_rows) == 0L) break
-        ord <- order(-otl_rows$med_diff, -abs(otl_rows$tbc.sd), otl_rows$id)
+        ord <- order(-otl_rows$med_diff, -abs(otl_rows$tbc.sd), otl_rows$internal_id)
         worst_line <- otl_rows$line[ord[1L]]
 
         # Mark exactly one exclusion per iteration
@@ -3518,7 +3518,7 @@ cleanbatch_child <- function(data.df,
               return(df$exclude)
             })(copy(.SD)),
             by = .(subjid, param),
-            .SDcols = c('index', 'id', 'sex', 'agedays', 'tbc.sd', 'ctbc.sd', 'exclude')]
+            .SDcols = c('index', 'id', 'internal_id', 'sex', 'agedays', 'tbc.sd', 'ctbc.sd', 'exclude')]
 
     # Capture EWMA1 iteration 1 values for debugging
     if (iteration == 1) {
@@ -3631,7 +3631,7 @@ cleanbatch_child <- function(data.df,
     data.sde <- data.sde[has_sde_subj == TRUE]
     data.sde[, has_sde_subj := NULL]
 
-    setorder(data.sde, subjid, param, agedays, id)
+    setorder(data.sde, subjid, param, agedays, internal_id)
 
     # Mark SDE-Identical: all values on same day are identical
     # Age 0: keep lowest id, age > 0: keep highest id
@@ -3663,7 +3663,7 @@ cleanbatch_child <- function(data.df,
   # Track temp SDE status before restoration
   data.sde[, was_temp_sde := exclude == 'Exclude-Temporary-Extraneous-Same-Day']
   data.sde[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
-  setorder(data.sde, subjid, param, agedays, id)
+  setorder(data.sde, subjid, param, agedays, internal_id)
 
   # -------------------------------------------
   # Phase B2: One-Day SDE identification + SDE-All-Extreme
@@ -3873,7 +3873,7 @@ cleanbatch_child <- function(data.df,
 
   # Order data for processing
   # Add id for consistent SDE order
-  data.df <- data.df[order(subjid, param, agedays, id),]
+  data.df <- data.df[order(subjid, param, agedays, internal_id),]
 
   # Pre-identify subject-params that need processing: Include values, >2 values
   # Include temp SDEs in count so they get p_plus/p_minus calculated
@@ -4118,10 +4118,10 @@ cleanbatch_child <- function(data.df,
               candidates <- df[pot_excl != ""]
               if (nrow(candidates) > 0) {
                 candidates[, abssum := abs(tbc.sd + dewma.all)]
-                # Use id tie-breaker for deterministic selection
+                # Use internal_id tie-breaker for deterministic selection
                 # which.max returns first tie, which depends on data order
-                # Use order() with id as tie-breaker for reproducibility
-                ord <- order(-candidates$abssum, candidates$id)
+                # Use order() with internal_id as tie-breaker for reproducibility
+                ord <- order(-candidates$abssum, candidates$internal_id)
                 worst_idx <- candidates$index[ord[1]]
                 df[index == worst_idx, exclude := pot_excl]
               }
@@ -4129,7 +4129,7 @@ cleanbatch_child <- function(data.df,
               return(df$exclude)
             })(copy(.SD)),
             by = .(subjid, param),
-            .SDcols = c('index', 'id', 'subjid', 'param', 'agedays', 'v', 'sex', 'tbc.sd', 'ctbc.sd',
+            .SDcols = c('index', 'id', 'internal_id', 'subjid', 'param', 'agedays', 'v', 'sex', 'tbc.sd', 'ctbc.sd',
                         'tbc.p_plus', 'tbc.p_minus', 'first_meas', 'exclude')]
 
     # Find subject-params with NEW exclusions this iteration
@@ -4265,7 +4265,7 @@ cleanbatch_child <- function(data.df,
               if (nrow(candidates) > 0) {
                 candidates[, abssum := abs(tbc.sd + dewma.all)]
                 # Use id tie-breaker for deterministic selection
-                ord <- order(-candidates$abssum, candidates$id)
+                ord <- order(-candidates$abssum, candidates$internal_id)
                 worst_idx <- candidates$index[ord[1]]
                 df[index == worst_idx, exclude := pot_excl]
               }
@@ -4273,7 +4273,7 @@ cleanbatch_child <- function(data.df,
               return(df$exclude)
             })(copy(.SD)),
             by = .(subjid, param),
-            .SDcols = c('index', 'id', 'subjid', 'param', 'agedays', 'v', 'sex', 'tbc.sd', 'ctbc.sd',
+            .SDcols = c('index', 'id', 'internal_id', 'subjid', 'param', 'agedays', 'v', 'sex', 'tbc.sd', 'ctbc.sd',
                         'tbc.p_plus', 'tbc.p_minus', 'exclude')]
 
     data.df[sp_key %in% sp_to_process, has_new_excl := (exclude %in% ewma2_hthc_codes) & !had_ewma2_before]
@@ -4352,7 +4352,7 @@ cleanbatch_child <- function(data.df,
 
   # order just for ease later
   # Add id for consistent SDE order
-  data.df <- data.df[order(subjid, param, agedays, id),]
+  data.df <- data.df[order(subjid, param, agedays, internal_id),]
 
   # Compute valid_set AFTER sort, not before
   # valid_set is a logical vector indexed by row position, so it must be computed
@@ -4372,8 +4372,8 @@ cleanbatch_child <- function(data.df,
   # Groups without violations are skipped entirely (saves copy(.SD), merges, EWMA, etc.)
   data.df[, sp_key := paste0(subjid, "_", param)]
   {
-    pf <- data.df[valid_set, .(sp_key, subjid, param, agedays, id, sex, v)]
-    setorder(pf, subjid, param, agedays, id)
+    pf <- data.df[valid_set, .(sp_key, subjid, param, agedays, id, internal_id, sex, v)]
+    setorder(pf, subjid, param, agedays, internal_id)
 
     # Compute gaps and raw value diffs within each group
     pf[, `:=`(
@@ -4622,7 +4622,7 @@ cleanbatch_child <- function(data.df,
 
       # sort df since it got reordered with keys
       # Include id for deterministic SDE order
-      df <- df[order(agedays, id),]
+      df <- df[order(agedays, internal_id),]
 
       # 17A
       df[, d_agedays := shift(agedays, n = 1L, type = "lead") - agedays]
@@ -4724,7 +4724,7 @@ cleanbatch_child <- function(data.df,
         # 17I
         # sort df since it got reordered with keys
         # Include id for deterministic SDE order
-        df <- df[order(agedays, id),]
+        df <- df[order(agedays, internal_id),]
         df[, mindiff_prior := shift(mindiff, n = 1L, type = "lag")]
         df[, maxdiff_prior := shift(maxdiff, n = 1L, type = "lag")]
       } else { # head circumference
@@ -4776,7 +4776,7 @@ cleanbatch_child <- function(data.df,
 
         # 17N: Sort and lag thresholds for pairwise violation check
         # Include id for deterministic SDE order
-        df <- df[order(agedays, id),]
+        df <- df[order(agedays, internal_id),]
         df[, mindiff_prior := shift(mindiff, n = 1L, type = "lag")]
         df[, maxdiff_prior := shift(maxdiff, n = 1L, type = "lag")]
       }
@@ -4883,7 +4883,7 @@ cleanbatch_child <- function(data.df,
         # Use id tie-breaker for deterministic selection
         # which.max returns first tie, which depends on data order
         candidates <- df[val_excl != "Include"]
-        ord <- order(-candidates$absval, candidates$id)
+        ord <- order(-candidates$absval, candidates$internal_id)
         idx <- candidates$index[ord[1]]
 
 
@@ -4904,7 +4904,7 @@ cleanbatch_child <- function(data.df,
 
     return(exclude_all)
   })(copy(.SD)), by = .(subjid, param),
-  .SDcols = c('index', 'id', 'agedays', 'sex', 'param', 'v', 'tbc.sd', 'exclude')]
+  .SDcols = c('index', 'id', 'internal_id', 'agedays', 'sex', 'param', 'v', 'tbc.sd', 'exclude')]
 
   data.df[, sp_key := NULL]
 
@@ -4917,7 +4917,7 @@ cleanbatch_child <- function(data.df,
 
   # order just for ease later
   # Add id for consistent SDE order
-  data.df <- data.df[order(subjid, param, agedays, id),]
+  data.df <- data.df[order(subjid, param, agedays, internal_id),]
 
   # Compute valid_set AFTER sort, not before
   # create the valid set
@@ -4977,10 +4977,10 @@ cleanbatch_child <- function(data.df,
       # 19E: which is larger
       # Use id tie-breaker for deterministic selection
       max_ind <- if (!all(is.na(df$comp_diff))){
-        ord <- order(-df$comp_diff, df$id)
+        ord <- order(-df$comp_diff, df$internal_id)
         ord[1]
       } else {
-        ord <- order(-abs(df$tbc.sd), df$id)
+        ord <- order(-abs(df$tbc.sd), df$internal_id)
         ord[1]
       }
 
@@ -5024,7 +5024,7 @@ cleanbatch_child <- function(data.df,
 
     return(exclude_all)
   })(copy(.SD)), by = .(subjid, param),
-  .SDcols = c('index', 'id', 'agedays', 'subjid', 'param', 'tbc.sd', 'ctbc.sd', 'exclude')]
+  .SDcols = c('index', 'id', 'internal_id', 'agedays', 'subjid', 'param', 'tbc.sd', 'ctbc.sd', 'exclude')]
 
   # 21: error load ----
 
@@ -5065,8 +5065,8 @@ cleanbatch_child <- function(data.df,
 
   # Add error.load.mincount check
   # Stata requires at least 2 errors before applying Error-load
-  # Round for threshold=0.4
-  data.df[valid_set & err_ratio > .4 & n_errors >= error.load.mincount & exclude == "Include",
+  # Bug fix (2026-04-12): was hardcoded .4 instead of error.load.threshold parameter
+  data.df[valid_set & err_ratio > error.load.threshold & n_errors >= error.load.mincount & exclude == "Include",
           exclude := "Exclude-Error-load"]
 
   # Cleanup

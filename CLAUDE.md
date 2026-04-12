@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-github-latest (growthcleanr)
 
-**Last updated:** 2026-04-04 (growth.R removed → cleangrowth() now in child_clean.R; adjustcarryforward() deprecated/removed; gc_preload_refs() + ref_tables/cached_results/changed_subjids added)
+**Last updated:** 2026-04-12 (internal_id rename complete in both algorithms; error load bug fix)
 
 ## Overview
 
@@ -18,6 +18,12 @@ This CLAUDE.md is for **Claude Code agents working on gc
 code**. For pipeline/Qual-AD context, see
 `__Pipeline/CLAUDE.md`.
 
+**CRITICAL:** The only valid local working copy of growthcleanr
+is `__Pipeline/gc-github-latest/`. Stale copies exist in
+`/Users/Shared/` — do NOT use them. Never edit files outside
+`__Pipeline/` without Carrie's explicit written permission in
+chat.
+
 ---
 
 ## Algorithms
@@ -25,7 +31,7 @@ code**. For pipeline/Qual-AD context, see
 | Algorithm | Status | Default path | Notes |
 |-----------|--------|--------------|-------|
 | Child | Active, primary | `child_clean.R` | Default pediatric path in v3.0.0 |
-| Adult | Active, updated v3.0.0 | `adult_clean.R` + `adult_support.R` | Permissiveness framework, 4 exclusion levels |
+| Adult | **Closed pending validation** | `adult_clean.R` + `adult_support.R` | Permissiveness framework, 4 exclusion levels. Do not modify without checking with Carrie first. |
 | Legacy pediatric | Deprecated | `pediatric_clean_legacy.R` | `use_legacy_algorithm = TRUE` |
 | `adjustcarryforward()` | Deprecated | removed in v3.0.0 | CF adjustment utility; present on Main/CRAN, removed from `efficiency-updates` |
 
@@ -100,9 +106,13 @@ Two layered batching systems:
 | `agedays` | numeric | Age in days at measurement |
 | `sex` | any | `0`/`"m"`/`"M"` = male; `1`/`"f"`/`"F"` = female |
 | `measurement` | numeric | Recorded value in units specified by `param` |
-| `id` | numeric/char (optional) | Unique row identifier; if NULL, generated as `1:N` |
+| `id` | any (required) | Unique row identifier; preserved in output. Can be numeric, character, UUID, etc. |
 
 ### Input handling
+
+- `internal_id` (sequential `1:N`) is created at entry for all
+  internal sorting and tiebreaking. The user's `id` is never
+  used for algorithm logic — only for output.
 
 - `measurement == 0` → replaced with `NaN` (treated as missing)
 - Imperial converted to metric before processing
@@ -124,7 +134,7 @@ it in the sort key, SDE resolution order is undefined.
 
 | Column | Description |
 |--------|-------------|
-| `id` | Row identifier |
+| `id` | User-provided row identifier (preserved as-is, any type) |
 | `exclude` | Exclusion code or `"Include"` |
 | `param` | Growth parameter |
 | `cf_rescued` | CF rescue reason (empty if not rescued) |
@@ -253,7 +263,9 @@ BMI (computed internally) for some threshold decisions.
 ### cleanadult() Interface
 
 Called internally by `cleangrowth()`. Input: data.table with
-`id`, `subjid`, `sex`, `agedays`, `param`, `measurement`.
+`id`, `internal_id`, `subjid`, `sex`, `agedays`, `param`,
+`measurement`. `internal_id` is a sequential numeric created
+by `cleangrowth()` for deterministic sorting and tiebreaking.
 Accepts HEIGHTCM/HEIGHTIN and WEIGHTKG/WEIGHTLBS (converts
 internally). Sex is not used by the algorithm but required by
 the package interface.
@@ -261,9 +273,10 @@ the package interface.
 **Output:** Returns input df plus `result` (exclusion code),
 `mean_ht`, and optionally `bin_result` (default ON),
 `extraneous`, `loss_groups`, `gain_groups`. Internal columns
-(`meas_m`, `ageyears`, `age_days`) are dropped. Original `id`
-type is preserved (converted to character internally, restored
-on output).
+(`meas_m`, `ageyears`, `age_days`) are dropped. The user's
+original `id` is preserved: `cleanadult()` swaps `internal_id`
+into the `id` column at entry for internal processing and
+restores the user's `id` at exit.
 
 ### Adult Algorithm Steps
 
@@ -371,7 +384,7 @@ Default: `"looser"`
 | Rounding tolerance | None (removed) | 0.12 cm/kg on all threshold comparisons |
 | Head circumference | Supported (WHO only, ≤3y cleaned) | Not applicable |
 | `perclimit` scope | N/A | 11Wa: subject-level max wt; 11Wb: observation-level |
-| Sort determinism | `setkey(data.df, subjid, param, agedays, id)` | All sorts include `id` as final tiebreaker |
+| Sort determinism | `setkey(data.df, subjid, param, agedays, internal_id)` | All sorts include `internal_id` (as character) as final tiebreaker |
 | Missing-as-infinity | N/A | `ifelse(is.na(...), Inf, ...)` for edge EWMA values |
 
 ---
@@ -565,10 +578,10 @@ NOT_CRAN=true Rscript -e \
 
 | File | Tests | Assertions | Coverage |
 |------|-------|------------|----------|
-| `test-adult-clean.R` | 210 | 210 | All 14 steps, all 4 permissiveness levels, edge cases |
+| `test-adult-clean.R` | 198 | 198 | All 14 steps, all 4 permissiveness levels, edge cases |
 
 Regression test: `tests/test_harness.R` runs `cleanadult()`
-against `inst/testdata/adult-gc-test-ALL-PHASES.csv` — 1483
+against `inst/testdata/adult-gc-test-ALL-PHASES.csv` — 1508
 rows at all 4 permissiveness levels.
 
 ```bash
@@ -655,10 +668,30 @@ Requires installed package — see Known Issues. Run in background from Claude C
 
 ### Fixed (recent)
 
-- [x] **Character `id` breaks child algorithm sorting:**
-  `id_sort := ifelse(agedays == 0, id, -id)` failed when
-  `id` is character because `-id` is undefined for strings.
-  Fixed: all 4 locations now use `internal_id` (numeric).
+- [x] **`internal_id` for all internal sorting/tiebreaking
+  (2026-04-12):** Both child and adult algorithms use
+  `internal_id` (sequential integer `1:N`, created by
+  `cleangrowth()`) for all internal sorting, tiebreaking,
+  and ordering. The user's original `id` (any type) is
+  preserved untouched and returned in output.
+  **Child:** `internal_id` added to all 7 `.SDcols` and
+  column-select locations that were missing it (lines 3344,
+  3521, 4132, 4276, 4375, 4907, 5027 in `child_clean.R`).
+  **Adult:** `cleanadult()` converts `internal_id` to
+  character at entry (`as.character()`) so all named vector
+  indexing (which uses character keys in R) works correctly.
+  The user's `id` is saved, `internal_id` is swapped into
+  the `id` column for internal processing, and the user's
+  `id` is restored at exit. All 28 `$id` references in
+  `adult_support.R` renamed to `$internal_id`.
+  `cleangrowth()` no longer overwrites `data.adult$id`
+  with `line`.
+- [x] **Child error load bug fix (2026-04-12):** Step 21
+  used hardcoded `.4` threshold instead of the configurable
+  `error.load.threshold` parameter (default 0.5). Fixed to
+  use the parameter. This changes behavior: 2 rows in
+  syngrowth that were excluded at 0.4 are now included at
+  the correct 0.5 threshold.
 - [x] **Outer batching wrapper defeated:** Lines 440–441
   overwrote batch filter with all subjects. Fixed.
 - [x] **Missing data bug:** NA measurements coded as
@@ -682,14 +715,8 @@ Requires installed package — see Known Issues. Run in background from Claude C
 
 ## Next Priorities
 
-1. **Adult integration into package (COMPLETE 2026-04-03):**
-   File cleanup, `cleangrowth()` dispatch update, output merge,
-   `weight_cap` deprecation, CRAN fixes (NULL decls,
-   cat→message). Smoke tests passing. Remaining: integration
-   tests through `cleangrowth()` (see Known Issues, adult).
-1b. **Adult algorithm walk-through:** Separate session to
-   review adult algorithm logic before clinician validation.
-   Will use a fresh conversation for a clean read-through.
+1. **Child algorithm work** — current focus. Adult is closed
+   pending clinician validation.
 2. **Design extreme/clinical test patients from literature:**
    Create synthetic patients based on real clinical scenarios
    with literature-sourced growth values (e.g., hydrocephalus
@@ -697,6 +724,18 @@ Requires installed package — see Known Issues. Run in background from Claude C
    severe obesity, Turner syndrome, growth hormone deficiency).
    Goal: verify gc handles physiologically real but extreme
    trajectories correctly — not just random perturbations.
+
+### Adult status (closed 2026-04-09)
+
+**Do not modify adult code or tests without checking with
+Carrie first.** Adult algorithm is closed pending clinician
+validation. Walk-through complete (2026-04-09): 198/198 unit
+tests, 1508/1508 regression tests at all 4 permissiveness
+levels. Deferred items in `walkthrough-todo-2026-04-09.md`.
+Completed items:
+- Adult integration into package (2026-04-03)
+- wtallow redesign (2026-04-09)
+- Algorithm walk-through with wtallow reconciliation (2026-04-09)
 
 ---
 

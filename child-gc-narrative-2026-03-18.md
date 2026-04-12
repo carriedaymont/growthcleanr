@@ -2191,14 +2191,20 @@ all remaining Include values are also excluded.
    non_error_codes`
 3. `n_includes = count of Include rows`
 4. `err_ratio = n_errors / (n_errors + n_includes)`
-5. If `err_ratio > 0.4` AND `n_errors >= error.load.mincount`
+5. If `err_ratio > error.load.threshold` (default 0.5)
+   AND `n_errors >= error.load.mincount`
    (default 2): all Include rows →
    `Exclude-Error-load`
 
 ### Checklist findings
 
-1. **Boundary:** `err_ratio > 0.4` — strict `>`. An
-   exactly 40% error rate does NOT trigger.
+1. **Boundary:** `err_ratio > error.load.threshold` — strict
+   `>`. An exactly 50% error rate does NOT trigger.
+   **Bug fix (2026-04-12):** Was hardcoded `> .4` instead of
+   using the `error.load.threshold` parameter (default 0.5).
+   Fixed to use the parameter. This changes behavior: 2 rows
+   in syngrowth that were excluded at 0.4 are now included
+   at the correct 0.5 threshold.
 2. **`error.load.mincount`:** Default 2. Prevents a
    subject-param with 1 error and 1 include (50% ratio)
    from triggering.
