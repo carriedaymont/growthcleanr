@@ -593,27 +593,22 @@ Step 6, recalculates z-scores for modified measurement
 values. It should use the same WHO/CDC blending formula
 as the main z-score calculation (2–5 year window).
 
-***What the code currently does (line 2607):***
+***What the code currently does:***
 
 | Age range | Parameter | Formula |
 |-----------|-----------|---------|
 | < 2 years | any | WHO only |
 | 2–5 years | HT, WT | `(cdc × (age-2) + who × (5-age)) / 3` |
-| ≥ 4 years | HT, WT | CDC only (overwrites blend) |
+| > 5 years | HT, WT | CDC only |
 | any age | HEADCM | WHO only |
 
-***BUG: CDC-only cutoff should be > 5, not >= 4.*** The
-CDC-only assignment at line 2607 uses `>= 4 years`, while
-the main z-score correctly uses `> 5 years` (line 773).
-Because the CDC-only assignment runs after the blending
-assignment, ages 4–5 get their blended z-score overwritten
-with CDC-only. The comment at line 2604 says "Match Stata
-behavior" but appears to have confused the WHO/CDC blending
-window (2–5 years) with the corrected/uncorrected smoothing
-window (2–4 years). This function only does WHO/CDC blending
-(not corrected/uncorrected smoothing), so the cutoff should
-match the main calculation: `> 5`. **Fix: change line 2607
-from `>= 4` to `> 5`.**
+This now matches the main z-score blending formula.
+
+***BUG FIXED (2026-03-20):*** The CDC-only cutoff was
+previously `>= 4 years`, which conflated the WHO/CDC
+blending window (2–5 years) with the corrected/uncorrected
+smoothing window (2–4 years). Fixed to `> 5` to match the
+main z-score calculation.
 
 ### Recentering
 
@@ -889,16 +884,11 @@ or are handled within other steps in the child algorithm.
 
 ## Open Questions and Issues to Investigate
 
-- [x] **BUG: Z-score blending in
-  `calc_and_recenter_z_scores()`:** CDC-only cutoff is
-  `>= 4 years` (line 2607), while main z-score correctly
-  uses `> 5 years` (line 773). **Confirmed bug.** This
-  function does only WHO/CDC blending, not
-  corrected/uncorrected smoothing. The `>= 4` cutoff
-  appears to have been confused with the 2–4 year
-  corrected/uncorrected smoothing window. Fix: change
-  line 2607 from `>= 4` to `> 5`. See "Age blending —
-  calc_and_recenter_z_scores()" section above for details.
+- [x] **BUG FIXED: Z-score blending in
+  `calc_and_recenter_z_scores()`:** CDC-only cutoff was
+  `>= 4 years`; fixed to `> 5` to match main z-score
+  blending. See "Age blending — calc_and_recenter_z_scores()"
+  section above.
 - [x] **HC age limits:** "Not cleaned" is applied at
   `agedays > 3 × 365.25` (line 1117), but "Missing" is
   applied at `agedays >= 5 × 365.25` (line 1301).
@@ -915,23 +905,17 @@ or are handled within other steps in the child algorithm.
   dataset. Fix requires removing 440–441 and updating
   result assembly to use a batch-level reference.
   Batch size should also be parameterized.
-- [ ] **Debug output still present:** Step 5 has a
-  hard stop (`stop()`) on duplicate Include values after
-  temp SDE (lines 2783–2792). Should be converted to a
-  `warning()`. The check itself is useful (finding
-  duplicate Includes after Step 5 would indicate a real
-  bug), but hard-stopping production runs is not
-  appropriate.
+- [x] **Debug output fixed:** Step 5 `stop()` on duplicate
+  Include values converted to `warning()`. Also fixed in
+  Step 13 (two locations).
 - [ ] **Exclusion code rename and cleanup:** All exclusion
   code names will be renamed at the end of development.
   The exclude.levels list also includes many legacy codes
   from the original pediatric algorithm that the child
   algorithm does not produce — clean up at the same time.
-- [ ] **Parallel processing produces incorrect results on
-  macOS.** See "Batching and Dispatch — Parallel processing"
-  section above. Likely caused by `data.table` + forked
-  process incompatibility. Needs investigation and fix
-  (PSOCK clusters, `setDTthreads()`, or `future` framework).
+- [x] **Parallel processing fixed (2026-04-04).** Three
+  bugs resolved (see CLAUDE.md). Requires installed package
+  via `devtools::install_local()`.
 - [ ] **Batch size should be parameterized.** Currently
   hard-coded at 2,000 subjects. Add a `batch_size` argument
   to `cleangrowth()`. See "Batching and Dispatch — Batch
@@ -1142,8 +1126,8 @@ in Step 13 with different parameters (see Step 13).
 
 ### Logic
 
-**Input:** A data.table with columns `id, subjid, param,
-agedays, tbc.sd, exclude`.
+**Input:** A data.table with columns `id, internal_id,
+subjid, param, agedays, tbc.sd, exclude`.
 
 **Step 5a — Identify SDE days:**
 For each `(subjid, param, agedays)` group, if more than one

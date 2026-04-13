@@ -173,7 +173,6 @@
 #' matching same ageday measurements for the other parameter. Options include "default" (standard growthcleanr approach),
 #' and "flag.both" (in case of two measurements of one type without matching values for the other parameter, flag both
 #' for exclusion if beyond threshold)
-#' @param height.tolerance.cm maximum decrease in height tolerated for sequential measurements
 #' @param error.load.mincount minimum count of exclusions on parameter before
 #' considering excluding all measurements. Defaults to 2.
 #' @param error.load.threshold threshold of percentage of excluded measurement count to included measurement
@@ -318,7 +317,6 @@ cleangrowth <- function(subjid,
                         sd.extreme = 25,
                         z.extreme = 25,
                         lt3.exclude.mode = "default",
-                        height.tolerance.cm = 2.5,
                         error.load.mincount = 2,
                         error.load.threshold = 0.5,
                         sd.recenter = NA,
@@ -1099,12 +1097,12 @@ cleangrowth <- function(subjid,
 
         # Age-dependent ID selection for identicals
         tmp[, keep_id := ifelse(agedays == 0,
-                                min(id, na.rm = TRUE),
-                                max(id, na.rm = TRUE)),
+                                min(as.numeric(internal_id), na.rm = TRUE),
+                                max(as.numeric(internal_id), na.rm = TRUE)),
             by = .(subjid, agedays)]
 
         # Filter out non-selected identicals
-        tmp <- tmp[!(all_identical & id != keep_id)]
+        tmp <- tmp[!(all_identical & as.numeric(internal_id) != keep_id)]
 
         # Clean up temporary columns
         tmp[, `:=`(n_on_day = NULL, n_unique_vals = NULL, all_identical = NULL, keep_id = NULL)]
@@ -2970,12 +2968,12 @@ cleanbatch_child <- function(data.df,
   # Count included values with same measurement on same day
   data.df[, n_same_value := sum(exclude == "Include"), by = .(subjid, param, agedays, v)]
   data.df[, has_dup := (n_same_value > 1)]
-  # Age-dependent: keep lowest id at birth, highest id otherwise
+  # Age-dependent: keep lowest internal_id at birth, highest internal_id otherwise
   data.df[, keep_id := fifelse(agedays == 0L,
-                               min(id[exclude == "Include"], na.rm = TRUE),
-                               max(id[exclude == "Include"], na.rm = TRUE)),
+                               min(as.numeric(internal_id[exclude == "Include"]), na.rm = TRUE),
+                               max(as.numeric(internal_id[exclude == "Include"]), na.rm = TRUE)),
           by = .(subjid, param, agedays, v)]
-  data.df[has_dup & exclude == "Include" & id != keep_id,
+  data.df[has_dup & exclude == "Include" & as.numeric(internal_id) != keep_id,
           exclude := "Exclude-SDE-Identical"]
   data.df[, c("n_same_value", "has_dup", "keep_id") := NULL]
 
@@ -3759,30 +3757,30 @@ cleanbatch_child <- function(data.df,
     data.sde <- data.sde[order(subjid, param, agedays, as.numeric(internal_id))]
 
     # Mark SDE-Identical: all values on same day are identical
-    # Age 0: keep lowest id, age > 0: keep highest id
+    # Age 0: keep lowest internal_id, age > 0: keep highest internal_id
     data.sde[, keep_id := fifelse(agedays == 0L,
-                                  min(id, na.rm = TRUE),
-                                  max(id, na.rm = TRUE)),
+                                  min(as.numeric(internal_id), na.rm = TRUE),
+                                  max(as.numeric(internal_id), na.rm = TRUE)),
              by = .(subjid, param, agedays)]
-    data.sde[uniqueN(v) == 1L & id != keep_id,
+    data.sde[uniqueN(v) == 1L & as.numeric(internal_id) != keep_id,
              exclude := "Exclude-SDE-Identical",
              by = .(subjid, param, agedays)]
 
     # Mark SDE-Identical for duplicate values within same day
-    # Age-dependent id selection for duplicate values
+    # Age-dependent internal_id selection for duplicate values
     data.sde[, keep_id_dup := fifelse(agedays == 0L,
-                                      min(id, na.rm = TRUE),
-                                      max(id, na.rm = TRUE)),
+                                      min(as.numeric(internal_id), na.rm = TRUE),
+                                      max(as.numeric(internal_id), na.rm = TRUE)),
              by = .(subjid, param, agedays, v)]
     data.sde[, dup_count := .N, by = .(subjid, param, agedays, v)]
     # Fix SDE-Identical bug: was exclude != "Include" (backwards)
     # Should mark currently-included duplicates as SDE-Identical (matches Stata line 206: exc==0)
-    data.sde[dup_count > 1L & id != keep_id_dup & exclude == "Include",
+    data.sde[dup_count > 1L & as.numeric(internal_id) != keep_id_dup & exclude == "Include",
              exclude := "Exclude-SDE-Identical"]
     data.sde[, c("keep_id", "keep_id_dup", "dup_count") := NULL]
 
     # Include id for deterministic SDE order
-    setkey(data.sde, subjid, param, agedays, id)
+    setkey(data.sde, subjid, param, agedays, internal_id)
 
 
   # Track temp SDE status before restoration
@@ -3869,8 +3867,6 @@ cleanbatch_child <- function(data.df,
   data.sde[one_day_sde_flag & exclude == "Include" & !is.na(keep_id_oneday) &
              id != keep_id_oneday,
            exclude := "Exclude-SDE-One-Day"]
-
-  # h. no need to calculate for R.
 
   # -------------------------------------------
   # Phase B3: SDE-EWMA resolution
@@ -4816,19 +4812,16 @@ cleanbatch_child <- function(data.df,
           default = NA_real_
         )]
 
-        # CP ADD IN OR EQUAL TO FROM < or >
-        # 17G
+        # 17G: Scale WHO velocity limits by actual gap relative to reference interval
         df[d_agedays < whoinc.age.ht*30.4375, who_mindiff_ht :=
              who_mindiff_ht * d_agedays/(whoinc.age.ht*30.4375)]
         df[d_agedays > whoinc.age.ht*30.4375, who_maxdiff_ht :=
              who_maxdiff_ht * d_agedays/(whoinc.age.ht*30.4375)]
-        # CP ADD IN OR EQUAL TO FROM < or >
+        # For gaps < 9 months: widen limits (allow more loss, allow more gain)
         df[d_agedays < 9*30.4375, who_mindiff_ht := who_mindiff_ht*.5-3]
         df[d_agedays < 9*30.4375, who_maxdiff_ht := who_maxdiff_ht*2+3]
 
-        # 17H
-        ### WAS an error CP below where it said whomindiff for the second on einstead of maxdiff##
-        # tanner is implicit
+        # 17H: Choose between Tanner and WHO velocity limits
         # For gap < 9 months: use WHO (already transformed at lines 4030-4031)
         df[d_agedays < 9*30.4375 & !is.na(who_mindiff_ht), mindiff := who_mindiff_ht]
         df[d_agedays < 9*30.4375 & !is.na(who_maxdiff_ht), maxdiff := who_maxdiff_ht]
@@ -5173,7 +5166,8 @@ cleanbatch_child <- function(data.df,
                        "Exclude-SDE-EWMA",
                        "Exclude-SDE-One-Day",
                        "Exclude-Carried-Forward",
-                       "Missing")
+                       "Missing",
+                       "Not cleaned")
 
   data.df[valid_set,
           c("err_ratio", "n_errors") := {
@@ -5212,11 +5206,6 @@ cleanbatch_child <- function(data.df,
   has_ctbc <- "ctbc.sd" %in% colnames(data.df)
 
   if (has_potcorr && has_ctbc) {
-    # Merge potcorr from checkpoint_data if needed
-    if (!"potcorr" %in% colnames(data.df) && exists("checkpoint_data") && "potcorr" %in% colnames(checkpoint_data)) {
-      data.df <- merge(data.df, checkpoint_data[, .(id, potcorr)], by = "id", all.x = TRUE)
-    }
-
     # Create final_tbc column: use ctbc.sd for potcorr subjects, tbc.sd for others
     data.df[, final_tbc := ifelse(!is.na(potcorr) & potcorr == TRUE & !is.na(ctbc.sd), ctbc.sd, tbc.sd)]
   } else {
