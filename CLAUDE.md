@@ -408,8 +408,8 @@ Default: `"looser"`
 | `use_legacy_algorithm` | FALSE | Dispatch | If TRUE, use legacy pediatric algorithm |
 | `quietly` | TRUE | All | Suppress progress messages |
 | `ref_tables` | NULL | All reads | Pre-loaded closures from `gc_preload_refs()`; skips disk reads |
-| `cached_results` | NULL | Partial run | data.table from prior `cleangrowth()` call; paired with `changed_subjids` |
-| `changed_subjids` | NULL | Partial run | Vector of subject IDs to re-run; unchanged subjects use `cached_results` |
+| `cached_results` | NULL | Partial run | data.table from prior `cleangrowth()` call. Auto-detects changed subjects if `changed_subjids` is NULL; uses explicit list if both provided |
+| `changed_subjids` | NULL | Partial run | Optional vector of subject IDs to re-run. If NULL and `cached_results` provided, changed subjects are auto-detected |
 
 ### gc_preload_refs()
 
@@ -438,32 +438,75 @@ result <- cleangrowth(..., ref_tables = refs)
 
 Returns: `list(mtz_cdc_prelim, mtz_who_prelim, mtz_cdc)`.
 
-### Partial run (changed_subjids)
+### Partial run (cached_results)
 
-When measurements for only a subset of subjects have changed between
-runs, pass `cached_results` (full prior results) and `changed_subjids`
-(vector of subject IDs to re-run). Only those subjects are processed;
-the rest are taken from `cached_results`. Subjects are independent in
-all GC operations (by-group on subjid/param, fixed reference-based
-recentering), so this is safe.
+When running GC repeatedly on data that differs for only a subset of
+subjects (e.g., baseline vs. error-injected data, or updated data
+extracts), pass `cached_results` from a prior full run. Only subjects
+with changed data are re-processed; unchanged subjects receive their
+cached results. Subjects are independent in all GC operations
+(by-group on subjid/param, fixed reference-based recentering), so
+this is safe.
+
+**Two modes:**
+
+1. **Auto-detect** (recommended): Pass `cached_results` only.
+   `cleangrowth()` compares the incoming input data against the
+   cached results to automatically identify subjects with any
+   row-level differences (added/removed/modified measurements).
+   Only those subjects are re-processed.
+
+2. **Explicit**: Pass both `cached_results` and `changed_subjids`.
+   Only subjects in `changed_subjids` are re-processed. No
+   auto-detection is performed.
 
 ```r
-# First run
+# First run (full baseline)
+refs <- gc_preload_refs()
 res_baseline <- cleangrowth(..., ref_tables = refs)
 
-# Later run — only subjects 3, 7, 12 changed
-res_updated <- cleangrowth(...,
+# Auto-detect mode: pass modified data + cached baseline
+# GC figures out which subjects differ
+res_error <- cleangrowth(
+  subjid = d_err$subjid, param = d_err$param,
+  agedays = d_err$agedays, sex = d_err$sex,
+  measurement = d_err$measurement, id = d_err$id,
+  ref_tables = refs,
+  cached_results = res_baseline)
+
+# Explicit mode: caller provides the list of changed subjects
+res_error <- cleangrowth(...,
   ref_tables = refs,
   cached_results = res_baseline,
   changed_subjids = c(3, 7, 12))
 ```
 
+**Auto-detection details:**
+- Compares input subjid, param, agedays, sex, and measurement
+  (with the same 0→NaN transformation GC applies internally)
+- Detects added subjects (in input but not cache), removed
+  subjects (in cache but not input), and modified subjects
+  (any row-level difference in the comparison columns)
+- Removed subjects simply won't appear in output (they're not
+  in the input data)
+- With `quietly = FALSE`, prints a summary:
+  `Auto-detected N changed subjects (X added, Y modified, Z removed, W unchanged)`
+
+**Performance (50 subjects, 3 modified):**
+- Full run: ~1.05 sec
+- Auto-detect partial: ~1.0 sec (comparison overhead dominates
+  at small scale; savings increase with larger datasets and
+  fewer changed subjects)
+- Explicit partial: ~0.29 sec (no comparison overhead)
+- No changes detected: ~0.11 sec (returns cache immediately)
+
 Notes:
-- Both `cached_results` and `changed_subjids` must be provided together
-- If `changed_subjids` contains subject IDs not present in the input
-  data, they are silently ignored
-- Output row order matches input order (sorted by `id`)
-- Primarily designed for Eric's secure-environment use case (Qual-AD)
+- If `changed_subjids` contains subject IDs not present in the
+  input data, they are silently ignored
+- Output row order matches input order (sorted by `internal_id`)
+- Designed for two use cases: (1) error-injection pipeline
+  workflows where most subjects are unmodified, and (2) Eric's
+  secure-environment workflow with updated data extracts
 
 ### Configurable Parameters (adult, via cleangrowth)
 

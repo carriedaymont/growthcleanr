@@ -240,14 +240,27 @@
 #'   subjects; ~13 hours saved over 50K calls). Recommended for repeated calls (e.g.,
 #'   simulation loops). Defaults to NULL (reads files each call).
 #' @param cached_results Optional. A data.table of GC results from a prior \code{cleangrowth()}
-#'   call on the full dataset (e.g., a baseline run). Must be provided together with
-#'   \code{changed_subjids}. When both are supplied, only subjects in \code{changed_subjids}
-#'   are re-processed; all other subjects receive their cached results. Defaults to NULL
-#'   (process all subjects).
-#' @param changed_subjids Optional. Vector of subject IDs whose measurements have changed
-#'   since the cached baseline run. Must be provided together with \code{cached_results}.
-#'   Subjects not in this vector are taken from \code{cached_results} without re-processing.
+#'   call on the same or similar dataset (e.g., a baseline run before error injection).
+#'   Two usage modes:
+#'   \itemize{
+#'     \item \strong{Auto-detect mode} (\code{changed_subjids = NULL}): \code{cleangrowth()}
+#'       compares the current input data against the cached results to automatically identify
+#'       which subjects have any differences (added, removed, or modified rows). Only those
+#'       subjects are re-processed; unchanged subjects receive their cached results. This is
+#'       the recommended mode for error-injection workflows where most subjects are unmodified.
+#'     \item \strong{Explicit mode} (\code{changed_subjids} provided): Only subjects in
+#'       \code{changed_subjids} are re-processed. No auto-detection is performed. Use this
+#'       when you already know which subjects changed (e.g., from an external comparison).
+#'   }
 #'   Defaults to NULL (process all subjects).
+#' @param changed_subjids Optional. Vector of subject IDs whose measurements have changed
+#'   since the cached baseline run. When provided with \code{cached_results}, only these
+#'   subjects are re-processed. When NULL and \code{cached_results} is provided, changed
+#'   subjects are auto-detected by comparing input data to cached results.
+#'   Defaults to NULL.
+#' @param tri_exclude Logical. If TRUE, include a \code{tri_exclude} column in the output
+#'   that classifies each row as \code{"Include"}, \code{"Same-Day"} (same-day extraneous
+#'   values), or \code{"Exclude"} (all other exclusions). Defaults to FALSE.
 #'
 #' @return Vector of exclusion codes for each of the input measurements.
 #'
@@ -328,7 +341,8 @@ cleangrowth <- function(subjid,
                         id = NULL,
                         ref_tables = NULL,
                         cached_results = NULL,
-                        changed_subjids = NULL)
+                        changed_subjids = NULL,
+                        tri_exclude = FALSE)
                         {
   # ewma_window: number of neighbors on each side for EWMA weighting.
   # Default 15 is the R design choice; set to 25 to match Stata behavior.
@@ -374,10 +388,76 @@ cleangrowth <- function(subjid,
   # preprocessing ----
 
   # Partial-run mode: filter input to changed subjects only.
-  # Both cached_results and changed_subjids must be provided together.
   # This must happen before data.all.ages is built.
-  do_partial <- !is.null(changed_subjids) && !is.null(cached_results)
+  #
+  # Two modes:
+  #   1. Auto-detect: cached_results provided, changed_subjids NULL.
+  #      Compare input data to cached_results to find subjects with any
+  #      differences (added/removed/modified rows). Only those subjects
+  #      are re-processed.
+  #   2. Explicit: both cached_results and changed_subjids provided.
+  #      Only subjects in changed_subjids are re-processed.
+  do_partial <- !is.null(cached_results)
+  if (do_partial && is.null(changed_subjids)) {
+    # Auto-detect changed subjects by comparing input to cached results.
+    # Build a minimal data.table from input vectors for comparison.
+    # cached_results contains subjid, param, agedays, sex, v (measurement
+    # with 0→NaN applied). Compare on the original measurement values
+    # before that transformation, using the same columns cached_results has.
+    input_dt <- data.table(
+      subjid = as.factor(subjid),
+      param  = param,
+      agedays = as.integer(agedays),
+      sex    = as.integer(ifelse(
+        sex %in% c(0, "m", "M"), 0L, ifelse(sex %in% c(1, "f", "F"), 1L, NA_integer_)
+      )),
+      v      = ifelse(measurement == 0, NaN, measurement)
+    )
+    # Sort both datasets identically for per-subject comparison
+    compare_cols <- c("subjid", "param", "agedays", "sex", "v")
+    setkeyv(input_dt, compare_cols)
+    cached_compare <- cached_results[, ..compare_cols]
+    setkeyv(cached_compare, compare_cols)
+
+    # Subjects only in input (added) or only in cache (removed)
+    input_subj  <- unique(as.character(input_dt$subjid))
+    cached_subj <- unique(as.character(cached_results$subjid))
+    added   <- setdiff(input_subj, cached_subj)
+    removed <- setdiff(cached_subj, input_subj)
+
+    # For common subjects: compare row-by-row after sorting
+    common <- intersect(input_subj, cached_subj)
+    modified <- character(0)
+    if (length(common) > 0) {
+      # Per-subject comparison: concatenate all values into a single string
+      # and compare. This is fast and handles row count differences.
+      input_hash <- input_dt[as.character(subjid) %in% common,
+                             .(hash = paste(param, agedays, sex, v,
+                                            sep = "|", collapse = "\n")),
+                             by = subjid]
+      cached_hash <- cached_compare[as.character(subjid) %in% common,
+                                    .(hash = paste(param, agedays, sex, v,
+                                                   sep = "|", collapse = "\n")),
+                                    by = subjid]
+      merged <- merge(input_hash, cached_hash, by = "subjid",
+                      suffixes = c("_new", "_old"))
+      modified <- as.character(merged[hash_new != hash_old, subjid])
+    }
+
+    changed_subjids <- c(added, modified)
+    # Note: removed subjects are not in input data, so they simply won't
+    # appear in output. No special handling needed.
+
+    if (!quietly) {
+      message(sprintf(
+        "[%s] Auto-detected %d changed subjects (%d added, %d modified, %d removed, %d unchanged)",
+        Sys.time(), length(changed_subjids), length(added), length(modified),
+        length(removed), length(common) - length(modified)
+      ))
+    }
+  }
   if (do_partial) {
+    if (length(changed_subjids) == 0) return(cached_results)
     keep <- as.character(subjid) %in% as.character(changed_subjids)
     if (sum(keep) == 0) return(cached_results)  # nothing changed — return cache as-is
     subjid      <- subjid[keep]
@@ -407,7 +487,7 @@ cleangrowth <- function(subjid,
     stop("id must be provided and have the same length as measurement")
   }
   data.all.ages[, id := id]
-  data.all.ages[, internal_id := seq_len(.N)]  # Sequential IDs for internal use
+  data.all.ages[, internal_id := as.character(seq_len(.N))]  # Character for consistent type across child/adult
 
   # quality checks
   if (!is.numeric(adult_cutpoint)){
@@ -825,7 +905,7 @@ cleangrowth <- function(subjid,
       # At age 0: prefer LOWEST id (earliest measurement, before fluid/interventions)
       # At age > 0: prefer HIGHEST id (consistent with other SDE handling)
       # Create sort key: for age 0 use id ascending, for age > 0 use id descending
-      data.all[, id_sort := ifelse(agedays == 0, internal_id, -internal_id)]
+      data.all[, id_sort := ifelse(agedays == 0, as.numeric(internal_id), -as.numeric(internal_id))]
       setorder(data.all, subjid, param, agedays, id_sort)
 
       # initialize the column so it's always present
@@ -1033,7 +1113,7 @@ cleangrowth <- function(subjid,
         # Age-dependent ID sorting for consistent sequence numbering:
         # At age 0: sort by id ascending (lowest first)
         # At age > 0: sort by id descending (highest first)
-        tmp[, id_sort := ifelse(agedays == 0, internal_id, -internal_id)]
+        tmp[, id_sort := ifelse(agedays == 0, as.numeric(internal_id), -as.numeric(internal_id))]
         tmp <- tmp[order(subjid, agedays, id_sort),]
         tmp[, id_sort := NULL]
 
@@ -1673,7 +1753,50 @@ cleangrowth <- function(subjid,
       all_results,
       fill = TRUE
     )
-    setorder(all_results, internal_id)
+    all_results <- all_results[order(as.numeric(internal_id))]
+  }
+
+  # Derive bin_exclude and tri_exclude from final exclude codes.
+  # These are added after all processing (including partial-run merge)
+  # so they are consistent regardless of code path.
+
+  # Check for Exclude-Temporary-Extraneous-Same-Day surviving to output —
+  # this is an internal working code that should be resolved before output.
+  if (any(as.character(all_results$exclude) == "Exclude-Temporary-Extraneous-Same-Day",
+          na.rm = TRUE)) {
+    stop("Exclude-Temporary-Extraneous-Same-Day found in final output. ",
+         "This is an internal code that should have been resolved during processing. ",
+         "This indicates a bug in the algorithm.")
+  }
+
+  excl_char <- as.character(all_results$exclude)
+
+  # bin_exclude: Include vs Exclude (always present)
+  all_results[, bin_exclude := fifelse(excl_char == "Include", "Include", "Exclude")]
+
+  # tri_exclude: Include vs Same-Day vs Exclude (opt-in via tri_exclude parameter)
+  if (tri_exclude) {
+    # Child SDE codes (current names — will be renamed in future):
+    #   Exclude-SDE-Identical, Exclude-SDE-All-Exclude, Exclude-SDE-All-Extreme,
+    #   Exclude-SDE-EWMA, Exclude-SDE-EWMA-All-Extreme, Exclude-SDE-One-Day
+    # Adult SDE codes:
+    #   Exclude-A-HT-Identical, Exclude-A-HT-Extraneous,
+    #   Exclude-A-WT-Identical, Exclude-A-WT-Extraneous
+    child_sde_codes <- c(
+      "Exclude-SDE-Identical", "Exclude-SDE-All-Exclude",
+      "Exclude-SDE-All-Extreme", "Exclude-SDE-EWMA",
+      "Exclude-SDE-EWMA-All-Extreme", "Exclude-SDE-One-Day"
+    )
+    adult_sde_codes <- c(
+      "Exclude-A-HT-Identical", "Exclude-A-HT-Extraneous",
+      "Exclude-A-WT-Identical", "Exclude-A-WT-Extraneous"
+    )
+    sde_codes <- c(child_sde_codes, adult_sde_codes)
+
+    all_results[, tri_exclude := fifelse(
+      excl_char == "Include", "Include",
+      fifelse(excl_char %in% sde_codes, "Same-Day", "Exclude")
+    )]
   }
 
   return(all_results)
@@ -2457,8 +2580,10 @@ temporary_extraneous_infants <- function(df, exclude_from_dop_ids = NULL) {
 
   # make a small copy of df with fields we need
   # Include internal_id for age-dependent tiebreaker
-  # Use internal_id in keyby for deterministic SDE order
-  df <- df[j = .(tbc.sd, exclude, id, internal_id, orig_row), keyby = .(subjid, param, agedays, internal_id)]
+  # Use by (not keyby) to avoid lexicographic sort on character internal_id,
+  # then sort explicitly with as.numeric(internal_id) for correct numeric order
+  df <- df[, .(tbc.sd, exclude, id, internal_id, orig_row), by = .(subjid, param, agedays)]
+  df <- df[order(subjid, param, agedays, as.numeric(internal_id))]
 
   # Now compute valid.rows on the keyby-sorted data
   # Removed nnte filter (nnte calculation removed)
@@ -2574,7 +2699,7 @@ temporary_extraneous_infants <- function(df, exclude_from_dop_ids = NULL) {
     # At agedays=0: pick lowest id (sort ascending)
     # At agedays>0: pick highest id (sort descending via -internal_id)
     # Use internal_id for numeric sorting, not id (which may be character)
-    tiebreaker <- if(agedays[1] == 0) internal_id else -internal_id
+    tiebreaker <- if(agedays[1] == 0) as.numeric(internal_id) else -as.numeric(internal_id)
     ord <- order(absdmedian.spz,
                  absdmedian.dopz, tiebreaker)
     keep_id <- id[ord[1]]
@@ -2840,7 +2965,7 @@ cleanbatch_child <- function(data.df,
   # SDE-Identical handles partial identicals - duplicates are marked even when
   # mixed with non-duplicates. Groups by subjid/param/agedays/v to find
   # duplicates of each specific value.
-  setorder(data.df, subjid, param, agedays, internal_id)
+  data.df <- data.df[order(subjid, param, agedays, as.numeric(internal_id))]
 
   # Count included values with same measurement on same day
   data.df[, n_same_value := sum(exclude == "Include"), by = .(subjid, param, agedays, v)]
@@ -2918,7 +3043,7 @@ cleanbatch_child <- function(data.df,
     if (length(sp_with_potential_cf) > 0) {
       cf_subset <- data.sub[sp_key %in% sp_with_potential_cf]
       # Add id for consistent SDE order
-      setorder(cf_subset, subjid, param, agedays, internal_id)
+      cf_subset <- cf_subset[order(subjid, param, agedays, as.numeric(internal_id))]
 
       # CF logic updated to match Stata
       # Replaced dplyr/map_lgl with data.table for CF detection
@@ -3166,7 +3291,7 @@ cleanbatch_child <- function(data.df,
   # Add SDE-Identical rows back after CF rescue
   if (nrow(sde_identical_rows) > 0) {
     data.df <- rbind(data.df, sde_identical_rows, fill = TRUE)
-    data.df <- data.df[order(subjid, param, agedays, internal_id)]
+    data.df <- data.df[order(subjid, param, agedays, as.numeric(internal_id))]
   }
 
   # Drop columns no longer needed after Step 6
@@ -3304,7 +3429,7 @@ cleanbatch_child <- function(data.df,
   # Must include agedays and id for consistent order
   # Without agedays, calc_otl_evil_twins compares non-adjacent-in-time values
   # Without id, SDE rows (same ageday) have undefined order, causing parallel inconsistency
-  data.df <- data.df[order(subjid, param, agedays, internal_id),]
+  data.df <- data.df[order(subjid, param, agedays, as.numeric(internal_id)),]
 
   # Evil Twins requires 3+ measurements per subject-param
   data.df[, sp_count_9 := .N, by = .(subjid, param)]
@@ -3359,7 +3484,7 @@ cleanbatch_child <- function(data.df,
         #   3. Lowest id (deterministic)
         otl_rows <- df[otl == TRUE]
         if (nrow(otl_rows) == 0L) break
-        ord <- order(-otl_rows$med_diff, -abs(otl_rows$tbc.sd), otl_rows$internal_id)
+        ord <- order(-otl_rows$med_diff, -abs(otl_rows$tbc.sd), as.numeric(otl_rows$internal_id))
         worst_line <- otl_rows$line[ord[1L]]
 
         # Mark exactly one exclusion per iteration
@@ -3510,7 +3635,7 @@ cleanbatch_child <- function(data.df,
                   df[pot_excl == TRUE, exclude := 'Exclude-EWMA1-Extreme']
                 } else if (num.exclude > 1) {
                   # Select worst: highest abs(tbc.sd + dewma.all), lowest id as tiebreaker
-                  worst.row <- with(df, order(pot_excl, abs(tbc.sd + dewma.all), -internal_id, decreasing = TRUE))[1]
+                  worst.row <- with(df, order(pot_excl, abs(tbc.sd + dewma.all), -as.numeric(internal_id), decreasing = TRUE))[1]
                   df[worst.row, exclude := 'Exclude-EWMA1-Extreme']
                 }
               }
@@ -3631,7 +3756,7 @@ cleanbatch_child <- function(data.df,
     data.sde <- data.sde[has_sde_subj == TRUE]
     data.sde[, has_sde_subj := NULL]
 
-    setorder(data.sde, subjid, param, agedays, internal_id)
+    data.sde <- data.sde[order(subjid, param, agedays, as.numeric(internal_id))]
 
     # Mark SDE-Identical: all values on same day are identical
     # Age 0: keep lowest id, age > 0: keep highest id
@@ -3663,7 +3788,7 @@ cleanbatch_child <- function(data.df,
   # Track temp SDE status before restoration
   data.sde[, was_temp_sde := exclude == 'Exclude-Temporary-Extraneous-Same-Day']
   data.sde[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
-  setorder(data.sde, subjid, param, agedays, internal_id)
+  data.sde <- data.sde[order(subjid, param, agedays, as.numeric(internal_id))]
 
   # -------------------------------------------
   # Phase B2: One-Day SDE identification + SDE-All-Extreme
@@ -3873,7 +3998,7 @@ cleanbatch_child <- function(data.df,
 
   # Order data for processing
   # Add id for consistent SDE order
-  data.df <- data.df[order(subjid, param, agedays, internal_id),]
+  data.df <- data.df[order(subjid, param, agedays, as.numeric(internal_id)),]
 
   # Pre-identify subject-params that need processing: Include values, >2 values
   # Include temp SDEs in count so they get p_plus/p_minus calculated
@@ -4121,7 +4246,7 @@ cleanbatch_child <- function(data.df,
                 # Use internal_id tie-breaker for deterministic selection
                 # which.max returns first tie, which depends on data order
                 # Use order() with internal_id as tie-breaker for reproducibility
-                ord <- order(-candidates$abssum, candidates$internal_id)
+                ord <- order(-candidates$abssum, as.numeric(candidates$internal_id))
                 worst_idx <- candidates$index[ord[1]]
                 df[index == worst_idx, exclude := pot_excl]
               }
@@ -4265,7 +4390,7 @@ cleanbatch_child <- function(data.df,
               if (nrow(candidates) > 0) {
                 candidates[, abssum := abs(tbc.sd + dewma.all)]
                 # Use id tie-breaker for deterministic selection
-                ord <- order(-candidates$abssum, candidates$internal_id)
+                ord <- order(-candidates$abssum, as.numeric(candidates$internal_id))
                 worst_idx <- candidates$index[ord[1]]
                 df[index == worst_idx, exclude := pot_excl]
               }
@@ -4352,7 +4477,7 @@ cleanbatch_child <- function(data.df,
 
   # order just for ease later
   # Add id for consistent SDE order
-  data.df <- data.df[order(subjid, param, agedays, internal_id),]
+  data.df <- data.df[order(subjid, param, agedays, as.numeric(internal_id)),]
 
   # Compute valid_set AFTER sort, not before
   # valid_set is a logical vector indexed by row position, so it must be computed
@@ -4373,7 +4498,7 @@ cleanbatch_child <- function(data.df,
   data.df[, sp_key := paste0(subjid, "_", param)]
   {
     pf <- data.df[valid_set, .(sp_key, subjid, param, agedays, id, internal_id, sex, v)]
-    setorder(pf, subjid, param, agedays, internal_id)
+    pf <- pf[order(subjid, param, agedays, as.numeric(internal_id))]
 
     # Compute gaps and raw value diffs within each group
     pf[, `:=`(
@@ -4622,7 +4747,7 @@ cleanbatch_child <- function(data.df,
 
       # sort df since it got reordered with keys
       # Include id for deterministic SDE order
-      df <- df[order(agedays, internal_id),]
+      df <- df[order(agedays, as.numeric(internal_id)),]
 
       # 17A
       df[, d_agedays := shift(agedays, n = 1L, type = "lead") - agedays]
@@ -4724,7 +4849,7 @@ cleanbatch_child <- function(data.df,
         # 17I
         # sort df since it got reordered with keys
         # Include id for deterministic SDE order
-        df <- df[order(agedays, internal_id),]
+        df <- df[order(agedays, as.numeric(internal_id)),]
         df[, mindiff_prior := shift(mindiff, n = 1L, type = "lag")]
         df[, maxdiff_prior := shift(maxdiff, n = 1L, type = "lag")]
       } else { # head circumference
@@ -4776,7 +4901,7 @@ cleanbatch_child <- function(data.df,
 
         # 17N: Sort and lag thresholds for pairwise violation check
         # Include id for deterministic SDE order
-        df <- df[order(agedays, internal_id),]
+        df <- df[order(agedays, as.numeric(internal_id)),]
         df[, mindiff_prior := shift(mindiff, n = 1L, type = "lag")]
         df[, maxdiff_prior := shift(maxdiff, n = 1L, type = "lag")]
       }
@@ -4883,7 +5008,7 @@ cleanbatch_child <- function(data.df,
         # Use id tie-breaker for deterministic selection
         # which.max returns first tie, which depends on data order
         candidates <- df[val_excl != "Include"]
-        ord <- order(-candidates$absval, candidates$internal_id)
+        ord <- order(-candidates$absval, as.numeric(candidates$internal_id))
         idx <- candidates$index[ord[1]]
 
 
@@ -4917,7 +5042,7 @@ cleanbatch_child <- function(data.df,
 
   # order just for ease later
   # Add id for consistent SDE order
-  data.df <- data.df[order(subjid, param, agedays, internal_id),]
+  data.df <- data.df[order(subjid, param, agedays, as.numeric(internal_id)),]
 
   # Compute valid_set AFTER sort, not before
   # create the valid set
@@ -4977,10 +5102,10 @@ cleanbatch_child <- function(data.df,
       # 19E: which is larger
       # Use id tie-breaker for deterministic selection
       max_ind <- if (!all(is.na(df$comp_diff))){
-        ord <- order(-df$comp_diff, df$internal_id)
+        ord <- order(-df$comp_diff, as.numeric(df$internal_id))
         ord[1]
       } else {
-        ord <- order(-abs(df$tbc.sd), df$internal_id)
+        ord <- order(-abs(df$tbc.sd), as.numeric(df$internal_id))
         ord[1]
       }
 

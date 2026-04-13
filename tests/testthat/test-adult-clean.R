@@ -14,7 +14,7 @@ make_df <- function(subjid, param, agedays, measurement, sex = 0, id = NULL) {
   if (is.null(id)) id <- seq_len(n)
   data.table(
     id      = as.character(id),
-    internal_id = seq_len(n),
+    internal_id = as.character(seq_len(n)),
     subjid  = subjid,
     sex     = sex,
     agedays = agedays,
@@ -42,7 +42,7 @@ make_subject <- function(subjid, ages, hts, wts, sex = 0, id_start = 1) {
     id <- id + 1
   }
   dt <- rbindlist(rows)
-  dt[, internal_id := seq_len(.N)]
+  dt[, internal_id := as.character(seq_len(.N))]
   dt
 }
 
@@ -50,7 +50,7 @@ make_subject <- function(subjid, ages, hts, wts, sex = 0, id_start = 1) {
 run_clean <- function(df, ...) {
   df_copy <- copy(df)
   # Always reassign internal_id to ensure uniqueness after rbind
-  df_copy[, internal_id := seq_len(.N)]
+  df_copy[, internal_id := as.character(seq_len(.N))]
   if (!"ageyears" %in% names(df_copy) && !"age_years" %in% names(df_copy) &&
       "agedays" %in% names(df_copy)) {
     df_copy[, ageyears := agedays / 365.25]

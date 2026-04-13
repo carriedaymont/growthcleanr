@@ -121,19 +121,21 @@ test_that("stress test: exclusion category counts match expected", {
   # algorithm intentionally changes. Run the test once with new code,
   # read the printed counts, and update here.
   #
-  # Frozen counts — established 2026-03-20 on stress_test_data.rds
+  # Frozen counts — updated 2026-04-13 after error.load.threshold fix
+  # (2026-04-12: hardcoded 0.4 → configurable 0.5, reducing error-load
+  # exclusions) and internal_id character type change.
   # (10 error types including rounding)
   # Update these when algorithm intentionally changes.
-  expect_equal(catcount("Include"), 29094)
-  expect_equal(catcount("Exclude-SDE-EWMA"), 830)
+  expect_equal(catcount("Include"), 29194)
+  expect_equal(catcount("Exclude-SDE-EWMA"), 825)
   expect_equal(catcount("Exclude-Evil-Twins"), 734)
-  expect_equal(catcount("Exclude-EWMA2-middle"), 544)
-  expect_equal(catcount("Exclude-Error-load"), 499)
+  expect_equal(catcount("Exclude-EWMA2-middle"), 543)
+  expect_equal(catcount("Exclude-Error-load"), 401)
   expect_equal(catcount("Exclude-Carried-Forward"), 378)
   expect_equal(catcount("Exclude-Standardized-BIV"), 354)
-  expect_equal(catcount("Exclude-Absolute-BIV"), 246)
+  expect_equal(catcount("Exclude-Absolute-BIV"), 252)
   expect_equal(catcount("Exclude-Min-diff"), 155)
-  expect_equal(catcount("Exclude-SDE-All-Extreme"), 106)
+  expect_equal(catcount("Exclude-SDE-All-Extreme"), 104)
   expect_equal(catcount("Exclude-EWMA1-Extreme"), 58)
   expect_equal(catcount("Exclude-EWMA2-first"), 33)
   expect_equal(catcount("Exclude-SDE-Identical"), 31)
