@@ -9,14 +9,19 @@ library(data.table)
 # =============================================================================
 
 # ---------------------------------------------------------------------------
+# Shared data: load syngrowth once at file scope
+# ---------------------------------------------------------------------------
+data("syngrowth", package = "growthcleanr", envir = environment())
+.sg <- as.data.table(syngrowth)
+setkey(.sg, subjid, param, agedays)
+.sg_peds <- .sg[agedays < 20 * 365.25]
+
+# ---------------------------------------------------------------------------
 # Test 1: Single subject
 # ---------------------------------------------------------------------------
 test_that("child algorithm handles single subject", {
 
-  data("syngrowth", package = "growthcleanr", envir = environment())
-  dt <- as.data.table(syngrowth)
-  dt_peds <- dt[agedays < 20 * 365.25]
-  d1 <- dt_peds[subjid == unique(dt$subjid)[1]]
+  d1 <- .sg_peds[subjid == unique(.sg_peds$subjid)[1]]
 
   res <- cleangrowth(
     subjid = d1$subjid,
@@ -123,10 +128,7 @@ test_that("child algorithm handles all-NA measurements", {
 # ---------------------------------------------------------------------------
 test_that("child algorithm handles mix of NA and valid measurements", {
 
-  data("syngrowth", package = "growthcleanr", envir = environment())
-  dt <- as.data.table(syngrowth)
-  dt_peds <- dt[agedays < 20 * 365.25]
-  d <- dt_peds[subjid %in% unique(dt$subjid)[1:5]]
+  d <- .sg_peds[subjid %in% unique(.sg_peds$subjid)[1:5]]
 
   # Set half the measurements to NA
   d_half <- copy(d)
@@ -220,10 +222,7 @@ test_that("child algorithm marks negative agedays as Missing", {
 test_that("child algorithm excludes HEADCM > 3 years from cleaning", {
 
   # Use syngrowth subjects plus synthetic HC rows for a more realistic dataset
-  data("syngrowth", package = "growthcleanr", envir = environment())
-  dt <- as.data.table(syngrowth)
-  dt_peds <- dt[agedays < 20 * 365.25]
-  d <- dt_peds[subjid %in% unique(dt$subjid)[1:10]]
+  d <- .sg_peds[subjid %in% unique(.sg_peds$subjid)[1:10]]
 
   # Add HC rows: some under 3 years, some over 3 years
   young_ht <- d[param == "HEIGHTCM" & agedays < 1000]
@@ -310,16 +309,12 @@ test_that("child algorithm excludes biologically implausible values", {
 # ---------------------------------------------------------------------------
 test_that("child algorithm handles mix of data-rich and data-sparse subjects", {
 
-  data("syngrowth", package = "growthcleanr", envir = environment())
-  dt <- as.data.table(syngrowth)
-  dt_peds <- dt[agedays < 20 * 365.25]
-
   # Get one data-rich subject and create a data-sparse one
-  rich_subj <- unique(dt$subjid)[1]
-  d_rich <- dt_peds[subjid == rich_subj]
+  rich_subj <- unique(.sg_peds$subjid)[1]
+  d_rich <- .sg_peds[subjid == rich_subj]
 
   d_sparse <- data.table(
-    id = max(dt$id) + 1:2,
+    id = max(.sg_peds$id) + 1:2,
     subjid = "sparse_subj",
     sex = 0L,
     param = c("HEIGHTCM", "WEIGHTKG"),
@@ -381,10 +376,7 @@ test_that("child algorithm detects carried-forward values", {
 # ---------------------------------------------------------------------------
 test_that("child algorithm produces deterministic results", {
 
-  data("syngrowth", package = "growthcleanr", envir = environment())
-  dt <- as.data.table(syngrowth)
-  dt_peds <- dt[agedays < 20 * 365.25]
-  d <- dt_peds[subjid %in% unique(dt$subjid)[1:20]]
+  d <- .sg_peds[subjid %in% unique(.sg_peds$subjid)[1:20]]
 
   res1 <- cleangrowth(
     subjid = d$subjid, param = d$param,

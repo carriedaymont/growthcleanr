@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-github-latest (growthcleanr)
 
-**Last updated:** 2026-04-14 (exclusion code rename complete; .child_valid() rename; .child_exc() helper; exclude.levels updated; lt3.exclude.mode re-added)
+**Last updated:** 2026-04-14 (testing overhaul: adult tests fixed for library(), adult integration tests added, spanning subject tests, testing-reference.md created, permissiveness_presets exported)
 
 ## Overview
 
@@ -627,21 +627,33 @@ accidentally modify copies or joined tables.
 
 ## Testing
 
-### testthat suite (child)
+### testthat suite
 
-4 test files in `tests/testthat/`:
+Full details in `testing-reference.md` (test-by-test listing,
+coverage gaps, run instructions).
 
-| File | Tests | Assertions | Coverage |
-|------|-------|------------|----------|
-| `test-cleangrowth.R` | 4 | 54 | Legacy pediatric, adult, edge cases |
-| `test-child-regression.R` | 7 | 49 | Structural invariants, frozen counts, spot checks, cross-sample stability, Missing handling, HC, prelim_infants compat |
-| `test-child-parameters.R` | 10 | 24 | All configurable parameters |
-| `test-child-edge-cases.R` | 12 | 23 | Single subject, sparse data, all-NA, mixed NA, SDE-Identical, negative agedays, HEADCM >3yr, extreme values, density mix, CF, deterministic |
+6 actively maintained test files in `tests/testthat/`:
 
-Total child: 200/207 pass (7 pre-existing CF rescue +
-parallel failures). Existing `test-cdc.R` and `test-utils.R`
-not modified; `test-utils.R` has 6 pre-existing failures
-(old API without id parameter).
+| File | Tests | Assertions | Scope |
+|------|-------|------------|-------|
+| `test-cleangrowth.R` | 14 | 92 | `cleangrowth()` API: legacy pediatric, adult integration (7 tests), child-adult spanning (3 tests), deprecation |
+| `test-child-regression.R` | 9 | 54 | Frozen counts, spot checks, cross-sample stability, Missing, HC, preload_refs, changed_subjids |
+| `test-child-algorithms.R` | 24 | ~40 | CF rescue (modes + threshold cells), Evil Twins/OTL (1/2/3 unit errors + collateral), Error Load (threshold/mincount/constructed), HC boundary, cf_detail, parallel, GA correction (potcorr + near-potcorr), Birth EWMA2 (extreme/normal WT, extreme HT), LENGTHCM identity |
+| `test-child-parameters.R` | 9 | 21 | use_legacy_algorithm, sd.recenter, include.carryforward, sd.extreme, ewma_window, error.load params, recover.unit.error, imperial units, LENGTHCM |
+| `test-child-edge-cases.R` | 12 | 24 | Single subject, sparse data, all-NA, mixed NA, SDE-Identical, negative agedays, HEADCM >3yr, extreme values, density mix, CF, deterministic |
+| `test-adult-clean.R` | 198 | 198 | All 14 adult steps, 4 permissiveness levels, edge cases (via `cleanadult()` directly) |
+| **Total** | **266** | **~429** | |
+
+Additional test files not actively maintained:
+`test-cdc.R` (not modified in v3.0.0); `test-utils.R` (10
+failures — old API without `id` parameter, tests utility
+functions `splitinput`, `recode_sex`, `longwide`, `simple_bmi`).
+
+**Not tested (by design):** Steps 3 (unit error recovery) and
+4 (swapped measurements) are legacy features scheduled for
+redesign. Do not write tests for the current implementation —
+they would need to be rewritten anyway and would slow down
+the redesign.
 
 Run with:
 ```bash
@@ -649,11 +661,7 @@ NOT_CRAN=true Rscript -e \
   'testthat::test_file("tests/testthat/test-child-regression.R")'
 ```
 
-### testthat suite (adult)
-
-| File | Tests | Assertions | Coverage |
-|------|-------|------------|----------|
-| `test-adult-clean.R` | 198 | 198 | All 14 steps, all 4 permissiveness levels, edge cases |
+### Adult regression harness (separate from testthat)
 
 Regression test: `tests/test_harness.R` runs `cleanadult()`
 against `inst/testdata/adult-gc-test-ALL-PHASES.csv` — 1508
@@ -763,9 +771,12 @@ Requires installed package — see Known Issues. Run in background from Claude C
   UW scaling edge cases (very low/high UW).
 - [ ] **Performance:** `setkey(df, subjid)` optimization
   deferred.
-- [ ] **Integration tests through `cleangrowth()`:** Need
-  to add tests that exercise the full `cleangrowth()` →
-  `cleanadult()` path, not just direct `cleanadult()` calls.
+- [x] **Integration tests through `cleangrowth()`:** 7 tests
+  added to `test-cleangrowth.R` exercising the full
+  `cleangrowth()` → `cleanadult()` path: output columns,
+  imperial units, permissiveness passthrough, scale_max_lbs,
+  weight_cap deprecation, id preservation, spanning subject
+  output structure.
 
 ### Fixed (recent)
 

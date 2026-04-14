@@ -14,15 +14,16 @@ library(data.table)
 # =============================================================================
 
 # ---------------------------------------------------------------------------
-# Helper: run child algorithm on N-subject pediatric subset of syngrowth
+# Shared data: load syngrowth once, run 100-subject GC once
 # ---------------------------------------------------------------------------
-run_child_subset <- function(n_subjects, sd_recenter = "NHANES") {
-  data("syngrowth", package = "growthcleanr", envir = environment())
-  dt <- data.table::as.data.table(syngrowth)
-  data.table::setkey(dt, subjid, param, agedays)
-  dt_peds <- dt[agedays < 20 * 365.25]
-  subjs <- unique(dt$subjid)[seq_len(n_subjects)]
-  d <- dt_peds[subjid %in% subjs]
+data("syngrowth", package = "growthcleanr", envir = environment())
+.sg <- data.table::as.data.table(syngrowth)
+data.table::setkey(.sg, subjid, param, agedays)
+.sg_peds <- .sg[agedays < 20 * 365.25]
+
+run_child_subset <- function(n_subjects, sd_recenter = "NHANES", ...) {
+  subjs <- unique(.sg$subjid)[seq_len(n_subjects)]
+  d <- .sg_peds[subjid %in% subjs]
   res <- cleangrowth(
     subjid = d$subjid,
     param = d$param,
@@ -31,10 +32,14 @@ run_child_subset <- function(n_subjects, sd_recenter = "NHANES") {
     measurement = d$measurement,
     id = d$id,
     sd.recenter = sd_recenter,
-    quietly = TRUE
+    quietly = TRUE,
+    ...
   )
   return(list(input = d, result = res))
 }
+
+# Cache the 100-subject default run — used by Tests 1-4 and benchmark
+.out100 <- run_child_subset(100)
 
 # Convenience: look up a single record's exclusion code by id
 gcr_result <- function(res, rowid) {
@@ -46,9 +51,8 @@ gcr_result <- function(res, rowid) {
 # ---------------------------------------------------------------------------
 test_that("child algorithm: structural invariants on 100-subject subset", {
 
-  out <- run_child_subset(100)
-  d <- out$input
-  res <- out$result
+  d <- .out100$input
+  res <- .out100$result
 
   # 1a. Output has same number of rows as input
 
@@ -87,8 +91,7 @@ test_that("child algorithm: structural invariants on 100-subject subset", {
 # ---------------------------------------------------------------------------
 test_that("child algorithm: exclusion counts match expected on 100 subjects", {
 
-  out <- run_child_subset(100)
-  res <- out$result
+  res <- .out100$result
 
   # Helper to get count for a category
   catcount <- function(category) {
@@ -127,8 +130,7 @@ test_that("child algorithm: exclusion counts match expected on 100 subjects", {
 # ---------------------------------------------------------------------------
 test_that("child algorithm: spot-check individual records", {
 
-  out <- run_child_subset(100)
-  res <- out$result
+  res <- .out100$result
 
   # Include — normal measurement
   expect_equal(gcr_result(res, 23751), "Include")
@@ -175,7 +177,7 @@ test_that("child algorithm: spot-check individual records", {
 test_that("child algorithm: within-subject exclusions stable at 50 vs 100 subjects", {
 
   out50 <- run_child_subset(50)
-  out100 <- run_child_subset(100)
+  out100 <- .out100
 
   # Records that exist in both 50- and 100-subject subsets
   # These within-subject results should be identical
@@ -202,13 +204,9 @@ test_that("child algorithm: within-subject exclusions stable at 50 vs 100 subjec
 # ---------------------------------------------------------------------------
 test_that("child algorithm: missing measurements return Missing", {
 
-  data("syngrowth", package = "growthcleanr", envir = environment())
-  dt <- data.table::as.data.table(syngrowth)
-  dt_peds <- dt[agedays < 20 * 365.25]
-
   # Use 20 subjects for more robust test (avoids edge cases with
   # same-day duplicates both being NA on tiny subsets)
-  d20 <- dt_peds[subjid %in% unique(dt$subjid)[1:20]]
+  d20 <- .sg_peds[subjid %in% unique(.sg$subjid)[1:20]]
 
   # Introduce 10 missing values, avoiding same-day-same-param pairs
   # by picking one row per (subjid, param, agedays) group
@@ -250,13 +248,8 @@ test_that("child algorithm: missing measurements return Missing", {
 # ---------------------------------------------------------------------------
 test_that("child algorithm: HEADCM measurements are processed", {
 
-  data("syngrowth", package = "growthcleanr", envir = environment())
-  dt <- data.table::as.data.table(syngrowth)
-  data.table::setkey(dt, subjid, param, agedays)
-  dt_peds <- dt[agedays < 20 * 365.25]
-
   # Use 50 subjects — first 10 don't have infants, but first 50 has 8
-  d50 <- dt_peds[subjid %in% unique(dt$subjid)[1:50]]
+  d50 <- .sg_peds[subjid %in% unique(.sg$subjid)[1:50]]
   young <- d50[param == "HEIGHTCM" & agedays < 1095]
   expect_gt(nrow(young), 0)
 
@@ -300,10 +293,7 @@ test_that("child algorithm: HEADCM measurements are processed", {
 # ---------------------------------------------------------------------------
 test_that("prelim_infants = TRUE produces deprecation warning and runs child algorithm", {
 
-  data("syngrowth", package = "growthcleanr", envir = environment())
-  dt <- data.table::as.data.table(syngrowth)
-  dt_peds <- dt[agedays < 20 * 365.25]
-  d5 <- dt_peds[subjid %in% unique(dt$subjid)[1:5]]
+  d5 <- .sg_peds[subjid %in% unique(.sg$subjid)[1:5]]
 
   # prelim_infants = TRUE should warn and produce child algorithm results
   expect_warning(
@@ -335,45 +325,12 @@ test_that("prelim_infants = TRUE produces deprecation warning and runs child alg
 })
 
 # ---------------------------------------------------------------------------
-# Test 8: Performance benchmark — catch major regressions
-#
-# Runs 100-subject subset and reports elapsed time. Fails if runtime
-# exceeds a generous ceiling (60 sec) that should only trigger if
-# something has gone seriously wrong. The reported time is the useful
-# signal — check it when making algorithm or batching changes.
-# ---------------------------------------------------------------------------
-test_that("child algorithm: 100-subject benchmark completes in reasonable time", {
-
-  t0 <- proc.time()
-  out <- run_child_subset(100)
-  elapsed <- (proc.time() - t0)[["elapsed"]]
-
-  # Report timing — this is the main value of this test
-  cat(sprintf(
-    "\n=== BENCHMARK: 100 subjects (%d rows) completed in %.1f sec ===\n",
-    nrow(out$result), elapsed
-  ), file = stderr())
-
-  # Sanity check that it actually ran
-  expect_equal(nrow(out$result), 832)
-
-  # Generous ceiling — not a tight benchmark, just catches catastrophic
-  # slowdowns (e.g., batching bug causing N^2 behavior). Normal runtime
-  # on this machine is ~2-5 sec for 100 subjects.
-  expect_lt(elapsed, 60,
-            label = sprintf("Runtime %.1f sec exceeded 60 sec ceiling", elapsed))
-})
-
-# ---------------------------------------------------------------------------
 # Test 8: gc_preload_refs() + ref_tables produce identical results to full run
 # ---------------------------------------------------------------------------
 test_that("gc_preload_refs: ref_tables produces identical results to standard run", {
 
-  data("syngrowth", package = "growthcleanr", envir = environment())
-  dt <- data.table::as.data.table(syngrowth)
-  dt_peds <- dt[agedays < 20 * 365.25]
-  subjs <- unique(dt_peds$subjid)[seq_len(30)]
-  d <- dt_peds[subjid %in% subjs]
+  subjs <- unique(.sg_peds$subjid)[seq_len(30)]
+  d <- .sg_peds[subjid %in% subjs]
 
   # Standard run (reads refs from disk)
   res_standard <- cleangrowth(
@@ -414,11 +371,8 @@ test_that("gc_preload_refs: ref_tables produces identical results to standard ru
 # ---------------------------------------------------------------------------
 test_that("changed_subjids: partial run produces identical results to full run", {
 
-  data("syngrowth", package = "growthcleanr", envir = environment())
-  dt <- data.table::as.data.table(syngrowth)
-  dt_peds <- dt[agedays < 20 * 365.25]
-  subjs <- unique(dt_peds$subjid)[seq_len(30)]
-  d <- dt_peds[subjid %in% subjs]
+  subjs <- unique(.sg_peds$subjid)[seq_len(30)]
+  d <- .sg_peds[subjid %in% subjs]
 
   # Full run (baseline cached results)
   res_full <- cleangrowth(

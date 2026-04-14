@@ -2,6 +2,7 @@
 # Run with: testthat::test_file("tests/testthat/test-adult-clean.R")
 
 library(testthat)
+library(growthcleanr)
 library(data.table)
 library(dplyr)
 
@@ -55,7 +56,7 @@ run_clean <- function(df, ...) {
       "agedays" %in% names(df_copy)) {
     df_copy[, ageyears := agedays / 365.25]
   }
-  result <- cleanadult(df_copy, quietly = TRUE, ...)
+  result <- growthcleanr:::cleanadult(df_copy, quietly = TRUE, ...)
   result
 }
 

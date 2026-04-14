@@ -10,15 +10,17 @@ library(data.table)
 # =============================================================================
 
 # ---------------------------------------------------------------------------
-# Helper: run child algorithm on N-subject pediatric subset
+# Shared data: load syngrowth once at file scope
 # ---------------------------------------------------------------------------
+data("syngrowth", package = "growthcleanr", envir = environment())
+.sg <- as.data.table(syngrowth)
+setkey(.sg, subjid, param, agedays)
+.sg_peds <- .sg[agedays < 20 * 365.25]
+
+# Helper: run child algorithm on N-subject pediatric subset
 run_child_subset <- function(n_subjects, ...) {
-  data("syngrowth", package = "growthcleanr", envir = environment())
-  dt <- as.data.table(syngrowth)
-  setkey(dt, subjid, param, agedays)
-  dt_peds <- dt[agedays < 20 * 365.25]
-  subjs <- unique(dt$subjid)[seq_len(n_subjects)]
-  d <- dt_peds[subjid %in% subjs]
+  subjs <- unique(.sg$subjid)[seq_len(n_subjects)]
+  d <- .sg_peds[subjid %in% subjs]
   res <- cleangrowth(
     subjid = d$subjid,
     param = d$param,
@@ -173,10 +175,7 @@ test_that("recover.unit.error parameter is accepted and doesn't crash", {
 # ---------------------------------------------------------------------------
 test_that("imperial units (HEIGHTIN, WEIGHTLBS) are converted and processed", {
 
-  data("syngrowth", package = "growthcleanr", envir = environment())
-  dt <- as.data.table(syngrowth)
-  dt_peds <- dt[agedays < 20 * 365.25]
-  d <- dt_peds[subjid %in% unique(dt$subjid)[1:10]]
+  d <- .sg_peds[subjid %in% unique(.sg$subjid)[1:10]]
 
   # Convert metric to imperial
   d_imp <- copy(d)
@@ -213,10 +212,7 @@ test_that("imperial units (HEIGHTIN, WEIGHTLBS) are converted and processed", {
 # ---------------------------------------------------------------------------
 test_that("LENGTHCM param is accepted and processed", {
 
-  data("syngrowth", package = "growthcleanr", envir = environment())
-  dt <- as.data.table(syngrowth)
-  dt_peds <- dt[agedays < 20 * 365.25]
-  d <- dt_peds[subjid %in% unique(dt$subjid)[1:10]]
+  d <- .sg_peds[subjid %in% unique(.sg$subjid)[1:10]]
 
   # Change all HEIGHTCM to LENGTHCM for young children
   d_len <- copy(d)

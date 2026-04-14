@@ -5,7 +5,13 @@
 # permissiveness presets ----
 
 #' Return preset parameter values for each permissiveness level
-#' @keywords internal
+#'
+#' Returns a named list of four permissiveness levels (loosest, looser,
+#' tighter, tightest), each containing the full set of adult algorithm
+#' parameters for that level. Default level is "looser".
+#'
+#' @return Named list of four lists, each containing parameter values
+#' @export
 permissiveness_presets <- function() {
   list(
     loosest = list(
