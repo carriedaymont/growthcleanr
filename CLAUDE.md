@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-github-latest (growthcleanr)
 
-**Last updated:** 2026-04-12 (internal_id rename complete in both algorithms; error load bug fix)
+**Last updated:** 2026-04-14 (exclusion code rename complete; .child_valid() rename; .child_exc() helper; exclude.levels updated; lt3.exclude.mode re-added)
 
 ## Overview
 
@@ -55,10 +55,10 @@ This CLAUDE.md covers both the child and adult algorithms.
 
 | File | What it contains |
 |------|------------------|
-| `R/child_clean.R` | `cleangrowth()` entry point + exports (top of file); `gc_preload_refs()` (pre-loads reference closures for repeated calls); `cleanbatch_child()` main algorithm + support functions (`valid()`, `temporary_extraneous_infants()`, `calc_otl_evil_twins()`, `calc_and_recenter_z_scores()`, `ewma()`, `ewma_cache_init()`/`ewma_cache_update()`, `get_dop()`, `read_anthro()`) |
+| `R/child_clean.R` | `cleangrowth()` entry point + exports (top of file); `gc_preload_refs()` (pre-loads reference closures for repeated calls); `cleanchild()` main algorithm + support functions (`.child_valid()`, `.child_exc()`, `temporary_extraneous_infants()`, `calc_otl_evil_twins()`, `calc_and_recenter_z_scores()`, `ewma()`, `ewma_cache_init()`/`ewma_cache_update()`, `get_dop()`, `read_anthro()`) |
 | `R/pediatric_clean_legacy.R` | Legacy pediatric algorithm (`use_legacy_algorithm = TRUE`); deprecated, retained for backward compatibility |
 | ~~`R/growth.R`~~ | Removed in v3.0.0 — `cleangrowth()` moved into `child_clean.R` |
-| `R/utils.R` | Shared utilities (does NOT contain `valid()` — see note below) |
+| `R/utils.R` | Shared utilities (does NOT contain `.child_valid()` or `valid()` — see note below) |
 | `R/adult_clean.R` | `cleanadult()` main algorithm — permissiveness framework, 14 steps |
 | `R/adult_support.R` | Adult support functions — permissiveness presets, EWMA, BIV, height groups, evil twins, error load, etc. |
 | `inst/extdata/` | Reference tables (growth charts, recentering file, velocity tables) |
@@ -76,9 +76,9 @@ This CLAUDE.md covers both the child and adult algorithms.
 - GA correction (Step 2b) for potcorr subjects
 - Recentering → tbc.sd and ctbc.sd
 - Missing value identification
-- Batching and dispatch to `cleanbatch_child()`
+- Batching and dispatch to `cleanchild()`
 
-`cleanbatch_child()` processes one batch through all
+`cleanchild()` processes one batch through all
 cleaning steps (see Complete List of Steps below).
 
 ### Batching
@@ -165,47 +165,61 @@ output must expect a data.table, not a vector.
 
 ## Complete List of Exclusion Codes (child algorithm)
 
-| Code | Step | Param | Description |
+Child exclusion codes now follow the `Exclude-C-{WT|HT|HC}-{Reason}`
+format, making them param-specific. The `.child_exc()` helper
+function (line ~142 of `child_clean.R`) generates these codes:
+`.child_exc(param, reason)` → `Exclude-C-{param}-{reason}`.
+
+| Code pattern | Step | Param | Description |
 |------|------|-------|-------------|
 | `Include` | — | All | Value passes all checks |
-| `Missing` | Init | All | NA, NaN, agedays < 0; also HC ≥ 5y |
-| `Not cleaned` | Init | HEADCM | HC with agedays > 3 × 365.25 |
-| `Unit-Error-High` | 3 | HT, WT | Unit error detected (too high); corrected |
-| `Unit-Error-Low` | 3 | HT, WT | Unit error detected (too low); corrected |
-| `Swapped-Measurements` | 4 | HT, WT | HT/WT swapped; corrected |
-| `Exclude-Carried-Forward` | 6 | All | Identical to prior-day value (not rescued) |
-| `Exclude-Absolute-BIV` | 7 | All | Outside absolute biological limits |
-| `Exclude-Standardized-BIV` | 7 | All | Z-score beyond age-dependent cutoffs |
-| `Exclude-Evil-Twins` | 9 | All | Adjacent extreme value pair/group |
-| `Exclude-EWMA1-Extreme` | 11 | All | Extreme EWMA outlier |
-| `Exclude-SDE-Identical` | 13 | All | Same-day duplicate, identical value |
-| `Exclude-SDE-All-Exclude` | 13 | All | All same-day values excluded |
-| `Exclude-SDE-All-Extreme` | 13 | All | All same-day values extreme |
-| `Exclude-SDE-EWMA` | 13 | All | SDE resolved by EWMA comparison |
-| `Exclude-SDE-EWMA-All-Extreme` | 13 | All | All SDE values extreme by EWMA |
-| `Exclude-SDE-One-Day` | 13 | All | All measurements on single day |
-| `Exclude-Temporary-Extraneous-Same-Day` | 5 | All | Temp SDE (may persist) |
-| `Exclude-EWMA2-middle` | 15 | All | Moderate EWMA: middle value |
-| `Exclude-EWMA2-birth-WT` | 16 | WT | Birth weight EWMA outlier |
-| `Exclude-EWMA2-birth-WT-ext` | 16 | WT | Birth weight EWMA (extended) |
-| `Exclude-EWMA2-first` | 15 | All | Moderate EWMA: first value |
-| `Exclude-EWMA2-first-ext` | 15 | All | Moderate EWMA: first (extended) |
-| `Exclude-EWMA2-last` | 15 | All | Moderate EWMA: last value |
-| `Exclude-EWMA2-last-high` | 15 | All | Moderate EWMA: last (high) |
-| `Exclude-EWMA2-last-ext` | 15 | All | Moderate EWMA: last (extended) |
-| `Exclude-EWMA2-last-ext-high` | 15 | All | Moderate EWMA: last (ext, high) |
-| `Exclude-EWMA2-birth-HT-HC` | 16 | HT, HC | Birth HT/HC EWMA outlier |
-| `Exclude-EWMA2-birth-HT-HC-ext` | 16 | HT, HC | Birth HT/HC EWMA (extended) |
-| `Exclude-Min-diff` | 17 | HT, HC | Height/HC decreased > allowed |
-| `Exclude-Max-diff` | 17 | HT, HC | Height/HC increased > allowed |
-| `Exclude-2-meas->1-year` | 19 | All | 2 meas >1 yr apart, one excluded |
-| `Exclude-2-meas-<1-year` | 19 | All | 2 meas <1 yr apart, one excluded |
-| `Exclude-1-meas` | 19 | All | Single measurement excluded |
-| `Exclude-Error-load` | 21 | All | Error ratio exceeds threshold |
+| `Exclude-Missing` | Init | All | NA, NaN, agedays < 0; also HC ≥ 5y |
+| `Exclude-Not-Cleaned` | Init | HEADCM | HC with agedays > 3 × 365.25 |
+| `Exclude-C-{p}-Unit-Error-High` | 3 | HT, WT | Unit error detected (too high); corrected |
+| `Exclude-C-{p}-Unit-Error-Low` | 3 | HT, WT | Unit error detected (too low); corrected |
+| `Exclude-C-{p}-Swapped-Measurements` | 4 | HT, WT | HT/WT swapped; corrected |
+| `Exclude-C-{p}-Carried-Forward` | 6 | All | Identical to prior-day value (not rescued) |
+| `Exclude-C-{p}-Absolute-BIV` | 7 | All | Outside absolute biological limits |
+| `Exclude-C-{p}-Standardized-BIV` | 7 | All | Z-score beyond age-dependent cutoffs |
+| `Exclude-C-{p}-Evil-Twins` | 9 | All | Adjacent extreme value pair/group |
+| `Exclude-C-{p}-EWMA1-Extreme` | 11 | All | Extreme EWMA outlier |
+| `Exclude-C-{p}-SDE-Identical` | 13 | All | Same-day duplicate, identical value |
+| `Exclude-C-{p}-SDE-All-Exclude` | 13 | All | All same-day values excluded |
+| `Exclude-C-{p}-SDE-All-Extreme` | 13 | All | All same-day values extreme |
+| `Exclude-C-{p}-SDE-EWMA` | 13 | All | SDE resolved by EWMA comparison |
+| `Exclude-C-{p}-SDE-EWMA-All-Extreme` | 13 | All | All SDE values extreme by EWMA |
+| `Exclude-C-{p}-SDE-One-Day` | 13 | All | All measurements on single day |
+| `Exclude-C-{p}-Temporary-Extraneous-Same-Day` | 5 | All | Temp SDE (may persist) |
+| `Exclude-C-{p}-EWMA2-middle` | 15 | All | Moderate EWMA: middle value |
+| `Exclude-C-{p}-EWMA2-birth-WT` | 16 | WT | Birth weight EWMA outlier |
+| `Exclude-C-{p}-EWMA2-birth-WT-ext` | 16 | WT | Birth weight EWMA (extended) |
+| `Exclude-C-{p}-EWMA2-first` | 15 | All | Moderate EWMA: first value |
+| `Exclude-C-{p}-EWMA2-first-ext` | 15 | All | Moderate EWMA: first (extended) |
+| `Exclude-C-{p}-EWMA2-last` | 15 | All | Moderate EWMA: last value |
+| `Exclude-C-{p}-EWMA2-last-high` | 15 | All | Moderate EWMA: last (high) |
+| `Exclude-C-{p}-EWMA2-last-ext` | 15 | All | Moderate EWMA: last (extended) |
+| `Exclude-C-{p}-EWMA2-last-ext-high` | 15 | All | Moderate EWMA: last (ext, high) |
+| `Exclude-C-{p}-EWMA2-birth-HT-HC` | 16 | HT, HC | Birth HT/HC EWMA outlier |
+| `Exclude-C-{p}-EWMA2-birth-HT-HC-ext` | 16 | HT, HC | Birth HT/HC EWMA (extended) |
+| `Exclude-C-{p}-Min-diff` | 17 | HT, HC | Height/HC decreased > allowed |
+| `Exclude-C-{p}-Max-diff` | 17 | HT, HC | Height/HC increased > allowed |
+| `Exclude-C-{p}-2-meas->1-year` | 19 | All | 2 meas >1 yr apart, one excluded |
+| `Exclude-C-{p}-2-meas-<1-year` | 19 | All | 2 meas <1 yr apart, one excluded |
+| `Exclude-C-{p}-1-meas` | 19 | All | Single measurement excluded |
+| `Exclude-C-{p}-Error-load` | 21 | All | Error ratio exceeds threshold |
 
-The `exclude.levels` list includes many legacy codes from
-the original pediatric algorithm for backward compatibility.
-All exclusion codes will be renamed at the end of development.
+Where `{p}` = `WT`, `HT`, or `HC` depending on the row's param.
+
+**`Exclude-Missing` and `Exclude-Not-Cleaned`** are shared codes
+assigned in `cleangrowth()` before dispatch (not param-specific).
+
+**`exclude.levels`** has been updated to include all child and
+adult codes (was previously missing adult codes, causing silent
+NAs in factor output).
+
+**Legacy codes:** Exclusion codes in `pediatric_clean_legacy.R`
+were NOT renamed — the legacy algorithm retains the old code names
+for backward compatibility.
 
 ### CF rescue reason codes (cf_rescued column)
 
@@ -318,27 +332,28 @@ restores the user's `id` at exit.
 | `Exclude-A-WT-Scale-Max` | 4W | Weight at scale maximum |
 | `Exclude-A-WT-Scale-Max-Identical` | 4W | All weights identical at scale max |
 | `Exclude-A-WT-Scale-Max-RV-Propagated` | 4W | RV copy of scale-max exclusion (linked mode) |
-| `Exclude-A-Evil-Twins` | 9Wa | Adjacent pair with implausible weight difference |
-| `Exclude-A-WT-Traj-Ext-N` | 9Wb | Extreme EWMA outlier (independent mode) |
-| `Exclude-A-WT-Traj-Extreme-firstRV-N` | 9Wb | Extreme EWMA outlier (linked firstRV pass) |
-| `Exclude-A-WT-Traj-Extreme-allRV-N` | 9Wb | Extreme EWMA outlier (linked allRV pass) |
+| `Exclude-A-WT-Evil-Twins` | 9Wa | Adjacent pair with implausible weight difference |
+| `Exclude-A-WT-Traj-Ext` | 9Wb | Extreme EWMA outlier (independent mode) |
+| `Exclude-A-WT-Traj-Extreme-firstRV` | 9Wb | Extreme EWMA outlier (linked firstRV pass) |
+| `Exclude-A-WT-Traj-Extreme-allRV` | 9Wb | Extreme EWMA outlier (linked allRV pass) |
 | `Exclude-A-HT-Ord-Pair` | 10Ha | 2D height pair outside band (one excluded) |
 | `Exclude-A-HT-Ord-Pair-All` | 10Ha | 2D height pair outside band (all excluded) |
 | `Exclude-A-HT-Window` | 10Hb | 3+D height outside window (one excluded) |
 | `Exclude-A-HT-Window-All` | 10Hb | 3+D height outside window (all excluded) |
 | `Exclude-A-WT-2D-Ordered` | 11Wa | 2D ordered weight pair outside wtallow/perclimit |
 | `Exclude-A-WT-2D-Non-Ordered` | 11Wa2 | 2D non-ordered weight pair |
-| `Exclude-A-WT-Traj-Moderate-N` | 11Wb | Moderate EWMA outlier (independent or firstRV) |
-| `Exclude-A-WT-Traj-Moderate-allRV-N` | 11Wb | Moderate EWMA outlier (linked allRV pass) |
-| `Exclude-A-WT-Traj-Moderate-Error-Load-N` | 11Wb | 4+ consecutive moderate EWMA candidates |
-| `Exclude-A-WT-Traj-Moderate-Error-Load-RV-N` | 11Wb | Error load escalation to entire patient (linked) |
+| `Exclude-A-WT-Traj-Moderate` | 11Wb | Moderate EWMA outlier (independent or firstRV) |
+| `Exclude-A-WT-Traj-Moderate-allRV` | 11Wb | Moderate EWMA outlier (linked allRV pass) |
+| `Exclude-A-WT-Traj-Moderate-Error-Load` | 11Wb | 4+ consecutive moderate EWMA candidates |
+| `Exclude-A-WT-Traj-Moderate-Error-Load-RV` | 11Wb | Error load escalation to entire patient (linked) |
 | `Exclude-A-HT-Single` | 13 | 1D height outside limits |
 | `Exclude-A-WT-Single` | 13 | 1D weight outside limits |
 | `Exclude-A-HT-Too-Many-Errors` | 14 | Error ratio > threshold |
 | `Exclude-A-WT-Too-Many-Errors` | 14 | Error ratio > threshold |
 
-**Note:** N in trajectory (Traj) codes = the iteration of
-the EWMA exclusion loop in which the value was excluded.
+**Note:** The `-N` round suffix (iteration number) was removed
+from adult trajectory codes in the 2026-04-14 exclusion code
+rename. Trajectory codes no longer include the loop iteration.
 
 #### SDE Codes
 
@@ -396,15 +411,14 @@ Default: `"looser"`
 | `recover.unit.error` | FALSE | Step 3 | Attempt to identify and correct unit errors |
 | `sd.extreme` | 25 | Step 7 | SD-score cutoff for extreme exclusion |
 | `z.extreme` | 25 | Step 7 | Z-score cutoff for extreme exclusion |
-| `height.tolerance.cm` | 2.5 | Step 17 | Maximum height decrease tolerated |
 | `error.load.mincount` | 2 | Step 21 | Min exclusions before evaluating error load |
 | `error.load.threshold` | 0.5 | Step 21 | Error ratio above this excludes all |
 | `sd.recenter` | NA | Recentering | Child always uses fixed file |
 | `include.carryforward` | FALSE | Step 6 | If TRUE, skip CF detection entirely |
 | `ewma.exp` | -1.5 | EWMA steps | Exponent for EWMA weighting |
-| `lt3.exclude.mode` | "default" | Step 19 | Mode for pairs/singles exclusion |
 | `ewma_window` | 15 | EWMA steps | Max observations on each side for EWMA |
 | `adult_cutpoint` | 20 | Preprocessing | Age (years) dividing pediatric/adult |
+| `lt3.exclude.mode` | `"default"` | Legacy | Passed to `cleanlegacy()` — re-added after accidental removal |
 | `use_legacy_algorithm` | FALSE | Dispatch | If TRUE, use legacy pediatric algorithm |
 | `quietly` | TRUE | All | Suppress progress messages |
 | `ref_tables` | NULL | All reads | Pre-loaded closures from `gc_preload_refs()`; skips disk reads |
@@ -525,26 +539,27 @@ full list. `cleangrowth()` currently exposes only
 
 ## Key Concepts for Code Work
 
-### The `valid()` function
+### The `.child_valid()` function (formerly `valid()`)
 
-**Two separate definitions exist:** `child_clean.R` (line
-5044) and `pediatric_support_legacy.R` (line 10). They serve
-different algorithm paths. **Do not create additional copies.**
-A previous bug was caused by duplicate `valid()` definitions
-where R's alphabetical file load order caused the wrong copy
-to take precedence (see Fixed issues below).
+**Renamed from `valid()` to `.child_valid()` (2026-04-14)** to
+avoid collision with the legacy `valid()` in
+`pediatric_support_legacy.R`. R's alphabetical file loading
+caused the legacy version to overwrite the child version when
+both were named `valid()`. The legacy `valid()` remains
+unchanged. **Do not create additional copies of either function.**
 
 Critical gatekeeper — returns a logical vector of which rows
 are eligible for each step. The `include.*` flags control
 whether temporarily excluded categories participate:
 
-- `valid(df)` — only non-excluded, non-Missing, non-"Not cleaned"
-- `valid(df, include.temporary.extraneous = TRUE)` — also temp SDEs
-- `valid(df, include.extraneous = TRUE)` — also permanent SDEs
-- `valid(df, include.carryforward = TRUE)` — also CFs
+- `.child_valid(df)` — only non-excluded, non-Exclude-Missing, non-Exclude-Not-Cleaned
+- `.child_valid(df, include.temporary.extraneous = TRUE)` — also temp SDEs
+- `.child_valid(df, include.extraneous = TRUE)` — also permanent SDEs
+- `.child_valid(df, include.carryforward = TRUE)` — also CFs
 
 Works by checking the text of the `exclude` column, not
-factor ordering.
+factor ordering. Uses the new `Exclude-Missing` and
+`Exclude-Not-Cleaned` code names.
 
 ### CSD z-scores (not LMS)
 
@@ -608,8 +623,10 @@ accidentally modify copies or joined tables.
 | `test-child-parameters.R` | 10 | 24 | All configurable parameters |
 | `test-child-edge-cases.R` | 12 | 23 | Single subject, sparse data, all-NA, mixed NA, SDE-Identical, negative agedays, HEADCM >3yr, extreme values, density mix, CF, deterministic |
 
-Total child (as of 2026-03-24): 33 tests, 150 assertions.
-Existing `test-cdc.R` and `test-utils.R` not modified.
+Total child: 200/207 pass (7 pre-existing CF rescue +
+parallel failures). Existing `test-cdc.R` and `test-utils.R`
+not modified; `test-utils.R` has 6 pre-existing failures
+(old API without id parameter).
 
 Run with:
 ```bash
@@ -681,13 +698,18 @@ Requires installed package — see Known Issues. Run in background from Claude C
   package to access extdata via `system.file()`).
 - [ ] **Batch size hard-coded at 2,000:** Should be a
   `batch_size` parameter on `cleangrowth()`.
-- [ ] **Batch-invariant operations inside loop:**
-  `exclude.levels` definition, Tanner/WHO velocity reads,
-  and `read_anthro()` calls are repeated per batch. Move
-  before the loop.
-- [ ] **Exclusion code rename pending:** All codes will be
-  renamed at end of development. Legacy codes in
-  `exclude.levels` should be cleaned up at the same time.
+- [x] **Batch-invariant operations moved before loop
+  (2026-04-13):** `exclude.levels` definition and
+  Tanner/WHO velocity reads moved before the outer loop.
+  `read_anthro()` calls already optimized via `ref_tables`.
+- [x] **Exclusion code rename (2026-04-14):** Child codes
+  renamed to `Exclude-C-{WT|HT|HC}-{Reason}` format; adult
+  `-N` round suffix removed from trajectory codes;
+  `Exclude-A-Evil-Twins` → `Exclude-A-WT-Evil-Twins`;
+  `Missing` → `Exclude-Missing`; `Not cleaned` →
+  `Exclude-Not-Cleaned`. `exclude.levels` updated to include
+  all adult codes. Legacy codes in `pediatric_clean_legacy.R`
+  were NOT renamed.
 - [ ] **CF rescue thresholds:** Current thresholds (0.05/0.1
   with wholehalfimp, teen age cutoffs) may be tuned in
   future updates.
@@ -711,6 +733,25 @@ Requires installed package — see Known Issues. Run in background from Claude C
 
 ### Fixed (recent)
 
+- [x] **Exclusion code rename (2026-04-14):** All child
+  exclusion codes renamed from `Exclude-{Reason}` to
+  `Exclude-C-{WT|HT|HC}-{Reason}` (param-specific), using
+  `.child_exc(param, reason)` helper. `Missing` →
+  `Exclude-Missing`, `Not cleaned` → `Exclude-Not-Cleaned`
+  (shared codes assigned in `cleangrowth()`). Adult: `-N`
+  round suffix removed from trajectory codes;
+  `Exclude-A-Evil-Twins` → `Exclude-A-WT-Evil-Twins`.
+  `exclude.levels` updated to include all adult codes (was
+  missing them, causing silent NAs in factor output).
+  `valid()` renamed to `.child_valid()` in `child_clean.R`
+  to avoid collision with legacy `valid()` in
+  `pediatric_support_legacy.R`. `lt3.exclude.mode` parameter
+  re-added to `cleangrowth()` with default `"default"` (was
+  accidentally removed but `cleanlegacy()` still requires it).
+  Legacy codes in `pediatric_clean_legacy.R` NOT renamed.
+  Tests: child 200/207 (7 pre-existing CF rescue + parallel
+  failures), adult 198/198 unit + 1508/1508 regression at
+  all 4 levels, test-utils.R 6 pre-existing failures.
 - [x] **`internal_id` for all internal sorting/tiebreaking
   (2026-04-12):** Both child and adult algorithms use
   `internal_id` (sequential integer `1:N`, created by
@@ -741,7 +782,8 @@ Requires installed package — see Known Issues. Run in background from Claude C
   SDE-EWMA instead of Missing. Root cause: duplicate
   `valid()` definitions in two files; R's alphabetical
   load order caused the unfixed copy to overwrite the
-  fixed one. Fixed in v3.0.0.
+  fixed one. Fixed in v3.0.0. Further prevented by
+  renaming child version to `.child_valid()` (2026-04-14).
 - [x] **BIV threshold for preterm weights:** Previous
   threshold excluded legitimate preterm weights (0.7–1.0
   kg). Changed to <0.2 kg for agedays ≤ 365 and <1 kg
@@ -870,10 +912,11 @@ as changes don't affect algorithm performance).
 
 Things that have caused bugs before or fail silently:
 
-- **Do not create a second `valid()` definition.** Two copies
-  in different files caused the missing data bug (R's
-  alphabetical load order made the wrong copy win). Child
-  version is in `child_clean.R`; legacy version is in
+- **Do not create additional `valid()`/`.child_valid()`
+  definitions.** Two copies in different files caused the
+  missing data bug (R's alphabetical load order made the wrong
+  copy win). Child version is `.child_valid()` in
+  `child_clean.R`; legacy version is `valid()` in
   `pediatric_support_legacy.R`. Do not add a third.
 - **`parallel = TRUE` requires installed package.** Will fail
   with `load_all()` only — workers need `system.file()` access

@@ -91,14 +91,14 @@
 # SUPPORTING FUNCTIONS
 ################################################################################
 #
-# This file contains the main cleanbatch_child() function and supporting utilities:
+# This file contains the main cleanchild() function and supporting utilities:
 #   - calc_otl_evil_twins(): Identifies Evil Twins (Step 9)
 #   - temporary_extraneous_infants(): Temporary SDE resolution (Step 5)
 #   - clean_infants_with_sde(): Final SDE resolution (Step 13)
 #   - Various EWMA calculation helpers
 #
 # Additional support functions are in pediatric_support.R:
-#   - valid(): Identifies included/partially-included rows
+#   - .child_valid(): Identifies included/partially-included rows
 #   - swap_parameters(): Finds DOP values for comparison
 #   - temporary_extraneous(): Generic SDE resolution (used in Step 5)
 #
@@ -139,6 +139,17 @@
 #
 
 
+# Helper: generate param-specific child exclusion code
+# Usage: .child_exc("WEIGHTKG", "BIV") -> "Exclude-C-WT-BIV"
+#        .child_exc("HEIGHTCM", "CF")  -> "Exclude-C-HT-CF"
+#        .child_exc("HEADCM", "Traj")  -> "Exclude-C-HC-Traj"
+# Vectorized over param_val (works in data.table j expressions).
+.child_exc <- function(param_val, suffix) {
+  p <- data.table::fifelse(param_val == "WEIGHTKG", "WT",
+         data.table::fifelse(param_val == "HEIGHTCM", "HT", "HC"))
+  paste0("Exclude-C-", p, "-", suffix)
+}
+
   #### R-Oxygen Markup (Hidden)
 
 
@@ -169,10 +180,6 @@
 #' the mean (either above or below) will be flagged as invalid. Defaults to 25.
 #' @param z.extreme Measurements with an absolute z-score greater than
 #' z.extreme will be flagged as invalid. Defaults to 25.
-#' @param lt3.exclude.mode Determines type of exclusion procedure to use for 1 or 2 measurements of one type without
-#' matching same ageday measurements for the other parameter. Options include "default" (standard growthcleanr approach),
-#' and "flag.both" (in case of two measurements of one type without matching values for the other parameter, flag both
-#' for exclusion if beyond threshold)
 #' @param error.load.mincount minimum count of exclusions on parameter before
 #' considering excluding all measurements. Defaults to 2.
 #' @param error.load.threshold threshold of percentage of excluded measurement count to included measurement
@@ -232,8 +239,8 @@
 #'   Old mapping: `prelim_infants = TRUE` → child algorithm (use_legacy_algorithm = FALSE);
 #'   `prelim_infants = FALSE` → legacy algorithm (use_legacy_algorithm = TRUE).
 #' @param use_legacy_algorithm Logical. If TRUE, run the legacy pediatric algorithm
-#'   (`cleanbatch_legacy`, formerly `cleanbatch`). If FALSE (default), run the child
-#'   algorithm (`cleanbatch_child`), which includes enhanced methods for children 0-2 years.
+#'   (`cleanlegacy`, formerly `cleanbatch`). If FALSE (default), run the child
+#'   algorithm (`cleanchild`), which includes enhanced methods for children 0-2 years.
 #' @param ref_tables Optional. Pre-loaded reference closures from \code{\link{gc_preload_refs}}.
 #'   When provided, skips all \code{read_anthro()} file reads (~0.93 sec per call on 200
 #'   subjects; ~13 hours saved over 50K calls). Recommended for repeated calls (e.g.,
@@ -316,9 +323,9 @@ cleangrowth <- function(subjid,
                         recover.unit.error = FALSE,
                         sd.extreme = 25,
                         z.extreme = 25,
-                        lt3.exclude.mode = "default",
                         error.load.mincount = 2,
                         error.load.threshold = 0.5,
+                        lt3.exclude.mode = "default",
                         sd.recenter = NA,
                         sdmedian.filename = "",
                         sdrecentered.filename = "",
@@ -527,33 +534,31 @@ cleangrowth <- function(subjid,
   batches <- patients %>%
     mutate(batch = (row_number() - 1) %/% 2000 + 1)
 
-  ### Loop Begin ###
+  # --- Batch-invariant constants (computed once, not per batch) ---
 
-  for (id_batch in unique(batches$batch)) {
-    print(paste("Loop " , i, " start.", sep = ""))
-    ids <- batches$subjid[batches$batch == id_batch]
+  # .child_exc() is defined at file level (before cleangrowth) so it's
+  # visible in data.table j expressions within cleanchild()
 
-    data.all <- copy(
-      data.all.ages[
-        subjid %in% ids & agedays < adult_cutpoint * 365.25
-      ]
-    )
-
-    data.adult <- copy(
-      data.all.ages[
-        subjid %in% ids & agedays >= adult_cutpoint * 365.25
-      ]
-    )
-    ### BATCHING ###
-  # Batch-level reference for result assembly (all ages for this batch's subjects)
-  data.batch <- copy(data.all.ages[subjid %in% ids])
-
-  # constants for pediatric
   # enumerate the different exclusion levels
   if (use_child_algorithm){
-    # different for infants
     exclude.levels.peds <- c(
       'Include',
+      'Exclude-Missing',
+      'Exclude-Not-Cleaned',
+      'Exclude-C-Temp-Same-Day',
+      # param-specific child codes (WT/HT/HC)
+      paste0("Exclude-C-", c("WT", "HT", "HC"), "-CF"),
+      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Traj-Extreme"),
+      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Identical"),
+      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Extraneous"),
+      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Traj"),
+      paste0("Exclude-C-", c("HT", "HC"), "-Abs-Diff"),
+      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Pair"),
+      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Single"),
+      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Too-Many-Errors"),
+      paste0("Exclude-C-", c("WT", "HT", "HC"), "-BIV"),
+      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Evil-Twins"),
+      # legacy codes (used by cleanlegacy() path only)
       'Unit-Error-High',
       'Unit-Error-Low',
       'Unit-Error-Possible',
@@ -563,35 +568,12 @@ cleangrowth <- function(subjid,
       'Not cleaned',
       'Exclude-Temporary-Extraneous-Same-Day',
       'Exclude-Carried-Forward',
-      # CF rescue codes removed from exclude.levels — rescued CFs are now
-      # set back to "Include" with rescue reason stored in cf_rescued column
       'Exclude-EWMA-Extreme',
       'Exclude-EWMA-Extreme-Pair',
       'Exclude-SDE-Identical',
-      'Exclude-SDE-All-Exclude',
       'Exclude-SDE-All-Extreme',
       'Exclude-SDE-EWMA',
       'Exclude-SDE-One-Day',
-      "Exclude-EWMA2-middle",
-      "Exclude-EWMA2-birth-WT",
-      "Exclude-EWMA2-birth-WT-ext",
-      "Exclude-EWMA2-first",
-      "Exclude-EWMA2-first-ext",
-      "Exclude-EWMA2-last",
-      "Exclude-EWMA2-last-high",
-      "Exclude-EWMA2-last-ext",
-      "Exclude-EWMA2-last-ext-high",
-      "Exclude-EWMA2-birth-HT-HC",
-      "Exclude-EWMA2-birth-HT-HC-ext",
-      "Exclude-Min-diff",
-      "Exclude-Max-diff",
-      "Exclude-2-meas->1-year",
-      "Exclude-2-meas-<1-year",
-      "Exclude-1-meas",
-      "Exclude-Error-load",
-
-      # old
-
       'Exclude-Extraneous-Same-Day',
       'Exclude-SD-Cutoff',
       'Exclude-EWMA-8',
@@ -609,17 +591,33 @@ cleangrowth <- function(subjid,
       'Exclude-Single-Outlier',
       'Exclude-Too-Many-Errors',
       'Exclude-Too-Many-Errors-Other-Parameter',
-
-      #new
+      "Exclude-EWMA2-middle",
+      "Exclude-EWMA2-birth-WT",
+      "Exclude-EWMA2-birth-WT-ext",
+      "Exclude-EWMA2-first",
+      "Exclude-EWMA2-first-ext",
+      "Exclude-EWMA2-last",
+      "Exclude-EWMA2-last-high",
+      "Exclude-EWMA2-last-ext",
+      "Exclude-EWMA2-last-ext-high",
+      "Exclude-EWMA2-birth-HT-HC",
+      "Exclude-EWMA2-birth-HT-HC-ext",
+      "Exclude-Min-diff",
+      "Exclude-Max-diff",
+      "Exclude-2-meas->1-year",
+      "Exclude-2-meas-<1-year",
+      "Exclude-1-meas",
+      "Exclude-Error-load",
       "Exclude-Absolute-BIV",
       "Exclude-Standardized-BIV",
       "Exclude-Evil-Twins",
-      "Exclude-EWMA1-Extreme",
-      "Exclude-SDE-EWMA-All-Extreme"
+      "Exclude-EWMA1-Extreme"
     )
   } else {
     exclude.levels.peds <- c(
       'Include',
+      'Exclude-Missing',
+      'Exclude-Not-Cleaned',
       'Unit-Error-High',
       'Unit-Error-Low',
       'Unit-Error-Possible',
@@ -650,32 +648,105 @@ cleangrowth <- function(subjid,
     )
   }
 
+  # Adult exclusion codes used by cleanadult()
   exclude.levels.adult <- c(
-    "Include",
-    "Exclude-Adult-BIV",
-    "Exclude-Adult-Hundreds",
-    "Exclude-Adult-Hundreds-RV",
-    "Exclude-Adult-Unit-Errors",
-    "Exclude-Adult-Unit-Errors-RV",
-    "Exclude-Adult-Transpositions",
-    "Exclude-Adult-Transpositions-RV",
-    "Exclude-Adult-Weight-Cap-Identical",
-    "Exclude-Adult-Weight-Cap",
-    "Exclude-Adult-Swapped-Measurements",
-    "Exclude-Adult-Identical-Same-Day",
-    "Exclude-Adult-Extraneous-Same-Day",
-    "Exclude-Adult-Distinct-Pairs",
-    "Exclude-Adult-Distinct-3-Or-More",
-    "Exclude-Adult-EWMA-Extreme",
-    "Exclude-Adult-EWMA-Extreme-RV",
-    "Exclude-Adult-Distinct-Ordered-Pairs",
-    "Exclude-Adult-EWMA-Moderate",
-    "Exclude-Adult-Possibly-Impacted-By-Weight-Cap",
-    "Exclude-Adult-Distinct-Single",
-    "Exclude-Adult-Too-Many-Errors"
+    "Exclude-A-HT-BIV",
+    "Exclude-A-WT-BIV",
+    "Exclude-A-WT-Scale-Max",
+    "Exclude-A-WT-Scale-Max-Identical",
+    "Exclude-A-WT-Scale-Max-RV-Propagated",
+    "Exclude-A-WT-Evil-Twins",
+    "Exclude-A-HT-Identical",
+    "Exclude-A-HT-Extraneous",
+    "Exclude-A-WT-Identical",
+    "Exclude-A-WT-Extraneous",
+    "Exclude-A-WT-Traj-Ext",
+    "Exclude-A-WT-Traj-Extreme-firstRV",
+    "Exclude-A-WT-Traj-Extreme-allRV",
+    "Exclude-A-HT-Ord-Pair",
+    "Exclude-A-HT-Ord-Pair-All",
+    "Exclude-A-HT-Window",
+    "Exclude-A-HT-Window-All",
+    "Exclude-A-WT-2D-Ordered",
+    "Exclude-A-WT-2D-Non-Ordered",
+    "Exclude-A-WT-Traj-Moderate",
+    "Exclude-A-WT-Traj-Moderate-allRV",
+    "Exclude-A-WT-Traj-Moderate-RV-propagated",
+    "Exclude-A-WT-Traj-Moderate-Error-Load",
+    "Exclude-A-WT-Traj-Moderate-Error-Load-RV",
+    "Exclude-A-HT-Single",
+    "Exclude-A-WT-Single",
+    "Exclude-A-HT-Too-Many-Errors",
+    "Exclude-A-WT-Too-Many-Errors"
   )
+  exclude.levels <- c(exclude.levels.peds, exclude.levels.adult)
 
-  exclude.levels <- base::union(exclude.levels.peds, exclude.levels.adult)
+  # Load velocity reference tables (same for all batches)
+  # Tanner height velocity (used by Step 17 for ages 2.5+ years)
+  tanner_ht_vel_path <- ifelse(
+    ref.data.path == "",
+    system.file(file.path("extdata", "tanner_ht_vel.csv.gz"), package = "growthcleanr"),
+    file.path(ref.data.path, "tanner_ht_vel.csv.gz")
+  )
+  tanner.ht.vel <- fread(tanner_ht_vel_path)
+  setnames(tanner.ht.vel, colnames(tanner.ht.vel), gsub('_', '.', colnames(tanner.ht.vel)))
+  setkey(tanner.ht.vel, sex, tanner.months)
+  tanner.fields <- colnames(tanner.ht.vel)
+  tanner.fields <- tanner.fields[!tanner.fields %in% c('sex', 'tanner.months')]
+
+  # WHO velocity tables (differ by algorithm: child uses HC-specific files)
+  if (!use_child_algorithm){
+    who_max_ht_vel_path <- ifelse(
+      ref.data.path == "",
+      system.file(file.path("extdata", "who_ht_maxvel_3sd.csv.gz"), package = "growthcleanr"),
+      file.path(ref.data.path, "who_ht_maxvel_3sd.csv.gz")
+    )
+    who_ht_vel_3sd_path <- ifelse(
+      ref.data.path == "",
+      system.file(file.path("extdata", "who_ht_vel_3sd.csv.gz"), package = "growthcleanr"),
+      file.path(ref.data.path, "who_ht_vel_3sd.csv.gz")
+    )
+  } else {
+    who_max_ht_vel_path <- ifelse(
+      ref.data.path == "",
+      system.file(file.path("extdata", "who_hc_maxvel_3sd_infants.csv.gz"), package = "growthcleanr"),
+      file.path(ref.data.path, "who_hc_maxvel_3sd_infants.csv.gz")
+    )
+    who_ht_vel_3sd_path <- ifelse(
+      ref.data.path == "",
+      system.file(file.path("extdata", "who_hc_vel_3sd_infants.csv.gz"), package = "growthcleanr"),
+      file.path(ref.data.path, "who_hc_vel_3sd_infants.csv.gz")
+    )
+  }
+  who.max.ht.vel <- fread(who_max_ht_vel_path)
+  who.ht.vel <- fread(who_ht_vel_3sd_path)
+  setkey(who.max.ht.vel, sex, whoagegrp_ht)
+  setkey(who.ht.vel, sex, whoagegrp_ht)
+  who.ht.vel <- merge(who.ht.vel, who.max.ht.vel, by = c('sex', 'whoagegrp_ht'), all = TRUE)
+  setnames(who.ht.vel, colnames(who.ht.vel), gsub('_', '.', colnames(who.ht.vel)))
+  setkey(who.ht.vel, sex, whoagegrp.ht)
+  who.fields <- colnames(who.ht.vel)
+  who.fields <- who.fields[!who.fields %in% c('sex', 'whoagegrp.ht')]
+
+  ### Loop Begin ###
+
+  for (id_batch in unique(batches$batch)) {
+    print(paste("Loop " , i, " start.", sep = ""))
+    ids <- batches$subjid[batches$batch == id_batch]
+
+    data.all <- copy(
+      data.all.ages[
+        subjid %in% ids & agedays < adult_cutpoint * 365.25
+      ]
+    )
+
+    data.adult <- copy(
+      data.all.ages[
+        subjid %in% ids & agedays >= adult_cutpoint * 365.25
+      ]
+    )
+  # Batch-level reference for result assembly (all ages for this batch's subjects)
+  data.batch <- copy(data.all.ages[subjid %in% ids])
 
   # if there's no pediatric data, no need to go through this rigamarole
   if (nrow(data.all) > 0){
@@ -705,7 +776,7 @@ cleangrowth <- function(subjid,
                          "get_dop", "calc_otl_evil_twins",
                          "calc_and_recenter_z_scores",
 
-                         # EWMA cache (added v3.0.0 — required for cleanbatch_child)
+                         # EWMA cache (added v3.0.0 — required for cleanchild)
                          "ewma_cache_init", "ewma_cache_update")
       } else {
         var_for_par <- c("temporary_extraneous", "valid", "swap_parameters",
@@ -733,60 +804,7 @@ cleangrowth <- function(subjid,
       cat(sprintf("[%s] Begin processing pediatric data...\n", Sys.time()))
     }
 
-    # load tanner height velocity data. sex variable is defined such that 0=male and 1=female
-    # recode column names to match syntactic style ("." rather than "_" in variable names)
-    tanner_ht_vel_path <- ifelse(
-      ref.data.path == "",
-      system.file(file.path("extdata", "tanner_ht_vel.csv.gz"), package = "growthcleanr"),
-      file.path(ref.data.path, "tanner_ht_vel.csv.gz")
-    )
-
-    tanner.ht.vel <- fread(tanner_ht_vel_path)
-
-    setnames(tanner.ht.vel,
-             colnames(tanner.ht.vel),
-             gsub('_', '.', colnames(tanner.ht.vel)))
-    setkey(tanner.ht.vel, sex, tanner.months)
-    # keep track of column names in the tanner data
-    tanner.fields <- colnames(tanner.ht.vel)
-    tanner.fields <- tanner.fields[!tanner.fields %in% c('sex', 'tanner.months')]
-
-    if (!use_child_algorithm){
-      who_max_ht_vel_path <- ifelse(
-        ref.data.path == "",
-        system.file(file.path("extdata", "who_ht_maxvel_3sd.csv.gz"), package = "growthcleanr"),
-        file.path(ref.data.path, "who_ht_maxvel_3sd.csv.gz")
-      )
-
-      who_ht_vel_3sd_path <- ifelse(
-        ref.data.path == "",
-        system.file(file.path("extdata", "who_ht_vel_3sd.csv.gz"), package = "growthcleanr"),
-        file.path(ref.data.path, "who_ht_vel_3sd.csv.gz")
-      )
-    } else {
-      who_max_ht_vel_path <- ifelse(
-        ref.data.path == "",
-        system.file(file.path("extdata", "who_hc_maxvel_3sd_infants.csv.gz"), package = "growthcleanr"),
-        file.path(ref.data.path, "who_hc_maxvel_3sd_infants.csv.gz")
-      )
-
-      who_ht_vel_3sd_path <- ifelse(
-        ref.data.path == "",
-        system.file(file.path("extdata", "who_hc_vel_3sd_infants.csv.gz"), package = "growthcleanr"),
-        file.path(ref.data.path, "who_hc_vel_3sd_infants.csv.gz")
-      )
-    }
-    who.max.ht.vel <- fread(who_max_ht_vel_path)
-    who.ht.vel <- fread(who_ht_vel_3sd_path)
-    setkey(who.max.ht.vel, sex, whoagegrp_ht)
-    setkey(who.ht.vel, sex, whoagegrp_ht)
-    who.ht.vel <- merge(who.ht.vel, who.max.ht.vel, by = c('sex', 'whoagegrp_ht'), all = TRUE)
-
-    setnames(who.ht.vel, colnames(who.ht.vel), gsub('_', '.', colnames(who.ht.vel)))
-    setkey(who.ht.vel, sex, whoagegrp.ht)
-    # keep track of column names in the who growth velocity data
-    who.fields <- colnames(who.ht.vel)
-    who.fields <- who.fields[!who.fields %in% c('sex', 'whoagegrp.ht')]
+    # Velocity reference tables loaded once before the loop (batch-invariant)
 
     # 1.  General principles
     # a.	All steps are done separately for each parameter unless otherwise noted
@@ -1208,12 +1226,12 @@ cleangrowth <- function(subjid,
     # Mark missing values for exclusion
     data.all[, exclude := factor(with(data.all, ifelse(
       is.na(v) |
-        agedays < 0, 'Missing', 'Include'
+        agedays < 0, 'Exclude-Missing', 'Include'
     )),
     levels = exclude.levels,
     ordered = TRUE)]
     # also mark certain measurements to not consider
-    data.all[param == "HEADCM" & agedays > (3*365.25), exclude := "Not cleaned"]
+    data.all[param == "HEADCM" & agedays > (3*365.25), exclude := "Exclude-Not-Cleaned"]
 
     # Initialize cf_rescued column to track CF rescue status
     # Populated in Step 6; rescued CFs get set back to "Include" but this column
@@ -1387,11 +1405,11 @@ cleangrowth <- function(subjid,
     }
 
     # safety check: treat observations where tbc.sd cannot be calculated as missing
-    data.all[is.na(tbc.sd), exclude := 'Missing']
+    data.all[is.na(tbc.sd), exclude := 'Exclude-Missing']
 
-    # Set HC >= 5 years to Missing
+    # Set HC >= 5 years to Exclude-Missing
     # WHO reference for HC only goes up to 5 years
-    data.all[param == "HEADCM" & agedays >= 5*365.25, exclude := 'Missing']
+    data.all[param == "HEADCM" & agedays >= 5*365.25, exclude := 'Exclude-Missing']
 
     if (use_child_algorithm){
       # Removed NNTE calculation - was not helpful for efficiency
@@ -1425,7 +1443,7 @@ cleangrowth <- function(subjid,
       ))
     if (num.batches == 1) {
       if (!use_child_algorithm){
-        ret.df <- cleanbatch_legacy(data.all,
+        ret.df <- cleanlegacy(data.all,
                              log.path = log.path,
                              quietly = quietly,
                              parallel = parallel,
@@ -1443,7 +1461,7 @@ cleangrowth <- function(subjid,
                              error.load.threshold = error.load.threshold,
                              error.load.mincount = error.load.mincount)
       } else {
-        ret.df <- cleanbatch_child(
+        ret.df <- cleanchild(
           data.all,
           log.path = log.path,
           quietly = quietly,
@@ -1457,7 +1475,6 @@ cleangrowth <- function(subjid,
           exclude.levels = exclude.levels,
           tanner.ht.vel = tanner.ht.vel,
           who.ht.vel = who.ht.vel,
-          lt3.exclude.mode = lt3.exclude.mode,
           error.load.threshold = error.load.threshold,
           error.load.mincount = error.load.mincount,
           ref.data.path = ref.data.path,
@@ -1475,7 +1492,7 @@ cleangrowth <- function(subjid,
         ret.df <- ddply(
           data.all,
           .(batch),
-          cleanbatch_legacy,
+          cleanlegacy,
           .parallel = parallel,
           .paropts = list(.packages = "data.table"),
           log.path = log.path,
@@ -1499,7 +1516,7 @@ cleangrowth <- function(subjid,
         ret.df <- ddply(
           data.all,
           .(batch),
-          cleanbatch_child,
+          cleanchild,
           .parallel = parallel,
           .paropts = list(.packages = c("data.table", "growthcleanr")),
           log.path = log.path,
@@ -1514,7 +1531,6 @@ cleangrowth <- function(subjid,
           exclude.levels = exclude.levels,
           tanner.ht.vel = tanner.ht.vel,
           who.ht.vel = who.ht.vel,
-          lt3.exclude.mode = lt3.exclude.mode,
           error.load.threshold = error.load.threshold,
           error.load.mincount = error.load.mincount,
           ref.data.path = ref.data.path,
@@ -1629,8 +1645,8 @@ cleangrowth <- function(subjid,
       res <- as.data.table(res)
     }
 
-    # replace result with missing if measurement or agedays are missing
-    res[is.na(measurement) | agedays < 0, result := "Missing"]
+    # replace result with Exclude-Missing if measurement or agedays are missing
+    res[is.na(measurement) | agedays < 0, result := "Exclude-Missing"]
 
     if (parallel){
       stopCluster(cl)
@@ -1758,11 +1774,11 @@ cleangrowth <- function(subjid,
   # These are added after all processing (including partial-run merge)
   # so they are consistent regardless of code path.
 
-  # Check for Exclude-Temporary-Extraneous-Same-Day surviving to output —
+  # Check for Exclude-C-Temp-Same-Day surviving to output —
   # this is an internal working code that should be resolved before output.
-  if (any(as.character(all_results$exclude) == "Exclude-Temporary-Extraneous-Same-Day",
+  if (any(as.character(all_results$exclude) == "Exclude-C-Temp-Same-Day",
           na.rm = TRUE)) {
-    stop("Exclude-Temporary-Extraneous-Same-Day found in final output. ",
+    stop("Exclude-C-Temp-Same-Day found in final output. ",
          "This is an internal code that should have been resolved during processing. ",
          "This indicates a bug in the algorithm.")
   }
@@ -1774,16 +1790,11 @@ cleangrowth <- function(subjid,
 
   # tri_exclude: Include vs Same-Day vs Exclude (opt-in via tri_exclude parameter)
   if (tri_exclude) {
-    # Child SDE codes (current names — will be renamed in future):
-    #   Exclude-SDE-Identical, Exclude-SDE-All-Exclude, Exclude-SDE-All-Extreme,
-    #   Exclude-SDE-EWMA, Exclude-SDE-EWMA-All-Extreme, Exclude-SDE-One-Day
-    # Adult SDE codes:
-    #   Exclude-A-HT-Identical, Exclude-A-HT-Extraneous,
-    #   Exclude-A-WT-Identical, Exclude-A-WT-Extraneous
+    # Child SDE codes: Identical and Extraneous for each param
+    # Adult SDE codes: same pattern with -A- prefix
     child_sde_codes <- c(
-      "Exclude-SDE-Identical", "Exclude-SDE-All-Exclude",
-      "Exclude-SDE-All-Extreme", "Exclude-SDE-EWMA",
-      "Exclude-SDE-EWMA-All-Extreme", "Exclude-SDE-One-Day"
+      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Identical"),
+      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Extraneous")
     )
     adult_sde_codes <- c(
       "Exclude-A-HT-Identical", "Exclude-A-HT-Extraneous",
@@ -2585,7 +2596,7 @@ temporary_extraneous_infants <- function(df, exclude_from_dop_ids = NULL) {
 
   # Now compute valid.rows on the keyby-sorted data
   # Removed nnte filter (nnte calculation removed)
-  valid.rows <- valid(df, include.temporary.extraneous = TRUE)
+  valid.rows <- .child_valid(df, include.temporary.extraneous = TRUE)
 
   # initialize fields
   df[, `:=`(
@@ -2858,7 +2869,7 @@ calc_and_recenter_z_scores <- function(df, cn, ref.data.path,
 #' @import data.table
 #' @importFrom stats median embed
 #' @noRd
-cleanbatch_child <- function(data.df,
+cleanchild <- function(data.df,
                                log.path,
                                quietly,
                                parallel,
@@ -2871,7 +2882,6 @@ cleanbatch_child <- function(data.df,
                                exclude.levels,
                                tanner.ht.vel,
                                who.ht.vel,
-                               lt3.exclude.mode,
                                error.load.threshold,
                                error.load.mincount,
                                ref.data.path,
@@ -2974,7 +2984,7 @@ cleanbatch_child <- function(data.df,
                                max(as.numeric(internal_id[exclude == "Include"]), na.rm = TRUE)),
           by = .(subjid, param, agedays, v)]
   data.df[has_dup & exclude == "Include" & as.numeric(internal_id) != keep_id,
-          exclude := "Exclude-SDE-Identical"]
+          exclude := .child_exc(param, "Identical")]
   data.df[, c("n_same_value", "has_dup", "keep_id") := NULL]
 
   # Include id for deterministic SDE order
@@ -2990,10 +3000,10 @@ cleanbatch_child <- function(data.df,
       "[%s] Preliminarily identify potential extraneous...\n",
       Sys.time()
     ))
-  data.df$exclude[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-Temporary-Extraneous-Same-Day'
+  data.df$exclude[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-C-Temp-Same-Day'
 
   # capture a list of subjects with possible extraneous for efficiency later
-  subj.dup <- data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', unique(subjid)]
+  subj.dup <- data.df[exclude == 'Exclude-C-Temp-Same-Day', unique(subjid)]
 
   # Safety check after Step 5 - warn if duplicate Includes found
   step5_dupe_check <- data.df[exclude == "Include", .N, by = .(subjid, param, agedays)][N > 1]
@@ -3018,7 +3028,7 @@ cleanbatch_child <- function(data.df,
     # Only run CF detection on valid values with >1 measurement per subject-param
     sp_multi <- data.df[, .(is_multi = .N > 1), by = .(subjid, param)]
     not_single <- sp_multi[data.df, on = .(subjid, param), is_multi]
-    valid_set <- valid(data.df, include.temporary.extraneous = TRUE) &
+    valid_set <- .child_valid(data.df, include.temporary.extraneous = TRUE) &
       not_single
     data.sub <- data.df[valid_set,]
 
@@ -3084,11 +3094,11 @@ cleanbatch_child <- function(data.df,
 
     # Merge CF flags back to data.df
     cf_idx <- data.sub$index[data.sub$cf]
-    data.df[index %in% cf_idx, exclude := "Exclude-Carried-Forward"]
+    data.df[index %in% cf_idx, exclude := .child_exc(param, "CF")]
 
     # Check if CFs exist before rescue processing
     # This optimization skips rescue logic if no CFs are present (matches Stata lines 775-780)
-    any_cf <- any(data.df$exclude == "Exclude-Carried-Forward")
+    any_cf <- any(grepl("^Exclude-C-(WT|HT|HC)-CF$", data.df$exclude))
     if (!quietly)
       cat(sprintf("  CF rescue pre-filter: CFs exist = %s\n", any_cf))
 
@@ -3100,15 +3110,15 @@ cleanbatch_child <- function(data.df,
     # This matches Stata lines 773-780
 
     # Check if any SDEs exist (matches Stata's anysde_chunk check)
-    any_sde <- any(data.df$exclude == "Exclude-Temporary-Extraneous-Same-Day")
+    any_sde <- any(data.df$exclude == "Exclude-C-Temp-Same-Day")
 
     if (any_sde) {
       # Temporarily convert Temp SDEs to potential includes for re-evaluation
       # (Stata does this by resetting exc==2 to exc==0 and restoring subjid)
-      data.df[exclude == "Exclude-Temporary-Extraneous-Same-Day", exclude := "Include"]
+      data.df[exclude == "Exclude-C-Temp-Same-Day", exclude := "Include"]
 
       # Re-run temp SDE logic (now CFs are excluded, so SDE evaluation will differ)
-      data.df$exclude[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-Temporary-Extraneous-Same-Day'
+      data.df$exclude[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-C-Temp-Same-Day'
     }
 
     # Determine if measurements are in whole or half imperial units (row-level flag)
@@ -3127,8 +3137,8 @@ cleanbatch_child <- function(data.df,
     # Temporarily remove them, do CF calculations, then add them back (like Stata's subjidresc approach)
 
     # Save SDE-Identical rows and remove from data.df temporarily
-    sde_identical_rows <- data.df[exclude == "Exclude-SDE-Identical"]
-    data.df <- data.df[exclude != "Exclude-SDE-Identical"]
+    sde_identical_rows <- data.df[grepl("^Exclude-C-(WT|HT|HC)-Identical$", exclude)]
+    data.df <- data.df[!grepl("^Exclude-C-(WT|HT|HC)-Identical$", exclude)]
 
     # Complete rewrite of CF string detection
     # Previous approach used v.orig sort + position indexing which failed when
@@ -3153,7 +3163,7 @@ cleanbatch_child <- function(data.df,
     # The ageday_has_include check only applies to CFs (for rescue eligibility), not originators
 
     # Initialize variables
-    data.df[, cf_binary := exclude == "Exclude-Carried-Forward"]
+    data.df[, cf_binary := grepl("^Exclude-C-(WT|HT|HC)-CF$", exclude)]
 
     # Process by subject-param to maintain ordering
     data.df[, ':=' (
@@ -3234,12 +3244,12 @@ cleanbatch_child <- function(data.df,
         # Code 4: only 1 CF AND |diff| < 0.05
         # Reverted to original threshold
         df[seq_win != 0 & absdiff < 0.05,
-           exclude := "Exclude-1-CF-deltaZ-<0.05"]
+           exclude := "Rescued"]
 
         # Code 5: only 1 CF AND |diff| >= 0.05 AND < 0.1 AND wholehalfimp
         # Reverted to original threshold
         df[seq_win != 0 & absdiff >= 0.05 & absdiff < .1 & wholehalfimp,
-           exclude := "Exclude-1-CF-deltaZ-<0.1-wholehalfimp"]
+           exclude := "Rescued-Imperial"]
 
       } else if (max(seq_win) > 1){
         # 2+ CFs in string - only teens get rescue (codes 6 and 7)
@@ -3248,18 +3258,18 @@ cleanbatch_child <- function(data.df,
         # Changed > to >= for adolescent thresholds
         # Reverted to original threshold
         df[seq_win != 0 & agedays/365.25 >= 16 & sex == 1 & absdiff < 0.05,
-           exclude := "Exclude-Teen-2-plus-CF-deltaZ-<0.05"]
+           exclude := "Rescued-Adol"]
         df[seq_win != 0 & agedays/365.25 >= 17 & sex == 0 & absdiff < 0.05,
-           exclude := "Exclude-Teen-2-plus-CF-deltaZ-<0.05"]
+           exclude := "Rescued-Adol"]
 
         # Code 7: any # of consecutive CFs AND adol AND |diff| >= 0.05 AND < 0.1 AND wholehalfimp
         # Reverted to original threshold
         df[seq_win != 0 & agedays/365.25 >= 16 & sex == 1 &
              absdiff >= 0.05 & absdiff < .1 & wholehalfimp,
-           exclude := "Exclude-Teen-2-plus-CF-deltaZ-<0.1-wholehalfimp"]
+           exclude := "Rescued-Adol-Imperial"]
         df[seq_win != 0 & agedays/365.25 >= 17 & sex == 0 &
              absdiff >= 0.05 & absdiff < .1 & wholehalfimp,
-           exclude := "Exclude-Teen-2-plus-CF-deltaZ-<0.1-wholehalfimp"]
+           exclude := "Rescued-Adol-Imperial"]
         # REMOVED: "CP ADD" section - codes 4/5 should NOT apply to multi-CF strings
       }
 
@@ -3271,10 +3281,10 @@ cleanbatch_child <- function(data.df,
 
     # Store rescue codes in cf_rescued column, then re-include rescued CFs
     # Rescued CFs participate in all downstream steps but are flagged for users
-    rescue_codes <- c("Exclude-1-CF-deltaZ-<0.05",
-                      "Exclude-1-CF-deltaZ-<0.1-wholehalfimp",
-                      "Exclude-Teen-2-plus-CF-deltaZ-<0.05",
-                      "Exclude-Teen-2-plus-CF-deltaZ-<0.1-wholehalfimp")
+    rescue_codes <- c("Rescued",
+                      "Rescued-Imperial",
+                      "Rescued-Adol",
+                      "Rescued-Adol-Imperial")
     rescued_mask <- data.df$exclude %in% rescue_codes
     if (any(rescued_mask)) {
       data.df[rescued_mask, cf_rescued := as.character(exclude)]
@@ -3317,94 +3327,87 @@ cleanbatch_child <- function(data.df,
   # add age in years
   data.df[, ageyears := agedays/365.25]
 
-  valid_set <- valid(data.df, include.temporary.extraneous = TRUE)
+  valid_set <- .child_valid(data.df, include.temporary.extraneous = TRUE)
 
-  exc_nam <- "Exclude-Absolute-BIV"
-
-  # identify absolute cutoffs
+  # identify absolute cutoffs — all BIV codes are now param-specific Exclude-C-{WT|HT|HC}-BIV
   # Min weight: <0.2 kg for first year, <1 kg after
   data.df[valid_set & param == "WEIGHTKG" & v < 0.2 & agedays <= 365,
-          exclude := exc_nam]
+          exclude := "Exclude-C-WT-BIV"]
   data.df[valid_set & param == "WEIGHTKG" & v < 1 & agedays > 365,
-          exclude := exc_nam]
+          exclude := "Exclude-C-WT-BIV"]
   # Max weight at birth
   data.df[valid_set & param == "WEIGHTKG" & v > 10.5 &
             agedays == 0,
-          exclude := exc_nam]
+          exclude := "Exclude-C-WT-BIV"]
   # Max weight for <2y
   data.df[valid_set & param == "WEIGHTKG" & v > 35 &
             ageyears < 2,
-          exclude := exc_nam]
+          exclude := "Exclude-C-WT-BIV"]
   # Max weight for all based on published data
   data.df[valid_set & param == "WEIGHTKG" & v > 600,
-          exclude := exc_nam]
+          exclude := "Exclude-C-WT-BIV"]
 
-  # Min/max HC based on analysis in do file from
+  # Min/max HT based on analysis in do file from
   # Also, 18 is z=-6 for 22 0/7 in Fenton and 65 is z=6 for 40 0/7
   data.df[valid_set & param == "HEIGHTCM" & v < 18,
-          exclude := exc_nam]
+          exclude := "Exclude-C-HT-BIV"]
   data.df[valid_set & param == "HEIGHTCM" & v > 244,
-          exclude := exc_nam]
+          exclude := "Exclude-C-HT-BIV"]
   data.df[valid_set & param == "HEIGHTCM" & v > 65 &
             agedays == 0,
-          exclude := exc_nam]
+          exclude := "Exclude-C-HT-BIV"]
 
   # Min/max HC based on analysis in do file from Oct 11 2022
   # Also, 13 is z=-6 for 22 0/7 in Fenton and
   data.df[valid_set & param == "HEADCM" & v < 13,
-          exclude := exc_nam]
+          exclude := "Exclude-C-HC-BIV"]
   data.df[valid_set & param == "HEADCM" & v > 75,
-          exclude := exc_nam]
+          exclude := "Exclude-C-HC-BIV"]
   data.df[valid_set & param == "HEADCM" & v > 50 &
             agedays == 0,
-          exclude := exc_nam]
+          exclude := "Exclude-C-HC-BIV"]
 
-  exc_nam <- "Exclude-Standardized-BIV"
-  # Added check to skip rows already marked Absolute-BIV
-  # This prevents Standardized-BIV from overwriting Absolute-BIV when both conditions are true.
+  # Standardized BIV — same param-specific code (Exclude-C-{WT|HT|HC}-BIV)
+  # Skip rows already marked BIV (absolute) to avoid overwriting
   # NOTE: This is the only step where an exclusion code can overwrite a non-temporary exclusion
   # code (e.g., this could overwrite CF codes). No other steps should overwrite non-temporary codes.
-  abs_biv <- "Exclude-Absolute-BIV"
+  biv_pattern <- "^Exclude-C-(WT|HT|HC)-BIV$"
 
   # identify z cutoff
   # ***Note, using unrecentered values***
   #  *For weight only do after birth
   data.df[valid_set & param == "WEIGHTKG" & sd.orig_uncorr < -25 &
-            ageyears < 1 & exclude != abs_biv,
-          exclude := exc_nam]
+            ageyears < 1 & !grepl(biv_pattern, exclude),
+          exclude := "Exclude-C-WT-BIV"]
   data.df[valid_set & param == "WEIGHTKG" & sd.orig_uncorr < -15 &
-            ageyears >= 1 & exclude != abs_biv,
-          exclude := exc_nam]
+            ageyears >= 1 & !grepl(biv_pattern, exclude),
+          exclude := "Exclude-C-WT-BIV"]
   data.df[valid_set & param == "WEIGHTKG" & sd.orig_uncorr > 22 &
-            exclude != abs_biv,
-          exclude := exc_nam]
+            !grepl(biv_pattern, exclude),
+          exclude := "Exclude-C-WT-BIV"]
 
   # *Max z-score for height based on analysis of CHOP data because 15/25 too loose for upper limits
   data.df[valid_set & param == "HEIGHTCM" & sd.orig_uncorr < -25 &
-            ageyears < 1 & exclude != abs_biv,
-          exclude := exc_nam]
+            ageyears < 1 & !grepl(biv_pattern, exclude),
+          exclude := "Exclude-C-HT-BIV"]
   data.df[valid_set & param == "HEIGHTCM" & sd.orig_uncorr < -15 &
-            ageyears >= 1 & exclude != abs_biv,
-          exclude := exc_nam]
+            ageyears >= 1 & !grepl(biv_pattern, exclude),
+          exclude := "Exclude-C-HT-BIV"]
   data.df[valid_set & param == "HEIGHTCM" & sd.orig_uncorr > 8 &
-            exclude != abs_biv,
-          exclude := exc_nam]
+            !grepl(biv_pattern, exclude),
+          exclude := "Exclude-C-HT-BIV"]
 
   # head circumference
   data.df[valid_set & param == "HEADCM" & sd.orig_uncorr < -15 &
-            exclude != abs_biv,
-          exclude := exc_nam]
+            !grepl(biv_pattern, exclude),
+          exclude := "Exclude-C-HC-BIV"]
   data.df[valid_set & param == "HEADCM" & sd.orig_uncorr > 15 &
-            exclude != abs_biv,
-          exclude := exc_nam]
-
-  # then, do some explicit overwriting for the 0 case (otherwise will be
-  # set as missing)
-  data.df[v == 0, exclude := exc_nam]
+            !grepl(biv_pattern, exclude),
+          exclude := "Exclude-C-HC-BIV"]
 
   # 7d.  Replace exc_*=0 if exc_*==2 & redo step 5 (temporary extraneous)
-  data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
-  data.df[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
+  data.df[exclude == 'Exclude-C-Temp-Same-Day', exclude := 'Include']
+  data.df[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-C-Temp-Same-Day']
 
   # Drop column no longer needed after Step 7
   # ageyears: only used for BIV age-threshold checks (Step 7)
@@ -3418,7 +3421,7 @@ cleanbatch_child <- function(data.df,
   # on every while-loop iteration — O(n*k) to O(n^2). New approach processes each group
   # independently (typically 3-30 rows), matching the pattern used in Steps 11/15/17.
 
-  exc_nam <- "Exclude-Evil-Twins"
+  # Evil Twins exclusion — param-specific code applied at final assignment
 
   # MUST reorder BEFORE computing valid_set
   # The valid_set boolean vector is computed based on row positions.
@@ -3432,7 +3435,7 @@ cleanbatch_child <- function(data.df,
   # Evil Twins requires 3+ measurements per subject-param
   data.df[, sp_count_9 := .N, by = .(subjid, param)]
   not_single_pairs <- data.df$sp_count_9 > 2L
-  valid_set <- valid(data.df, include.temporary.extraneous = FALSE) &
+  valid_set <- .child_valid(data.df, include.temporary.extraneous = FALSE) &
     not_single_pairs
 
   # 9A/B/C
@@ -3486,7 +3489,7 @@ cleanbatch_child <- function(data.df,
         worst_line <- otl_rows$line[ord[1L]]
 
         # Mark exactly one exclusion per iteration
-        df[line == worst_line, exclude := exc_nam]
+        df[line == worst_line, exclude := .child_exc(p, "Evil-Twins")]
 
         # Recalculate OTL on remaining Include values
         incl <- df[exclude == "Include"]
@@ -3504,20 +3507,20 @@ cleanbatch_child <- function(data.df,
       }
 
       # Collect lines marked for exclusion
-      excl <- df$line[df$exclude == exc_nam]
+      excl <- df$line[grepl("^Exclude-C-(WT|HT|HC)-Evil-Twins$", df$exclude)]
       if (length(excl) > 0L) et_excl_lines <- c(et_excl_lines, excl)
     }
 
     # Apply all exclusions back to data.df
     if (length(et_excl_lines) > 0L) {
-      data.df[line %in% et_excl_lines, exclude := exc_nam]
+      data.df[line %in% et_excl_lines, exclude := .child_exc(param, "Evil-Twins")]
     }
   }
   data.df[, sp_count_9 := NULL]
 
   # 9F.  redo temp extraneous
-  data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
-  data.df[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
+  data.df[exclude == 'Exclude-C-Temp-Same-Day', exclude := 'Include']
+  data.df[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-C-Temp-Same-Day']
 
   # Step 11: Extreme EWMA ----
   # Restructured to use global iterations for efficiency
@@ -3543,7 +3546,7 @@ cleanbatch_child <- function(data.df,
   # Pre-identify subject-params that need processing:
   # Count INCLUDE values only (not temp SDEs) - need >2 for EWMA processing
   data.df[, sp_key := paste0(subjid, "_", param)]
-  include_mask <- valid(data.df, include.temporary.extraneous = FALSE)
+  include_mask <- .child_valid(data.df, include.temporary.extraneous = FALSE)
   include_counts <- data.df[include_mask, .(n_include = .N), by = sp_key]
   sp_to_process <- include_counts[n_include > 2, sp_key]
 
@@ -3557,7 +3560,7 @@ cleanbatch_child <- function(data.df,
                 length(sp_to_process), nrow(extreme_sp)))
 
   # Track subjects with SDEs for targeted temp SDE recalculation
-  subj_with_sde <- unique(data.df[exclude == "Exclude-Temporary-Extraneous-Same-Day", subjid])
+  subj_with_sde <- unique(data.df[exclude == "Exclude-C-Temp-Same-Day", subjid])
 
   iteration <- 0
   while (length(sp_to_process) > 0) {
@@ -3566,13 +3569,13 @@ cleanbatch_child <- function(data.df,
       cat(sprintf("  EWMA1 iteration %d: %d subject-params\n", iteration, length(sp_to_process)))
 
     # Track which rows had EWMA1 exclusions before this iteration
-    data.df[sp_key %in% sp_to_process, had_ewma1_before := (exclude == 'Exclude-EWMA1-Extreme')]
+    data.df[sp_key %in% sp_to_process, had_ewma1_before := grepl("^Exclude-C-(WT|HT|HC)-Traj-Extreme$", exclude)]
 
     # Process each subject-param - ONE exclusion per subject-param per iteration
     data.df[sp_key %in% sp_to_process,
             exclude := (function(df) {
               # Only Include values participate (no temp SDEs)
-              include_set <- valid(df, include.temporary.extraneous = FALSE)
+              include_set <- .child_valid(df, include.temporary.extraneous = FALSE)
 
               if (sum(include_set) > 2) {
                 # Initialize EWMA fields
@@ -3630,18 +3633,18 @@ cleanbatch_child <- function(data.df,
                 # Exclude at most ONE value (the worst)
                 num.exclude <- sum(df$pot_excl, na.rm = TRUE)
                 if (num.exclude == 1) {
-                  df[pot_excl == TRUE, exclude := 'Exclude-EWMA1-Extreme']
+                  df[pot_excl == TRUE, exclude := .child_exc(param, "Traj-Extreme")]
                 } else if (num.exclude > 1) {
                   # Select worst: highest abs(tbc.sd + dewma.all), lowest id as tiebreaker
                   worst.row <- with(df, order(pot_excl, abs(tbc.sd + dewma.all), -as.numeric(internal_id), decreasing = TRUE))[1]
-                  df[worst.row, exclude := 'Exclude-EWMA1-Extreme']
+                  df[worst.row, exclude := .child_exc(param, "Traj-Extreme")]
                 }
               }
 
               return(df$exclude)
             })(copy(.SD)),
             by = .(subjid, param),
-            .SDcols = c('index', 'id', 'internal_id', 'sex', 'agedays', 'tbc.sd', 'ctbc.sd', 'exclude')]
+            .SDcols = c('index', 'id', 'internal_id', 'param', 'sex', 'agedays', 'tbc.sd', 'ctbc.sd', 'exclude')]
 
     # Capture EWMA1 iteration 1 values for debugging
     if (iteration == 1) {
@@ -3658,7 +3661,7 @@ cleanbatch_child <- function(data.df,
 
     # Find subject-params with NEW exclusions this iteration
     data.df[sp_key %in% sp_to_process, has_new_excl :=
-              (exclude == 'Exclude-EWMA1-Extreme') & !had_ewma1_before]
+              grepl("^Exclude-C-(WT|HT|HC)-Traj-Extreme$", exclude) & !had_ewma1_before]
     sp_with_new_excl <- unique(data.df[has_new_excl == TRUE, sp_key])
     subjects_with_new_excl <- unique(data.df[has_new_excl == TRUE, subjid])
 
@@ -3666,14 +3669,14 @@ cleanbatch_child <- function(data.df,
     affected_sde_subj <- intersect(subjects_with_new_excl, subj_with_sde)
     if (length(affected_sde_subj) > 0) {
       # Reset temp SDEs to Include for affected subjects
-      data.df[subjid %in% affected_sde_subj & exclude == 'Exclude-Temporary-Extraneous-Same-Day',
+      data.df[subjid %in% affected_sde_subj & exclude == 'Exclude-C-Temp-Same-Day',
               exclude := 'Include']
       # Recalculate temp SDEs for subset
       sde_subset <- data.df[subjid %in% affected_sde_subj]
       sde_result <- temporary_extraneous_infants(sde_subset[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])
       # Apply results back using index
       sde_indices_to_mark <- sde_subset$index[sde_result]
-      data.df[index %in% sde_indices_to_mark, exclude := 'Exclude-Temporary-Extraneous-Same-Day']
+      data.df[index %in% sde_indices_to_mark, exclude := 'Exclude-C-Temp-Same-Day']
     }
 
     # Next iteration: only subject-params with new exclusions
@@ -3688,8 +3691,8 @@ cleanbatch_child <- function(data.df,
 
   # Final temp SDE recalculation (end of Step 11, before Step 13)
   # Note: Does NOT use exclude_from_dop_ids - that's only for Step 13
-  data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
-  data.df[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-Temporary-Extraneous-Same-Day']
+  data.df[exclude == 'Exclude-C-Temp-Same-Day', exclude := 'Include']
+  data.df[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-C-Temp-Same-Day']
 
   # 13: SDEs ----
 
@@ -3701,7 +3704,7 @@ cleanbatch_child <- function(data.df,
 
   # Pass temp SDE ids to exclude from DOP median
   # This matches Stata Step 13 line 1516: DOP median uses only fully included values (exc==0)
-  temp_sde_ids_step13 <- data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', id]
+  temp_sde_ids_step13 <- data.df[exclude == 'Exclude-C-Temp-Same-Day', id]
 
   # Safety check: no Include duplicates should exist before restoring temp SDEs
   pre_dupe_check <- data.df[exclude == "Include", .N, by = .(subjid, param, agedays)][N > 1]
@@ -3710,10 +3713,10 @@ cleanbatch_child <- function(data.df,
             " Include duplicates before restoring temp SDEs.")
   }
 
-  data.df[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
+  data.df[exclude == 'Exclude-C-Temp-Same-Day', exclude := 'Include']
   data.df[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)],
                                         exclude_from_dop_ids = temp_sde_ids_step13),
-          exclude := 'Exclude-Temporary-Extraneous-Same-Day']
+          exclude := 'Exclude-C-Temp-Same-Day']
 
   # Safety check: no Include duplicates after temp SDE marking
   post_dupe_check <- data.df[exclude == "Include", .N, by = .(subjid, param, agedays)][N > 1]
@@ -3726,7 +3729,7 @@ cleanbatch_child <- function(data.df,
   # Pre-filter to subjects with same-day measurements (potential SDEs)
   # If a subject has no same-day measurements, SDE steps can do nothing - skip entirely
   # Exclude SDE-Identicals from count - they're already handled and shouldn't trigger SDE processing
-  sde_day_counts <- data.df[exclude %in% c("Include", "Exclude-Temporary-Extraneous-Same-Day"),
+  sde_day_counts <- data.df[exclude %in% c("Include", "Exclude-C-Temp-Same-Day"),
                             .(n_on_day = .N), by = .(subjid, param, agedays)]
   subj_with_sde_days <- unique(sde_day_counts[n_on_day > 1, subjid])
   n_total_subj <- uniqueN(data.df$subjid)
@@ -3745,11 +3748,11 @@ cleanbatch_child <- function(data.df,
     data.df_sde_subset <- data.df[subjid %in% subj_with_sde_days]
 
     # Mark groups that have a temp SDE
-    data.df_sde_subset[, sde_this := any(exclude == "Exclude-Temporary-Extraneous-Same-Day"),
+    data.df_sde_subset[, sde_this := any(exclude == "Exclude-C-Temp-Same-Day"),
                         by = .(subjid, param, agedays)]
 
     # Filter to valid rows (Include or Temp SDE), then keep only subjects with any SDE
-    data.sde <- data.df_sde_subset[valid(data.df_sde_subset, include.temporary.extraneous = TRUE)]
+    data.sde <- data.df_sde_subset[.child_valid(data.df_sde_subset, include.temporary.extraneous = TRUE)]
     data.sde[, has_sde_subj := any(sde_this == TRUE), by = .(subjid)]
     data.sde <- data.sde[has_sde_subj == TRUE]
     data.sde[, has_sde_subj := NULL]
@@ -3763,7 +3766,7 @@ cleanbatch_child <- function(data.df,
                                   max(as.numeric(internal_id), na.rm = TRUE)),
              by = .(subjid, param, agedays)]
     data.sde[uniqueN(v) == 1L & as.numeric(internal_id) != keep_id,
-             exclude := "Exclude-SDE-Identical",
+             exclude := .child_exc(param, "Identical"),
              by = .(subjid, param, agedays)]
 
     # Mark SDE-Identical for duplicate values within same day
@@ -3776,7 +3779,7 @@ cleanbatch_child <- function(data.df,
     # Fix SDE-Identical bug: was exclude != "Include" (backwards)
     # Should mark currently-included duplicates as SDE-Identical (matches Stata line 206: exc==0)
     data.sde[dup_count > 1L & as.numeric(internal_id) != keep_id_dup & exclude == "Include",
-             exclude := "Exclude-SDE-Identical"]
+             exclude := .child_exc(param, "Identical")]
     data.sde[, c("keep_id", "keep_id_dup", "dup_count") := NULL]
 
     # Include id for deterministic SDE order
@@ -3784,8 +3787,8 @@ cleanbatch_child <- function(data.df,
 
 
   # Track temp SDE status before restoration
-  data.sde[, was_temp_sde := exclude == 'Exclude-Temporary-Extraneous-Same-Day']
-  data.sde[exclude == 'Exclude-Temporary-Extraneous-Same-Day', exclude := 'Include']
+  data.sde[, was_temp_sde := exclude == 'Exclude-C-Temp-Same-Day']
+  data.sde[exclude == 'Exclude-C-Temp-Same-Day', exclude := 'Include']
   data.sde <- data.sde[order(subjid, param, agedays, as.numeric(internal_id))]
 
   # -------------------------------------------
@@ -3813,7 +3816,7 @@ cleanbatch_child <- function(data.df,
              !is.na(min_absdiff_rel_to_median) &
 
                min_absdiff_rel_to_median > 2,
-           exclude := "Exclude-SDE-All-Extreme"]
+           exclude := .child_exc(param, "Extraneous")]
 
   # DOP medians (cross-parameter grouping by subjid, agedays)
   # DOP median uses FULLY included values only
@@ -3866,7 +3869,7 @@ cleanbatch_child <- function(data.df,
   # Assign SDE-One-Day exclusions
   data.sde[one_day_sde_flag & exclude == "Include" & !is.na(keep_id_oneday) &
              id != keep_id_oneday,
-           exclude := "Exclude-SDE-One-Day"]
+           exclude := .child_exc(param, "Extraneous")]
 
   # -------------------------------------------
   # Phase B3: SDE-EWMA resolution
@@ -3920,10 +3923,10 @@ cleanbatch_child <- function(data.df,
 
   # SDE-EWMA selection using sort logic
   data.sde[, n_available := sum(
-    exclude %in% c("Exclude-Temporary-Extraneous-Same-Day", "Include")),
+    exclude %in% c("Exclude-C-Temp-Same-Day", "Include")),
     by = .(subjid, param, agedays)]
   data.sde[, min_absdewma := {
-    vals <- absdewma[exclude %in% c("Exclude-Temporary-Extraneous-Same-Day", "Include")]
+    vals <- absdewma[exclude %in% c("Exclude-C-Temp-Same-Day", "Include")]
     m <- suppressWarnings(min(vals, na.rm = TRUE))
     if (is.infinite(m)) NA_real_
     else m
@@ -3931,9 +3934,9 @@ cleanbatch_child <- function(data.df,
 
   # SDE-All-Extreme if min absdewma > 1
   data.sde[n_available >= 2L &
-             exclude %in% c("Exclude-Temporary-Extraneous-Same-Day", "Include") &
+             exclude %in% c("Exclude-C-Temp-Same-Day", "Include") &
              !is.na(min_absdewma) & min_absdewma > 1,
-           exclude := "Exclude-SDE-All-Extreme"]
+           exclude := .child_exc(param, "Extraneous")]
 
   # Age-dependent tiebreaker for EWMA selection
   data.sde[, tiebreaker_ewma := fifelse(
@@ -3941,7 +3944,7 @@ cleanbatch_child <- function(data.df,
 
   # Find the id to keep: sort eligible values by absdewma (asc), then tiebreaker (asc)
   data.sde[, keep_id_ewma := {
-    eligible_mask <- exclude %in% c("Exclude-Temporary-Extraneous-Same-Day", "Include")
+    eligible_mask <- exclude %in% c("Exclude-C-Temp-Same-Day", "Include")
     if (sum(eligible_mask) == 0L) NA_integer_
     else {
       eligible_ids <- id[eligible_mask]
@@ -3952,13 +3955,13 @@ cleanbatch_child <- function(data.df,
     }
   }, by = .(subjid, param, agedays)]
 
-  # Assign SDE-EWMA exclusions: keep_id gets Include, others get Exclude-SDE-EWMA
-  data.sde[exclude %in% c("Exclude-Temporary-Extraneous-Same-Day", "Include") &
+  # Assign SDE-Extraneous exclusions: keep_id gets Include, others get Exclude-C-{param}-Extraneous
+  data.sde[exclude %in% c("Exclude-C-Temp-Same-Day", "Include") &
              id == keep_id_ewma,
            exclude := "Include"]
-  data.sde[exclude %in% c("Exclude-Temporary-Extraneous-Same-Day", "Include") &
+  data.sde[exclude %in% c("Exclude-C-Temp-Same-Day", "Include") &
              id != keep_id_ewma,
-           exclude := "Exclude-SDE-EWMA"]
+           exclude := .child_exc(param, "Extraneous")]
 
   }  # End of SDE pre-filter else block
 
@@ -3973,7 +3976,7 @@ cleanbatch_child <- function(data.df,
   # Evil Twins, early SDE-Identical).
   data.df[!is.na(sde_exclude) &
             exclude %in% c("Include",
-                           "Exclude-Temporary-Extraneous-Same-Day"),
+                           "Exclude-C-Temp-Same-Day"),
           exclude := sde_exclude]
   data.df[, sde_exclude := NULL]
   # Keep only original columns (drop any extras from SDE processing)
@@ -3999,7 +4002,7 @@ cleanbatch_child <- function(data.df,
   # Pre-identify subject-params that need processing: Include values, >2 values
   # Include temp SDEs in count so they get p_plus/p_minus calculated
   data.df[, sp_key := paste0(subjid, "_", param)]
-  include_counts <- data.df[valid(data.df, include.temporary.extraneous = TRUE),
+  include_counts <- data.df[.child_valid(data.df, include.temporary.extraneous = TRUE),
                             .(n_include = .N), by = sp_key]
   sp_to_process_15 <- include_counts[n_include > 2, sp_key]
 
@@ -4046,7 +4049,7 @@ cleanbatch_child <- function(data.df,
 
   # Get initial subject-params to process
   step15_filter <- data.df$sp_key %in% sp_to_process_15 &
-    valid(data.df, include.temporary.extraneous = FALSE) &
+    .child_valid(data.df, include.temporary.extraneous = FALSE) &
     !((data.df$param == "HEIGHTCM" | data.df$param == "HEADCM") & data.df$agedays == 0)
   sp_counts_15 <- data.df[step15_filter, .(n = .N), by = sp_key]
   sp_to_process <- sp_counts_15[n > 2, sp_key]
@@ -4083,7 +4086,7 @@ cleanbatch_child <- function(data.df,
     # RECALCULATE filter each iteration - valid() depends on current exclusions
     # Must recalculate filter inside loop
     step15_filter <- data.df$sp_key %in% sp_to_process &
-      valid(data.df, include.temporary.extraneous = FALSE) &
+      .child_valid(data.df, include.temporary.extraneous = FALSE) &
       !((data.df$param == "HEIGHTCM" | data.df$param == "HEADCM") & data.df$agedays == 0)
 
     # Recalculate first_meas each iteration
@@ -4099,9 +4102,7 @@ cleanbatch_child <- function(data.df,
             by = .(subjid, param)]
 
     # Track exclusions before this iteration
-    ewma2_codes <- c("Exclude-EWMA2-middle", "Exclude-EWMA2-birth-WT", "Exclude-EWMA2-birth-WT-ext",
-                     "Exclude-EWMA2-first", "Exclude-EWMA2-first-ext", "Exclude-EWMA2-last",
-                     "Exclude-EWMA2-last-high", "Exclude-EWMA2-last-ext", "Exclude-EWMA2-last-ext-high")
+    ewma2_codes <- paste0("Exclude-C-", c("WT", "HT", "HC"), "-Traj")
     data.df[sp_key %in% sp_to_process, had_ewma2_before := (exclude %in% ewma2_codes)]
 
     # Process each subject-param - ONE exclusion per subject-param per iteration
@@ -4186,51 +4187,51 @@ cleanbatch_child <- function(data.df,
 
               # Middle
               df[dewma.all > 1 & (c.dewma.all > 1 | is.na(c.dewma.all)) & addcrithigh & !(rowind %in% c(1, n)),
-                 pot_excl := "Exclude-EWMA2-middle"]
+                 pot_excl := .child_exc(param, "Traj")]
               df[dewma.all < -1 & (c.dewma.all < -1 | is.na(c.dewma.all)) & addcritlow & !(rowind %in% c(1, n)),
-                 pot_excl := "Exclude-EWMA2-middle"]
+                 pot_excl := .child_exc(param, "Traj")]
 
               # Birth WT
               df[agedays == 0 & c(agedays[2:.N], NA) < 365.25 & dewma.all > 3 & (c.dewma.all > 3 | is.na(c.dewma.all)) & addcrithigh,
-                 pot_excl := "Exclude-EWMA2-birth-WT"]
+                 pot_excl := "Exclude-C-WT-Traj"]
               df[agedays == 0 & c(agedays[2:.N], NA) < 365.25 & dewma.all < -3 & (c.dewma.all < -3 | is.na(c.dewma.all)) & addcritlow,
-                 pot_excl := "Exclude-EWMA2-birth-WT"]
+                 pot_excl := "Exclude-C-WT-Traj"]
               df[agedays == 0 & c(agedays[2:.N], NA) >= 365.25 & dewma.all > 4 & (c.dewma.all > 4 | is.na(c.dewma.all)) & addcrithigh,
-                 pot_excl := "Exclude-EWMA2-birth-WT-ext"]
+                 pot_excl := "Exclude-C-WT-Traj"]
               df[agedays == 0 & c(agedays[2:.N], NA) >= 365.25 & dewma.all < -4 & (c.dewma.all < -4 | is.na(c.dewma.all)) & addcritlow,
-                 pot_excl := "Exclude-EWMA2-birth-WT-ext"]
+                 pot_excl := "Exclude-C-WT-Traj"]
 
               # First
               df[first_meas & (c(agedays[2:.N], NA) - agedays < 365.25) & dewma.all > 2 & (c.dewma.all > 2 | is.na(c.dewma.all)) & addcrithigh,
-                 pot_excl := "Exclude-EWMA2-first"]
+                 pot_excl := .child_exc(param, "Traj")]
               df[first_meas & (c(agedays[2:.N], NA) - agedays < 365.25) & dewma.all < -2 & (c.dewma.all < -2 | is.na(c.dewma.all)) & addcritlow,
-                 pot_excl := "Exclude-EWMA2-first"]
+                 pot_excl := .child_exc(param, "Traj")]
 
               df[first_meas & (c(agedays[2:.N], NA) - agedays >= 365.25) & dewma.all > 3 & (c.dewma.all > 3 | is.na(c.dewma.all)) & addcrithigh,
-                 pot_excl := "Exclude-EWMA2-first-ext"]
+                 pot_excl := .child_exc(param, "Traj")]
               df[first_meas & (c(agedays[2:.N], NA) - agedays >= 365.25) & dewma.all < -3 & (c.dewma.all < -3 | is.na(c.dewma.all)) & addcritlow,
-                 pot_excl := "Exclude-EWMA2-first-ext"]
+                 pot_excl := .child_exc(param, "Traj")]
 
               # Last
               if (n >= 2) {
                 gap_last <- df$agedays[n] - df$agedays[n-1]
                 tbc_prev <- df$tbc.sd[n-1]
                 df[rowind == n & gap_last < 365.25*2 & abs(tbc_prev) < 2 & dewma.all > 2 & (c.dewma.all > 2 | is.na(c.dewma.all)) & addcrithigh,
-                   pot_excl := "Exclude-EWMA2-last"]
+                   pot_excl := .child_exc(param, "Traj")]
                 df[rowind == n & gap_last < 365.25*2 & abs(tbc_prev) < 2 & dewma.all < -2 & (c.dewma.all < -2 | is.na(c.dewma.all)) & addcritlow,
-                   pot_excl := "Exclude-EWMA2-last"]
+                   pot_excl := .child_exc(param, "Traj")]
                 df[rowind == n & gap_last < 365.25*2 & abs(tbc_prev) >= 2 & dewma.all > abs(tbc_prev) & (c.dewma.all > 3 | is.na(c.dewma.all)) & addcrithigh,
-                   pot_excl := "Exclude-EWMA2-last-high"]
+                   pot_excl := .child_exc(param, "Traj")]
                 df[rowind == n & gap_last < 365.25*2 & abs(tbc_prev) >= 2 & dewma.all < -abs(tbc_prev) & (c.dewma.all < -3 | is.na(c.dewma.all)) & addcritlow,
-                   pot_excl := "Exclude-EWMA2-last-high"]
+                   pot_excl := .child_exc(param, "Traj")]
                 df[rowind == n & gap_last >= 365.25*2 & abs(tbc_prev) < 2 & dewma.all > 3 & (c.dewma.all > 3 | is.na(c.dewma.all)) &
-                     (tbc.sd - tbc_dop > 4 | is.na(tbc_dop)) & addcrithigh, pot_excl := "Exclude-EWMA2-last-ext"]
+                     (tbc.sd - tbc_dop > 4 | is.na(tbc_dop)) & addcrithigh, pot_excl := .child_exc(param, "Traj")]
                 df[rowind == n & gap_last >= 365.25*2 & abs(tbc_prev) < 2 & dewma.all < -3 & (c.dewma.all < -3 | is.na(c.dewma.all)) &
-                     (tbc.sd - tbc_dop < -4 | is.na(tbc_dop)) & addcritlow, pot_excl := "Exclude-EWMA2-last-ext"]
+                     (tbc.sd - tbc_dop < -4 | is.na(tbc_dop)) & addcritlow, pot_excl := .child_exc(param, "Traj")]
                 df[rowind == n & gap_last >= 365.25*2 & abs(tbc_prev) >= 2 & dewma.all > 1+abs(tbc_prev) & (c.dewma.all > 3 | is.na(c.dewma.all)) &
-                     (tbc.sd - tbc_dop > 4 | is.na(tbc_dop)) & addcrithigh, pot_excl := "Exclude-EWMA2-last-ext-high"]
+                     (tbc.sd - tbc_dop > 4 | is.na(tbc_dop)) & addcrithigh, pot_excl := .child_exc(param, "Traj")]
                 df[rowind == n & gap_last >= 365.25*2 & abs(tbc_prev) >= 2 & dewma.all < -1-abs(tbc_prev) & (c.dewma.all < -3 | is.na(c.dewma.all)) &
-                     (tbc.sd - tbc_dop < -4 | is.na(tbc_dop)) & addcritlow, pot_excl := "Exclude-EWMA2-last-ext-high"]
+                     (tbc.sd - tbc_dop < -4 | is.na(tbc_dop)) & addcritlow, pot_excl := .child_exc(param, "Traj")]
               }
 
               # Exclude the worst candidate (highest abssum)
@@ -4273,12 +4274,12 @@ cleanbatch_child <- function(data.df,
   # Filter for Step 16: HT/HC only, subjects with birth measurement, >2 values
   # Get subjects with birth measurements (HT/HC at agedays=0)
   subj_with_birth <- unique(data.df[param %in% c("HEIGHTCM", "HEADCM") &
-                                     valid(data.df, include.temporary.extraneous = FALSE) &
+                                     .child_valid(data.df, include.temporary.extraneous = FALSE) &
                                      agedays == 0, subjid])
 
   # Initial filter for counting
   step16_filter <- data.df$param %in% c("HEIGHTCM", "HEADCM") &
-    valid(data.df, include.temporary.extraneous = FALSE) &
+    .child_valid(data.df, include.temporary.extraneous = FALSE) &
     data.df$subjid %in% subj_with_birth
   sp_counts_16 <- data.df[step16_filter, .(n = .N), by = sp_key]
   sp_to_process <- sp_counts_16[n > 2, sp_key]
@@ -4309,10 +4310,10 @@ cleanbatch_child <- function(data.df,
     # Must recalculate filter inside loop
     step16_filter <- data.df$sp_key %in% sp_to_process &
       data.df$param %in% c("HEIGHTCM", "HEADCM") &
-      valid(data.df, include.temporary.extraneous = FALSE) &
+      .child_valid(data.df, include.temporary.extraneous = FALSE) &
       data.df$subjid %in% subj_with_birth
 
-    ewma2_hthc_codes <- c("Exclude-EWMA2-birth-HT-HC", "Exclude-EWMA2-birth-HT-HC-ext")
+    ewma2_hthc_codes <- paste0("Exclude-C-", c("HT", "HC"), "-Traj")
     data.df[sp_key %in% sp_to_process, had_ewma2_before := (exclude %in% ewma2_hthc_codes)]
 
     data.df[step16_filter,
@@ -4374,13 +4375,13 @@ cleanbatch_child <- function(data.df,
               next_age <- if (nrow(df) > 1) df$agedays[2] else NA
 
               df[agedays == 0 & !is.na(next_age) & next_age < 365.25 & dewma.all > 3 & (c.dewma.all > 3 | is.na(c.dewma.all)) & addcrithigh,
-                 pot_excl := "Exclude-EWMA2-birth-HT-HC"]
+                 pot_excl := .child_exc(param, "Traj")]
               df[agedays == 0 & !is.na(next_age) & next_age < 365.25 & dewma.all < -3 & (c.dewma.all < -3 | is.na(c.dewma.all)) & addcritlow,
-                 pot_excl := "Exclude-EWMA2-birth-HT-HC"]
+                 pot_excl := .child_exc(param, "Traj")]
               df[agedays == 0 & !is.na(next_age) & next_age >= 365.25 & dewma.all > 4 & (c.dewma.all > 4 | is.na(c.dewma.all)) & addcrithigh,
-                 pot_excl := "Exclude-EWMA2-birth-HT-HC-ext"]
+                 pot_excl := .child_exc(param, "Traj")]
               df[agedays == 0 & !is.na(next_age) & next_age >= 365.25 & dewma.all < -4 & (c.dewma.all < -4 | is.na(c.dewma.all)) & addcritlow,
-                 pot_excl := "Exclude-EWMA2-birth-HT-HC-ext"]
+                 pot_excl := .child_exc(param, "Traj")]
 
               candidates <- df[pot_excl != ""]
               if (nrow(candidates) > 0) {
@@ -4483,7 +4484,7 @@ cleanbatch_child <- function(data.df,
   tmp <- table(paste0(data.df$subjid, "_", data.df$param))
   not_single <- paste0(data.df$subjid, "_", data.df$param) %in% names(tmp)[tmp > 1]
   # Removed nnte_full filter to match Stata (NNTE appended before Step 17)
-  valid_set <- valid(data.df, include.temporary.extraneous = FALSE) &
+  valid_set <- .child_valid(data.df, include.temporary.extraneous = FALSE) &
     not_single &
     data.df$param != "WEIGHTKG" # do not run on weight
 
@@ -4949,10 +4950,10 @@ cleanbatch_child <- function(data.df,
 
         # Q
         df[, val_excl := exclude]
-        df[diff_prev < mindiff_prior & bef.g.aftm1, val_excl := "Exclude-Min-diff"]
-        df[diff_next < mindiff & aft.g.aftm1, val_excl := "Exclude-Min-diff"]
-        df[diff_prev > maxdiff_prior & bef.g.aftm1, val_excl := "Exclude-Max-diff"]
-        df[diff_next > maxdiff & aft.g.aftm1, val_excl := "Exclude-Max-diff"]
+        df[diff_prev < mindiff_prior & bef.g.aftm1, val_excl := .child_exc(param, "Abs-Diff")]
+        df[diff_next < mindiff & aft.g.aftm1, val_excl := .child_exc(param, "Abs-Diff")]
+        df[diff_prev > maxdiff_prior & bef.g.aftm1, val_excl := .child_exc(param, "Abs-Diff")]
+        df[diff_next > maxdiff & aft.g.aftm1, val_excl := .child_exc(param, "Abs-Diff")]
         df[diff_prev < mindiff_prior & bef.g.aftm1, val_excl_code := "1"]
         df[diff_next < mindiff & aft.g.aftm1, val_excl_code := "2"]
         df[diff_prev > maxdiff_prior & bef.g.aftm1, val_excl_code := "3"]
@@ -4961,13 +4962,13 @@ cleanbatch_child <- function(data.df,
         # 17Q/R -- exclusions for pairs
         df[, val_excl := exclude]
         df[diff_prev < mindiff_prior & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lag"),
-           val_excl := "Exclude-Min-diff"]
+           val_excl := .child_exc(param, "Abs-Diff")]
         df[diff_next < mindiff & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lead"),
-           val_excl := "Exclude-Min-diff"]
+           val_excl := .child_exc(param, "Abs-Diff")]
         df[diff_prev > maxdiff_prior & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lag"),
-           val_excl := "Exclude-Max-diff"]
+           val_excl := .child_exc(param, "Abs-Diff")]
         df[diff_next > maxdiff & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lead"),
-           val_excl := "Exclude-Max-diff"]
+           val_excl := .child_exc(param, "Abs-Diff")]
         df[diff_prev < mindiff_prior & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lag"),
            val_excl_code := "5"]
         df[diff_next < mindiff & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lead"),
@@ -5047,7 +5048,7 @@ cleanbatch_child <- function(data.df,
   sp_counts <- include_df[, .(sp_n = .N), by = .(subjid, param)]
   only_single_pairs <- sp_counts[data.df, on = .(subjid, param), fifelse(is.na(sp_n), FALSE, sp_n <= 2L)]
   # Removed nnte_full filter to match Stata (NNTE included in Step 19)
-  valid_set <- valid(data.df, include.temporary.extraneous = FALSE) &
+  valid_set <- .child_valid(data.df, include.temporary.extraneous = FALSE) &
     only_single_pairs
 
   # Snapshot DOP data BEFORE by-group processing
@@ -5110,11 +5111,11 @@ cleanbatch_child <- function(data.df,
       if (isTRUE(abs(diff_tbc.sd) > 4 &
           (abs(diff_ctbc.sd) > 4 | is.na(diff_ctbc.sd)) &
           diff_agedays >=365.25)){
-        df[max_ind, exclude := "Exclude-2-meas->1-year"]
+        df[max_ind, exclude := .child_exc(param, "Pair")]
       } else if (isTRUE(abs(diff_tbc.sd) > 2.5 &
                  (abs(diff_ctbc.sd) > 2.5 | is.na(diff_ctbc.sd)) &
                  diff_agedays < 365.25)){
-        df[max_ind, exclude := "Exclude-2-meas-<1-year"]
+        df[max_ind, exclude := .child_exc(param, "Pair")]
       }
 
       # save the results
@@ -5133,10 +5134,10 @@ cleanbatch_child <- function(data.df,
         (abs(df$tbc.sd) > 5 & is.na(df$comp_diff))
       )
       if (one_meas_cond) {
-        df[, exclude := "Exclude-1-meas"]
+        df[, exclude := .child_exc(param, "Single")]
         # Only update exclude_all if 1-meas exclusion happens
         # Previous code at line 4529 unconditionally overwrote exclude_all, losing 2-meas results
-        exclude_all[ind_all == df$index] <- "Exclude-1-meas"
+        exclude_all[ind_all == df$index] <- .child_exc(df$param, "Single")
       }
     }
 
@@ -5160,14 +5161,11 @@ cleanbatch_child <- function(data.df,
 
   # Non-error codes that should be excluded from both numerator AND denominator
   # CF rescue codes removed — rescued CFs are now "Include" (stored in cf_rescued column)
-  non_error_codes <- c("Exclude-SDE-Identical",
-                       "Exclude-SDE-All-Exclude",
-                       "Exclude-SDE-All-Extreme",
-                       "Exclude-SDE-EWMA",
-                       "Exclude-SDE-One-Day",
-                       "Exclude-Carried-Forward",
-                       "Missing",
-                       "Not cleaned")
+  non_error_codes <- c(paste0("Exclude-C-", c("WT", "HT", "HC"), "-Identical"),
+                       paste0("Exclude-C-", c("WT", "HT", "HC"), "-Extraneous"),
+                       paste0("Exclude-C-", c("WT", "HT", "HC"), "-CF"),
+                       "Exclude-Missing",
+                       "Exclude-Not-Cleaned")
 
   data.df[valid_set,
           c("err_ratio", "n_errors") := {
@@ -5186,7 +5184,7 @@ cleanbatch_child <- function(data.df,
   # Stata requires at least 2 errors before applying Error-load
   # Bug fix (2026-04-12): was hardcoded .4 instead of error.load.threshold parameter
   data.df[valid_set & err_ratio > error.load.threshold & n_errors >= error.load.mincount & exclude == "Include",
-          exclude := "Exclude-Error-load"]
+          exclude := .child_exc(param, "Too-Many-Errors")]
 
   # Cleanup
   data.df[, c("err_ratio", "n_errors") := NULL]
@@ -5259,7 +5257,7 @@ cleanbatch_child <- function(data.df,
 #     exclude < 'Exclude'
 #     |
 #       include.temporary.extraneous &
-#       exclude == 'Exclude-Temporary-Extraneous-Same-Day'
+#       exclude == 'Exclude-C-Temp-Same-Day'
 #     | include.extraneous & exclude == 'Exclude-Extraneous-Same-Day'
 #     |
 #       include.carryforward &
@@ -5267,28 +5265,25 @@ cleanbatch_child <- function(data.df,
 #   )
 # }
 
-valid <- function(df,
+.child_valid <- function(df,
                   include.temporary.extraneous = FALSE,
                   include.extraneous = FALSE,
                   include.carryforward = FALSE) {
   exclude <- if (is.data.frame(df)) df$exclude else df
   exclude <- as.character(exclude)
 
-  # Base set: non-excluded rows that are not missing or uncleaned.
-  # "Missing" and "Not cleaned" rows must be excluded — their measurements
-  # are NA or out of scope, and processing them causes downstream errors.
-  # "Swapped-Measurements", "Unit-Error-*" etc. are kept because the legacy
-  # algorithm corrects those in-place and they remain valid for further steps.
-  keep <- !grepl("^Exclude", exclude) &
-          exclude != "Missing" &
-          exclude != "Not cleaned"
+  # Base set: non-excluded rows. All exclusion codes start with "Exclude-"
+  # (including Exclude-Missing and Exclude-Not-Cleaned), so this single
+  # grepl catches everything. "Swapped-Measurements", "Unit-Error-*" etc.
+  # are legacy codes that don't start with "Exclude" — they remain valid.
+  keep <- !grepl("^Exclude", exclude)
 
   if (include.temporary.extraneous)
-    keep <- keep | exclude == "Exclude-Temporary-Extraneous-Same-Day"
+    keep <- keep | exclude == "Exclude-C-Temp-Same-Day"
   if (include.extraneous)
-    keep <- keep | exclude == "Exclude-Extraneous-Same-Day"
+    keep <- keep | grepl("^Exclude-C-(WT|HT|HC)-Extraneous$", exclude)
   if (include.carryforward)
-    keep <- keep | exclude == "Exclude-Carried-Forward"
+    keep <- keep | grepl("^Exclude-C-(WT|HT|HC)-CF$", exclude)
 
   return(keep)
 }

@@ -53,13 +53,13 @@ If `id` is numeric and sequential (as in test data), behavior is identical. If `
 
 ### D5. `height.tolerance.cm` — declared but never passed or used
 
-**Issue:** `height.tolerance.cm` (default 2.5) is declared as a parameter of `cleangrowth()` (line 321) and documented in the narrative (line 848), but it is never passed to `cleanbatch_child()` and never referenced in Step 17's velocity logic. Step 17 uses hardcoded velocity reference tables instead.
+**Issue:** `height.tolerance.cm` (default 2.5) is declared as a parameter of `cleangrowth()` (line 321) and documented in the narrative (line 848), but it is never passed to `cleanchild()` and never referenced in Step 17's velocity logic. Step 17 uses hardcoded velocity reference tables instead.
 
 **Question for Carrie:** Was this parameter intended to be used in Step 17 as a mindiff override? Or is it a legacy parameter from the Stata version that should be removed from the interface?
 
 ### D6. `lt3.exclude.mode` — passed but never referenced
 
-**Issue:** `lt3.exclude.mode` (default "default") is passed to `cleanbatch_child()` (line 1444, 1462, 1496, 1519) and accepted as a parameter (line 2876), but never referenced in Step 19 code. The "flag.both" mode described in the roxygen documentation is not implemented.
+**Issue:** `lt3.exclude.mode` (default "default") is passed to `cleanchild()` (line 1444, 1462, 1496, 1519) and accepted as a parameter (line 2876), but never referenced in Step 19 code. The "flag.both" mode described in the roxygen documentation is not implemented.
 
 **Question for Carrie:** Should "flag.both" mode be implemented in Step 19, or should this parameter be removed (or documented as not yet implemented)?
 
@@ -103,26 +103,24 @@ If `id` is numeric and sequential (as in test data), behavior is identical. If `
 
 ## Remaining items
 
-### Still to do (from Carrie's review)
+### Completed (2026-04-13 session 3)
 
-1. **#5: Move batch-invariant operations before the loop** — `exclude.levels` definition, velocity reference reads, `read_anthro()` calls are repeated per batch. Moving before the outer loop would avoid redundant re-computation. IN PROGRESS — was interrupted by API errors.
+1. **#5 DONE:** Moved `exclude.levels` definition and Tanner/WHO velocity reference reads before the outer loop. `read_anthro()` calls not moved (already optimized via `ref_tables`/`gc_preload_refs()`).
 
-2. **#6: Remove line numbers from narrative** — All narrative line numbers are stale. Better absent than wrong.
+2. **#6 DONE:** Removed all line number references from narrative.
 
-3. **#7: Add `internal_id` to narrative input column lists** — Multiple step descriptions list input columns without `internal_id`.
+3. **#7 DONE:** `internal_id` already in narrative input column lists (done in session 1).
 
-### Needs discussion with Carrie
+4. **D2 RESOLVED:** `Exclude-SDE-All-Exclude` is dead code. Carrie confirmed it's no longer a real scenario. Will be removed during exclusion code rename.
 
-4. **D2: `Exclude-SDE-All-Exclude`** — never assigned. Dead code or missing implementation? Carrie needs to review Step 13 in detail.
+5. **D3 RESOLVED:** `Exclude-SDE-EWMA-All-Extreme` — deferred to exclusion code rename pass (will match up with adult format).
 
-5. **D3: `Exclude-SDE-EWMA-All-Extreme`** — never assigned. Should it replace `Exclude-SDE-All-Extreme` at the EWMA check, or is it dead? Also not in `non_error_codes`. Carrie needs to review Step 13.
+6. **D6 DONE:** `lt3.exclude.mode` removed from `cleangrowth()` declaration, roxygen, all 4 pass-through calls, and `cleanchild()` parameter list. Was never referenced in code. Left intact in legacy `pediatric_clean_legacy.R`.
 
-6. **D6: `lt3.exclude.mode`** — passed to `cleanbatch_child()` but never referenced. "flag.both" mode not implemented. Needs discussion.
+7. **#2 DONE:** `v == 0` handler in Step 7 removed. `v` is already NaN for zero measurements (preprocessing converts `measurement == 0` to NaN). The handler could never fire.
 
-7. **#2: `v == 0` handler in Step 7** — applies to ALL rows (no valid_set filter). In practice, `v == 0` is converted to NaN during preprocessing so this should never fire. Carrie wants to discuss what `v` does.
-
-8. **#8: Step 15 exclusion rule table** — missing `c.dewma.all` column. For `last-high` and `last-ext-high`, `c.dewma.all` is hardcoded at 3. Needs discussion.
+8. **#8 DONE:** Step 15 exclusion rule table updated with full `c.dewma.all` thresholds for all rules, addcrit definitions with exact formulas, first_meas parameter-specific logic, DOP diff NA handling, and Step 17 velocity threshold formulas.
 
 ### Code cleanup (low priority, no behavioral impact)
 
-9. **Dead exclusion codes in `exclude.levels`**: `Exclude-SDE-All-Exclude` and `Exclude-SDE-EWMA-All-Extreme` — depends on D2/D3 decisions.
+9. **Dead exclusion codes in `exclude.levels`**: `Exclude-SDE-All-Exclude` and `Exclude-SDE-EWMA-All-Extreme` — will be removed during the full exclusion code rename to match adult format.

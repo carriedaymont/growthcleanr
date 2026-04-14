@@ -1,7 +1,7 @@
 # LEGACY pediatric algorithm. Retained for backward compatibility.
 # Use cleangrowth(use_legacy_algorithm = TRUE) to invoke.
 
-# Main pediatric growthcleanr function -- cleanbatch_legacy
+# Main pediatric growthcleanr function -- cleanlegacy
 # internal supporting functions for pediatrics can be found in: pediatric_support_legacy.R
 
 #' Function to clean data (optionally in batches):
@@ -19,7 +19,7 @@
 #' @import data.table
 #' @importFrom stats median
 #' @noRd
-cleanbatch_legacy <- function(data.df,
+cleanlegacy <- function(data.df,
                        log.path,
                        quietly,
                        parallel,

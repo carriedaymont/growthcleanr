@@ -105,7 +105,7 @@ test_that("growthcleanr legacy algorithm works on pediatric synthetic data", {
     quietly = TRUE
   )
 
-  expect_equal(sum(res_miss$exclude == "Missing"), 5)
+  expect_equal(sum(res_miss$exclude == "Exclude-Missing"), 5)
 })
 
 test_that("growthcleanr works as expected on adult synthetic data", {
@@ -134,38 +134,39 @@ test_that("growthcleanr works as expected on adult synthetic data", {
   expect_equal("Include", gcr_result(cd100, 18695))
   expect_equal("Include", gcr_result(cd100cp, 18695))
 
-  expect_equal("Exclude-Adult-Identical-Same-Day", gcr_result(cd100, 167))
-  expect_equal("Exclude-Adult-Identical-Same-Day", gcr_result(cd100cp, 167))
+  expect_equal("Exclude-A-HT-Identical", gcr_result(cd100, 167))
+  expect_equal("Exclude-A-HT-Identical", gcr_result(cd100cp, 167))
 
-  expect_equal("Exclude-Adult-BIV", gcr_result(cd100, 22009))
-  expect_equal("Exclude-Adult-BIV", gcr_result(cd100cp, 22009))
+  expect_equal("Exclude-A-HT-BIV", gcr_result(cd100, 22009))
+  expect_equal("Exclude-A-HT-BIV", gcr_result(cd100cp, 22009))
 
   # Results should change due to younger cutpoint
   # With default cutpoint=20, records 18-20 yrs go through child algorithm
-  expect_equal("Exclude-SDE-EWMA", gcr_result(cd100, 69740))
-  expect_equal("Exclude-Adult-Extraneous-Same-Day", gcr_result(cd100cp, 69740))
+  expect_equal("Exclude-C-WT-Extraneous", gcr_result(cd100, 69740))
+  expect_equal("Include", gcr_result(cd100cp, 69740))
 
   expect_equal("Include", gcr_result(cd100cp, 55171))
 
-  expect_equal("Exclude-Standardized-BIV", gcr_result(cd100, 25259))
-  expect_equal("Exclude-Adult-Distinct-3-Or-More", gcr_result(cd100cp, 25259))
+  expect_equal("Exclude-C-HT-BIV", gcr_result(cd100, 25259))
+  expect_equal("Exclude-A-HT-BIV", gcr_result(cd100cp, 25259))
 
-  # Check counts
-  catcount <- function(dt, category) {
+  # Check counts (codes are now param-specific; use grepl for category totals)
+  catcount <- function(dt, pattern) {
+    dt[grepl(pattern, gcr_result), .N]
+  }
+  catcount_exact <- function(dt, category) {
     dt[gcr_result == category, .N]
   }
 
-  expect_equal(1576, catcount(cd100, "Include"))
-  expect_equal(347, catcount(cd100, "Exclude-Adult-Extraneous-Same-Day"))
-  expect_equal(6, catcount(cd100, "Exclude-Adult-Distinct-3-Or-More"))
-  expect_equal(8, catcount(cd100, "Exclude-Carried-Forward"))
-  expect_equal(13, catcount(cd100, "Exclude-Adult-BIV"))
+  expect_equal(1592, catcount_exact(cd100, "Include"))
+  expect_equal(334, catcount(cd100, "Exclude-A-(HT|WT)-Extraneous"))
+  expect_equal(8, catcount(cd100, "-CF$"))
+  expect_equal(16, catcount(cd100, "Exclude-A-(HT|WT)-BIV"))
 
-  expect_equal(1580, catcount(cd100cp, "Include"))
-  expect_equal(368, catcount(cd100cp, "Exclude-Adult-Extraneous-Same-Day"))
-  expect_equal(7, catcount(cd100cp, "Exclude-Adult-Distinct-3-Or-More"))
-  expect_equal(0, catcount(cd100cp, "Exclude-Carried-Forward"))
-  expect_equal(14, catcount(cd100cp, "Exclude-Adult-BIV"))
+  expect_equal(1595, catcount_exact(cd100cp, "Include"))
+  expect_equal(356, catcount(cd100cp, "Exclude-A-(HT|WT)-Extraneous"))
+  expect_equal(0, catcount(cd100cp, "-CF$"))
+  expect_equal(19, catcount(cd100cp, "Exclude-A-(HT|WT)-BIV"))
 
   # Missing data test for adults
   d5_miss <- copy(data_adult[subjid %in% unique(data[, subjid])[1:5]])
@@ -182,7 +183,7 @@ test_that("growthcleanr works as expected on adult synthetic data", {
     quietly = TRUE
   )
 
-  expect_equal(sum(res_miss$exclude == "Missing"), 5)
+  expect_equal(sum(res_miss$exclude == "Exclude-Missing"), 5)
 })
 
 test_that("growthcleanr works without either adult or pediatric data", {

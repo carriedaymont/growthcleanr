@@ -930,8 +930,8 @@ evil_twins <- function(w_subj_df, wtallow_formula = "piecewise") {
 #'
 #' @param subj_df Data frame with age_days, meas_m, id columns (pre-sorted)
 #' @param wtallow_formula Formula for ET cap computation
-#' @param exc_label Base label for exclusion codes. Round number is appended.
-#' @return Named character vector: id -> "<exc_label>-N" for excluded values
+#' @param exc_label Exclusion code label assigned to excluded values.
+#' @return Named character vector: id -> exc_label for excluded values
 #' @keywords internal
 remove_ewma_wt <- function(subj_df, wtallow_formula = "piecewise",
                            exc_label = "Exclude-A-WT-Traj-Ext",
@@ -995,7 +995,7 @@ remove_ewma_wt <- function(subj_df, wtallow_formula = "piecewise",
       to_rem <- cand_idx[ord[1]]
 
       rem_ids <- c(rem_ids, as.character(subj_df$internal_id[to_rem]))
-      round_codes <- c(round_codes, paste0(exc_label, "-", round_num))
+      round_codes <- c(round_codes, exc_label)
       subj_df <- subj_df[-to_rem, ]
       round_num <- round_num + 1
 
@@ -1282,7 +1282,7 @@ remove_mod_ewma_wt <- function(full_inc_df, exc_label = "Exclude-A-WT-Traj-Moder
     # Error load: all excluded immediately
     el_ids <- ids[error_load]
     if (length(el_ids) > 0) {
-      el_code <- paste0(exc_label, "-Error-Load-", round_num)
+      el_code <- paste0(exc_label, "-Error-Load")
       exclusions[el_ids] <- el_code
     }
 
@@ -1332,8 +1332,7 @@ remove_mod_ewma_wt <- function(full_inc_df, exc_label = "Exclude-A-WT-Traj-Moder
                  as.numeric(ids[cand_idx]))
     best_idx <- cand_idx[ord[1]]
 
-    exc_code <- paste0(exc_label, "-", round_num)
-    exclusions[ids[best_idx]] <- exc_code
+    exclusions[ids[best_idx]] <- exc_label
 
     # Remove excluded + error load
     to_remove <- error_load
@@ -1550,7 +1549,7 @@ eval_error_load <- function(subj_results, error_threshold = 0.41) {
                         "Exclude-A-WT-Scale-Max",
                         "Exclude-A-WT-Scale-Max-Identical",
                         "Exclude-A-WT-Scale-Max-RV-Propagated",
-                        "Exclude-A-Evil-Twins")
+                        "Exclude-A-WT-Evil-Twins")
 
     # EWMA-RV-propagated codes don't count as errors (same underlying error as source).
     # Scale-Max-RV-propagated DOES count (matches Stata "RV 400" behavior).

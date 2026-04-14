@@ -362,7 +362,7 @@ test_that("evil twins detected for implausibly large weight change", {
   )
   out <- run_clean(df)
   # The 165kg value should be excluded as evil twin (most deviant from median)
-  expect_equal(res(out, 2), "Exclude-A-Evil-Twins")
+  expect_equal(res(out, 2), "Exclude-A-WT-Evil-Twins")
 })
 
 test_that("evil twins not triggered when weight range <= cap", {
@@ -375,7 +375,7 @@ test_that("evil twins not triggered when weight range <= cap", {
   )
   out <- run_clean(df)
   # Should NOT be evil twins
-  expect_true(res(out, 2) != "Exclude-A-Evil-Twins")
+  expect_true(res(out, 2) != "Exclude-A-WT-Evil-Twins")
 })
 
 test_that("evil twins: dynamic while loop resolves more than 3 OOB pairs", {
@@ -396,8 +396,8 @@ test_that("evil twins: dynamic while loop resolves more than 3 OOB pairs", {
   )
   out <- run_clean(df)
   # All four 220-kg values should be excluded as evil twins
-  expect_equal(sum(out$result == "Exclude-A-Evil-Twins"), 4)
-  expect_equal(res(out, 8), "Exclude-A-Evil-Twins")  # 4th pair — only caught by while loop
+  expect_equal(sum(out$result == "Exclude-A-WT-Evil-Twins"), 4)
+  expect_equal(res(out, 8), "Exclude-A-WT-Evil-Twins")  # 4th pair — only caught by while loop
 })
 
 
@@ -759,8 +759,8 @@ test_that("full test dataset passes 1220/1220", {
       "Exclude-Adult-Scale-Max-Identical" = "Exclude-A-WT-Scale-Max-Identical",
       "RV 400" = "Exclude-A-WT-Scale-Max",
       "Exclude-Adult-Scale-Max-RV-propagated" = "Exclude-A-WT-Scale-Max-RV-Propagated",
-      "Evil twins" = "Exclude-A-Evil-Twins",
-      "Exclude-Adult-Evil-Twins" = "Exclude-A-Evil-Twins",
+      "Evil twins" = "Exclude-A-WT-Evil-Twins",
+      "Exclude-Adult-Evil-Twins" = "Exclude-A-WT-Evil-Twins",
       "Same-day-identical" = "Exclude-A-WT-Identical",
       "Exclude-Adult-Identical-Same-Day" = "Exclude-A-WT-Identical",
       "Same-day-extraneous" = "Exclude-A-WT-Extraneous",
@@ -799,28 +799,28 @@ test_that("full test dataset passes 1220/1220", {
     for (s in names(mapping)) {
       result[code == s] <- mapping[s]
     }
-    # Regex for old EWMA round codes → new Traj format
+    # Regex for old EWMA round codes → new Traj format (round number stripped)
     result <- sub(
-      "^Exclude-Adult-EWMA-Extreme round (\\d+)$",
-      "Exclude-A-WT-Traj-Ext-\\1", result)
+      "^Exclude-Adult-EWMA-Extreme round \\d+$",
+      "Exclude-A-WT-Traj-Ext", result)
     result <- sub(
-      "^Exclude-Adult-EWMA-Extreme-firstRV round (\\d+)$",
-      "Exclude-A-WT-Traj-Extreme-firstRV-\\1", result)
+      "^Exclude-Adult-EWMA-Extreme-firstRV round \\d+$",
+      "Exclude-A-WT-Traj-Extreme-firstRV", result)
     result <- sub(
-      "^Exclude-Adult-EWMA-Extreme-allRV round (\\d+)$",
-      "Exclude-A-WT-Traj-Extreme-allRV-\\1", result)
+      "^Exclude-Adult-EWMA-Extreme-allRV round \\d+$",
+      "Exclude-A-WT-Traj-Extreme-allRV", result)
     result <- sub(
-      "^Exclude-Adult-EWMA-Moderate round (\\d+)$",
-      "Exclude-A-WT-Traj-Moderate-\\1", result)
+      "^Exclude-Adult-EWMA-Moderate round \\d+$",
+      "Exclude-A-WT-Traj-Moderate", result)
     result <- sub(
-      "^Exclude-Adult-EWMA-Moderate-allRV round (\\d+)$",
-      "Exclude-A-WT-Traj-Moderate-allRV-\\1", result)
+      "^Exclude-Adult-EWMA-Moderate-allRV round \\d+$",
+      "Exclude-A-WT-Traj-Moderate-allRV", result)
     result <- sub(
-      "^Exclude-Adult-EWMA-Moderate-Error-Load round (\\d+)$",
-      "Exclude-A-WT-Traj-Moderate-Error-Load-\\1", result)
+      "^Exclude-Adult-EWMA-Moderate-Error-Load round \\d+$",
+      "Exclude-A-WT-Traj-Moderate-Error-Load", result)
     result <- sub(
-      "^Exclude-Adult-EWMA-Moderate-Error-Load-RV round (\\d+)$",
-      "Exclude-A-WT-Traj-Moderate-Error-Load-RV-\\1", result)
+      "^Exclude-Adult-EWMA-Moderate-Error-Load-RV round \\d+$",
+      "Exclude-A-WT-Traj-Moderate-Error-Load-RV", result)
     result
   }
 

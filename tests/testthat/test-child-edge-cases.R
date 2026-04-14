@@ -115,7 +115,7 @@ test_that("child algorithm handles all-NA measurements", {
   ))
 
   expect_equal(nrow(res), 4)
-  expect_true(all(res$exclude == "Missing"))
+  expect_true(all(res$exclude == "Exclude-Missing"))
 })
 
 # ---------------------------------------------------------------------------
@@ -147,10 +147,10 @@ test_that("child algorithm handles mix of NA and valid measurements", {
 
   expect_equal(nrow(res), nrow(d_half))
   # All NA rows should be Missing
-  expect_true(all(res[id %in% na_ids]$exclude == "Missing"))
+  expect_true(all(res[id %in% na_ids]$exclude == "Exclude-Missing"))
   # Non-NA rows should NOT be Missing
   non_na_ids <- d_half$id[!seq_len(nrow(d_half)) %in% na_rows]
-  expect_false(any(res[id %in% non_na_ids]$exclude == "Missing"))
+  expect_false(any(res[id %in% non_na_ids]$exclude == "Exclude-Missing"))
 })
 
 # ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ test_that("child algorithm marks same-day identical measurements", {
   )
 
   # Should have SDE-Identical exclusions for the duplicates
-  n_sde_identical <- sum(res$exclude == "Exclude-SDE-Identical")
+  n_sde_identical <- sum(grepl("Identical", res$exclude))
   expect_gt(n_sde_identical, 0,
             label = "Same-day identical values should get SDE-Identical")
 })
@@ -211,7 +211,7 @@ test_that("child algorithm marks negative agedays as Missing", {
   expect_equal(nrow(res), 4)
   # Negative agedays should be Missing
   neg_rows <- res[agedays < 0]
-  expect_true(all(neg_rows$exclude == "Missing"))
+  expect_true(all(neg_rows$exclude == "Exclude-Missing"))
 })
 
 # ---------------------------------------------------------------------------
@@ -252,15 +252,15 @@ test_that("child algorithm excludes HEADCM > 3 years from cleaning", {
 
   expect_equal(nrow(res), nrow(combined))
 
-  # HEADCM under 3 years should NOT be "Not cleaned"
+  # HEADCM under 3 years should NOT be "Exclude-Not-Cleaned"
   hc_young_res <- res[id %in% hc_young$id]
   if (nrow(hc_young_res) > 0) {
-    expect_false(any(hc_young_res$exclude == "Not cleaned"),
+    expect_false(any(hc_young_res$exclude == "Exclude-Not-Cleaned"),
                  info = "HC under 3 years should not be 'Not cleaned'")
   }
 
   # HEADCM over 3 years should be excluded from cleaning
-  # (marked "Not cleaned" or equivalent exclusion)
+  # (marked "Exclude-Not-Cleaned" or equivalent exclusion)
   hc_old_res <- res[id %in% hc_old$id]
   if (nrow(hc_old_res) > 0) {
     expect_true(all(hc_old_res$exclude != "Include"),
@@ -372,7 +372,7 @@ test_that("child algorithm detects carried-forward values", {
   )
 
   # Some of the repeated weights should be flagged as CF
-  n_cf <- sum(grepl("Carried-Forward|CF-deltaZ", res$exclude))
+  n_cf <- sum(grepl("-CF$|-CF-deltaZ", res$exclude))
   expect_gt(n_cf, 0, label = "Obvious carry-forwards should be detected")
 })
 

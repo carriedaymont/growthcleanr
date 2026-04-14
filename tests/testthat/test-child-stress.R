@@ -121,36 +121,31 @@ test_that("stress test: exclusion category counts match expected", {
   # algorithm intentionally changes. Run the test once with new code,
   # read the printed counts, and update here.
   #
-  # Frozen counts — updated 2026-04-13 after error.load.threshold fix
-  # (2026-04-12: hardcoded 0.4 → configurable 0.5, reducing error-load
-  # exclusions) and internal_id character type change.
-  # (10 error types including rounding)
+  # Frozen counts — updated 2026-04-14 after exclusion code rename
+  # to param-specific format (Exclude-C-{WT|HT|HC}-{Reason}).
   # Update these when algorithm intentionally changes.
   expect_equal(catcount("Include"), 29194)
-  expect_equal(catcount("Exclude-SDE-EWMA"), 825)
-  expect_equal(catcount("Exclude-Evil-Twins"), 734)
-  expect_equal(catcount("Exclude-EWMA2-middle"), 543)
-  expect_equal(catcount("Exclude-Error-load"), 401)
-  expect_equal(catcount("Exclude-Carried-Forward"), 378)
-  expect_equal(catcount("Exclude-Standardized-BIV"), 354)
-  expect_equal(catcount("Exclude-Absolute-BIV"), 252)
-  expect_equal(catcount("Exclude-Min-diff"), 155)
-  expect_equal(catcount("Exclude-SDE-All-Extreme"), 104)
-  expect_equal(catcount("Exclude-EWMA1-Extreme"), 58)
-  expect_equal(catcount("Exclude-EWMA2-first"), 33)
-  expect_equal(catcount("Exclude-SDE-Identical"), 31)
-  expect_equal(catcount("Exclude-EWMA2-last"), 27)
-  expect_equal(catcount("Exclude-EWMA2-birth-HT-HC"), 4)
-  expect_equal(catcount("Exclude-EWMA2-birth-WT"), 2)
-  expect_equal(catcount("Exclude-EWMA2-last-high"), 2)
-  expect_equal(catcount("Exclude-EWMA2-last-ext"), 1)
-  expect_equal(catcount("Missing"), 1)
-  expect_equal(catcount("Exclude-EWMA2-first-ext"), 1)
-  expect_equal(catcount("Exclude-Max-diff"), 1)
+  expect_equal(catcount("Exclude-C-HT-Evil-Twins"), 630)
+  expect_equal(catcount("Exclude-C-WT-Extraneous"), 617)
+  expect_equal(catcount("Exclude-C-HT-BIV"), 545)
+  expect_equal(catcount("Exclude-C-HT-Too-Many-Errors"), 401)
+  expect_equal(catcount("Exclude-C-HT-Traj"), 360)
+  expect_equal(catcount("Exclude-C-HT-Extraneous"), 312)
+  expect_equal(catcount("Exclude-C-WT-Traj"), 253)
+  expect_equal(catcount("Exclude-C-HT-CF"), 209)
+  expect_equal(catcount("Exclude-C-WT-CF"), 169)
+  expect_equal(catcount("Exclude-C-HT-Abs-Diff"), 156)
+  expect_equal(catcount("Exclude-C-WT-Evil-Twins"), 104)
+  expect_equal(catcount("Exclude-C-WT-BIV"), 61)
+  expect_equal(catcount("Exclude-C-HT-Traj-Extreme"), 39)
+  expect_equal(catcount("Exclude-C-WT-Traj-Extreme"), 19)
+  expect_equal(catcount("Exclude-C-HT-Identical"), 17)
+  expect_equal(catcount("Exclude-C-WT-Identical"), 14)
+  expect_equal(catcount("Exclude-Missing"), 1)
 
-  # 21 distinct categories present
+  # 18 distinct categories present
   expect_equal(
-    length(unique(as.character(res$exclude))), 21
+    length(unique(as.character(res$exclude))), 18
   )
 })
 

@@ -109,7 +109,7 @@ Find the corresponding code in the main algorithm file and any support functions
 - **Adult:** The main loop in `adult_clean.R` dispatches to support functions in
   `adult_support.R`.
 - **Child:** Everything is in `child_clean.R` — both the main algorithm
-  (`cleanbatch_child()`) and all support functions (`valid()`,
+  (`cleanchild()`) and all support functions (`valid()`,
   `temporary_extraneous_infants()`, `calc_otl_evil_twins()`,
   `calc_and_recenter_z_scores()`, `ewma()`, etc.).
 

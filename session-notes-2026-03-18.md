@@ -22,7 +22,7 @@ Code file: `R/child_clean.R` (VERSION: 2026-01-09)
 - **Location:** Lines 411–1612 of `child_clean.R`
 - **Description:** There are TWO batching systems layered on top of each other:
   - **Outer wrapper (colleague's):** Lines 411–420 create batches of 2000 subjects. The for-loop at line 424 iterates over these batches. Lines 428–438 correctly filter `data.all` and `data.adult` to only the current batch's subjects.
-  - **Original batching (pre-existing):** Lines 443–444 split ALL data by age cutpoint (ignoring the wrapper's batch filter). Then lines 616–623 create a SECOND batching system using `sample(num.batches, ...)` and assign a `batch` column. Lines 1333–1431 dispatch to `cleanbatch_child()` using either direct call (num.batches==1) or `ddply` by batch.
+  - **Original batching (pre-existing):** Lines 443–444 split ALL data by age cutpoint (ignoring the wrapper's batch filter). Then lines 616–623 create a SECOND batching system using `sample(num.batches, ...)` and assign a `batch` column. Lines 1333–1431 dispatch to `cleanchild()` using either direct call (num.batches==1) or `ddply` by batch.
 - **Problem:** Lines 443–444 overwrite the wrapper's batch-filtered `data.all`/`data.adult` with the full dataset. So every iteration of the outer loop processes ALL subjects.
 - **Net effect:** Results are likely correct (deduplication at line 1590 via `match()`), but runtime scales as N_outer_batches × full_dataset_time.
 - **Fix:** Need to decide which batching system to keep. See detailed analysis below.
@@ -119,12 +119,12 @@ Line 1617:    return(all_results)
 ```
 Lines 616–623:   Assign random batch numbers to subjects in data.all
                  (using num.batches, which = 1 when parallel = FALSE)
-Lines 1333–1431: Dispatch to cleanbatch_child():
+Lines 1333–1431: Dispatch to cleanchild():
                    num.batches == 1: direct call on full data.all
-                   num.batches > 1:  ddply(data.all, .(batch), cleanbatch_child, .parallel=TRUE)
+                   num.batches > 1:  ddply(data.all, .(batch), cleanchild, .parallel=TRUE)
 ```
 In our case (parallel = FALSE), num.batches = 1, so the inner
-batching is a no-op: all subjects go to one cleanbatch_child() call.
+batching is a no-op: all subjects go to one cleanchild() call.
 
 ### The overwrite problem (lines 443–444)
 

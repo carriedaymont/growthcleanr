@@ -98,21 +98,23 @@ test_that("child algorithm: exclusion counts match expected on 100 subjects", {
   }
 
   # Frozen expected counts (100 subjects, 832 rows, sd.recenter = "NHANES")
+  # Updated for param-specific exclusion code rename (2026-04-14)
   expect_equal(nrow(res), 832)
   expect_equal(catcount("Include"), 599)
-  expect_equal(catcount("Exclude-SDE-EWMA"), 127)
-  expect_equal(catcount("Exclude-Carried-Forward"), 75)
-  expect_equal(catcount("Exclude-SDE-Identical"), 13)
-  expect_equal(catcount("Exclude-SDE-All-Extreme"), 6)
-  expect_equal(catcount("Exclude-EWMA2-middle"), 3)
-  expect_equal(catcount("Exclude-Absolute-BIV"), 3)
-  expect_equal(catcount("Exclude-Min-diff"), 3)
-  expect_equal(catcount("Exclude-Standardized-BIV"), 2)
-  expect_equal(catcount("Exclude-Evil-Twins"), 1)
+  expect_equal(catcount("Exclude-C-HT-Extraneous"), 67)
+  expect_equal(catcount("Exclude-C-WT-Extraneous"), 66)
+  expect_equal(catcount("Exclude-C-WT-CF"), 43)
+  expect_equal(catcount("Exclude-C-HT-CF"), 32)
+  expect_equal(catcount("Exclude-C-WT-Identical"), 8)
+  expect_equal(catcount("Exclude-C-HT-BIV"), 5)
+  expect_equal(catcount("Exclude-C-HT-Identical"), 5)
+  expect_equal(catcount("Exclude-C-HT-Abs-Diff"), 3)
+  expect_equal(catcount("Exclude-C-WT-Traj"), 2)
+  expect_equal(catcount("Exclude-C-HT-Traj"), 1)
+  expect_equal(catcount("Exclude-C-WT-Evil-Twins"), 1)
 
-  # Exactly 10 distinct categories present (Error-load no longer triggers
-  # at default threshold=0.5; previously triggered at hardcoded 0.4)
-  expect_equal(length(unique(as.character(res$exclude))), 10)
+  # Exactly 12 distinct categories present
+  expect_equal(length(unique(as.character(res$exclude))), 12)
 })
 
 # ---------------------------------------------------------------------------
@@ -131,37 +133,37 @@ test_that("child algorithm: spot-check individual records", {
   # Include — normal measurement
   expect_equal(gcr_result(res, 23751), "Include")
 
-  # Exclude-SDE-EWMA — same-day extraneous based on EWMA
-  expect_equal(gcr_result(res, 23755), "Exclude-SDE-EWMA")
+  # Exclude-C-HT-Extraneous — same-day extraneous (HEIGHTCM)
+  expect_equal(gcr_result(res, 23755), "Exclude-C-HT-Extraneous")
 
-  # Exclude-Carried-Forward — repeated value from prior visit
-  expect_equal(gcr_result(res, 3), "Exclude-Carried-Forward")
-  expect_equal(gcr_result(res, 4), "Exclude-Carried-Forward")
+  # Exclude-C-{param}-CF — carried forward (repeated value from prior visit)
+  expect_equal(gcr_result(res, 3), "Exclude-C-HT-CF")
+  expect_equal(gcr_result(res, 4), "Exclude-C-WT-CF")
 
-  # Exclude-SDE-Identical — same-day identical value
-  expect_equal(gcr_result(res, 67275), "Exclude-SDE-Identical")
+  # Exclude-C-WT-Identical — same-day identical value (WEIGHTKG)
+  expect_equal(gcr_result(res, 67275), "Exclude-C-WT-Identical")
 
-  # Exclude-SDE-All-Extreme — all same-day values are extreme
-  expect_equal(gcr_result(res, 40091), "Exclude-SDE-All-Extreme")
+  # Exclude-C-HT-Extraneous — same-day extraneous (HEIGHTCM)
+  expect_equal(gcr_result(res, 40091), "Exclude-C-HT-Extraneous")
 
-  # Exclude-Absolute-BIV — biologically implausible value (313.6 cm at 434 days)
-  expect_equal(gcr_result(res, 40108), "Exclude-Absolute-BIV")
+  # Exclude-C-HT-BIV — biologically implausible value (313.6 cm at 434 days)
+  expect_equal(gcr_result(res, 40108), "Exclude-C-HT-BIV")
 
-  # Exclude-EWMA2-middle — EWMA pass 2 middle exclusion
-  expect_equal(gcr_result(res, 7), "Exclude-EWMA2-middle")
+  # Exclude-C-WT-Traj — EWMA pass 2 middle exclusion (WEIGHTKG)
+  expect_equal(gcr_result(res, 7), "Exclude-C-WT-Traj")
 
-  # Exclude-Min-diff — minimum height difference violation
-  expect_equal(gcr_result(res, 38718), "Exclude-Min-diff")
+  # Exclude-C-HT-Abs-Diff — height difference violation
+  expect_equal(gcr_result(res, 38718), "Exclude-C-HT-Abs-Diff")
 
   # ID 25251 was Exclude-Error-load when threshold was hardcoded at 0.4;
   # now Include at default threshold=0.5
   expect_equal(gcr_result(res, 25251), "Include")
 
-  # Exclude-Standardized-BIV — standardized biologically implausible
-  expect_equal(gcr_result(res, 25257), "Exclude-Standardized-BIV")
+  # Exclude-C-HT-BIV — standardized biologically implausible (HEIGHTCM)
+  expect_equal(gcr_result(res, 25257), "Exclude-C-HT-BIV")
 
-  # Exclude-Evil-Twins — evil twin detection (OTL in algorithm)
-  expect_equal(gcr_result(res, 25258), "Exclude-Evil-Twins")
+  # Exclude-C-WT-Evil-Twins — evil twin detection (WEIGHTKG)
+  expect_equal(gcr_result(res, 25258), "Exclude-C-WT-Evil-Twins")
 })
 
 # ---------------------------------------------------------------------------
@@ -178,13 +180,13 @@ test_that("child algorithm: within-subject exclusions stable at 50 vs 100 subjec
   # Records that exist in both 50- and 100-subject subsets
   # These within-subject results should be identical
   stable_ids <- c(
-    3,      # CF
-    4,      # CF
-    67275,  # SDE-Identical
-    40108,  # Absolute-BIV
-    40091,  # SDE-All-Extreme
+    3,      # CF (Exclude-C-HT-CF)
+    4,      # CF (Exclude-C-WT-CF)
+    67275,  # Identical (Exclude-C-WT-Identical)
+    40108,  # BIV (Exclude-C-HT-BIV)
+    40091,  # Extraneous (Exclude-C-HT-Extraneous)
     23751,  # Include
-    23755   # SDE-EWMA
+    23755   # Extraneous (Exclude-C-HT-Extraneous)
   )
 
   for (sid in stable_ids) {
@@ -229,7 +231,7 @@ test_that("child algorithm: missing measurements return Missing", {
   ))
 
   # Count of "Missing" should equal number of NA measurements
-  n_missing_result <- sum(res$exclude == "Missing")
+  n_missing_result <- sum(res$exclude == "Exclude-Missing")
   expect_equal(n_missing_result, length(missing_ids),
                info = "Count of Missing results should match count of NA measurements")
 
@@ -240,7 +242,7 @@ test_that("child algorithm: missing measurements return Missing", {
 
   # Non-missing rows should NOT be "Missing"
   non_missing <- res[!id %in% missing_ids]
-  expect_false(any(as.character(non_missing$exclude) == "Missing"))
+  expect_false(any(as.character(non_missing$exclude) == "Exclude-Missing"))
 })
 
 # ---------------------------------------------------------------------------

@@ -82,8 +82,8 @@ test_that("include.carryforward = TRUE keeps CFs, FALSE excludes them", {
   out_keep_cf <- run_child_subset(50, include.carryforward = TRUE)
   out_excl_cf <- run_child_subset(50, include.carryforward = FALSE)
 
-  n_cf_kept <- sum(grepl("Carried-Forward|CF-deltaZ", out_keep_cf$result$exclude))
-  n_cf_excl <- sum(grepl("Carried-Forward|CF-deltaZ", out_excl_cf$result$exclude))
+  n_cf_kept <- sum(grepl("-CF$|-CF-deltaZ", out_keep_cf$result$exclude))
+  n_cf_excl <- sum(grepl("-CF$|-CF-deltaZ", out_excl_cf$result$exclude))
 
   # include.carryforward = TRUE: CFs are kept as Include, so 0 CF exclusion codes
   expect_equal(n_cf_kept, 0,
@@ -152,18 +152,8 @@ test_that("error load parameters affect error-load exclusions", {
 # ---------------------------------------------------------------------------
 # Test 7: lt3.exclude.mode controls handling of subjects with < 3 measurements
 # ---------------------------------------------------------------------------
-test_that("lt3.exclude.mode parameter is accepted", {
-
-  # Default behavior
-  out_default <- run_child_subset(50, lt3.exclude.mode = "default")
-  # Flag only (don't exclude)
-  out_flag <- run_child_subset(50, lt3.exclude.mode = "flag.only")
-
-  # Both should complete without error and have same row counts
-  expect_equal(nrow(out_default$result), nrow(out_flag$result))
-  expect_false(any(is.na(out_default$result$exclude)))
-  expect_false(any(is.na(out_flag$result$exclude)))
-})
+# lt3.exclude.mode test removed — parameter was removed from cleangrowth()
+# (walkthrough-todo-2026-04-13, D6)
 
 # ---------------------------------------------------------------------------
 # Test 8: recover.unit.error parameter
@@ -211,7 +201,7 @@ test_that("imperial units (HEIGHTIN, WEIGHTLBS) are converted and processed", {
 
   # All rows processed (none dropped as Missing due to unrecognized param)
   expect_equal(nrow(res_imp), nrow(d_imp))
-  expect_equal(sum(res_imp$exclude == "Missing"), 0,
+  expect_equal(sum(res_imp$exclude == "Exclude-Missing"), 0,
                info = "No Missing codes should appear for valid imperial measurements")
 
   # Some should be Include
@@ -244,5 +234,5 @@ test_that("LENGTHCM param is accepted and processed", {
 
   expect_equal(nrow(res), nrow(d_len))
   # No Missing from unrecognized params
-  expect_equal(sum(res$exclude == "Missing"), 0)
+  expect_equal(sum(res$exclude == "Exclude-Missing"), 0)
 })

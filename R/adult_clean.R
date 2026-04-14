@@ -465,7 +465,7 @@ cleanadult <- function(df,
           (max(et_df$meas_m) - min(et_df$meas_m)) > (min_et_cap + 0.12)) {
         et_exc_ids <- evil_twins(et_df, wtallow_formula = wtallow_formula)
         if (length(et_exc_ids) > 0) {
-          w_subj_keep[et_exc_ids] <- "Exclude-A-Evil-Twins"
+          w_subj_keep[et_exc_ids] <- "Exclude-A-WT-Evil-Twins"
           w_subj_df <- w_subj_df[!w_subj_df$internal_id %in% et_exc_ids, ]
           if (nrow(w_subj_df) > 0) {
             w_subj_df <- identify_rv(w_subj_df)
@@ -1161,10 +1161,8 @@ cleanadult <- function(df,
               rv_of_el <- rv_of_el[w_subj_keep[rv_of_el] == "Include"]
 
               if (length(rv_of_el) > 0) {
-                el_round <- sub(".*-(\\d+)$", "\\1", el_codes[1])
-                el_rv_code <- paste0("Exclude-A-WT-Traj-Moderate-Error-Load-RV-", el_round)
                 remaining_inc <- names(w_subj_keep)[w_subj_keep == "Include"]
-                w_subj_keep[remaining_inc] <- el_rv_code
+                w_subj_keep[remaining_inc] <- "Exclude-A-WT-Traj-Moderate-Error-Load-RV"
               }
             }
 
