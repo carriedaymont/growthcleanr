@@ -98,12 +98,12 @@ test_that("child algorithm: exclusion counts match expected on 100 subjects", {
   }
 
   # Frozen expected counts (100 subjects, 832 rows, sd.recenter = "NHANES")
-  # Updated for param-specific exclusion code rename (2026-04-14)
+  # Updated for CF rescue lookup thresholds (2026-04-14): WT-CF 43→30, Include 599→612
   expect_equal(nrow(res), 832)
-  expect_equal(catcount("Include"), 599)
+  expect_equal(catcount("Include"), 612)
   expect_equal(catcount("Exclude-C-HT-Extraneous"), 67)
   expect_equal(catcount("Exclude-C-WT-Extraneous"), 66)
-  expect_equal(catcount("Exclude-C-WT-CF"), 43)
+  expect_equal(catcount("Exclude-C-WT-CF"), 30)
   expect_equal(catcount("Exclude-C-HT-CF"), 32)
   expect_equal(catcount("Exclude-C-WT-Identical"), 8)
   expect_equal(catcount("Exclude-C-HT-BIV"), 5)

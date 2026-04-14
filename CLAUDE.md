@@ -221,17 +221,30 @@ NAs in factor output).
 were NOT renamed — the legacy algorithm retains the old code names
 for backward compatibility.
 
-### CF rescue reason codes (cf_rescued column)
+### CF rescue
+
+**Parameter:** `cf_rescue = c("standard", "none", "all")`
+- `"standard"` (default): age/interval/param-specific lookup thresholds
+- `"none"`: no rescue (all CFs excluded)
+- `"all"`: all CFs rescued (no CF exclusions)
+
+**cf_rescued column values:**
 
 | Code | Meaning |
 |------|---------|
 | `""` | Not CF, or CF not rescued |
-| `1 CF deltaZ <0.05` | Single CF, z-score diff < 0.05 |
-| `1 CF deltaZ <0.1 wholehalfimp` | Single CF, diff < 0.1, imperial |
-| `Teen 2 plus CF deltaZ <0.05` | ≥2 CFs, teen, diff < 0.05 |
-| `Teen 2 plus CF deltaZ <0.1 wholehalfimp` | ≥2 CFs, teen, diff < 0.1, imperial |
+| `"Rescued"` | CF rescued by lookup threshold (standard mode) |
+| `"Rescued-All"` | CF rescued because cf_rescue="all" |
 
-CF rescue thresholds may be tuned in future updates.
+**Optional cf_detail columns** (enabled by `cf_detail = TRUE`):
+- `cf_status`: NA (not CF candidate), "CF-NR" (excluded), or "CF-Resc" (rescued)
+- `cf_deltaZ`: absolute z-score difference from originator
+
+CF rescue thresholds are defined in `cf-rescue-thresholds.md` —
+lookup tables by age bin × interval bin × param × rounding type.
+Three levels (0.05 / 0.20 / 0.40) plus NR (no rescue).
+Derived from 100K synthetic tracker population; full methodology
+in `__Pipeline/CF-exploration/cf-threshold-schemes.md`.
 
 ---
 
@@ -414,7 +427,9 @@ Default: `"looser"`
 | `error.load.mincount` | 2 | Step 21 | Min exclusions before evaluating error load |
 | `error.load.threshold` | 0.5 | Step 21 | Error ratio above this excludes all |
 | `sd.recenter` | NA | Recentering | Child always uses fixed file |
-| `include.carryforward` | FALSE | Step 6 | If TRUE, skip CF detection entirely |
+| `include.carryforward` | FALSE | Step 6 | **Deprecated** — use `cf_rescue` instead. If TRUE, skip CF detection entirely |
+| `cf_rescue` | `"standard"` | Step 6 | CF rescue mode: `"standard"` (age/interval/param-specific lookup), `"none"` (all CFs excluded), `"all"` (all CFs rescued) |
+| `cf_detail` | FALSE | Step 6 | If TRUE, add `cf_status` and `cf_deltaZ` columns to output |
 | `ewma.exp` | -1.5 | EWMA steps | Exponent for EWMA weighting |
 | `ewma_window` | 15 | EWMA steps | Max observations on each side for EWMA |
 | `adult_cutpoint` | 20 | Preprocessing | Age (years) dividing pediatric/adult |
@@ -661,6 +676,20 @@ Rscript tests/test_harness.R [loosest|looser|tighter|tightest]
 **Deferred test gaps:** Error load with -5 exponent, weight
 scaling at permissiveness levels.
 
+**IMPORTANT: Reinstall before testing.** Tests load
+`library(growthcleanr)`, which uses the *installed* package,
+not source files. After any code changes, always reinstall
+before running tests:
+```r
+devtools::install_local("gc-github-latest",
+  force = TRUE, upgrade = "never")
+```
+Without this, tests run against stale installed code and
+results are misleading — tests may pass or fail for the
+wrong reasons. (`devtools::load_all()` loads source code
+in the current R session but does not affect fresh `Rscript`
+processes used by `testthat::test_file()`.)
+
 ### Runtime benchmarks
 
 | Dataset | Size | Sequential | Parallel 2 | Parallel 4 |
@@ -710,9 +739,16 @@ Requires installed package — see Known Issues. Run in background from Claude C
   `Exclude-Not-Cleaned`. `exclude.levels` updated to include
   all adult codes. Legacy codes in `pediatric_clean_legacy.R`
   were NOT renamed.
-- [ ] **CF rescue thresholds:** Current thresholds (0.05/0.1
-  with wholehalfimp, teen age cutoffs) may be tuned in
-  future updates.
+- [x] **CF rescue thresholds (2026-04-14):** Replaced fixed
+  thresholds (0.05/0.10 with wholehalfimp, teen age cutoffs)
+  with age/interval/param/rounding-specific lookup via
+  `.cf_rescue_lookup()`. Three levels: 0.05 (slow growth),
+  0.20 (moderate), 0.40 (fast growth), plus NR (no rescue).
+  No string-length or teen restriction. Three modes via
+  `cf_rescue` parameter: "standard" (lookup), "none", "all".
+  `include.carryforward` deprecated. Thresholds derived from
+  100K synthetic tracker population; methodology in
+  `__Pipeline/CF-exploration/cf-threshold-schemes.md`.
 - [ ] **LENGTHCM → HEIGHTCM:** No measurement adjustment for
   the ~0.5–0.7 cm supine/standing difference. Known
   limitation; future update planned.

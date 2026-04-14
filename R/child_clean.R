@@ -206,7 +206,22 @@
 #' @param sdrecentered.filename Legacy algorithm only. Name of file to save
 #' re-centered data to as CSV. Defaults to "", for which this data will not be
 #' saved. Ignored by the child algorithm.
-#' @param include.carryforward Determines whether Carry-Forward values are kept in the output. Defaults to False.
+#' @param include.carryforward Deprecated. Use \code{cf_rescue} instead.
+#'   \code{include.carryforward = TRUE} maps to \code{cf_rescue = "all"}.
+#'   \code{include.carryforward = FALSE} (old default) maps to \code{cf_rescue = "standard"}.
+#' @param cf_rescue CF rescue mode for the child algorithm. One of:
+#'   \describe{
+#'     \item{"standard"}{(Default) Use age/interval/param-specific lookup thresholds.
+#'       Identical-to-prior values are rescued (included) if |deltaZ| < threshold,
+#'       excluded as CF if |deltaZ| >= threshold. NR cells get no rescue (all excluded).}
+#'     \item{"none"}{No rescue. All identical-to-prior values are excluded as CF.}
+#'     \item{"all"}{All identical-to-prior values are rescued (no CF exclusions).}
+#'   }
+#' @param cf_detail Logical. If TRUE, include \code{cf_status} and \code{cf_deltaZ}
+#'   columns in the output. \code{cf_status} is one of: NA (not a CF candidate),
+#'   "CF-NR" (CF, does not meet rescue criteria), or "CF-Resc" (CF, meets rescue
+#'   criteria). \code{cf_deltaZ} is the absolute z-score difference used for rescue
+#'   evaluation. Defaults to FALSE.
 #' @param ewma.exp Exponent to use for weighting measurements in the
 #' exponentially weighted moving average calculations. Defaults to -1.5.
 #' This exponent should be negative in order to weight growth measurements
@@ -330,6 +345,8 @@ cleangrowth <- function(subjid,
                         sdmedian.filename = "",
                         sdrecentered.filename = "",
                         include.carryforward = FALSE,
+                        cf_rescue = "standard",
+                        cf_detail = FALSE,
                         ewma.exp = -1.5,
                         ref.data.path = "",
                         log.path = NA,
@@ -371,6 +388,22 @@ cleangrowth <- function(subjid,
     )
     adult_scale_max_lbs <- weight_cap
   }
+
+  # Handle include.carryforward deprecation → cf_rescue
+  # include.carryforward = TRUE means "keep CFs" = cf_rescue = "all"
+  # Only warn if user explicitly passed include.carryforward = TRUE
+  if (include.carryforward == TRUE) {
+    warning(
+      "The `include.carryforward` parameter is deprecated. ",
+      "Use `cf_rescue` instead. ",
+      "Mapping: include.carryforward = TRUE → cf_rescue = 'all'.",
+      call. = FALSE
+    )
+    cf_rescue <- "all"
+  }
+
+  # Validate cf_rescue
+  cf_rescue <- match.arg(cf_rescue, c("standard", "none", "all"))
 
   # Internal variable: TRUE means use child algorithm (new default)
   use_child_algorithm <- !use_legacy_algorithm
@@ -1470,6 +1503,8 @@ cleangrowth <- function(subjid,
           ewma.fields = ewma.fields,
           recover.unit.error = recover.unit.error,
           include.carryforward = include.carryforward,
+          cf_rescue = cf_rescue,
+          cf_detail = cf_detail,
           sd.extreme = sd.extreme,
           z.extreme = z.extreme,
           exclude.levels = exclude.levels,
@@ -1526,6 +1561,8 @@ cleangrowth <- function(subjid,
           ewma.fields = ewma.fields,
           recover.unit.error = recover.unit.error,
           include.carryforward = include.carryforward,
+          cf_rescue = cf_rescue,
+          cf_detail = cf_detail,
           sd.extreme = sd.extreme,
           z.extreme = z.extreme,
           exclude.levels = exclude.levels,
@@ -1711,6 +1748,12 @@ cleangrowth <- function(subjid,
       mean_ht = c(rep(NA_real_, nrow(ret.df)), adult_mean_ht),
       bin_result = c(rep(NA_character_, nrow(ret.df)), adult_bin_result)
     )
+
+    # Add cf_detail columns if present in child output
+    if (cf_detail && "cf_status" %in% names(ret.df)) {
+      full_out[, cf_status := c(as.character(ret.df$cf_status), rep(NA_character_, nrow(res)))]
+      full_out[, cf_deltaZ := c(ret.df$cf_deltaZ, rep(NA_real_, nrow(res)))]
+    }
 
     # preserve original exclude levels
     full_out[, exclude := factor(exclude, levels = exclude.levels)]
@@ -2850,6 +2893,113 @@ calc_and_recenter_z_scores <- function(df, cn, ref.data.path,
   return(df)
 }
 
+# CF rescue threshold lookup table
+# Returns the deltaZ threshold for CF rescue given age, interval, param, and rounding type.
+# Rescue if |deltaZ| < threshold; exclude if |deltaZ| >= threshold.
+# Returns 0 for NR (no rescue) cells and NA for impossible cells (--).
+# See cf-rescue-thresholds.md for full documentation.
+.cf_rescue_lookup <- function() {
+  # Build lookup table once; keyed for fast joins
+  # Age bins: agedays boundaries
+  age_breaks <- c(0, 91, 183, 366, 731, 1827, 3653, 5479, Inf)
+  age_labels <- c("0-3mo", "3-6mo", "6-12mo", "1-2y", "2-5y", "5-10y", "10-15y", "15-20y")
+  # Interval bins: interval_days boundaries
+  int_breaks <- c(1, 7, 30, 183, 365, Inf)
+  int_labels <- c("<1wk", "1wk-1mo", "1-6mo", "6mo-1y", ">1y")
+
+  # Threshold values: 0 = NR (no rescue), NA = impossible cell (--)
+  # Format: list of param -> type -> matrix[age_row, int_col]
+  #                           <1wk  1wk-1mo  1-6mo  6mo-1y  >1y
+  ht_other <- matrix(c(
+    0.40, 0.40,   NA,   NA,   NA,  # 0-3mo
+    0.20, 0.40,   NA,   NA,   NA,  # 3-6mo
+    0.05, 0.40, 0.00,   NA,   NA,  # 6-12mo
+    0.05, 0.40, 0.40,   NA,   NA,  # 1-2y
+    0.05, 0.20, 0.40,   NA,   NA,  # 2-5y
+    0.05, 0.05, 0.40, 0.40,   NA,  # 5-10y
+    0.05, 0.05, 0.20, 0.40, 0.00,  # 10-15y
+    0.05, 0.05, 0.05, 0.20, 0.20   # 15-20y
+  ), nrow = 8, ncol = 5, byrow = TRUE)
+
+  ht_imperial <- matrix(c(
+    NA,   NA,   NA,   NA,   NA,  # 0-3mo (not applicable)
+    NA,   NA,   NA,   NA,   NA,  # 3-6mo
+    NA,   NA,   NA,   NA,   NA,  # 6-12mo
+    NA,   NA,   NA,   NA,   NA,  # 1-2y
+    0.05, 0.20, 0.40, 0.40,   NA,  # 2-5y
+    0.05, 0.05, 0.40, 0.40,   NA,  # 5-10y
+    0.05, 0.05, 0.20, 0.40, 0.00,  # 10-15y
+    0.05, 0.05, 0.05, 0.20, 0.20   # 15-20y
+  ), nrow = 8, ncol = 5, byrow = TRUE)
+
+  wt_other <- matrix(c(
+    0.40, 0.40,   NA,   NA,   NA,  # 0-3mo
+    0.20, 0.40, 0.00,   NA,   NA,  # 3-6mo
+    0.05, 0.20, 0.00,   NA,   NA,  # 6-12mo
+    0.05, 0.20, 0.40,   NA,   NA,  # 1-2y
+    0.05, 0.05, 0.40, 0.40,   NA,  # 2-5y
+    0.05, 0.05, 0.20, 0.40,   NA,  # 5-10y
+    0.05, 0.05, 0.20, 0.40, 0.00,  # 10-15y
+    0.05, 0.05, 0.20, 0.20, 0.20   # 15-20y
+  ), nrow = 8, ncol = 5, byrow = TRUE)
+
+  wt_imperial <- matrix(c(
+    NA,   NA,   NA,   NA,   NA,  # 0-3mo
+    NA,   NA,   NA,   NA,   NA,  # 3-6mo
+    NA,   NA,   NA,   NA,   NA,  # 6-12mo
+    NA,   NA,   NA,   NA,   NA,  # 1-2y
+    0.05, 0.05, 0.40, 0.40,   NA,  # 2-5y
+    0.05, 0.05, 0.20, 0.40,   NA,  # 5-10y
+    0.05, 0.05, 0.20, 0.40, 0.00,  # 10-15y
+    0.05, 0.05, 0.20, 0.20, 0.20   # 15-20y
+  ), nrow = 8, ncol = 5, byrow = TRUE)
+
+  list(
+    age_breaks = age_breaks,
+    age_labels = age_labels,
+    int_breaks = int_breaks,
+    int_labels = int_labels,
+    tables = list(
+      HEIGHTCM = list(other = ht_other, imperial = ht_imperial),
+      HEADCM   = list(other = ht_other, imperial = ht_imperial),  # placeholder: use HT thresholds
+      WEIGHTKG = list(other = wt_other, imperial = wt_imperial)
+    )
+  )
+}
+
+# Vectorized CF threshold lookup: given vectors of agedays, interval_days, param, wholehalfimp,
+# returns a numeric vector of thresholds (0 = NR, NA = impossible cell)
+.cf_get_thresholds <- function(agedays, interval_days, param, wholehalfimp, lookup = NULL) {
+  if (is.null(lookup)) lookup <- .cf_rescue_lookup()
+
+  n <- length(agedays)
+  thresholds <- rep(NA_real_, n)
+
+  # Bin agedays
+  age_idx <- findInterval(agedays, lookup$age_breaks, rightmost.closed = TRUE)
+  # Bin interval_days
+  int_idx <- findInterval(interval_days, lookup$int_breaks, rightmost.closed = TRUE)
+
+  # Clamp to valid range
+
+  age_idx <- pmin(pmax(age_idx, 1L), length(lookup$age_labels))
+  int_idx <- pmin(pmax(int_idx, 1L), length(lookup$int_labels))
+
+  # Determine rounding type: imperial only applies at age > 2y (731+ days)
+  rtype <- ifelse(wholehalfimp & agedays >= 731, "imperial", "other")
+
+  # Look up each row
+  for (i in seq_len(n)) {
+    tbl <- lookup$tables[[param[i]]]
+    if (is.null(tbl)) next
+    mat <- tbl[[rtype[i]]]
+    if (is.null(mat)) next
+    thresholds[i] <- mat[age_idx[i], int_idx[i]]
+  }
+
+  thresholds
+}
+
 # Main pediatric growthcleanr function -- infants cleanbatch
 # internal supporting functions for pediatrics can be found in: infants_support.R
 # note
@@ -2877,6 +3027,8 @@ cleanchild <- function(data.df,
                                ewma.fields,
                                recover.unit.error,
                                include.carryforward,
+                               cf_rescue = "standard",
+                               cf_detail = FALSE,
                                sd.extreme,
                                z.extreme,
                                exclude.levels,
@@ -2908,7 +3060,7 @@ cleanchild <- function(data.df,
   whoagegrp.ht <- whoinc.1.ht <- whoinc.2.ht <- whoinc.3.ht <- whoinc.4.ht <- NULL
   whoinc.6.ht <- whoinc.age.ht <- z.orig <- NULL
 
-  cf_rescued <- NULL
+  cf_rescued <- cf_status <- cf_deltaZ <- cf_threshold <- NULL
   otl <- sd_med <- med_diff <- max_diff <- sum_otl <- i.exclude <- NULL
 
 
@@ -3018,7 +3170,10 @@ cleanchild <- function(data.df,
   # Initialize sde_identical_rows before CF block so it exists when referenced later
   sde_identical_rows <- data.df[0]  # Empty data.table with same structure
 
-  if (!include.carryforward) {
+  # Run CF detection unless cf_rescue = "all" and cf_detail is off (no need to detect)
+  run_cf_detection <- !(cf_rescue == "all" && !cf_detail)
+
+  if (run_cf_detection) {
     if (!quietly)
       cat(sprintf(
         "[%s] Exclude measurements carried forward...\n",
@@ -3229,68 +3384,82 @@ cleanchild <- function(data.df,
     data.df[, c("cf_binary", "nextcf", "priorcf",
                 "originator", "originator_seq", "cf_string_num", "originator_z") := NULL]
 
-    # Fix CF rescue logic
-    # Fix 1: Add same-day include check - CFs on days with includes are not eligible for rescue
-    # Fix 2: Changed > to >= for adolescent thresholds
-    # ageday_has_include now calculated earlier and used in string detection
-    # CFs with ageday_has_include already excluded from cs/seq_win assignment
+    # CF rescue: use age/interval/param-specific lookup thresholds
+    # CFs with ageday_has_include are already excluded from cs/seq_win assignment
+    # (they stay excluded regardless of rescue mode)
 
-    # Only apply rescue codes to CFs with valid cs assignment (already filtered for ageday_has_include)
-    data.df[!is.na(seq_win) & (ageday_has_include == FALSE | is.na(ageday_has_include)),
-            exclude := (function(df){
-      # only 1 cf in string - codes 4 and 5
-      if (max(seq_win) == 1){
+    # Compute interval_days for each CF: agedays - prior_ageday
+    # We need the originator's ageday for each CF string
+    # Reconstruct: originator is seq_win == 0, CFs are seq_win > 0
+    # For each CF, the originator's ageday is the ageday of the row with seq_win == 0 in the same cs group
+    data.df[, orig_ageday := NA_integer_]
+    data.df[seq_win == 0, orig_ageday := agedays]
+    # Propagate originator ageday forward within each string (same approach as originator_z)
+    if (max_iterations > 0) {
+      for (i in 1:max_iterations) {
+        data.df[, orig_ageday := ifelse(
+          !is.na(cs) & seq_win > 0 & is.na(orig_ageday),
+          shift(orig_ageday, type = "lag"),
+          orig_ageday
+        ), by = c("subjid", "param")]
+      }
+    }
 
-        # Code 4: only 1 CF AND |diff| < 0.05
-        # Reverted to original threshold
-        df[seq_win != 0 & absdiff < 0.05,
-           exclude := "Rescued"]
+    # For CFs, interval = agedays - originator agedays
+    # (This is the interval from the originator, which is the measurement being compared to)
+    data.df[!is.na(seq_win) & seq_win > 0, cf_interval := agedays - orig_ageday]
 
-        # Code 5: only 1 CF AND |diff| >= 0.05 AND < 0.1 AND wholehalfimp
-        # Reverted to original threshold
-        df[seq_win != 0 & absdiff >= 0.05 & absdiff < .1 & wholehalfimp,
-           exclude := "Rescued-Imperial"]
+    if (cf_rescue == "none") {
+      # No rescue: all CFs stay excluded
+      if (!quietly) cat("  CF rescue mode: none (all CFs excluded)\n")
 
-      } else if (max(seq_win) > 1){
-        # 2+ CFs in string - only teens get rescue (codes 6 and 7)
-
-        # Code 6: any # of consecutive CFs AND adol AND |diff| < 0.05
-        # Changed > to >= for adolescent thresholds
-        # Reverted to original threshold
-        df[seq_win != 0 & agedays/365.25 >= 16 & sex == 1 & absdiff < 0.05,
-           exclude := "Rescued-Adol"]
-        df[seq_win != 0 & agedays/365.25 >= 17 & sex == 0 & absdiff < 0.05,
-           exclude := "Rescued-Adol"]
-
-        # Code 7: any # of consecutive CFs AND adol AND |diff| >= 0.05 AND < 0.1 AND wholehalfimp
-        # Reverted to original threshold
-        df[seq_win != 0 & agedays/365.25 >= 16 & sex == 1 &
-             absdiff >= 0.05 & absdiff < .1 & wholehalfimp,
-           exclude := "Rescued-Adol-Imperial"]
-        df[seq_win != 0 & agedays/365.25 >= 17 & sex == 0 &
-             absdiff >= 0.05 & absdiff < .1 & wholehalfimp,
-           exclude := "Rescued-Adol-Imperial"]
-        # REMOVED: "CP ADD" section - codes 4/5 should NOT apply to multi-CF strings
+    } else if (cf_rescue == "all") {
+      # Rescue everything: all CFs re-included
+      cf_mask <- !is.na(data.df$seq_win) & data.df$seq_win > 0 &
+                 (data.df$ageday_has_include == FALSE | is.na(data.df$ageday_has_include))
+      if (any(cf_mask)) {
+        data.df[cf_mask, cf_rescued := "Rescued-All"]
+        data.df[cf_mask, exclude := "Include"]
+        if (!quietly)
+          cat(sprintf("  CF rescue mode: all (%d measurements re-included)\n", sum(cf_mask)))
       }
 
-      return(df$exclude)
-    })(copy(.SD)),
-    .SDcols = c('agedays', "seq_win", 'absdiff', "sex", "cs", "wholehalfimp",
-                "exclude"),
-    by = c("subjid", "param", "cs")]
+    } else {
+      # Standard rescue: use lookup table thresholds
+      cf_lookup <- .cf_rescue_lookup()
 
-    # Store rescue codes in cf_rescued column, then re-include rescued CFs
-    # Rescued CFs participate in all downstream steps but are flagged for users
-    rescue_codes <- c("Rescued",
-                      "Rescued-Imperial",
-                      "Rescued-Adol",
-                      "Rescued-Adol-Imperial")
-    rescued_mask <- data.df$exclude %in% rescue_codes
-    if (any(rescued_mask)) {
-      data.df[rescued_mask, cf_rescued := as.character(exclude)]
-      data.df[rescued_mask, exclude := "Include"]
-      if (!quietly)
-        cat(sprintf("  CF rescue: %d measurements re-included\n", sum(rescued_mask)))
+      # Get thresholds for all CF rows
+      cf_rows <- !is.na(data.df$seq_win) & data.df$seq_win > 0 &
+                 (data.df$ageday_has_include == FALSE | is.na(data.df$ageday_has_include))
+
+      if (any(cf_rows)) {
+        cf_dt <- data.df[cf_rows, .(index, agedays, cf_interval, param, wholehalfimp, absdiff)]
+        cf_dt[, cf_threshold := .cf_get_thresholds(
+          agedays = agedays,
+          interval_days = cf_interval,
+          param = as.character(param),
+          wholehalfimp = wholehalfimp,
+          lookup = cf_lookup
+        )]
+
+        # Rescue if absdiff < threshold (threshold > 0)
+        # NR cells have threshold = 0: no rescue (absdiff >= 0 is always true)
+        # NA threshold (impossible cell): treat as NR (no rescue)
+        cf_dt[, rescued := !is.na(cf_threshold) & cf_threshold > 0 & absdiff < cf_threshold]
+
+        # Apply rescues back to data.df
+        rescued_idx <- cf_dt[rescued == TRUE, index]
+        if (length(rescued_idx) > 0) {
+          data.df[index %in% rescued_idx, cf_rescued := "Rescued"]
+          data.df[index %in% rescued_idx, exclude := "Include"]
+          if (!quietly)
+            cat(sprintf("  CF rescue: %d measurements re-included (lookup thresholds)\n",
+                        length(rescued_idx)))
+        }
+
+        # Store thresholds on data.df for cf_detail output
+        data.df[cf_dt, cf_threshold := i.cf_threshold, on = "index"]
+      }
     }
 
     } # End if (any_cf)
@@ -3302,11 +3471,35 @@ cleanchild <- function(data.df,
     data.df <- data.df[order(subjid, param, agedays, as.numeric(internal_id))]
   }
 
+  # Populate cf_status and cf_deltaZ before dropping temp columns
+  if (cf_detail) {
+    # Initialize as NA (not a CF candidate)
+    data.df[, cf_status := NA_character_]
+    data.df[, cf_deltaZ := NA_real_]
+
+    # CF candidates are rows that were flagged as CF (seq_win > 0)
+    # They are either still excluded (CF-NR) or rescued (CF-Resc)
+    if ("seq_win" %in% names(data.df)) {
+      cf_candidate <- !is.na(data.df$seq_win) & data.df$seq_win > 0
+      # CF-Resc: rows that were rescued (cf_rescued is non-empty)
+      is_rescued <- cf_candidate & !is.na(data.df$cf_rescued) & data.df$cf_rescued != ""
+      # CF-NR: CF candidates that were NOT rescued
+      is_nr <- cf_candidate & !is_rescued
+      data.df[is_rescued, cf_status := "CF-Resc"]
+      data.df[is_nr, cf_status := "CF-NR"]
+      # deltaZ for all CF candidates
+      if ("absdiff" %in% names(data.df)) {
+        data.df[cf_candidate, cf_deltaZ := absdiff]
+      }
+    }
+  }
+
   # Drop columns no longer needed after Step 6
   # v.orig: only used for SDE tiebreaking and CF detection (Steps 5-6)
-  # wholehalfimp: only used in CF exclusion logic (Step 6 closure; conditional on !include.carryforward)
+  # wholehalfimp: only used in CF exclusion logic (Step 6)
   cols_to_drop_6 <- intersect(
-    c("v.orig", "wholehalfimp", "seq_win", "cs", "absdiff", "ageday_has_include"),
+    c("v.orig", "wholehalfimp", "seq_win", "cs", "absdiff", "ageday_has_include",
+      "orig_ageday", "cf_interval", "cf_threshold"),
     names(data.df)
   )
   if (length(cols_to_drop_6) > 0L) data.df[, (cols_to_drop_6) := NULL]
@@ -5233,6 +5426,15 @@ cleanchild <- function(data.df,
 
   # Also add final_tbc for reference
   return_cols <- c(return_cols, "final_tbc")
+
+  # Add cf_detail columns if requested
+  if (cf_detail) {
+    for (col in c("cf_status", "cf_deltaZ")) {
+      if (col %in% names(data.df)) {
+        return_cols <- c(return_cols, col)
+      }
+    }
+  }
 
   return(data.df[, ..return_cols])
 }

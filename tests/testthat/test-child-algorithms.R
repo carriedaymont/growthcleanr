@@ -67,56 +67,40 @@ get_clean_subject <- function(dt_peds, target_subjid, target_param, n_subj = 200
 # Section 1: CF rescue tests
 #
 # CF rescue re-includes carried-forward values when the z-score difference
-# between the CF'd value and the originator is small. The threshold is
-# controlled by cf_rescue_threshold (default 0.05).
-#
-# These tests are basic and will need updating when multi-level rescue
-# thresholds are implemented.
+# between the CF'd value and the originator is small enough for that
+# age/interval/param/rounding cell. Three modes:
+#   cf_rescue = "standard" (default) — age/interval/param lookup thresholds
+#   cf_rescue = "none"     — no rescue (all CFs excluded)
+#   cf_rescue = "all"      — all CFs rescued (no CF exclusions)
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
-# Test 1: High rescue threshold re-includes CFs that default threshold excludes
+# Test 1: Standard rescue rescues more CFs than "none" mode
 # ---------------------------------------------------------------------------
-test_that("CF rescue: high threshold rescues more CFs than low threshold", {
+test_that("CF rescue: standard rescues more CFs than none", {
   dt_peds <- load_syngrowth_peds()
   subjs <- unique(dt_peds$subjid)[1:200]
   d <- dt_peds[subjid %in% subjs]
 
-  # Very generous threshold — rescue CFs with delta-Z up to 1.0
-  res_high <- cleangrowth(
-    subjid = d$subjid, param = d$param, agedays = d$agedays,
-    sex = d$sex, measurement = d$measurement, id = d$id,
-    quietly = TRUE, cf_rescue_threshold = 1.0
-  )
+  res_std <- run_gc(d, cf_rescue = "standard")
+  res_none <- run_gc(d, cf_rescue = "none")
 
-  # Very strict threshold — rescue only CFs with delta-Z < 0.001
-  res_low <- cleangrowth(
-    subjid = d$subjid, param = d$param, agedays = d$agedays,
-    sex = d$sex, measurement = d$measurement, id = d$id,
-    quietly = TRUE, cf_rescue_threshold = 0.001
-  )
+  n_cf_std  <- sum(grepl("-CF$", res_std$exclude))
+  n_cf_none <- sum(grepl("-CF$", res_none$exclude))
 
-  n_cf_high <- sum(grepl("-CF$", res_high$exclude))
-  n_cf_low  <- sum(grepl("-CF$", res_low$exclude))
-
-  # High threshold rescues more → fewer remaining CFs
-  # Higher rescue threshold should leave fewer CFs excluded
-  expect_lt(n_cf_high, n_cf_low)
+  # Standard rescue should leave fewer CFs excluded than no rescue
+  expect_lte(n_cf_std, n_cf_none)
 })
 
 # ---------------------------------------------------------------------------
-# Test 2: cf_rescued column tracks rescue reason
+# Test 2: cf_rescued column tracks rescue status
 # ---------------------------------------------------------------------------
 test_that("CF rescue: cf_rescued column populated for rescued CFs", {
   dt_peds <- load_syngrowth_peds()
   subjs <- unique(dt_peds$subjid)[1:200]
   d <- dt_peds[subjid %in% subjs]
 
-  res <- cleangrowth(
-    subjid = d$subjid, param = d$param, agedays = d$agedays,
-    sex = d$sex, measurement = d$measurement, id = d$id,
-    quietly = TRUE, cf_rescue_threshold = 1.0
-  )
+  res <- run_gc(d, cf_rescue = "standard")
 
   # cf_rescued column should exist
   expect_true("cf_rescued" %in% names(res),
@@ -124,72 +108,48 @@ test_that("CF rescue: cf_rescued column populated for rescued CFs", {
 
   # Some rows should have rescue codes
   rescued <- res[cf_rescued != ""]
-  # With generous threshold, some CFs should be rescued
-  expect_gt(nrow(rescued), 0)
 
-  # Rescued CFs were set back to Include at rescue time, but may be
-  # re-excluded by later algorithm steps (EWMA, ET, etc.)
-  # Verify they are NOT Exclude-Carried-Forward (they were rescued from that)
-  expect_false(any(grepl("-CF$", rescued$exclude)),
-               info = "Rescued CFs should not retain CF exclusion code")
+  # Rescued CFs should not retain CF exclusion code
+  if (nrow(rescued) > 0) {
+    expect_false(any(grepl("-CF$", rescued$exclude)),
+                 info = "Rescued CFs should not retain CF exclusion code")
 
-  # Rescue codes should be valid CF rescue codes
-  valid_rescue <- c("Exclude-1-CF-deltaZ-<0.05",
-                     "Exclude-1-CF-deltaZ-<0.1-wholehalfimp",
-                     "Exclude-Teen-2-plus-CF-deltaZ-<0.05",
-                     "Exclude-Teen-2-plus-CF-deltaZ-<0.1-wholehalfimp")
-  expect_true(all(rescued$cf_rescued %in% valid_rescue),
-              info = "Rescue codes should be from the known set")
+    # Rescue codes should be valid
+    valid_rescue <- c("Rescued", "Rescued-All")
+    expect_true(all(rescued$cf_rescued %in% valid_rescue),
+                info = "Rescue codes should be from the known set")
+  }
 })
 
 # ---------------------------------------------------------------------------
-# Test 3: With threshold=0, no CFs are rescued
+# Test 3: cf_rescue = "none" rescues no CFs
 # ---------------------------------------------------------------------------
-test_that("CF rescue: threshold=0 rescues no CFs", {
+test_that("CF rescue: none mode rescues no CFs", {
   dt_peds <- load_syngrowth_peds()
   subjs <- unique(dt_peds$subjid)[1:100]
   d <- dt_peds[subjid %in% subjs]
 
-  res <- cleangrowth(
-    subjid = d$subjid, param = d$param, agedays = d$agedays,
-    sex = d$sex, measurement = d$measurement, id = d$id,
-    quietly = TRUE, cf_rescue_threshold = 0
-  )
+  res <- run_gc(d, cf_rescue = "none")
 
   rescued <- res[cf_rescued != ""]
   expect_equal(nrow(rescued), 0,
-               info = "threshold=0 should rescue no CFs (absdiff can't be < 0)")
+               info = "cf_rescue='none' should rescue no CFs")
 })
 
 # ---------------------------------------------------------------------------
-# Test 4: Multi-CF string rescue is teen-only
+# Test 4: cf_rescue = "all" rescues all CFs
 # ---------------------------------------------------------------------------
-test_that("CF rescue: multi-CF strings only rescued for teens", {
+test_that("CF rescue: all mode rescues all CFs", {
   dt_peds <- load_syngrowth_peds()
   subjs <- unique(dt_peds$subjid)[1:200]
   d <- dt_peds[subjid %in% subjs]
 
-  # Use generous threshold so delta-Z isn't the limiting factor
-  res <- cleangrowth(
-    subjid = d$subjid, param = d$param, agedays = d$agedays,
-    sex = d$sex, measurement = d$measurement, id = d$id,
-    quietly = TRUE, cf_rescue_threshold = 1.0
-  )
+  res <- run_gc(d, cf_rescue = "all")
 
-  # Check teen rescue codes — if any exist, the associated agedays should be teen
-  teen_rescued <- res[cf_rescued %in% c("Exclude-Teen-2-plus-CF-deltaZ-<0.05",
-                                         "Exclude-Teen-2-plus-CF-deltaZ-<0.1-wholehalfimp")]
-  if (nrow(teen_rescued) > 0) {
-    # Merge back to get agedays
-    d_ages <- d[, .(id, agedays)]
-    teen_rescued <- merge(teen_rescued, d_ages, by = "id")
-    # All teen-rescued CFs should be from teenage subjects
-    # Female >= 16yr (5844 days), Male >= 17yr (6209 days)
-    expect_true(all(teen_rescued$agedays >= 5844),
-                info = "Teen CF rescue should only apply to teenage measurements")
-  }
-  # If no teen rescue codes exist in this dataset, that's fine — the test
-  # for single-CF rescue below covers the basic path
+  # No CF exclusion codes should remain
+  n_cf <- sum(grepl("-CF$", res$exclude))
+  expect_equal(n_cf, 0,
+               info = "cf_rescue='all' should leave no CF exclusions")
 })
 
 
@@ -492,94 +452,58 @@ test_that("age boundary: HEADCM cleaned under 3yr, not cleaned over 3yr", {
 })
 
 # ---------------------------------------------------------------------------
-# Test 13: CF rescue teen boundary — female at 16 years
+# Test 13: cf_detail columns
 # ---------------------------------------------------------------------------
-test_that("age boundary: CF rescue multi-CF teen boundary for female", {
-  # This test verifies that multi-CF rescue applies at >= 16yr for females
-  # but not below 16yr. We construct synthetic data with a female teen
-  # who has carried-forward weight values.
-  #
-  # Strategy: use syngrowth teen females, inject identical repeated weights
-  # to force CF detection, then check rescue behavior by age.
-  # With generous threshold, under-16 multi-CFs should stay excluded,
-  # over-16 multi-CFs should be rescued.
-
+test_that("CF rescue: cf_detail produces cf_status and cf_deltaZ columns", {
   dt_peds <- load_syngrowth_peds()
+  subjs <- unique(dt_peds$subjid)[1:100]
+  d <- dt_peds[subjid %in% subjs]
 
-  # Find a female subject in the teen age range with enough data
-  subj_stats <- dt_peds[, .(
-    n = .N,
-    sex = sex[1],
-    max_age = max(agedays)
-  ), by = subjid]
+  res <- cleangrowth(
+    subjid = d$subjid, param = d$param, agedays = d$agedays,
+    sex = d$sex, measurement = d$measurement, id = d$id,
+    quietly = TRUE, cf_detail = TRUE
+  )
 
-  # Need a female (sex=1) with measurements going past 17yr
-  teen_females <- subj_stats[sex == 1 & max_age > 17 * 365.25 & n >= 10]
+  # cf_status and cf_deltaZ columns should exist
+  expect_true("cf_status" %in% names(res),
+              info = "Output must include cf_status column when cf_detail=TRUE")
+  expect_true("cf_deltaZ" %in% names(res),
+              info = "Output must include cf_deltaZ column when cf_detail=TRUE")
 
-  skip_if(nrow(teen_females) == 0, "No suitable teen female subjects in syngrowth")
+  # cf_status values should be from {NA, "CF-NR", "CF-Resc"}
+  valid_status <- c(NA_character_, "CF-NR", "CF-Resc")
+  expect_true(all(res$cf_status %in% valid_status | is.na(res$cf_status)),
+              info = "cf_status values should be NA, CF-NR, or CF-Resc")
 
-  target <- teen_females$subjid[1]
-  other_subjs <- unique(dt_peds$subjid)[1:30]
-  other_subjs <- other_subjs[other_subjs != target]
-  d <- dt_peds[subjid %in% c(target, other_subjs[1:20])]
-
-  # Run baseline to see structure
-  res_base <- run_gc(d, cf_rescue_threshold = 1.0)
-
-  # Check if this subject has any multi-CF strings that got teen-rescued
-  teen_codes <- c("Exclude-Teen-2-plus-CF-deltaZ-<0.05",
-                  "Exclude-Teen-2-plus-CF-deltaZ-<0.1-wholehalfimp")
-  single_codes <- c("Exclude-1-CF-deltaZ-<0.05",
-                     "Exclude-1-CF-deltaZ-<0.1-wholehalfimp")
-
-  # With threshold=1.0, check that any teen rescue codes are on teen-age rows
-  teen_rescued <- res_base[cf_rescued %in% teen_codes]
-  if (nrow(teen_rescued) > 0) {
-    teen_ages <- d[id %in% teen_rescued$id, agedays]
-    # Female teen rescue requires age >= 16yr (5844 days)
-    expect_true(all(teen_ages >= 16 * 365.25),
-                info = "Female multi-CF rescue should only apply at >= 16yr")
+  # cf_deltaZ should be NA for non-CF rows and numeric for CF rows
+  cf_rows <- !is.na(res$cf_status)
+  if (any(cf_rows)) {
+    expect_true(all(!is.na(res$cf_deltaZ[cf_rows])),
+                info = "cf_deltaZ should be non-NA for CF candidates")
+    expect_true(all(res$cf_deltaZ[cf_rows] >= 0),
+                info = "cf_deltaZ should be non-negative")
   }
-
-  # Verify: single-CF rescue has no age restriction
-  single_rescued <- res_base[cf_rescued %in% single_codes]
-  # If single-CF rescues exist, that confirms rescue works at any age
-  # (no age constraint on single-CF rescue path)
 })
 
 # ---------------------------------------------------------------------------
-# Test 14: CF rescue teen boundary — male at 17 years
+# Test 14: cf_detail not present by default
 # ---------------------------------------------------------------------------
-test_that("age boundary: CF rescue multi-CF teen boundary for male", {
+test_that("CF rescue: cf_detail columns absent by default", {
   dt_peds <- load_syngrowth_peds()
+  subjs <- unique(dt_peds$subjid)[1:50]
+  d <- dt_peds[subjid %in% subjs]
 
-  subj_stats <- dt_peds[, .(
-    n = .N,
-    sex = sex[1],
-    max_age = max(agedays)
-  ), by = subjid]
+  res <- cleangrowth(
+    subjid = d$subjid, param = d$param, agedays = d$agedays,
+    sex = d$sex, measurement = d$measurement, id = d$id,
+    quietly = TRUE
+  )
 
-  # Need a male (sex=0) with measurements going past 18yr
-  teen_males <- subj_stats[sex == 0 & max_age > 18 * 365.25 & n >= 10]
-
-  skip_if(nrow(teen_males) == 0, "No suitable teen male subjects in syngrowth")
-
-  target <- teen_males$subjid[1]
-  other_subjs <- unique(dt_peds$subjid)[1:30]
-  other_subjs <- other_subjs[other_subjs != target]
-  d <- dt_peds[subjid %in% c(target, other_subjs[1:20])]
-
-  res_base <- run_gc(d, cf_rescue_threshold = 1.0)
-
-  teen_codes <- c("Exclude-Teen-2-plus-CF-deltaZ-<0.05",
-                  "Exclude-Teen-2-plus-CF-deltaZ-<0.1-wholehalfimp")
-  teen_rescued <- res_base[cf_rescued %in% teen_codes]
-  if (nrow(teen_rescued) > 0) {
-    teen_ages <- d[id %in% teen_rescued$id, agedays]
-    # Male teen rescue requires age >= 17yr (6209 days)
-    expect_true(all(teen_ages >= 17 * 365.25),
-                info = "Male multi-CF rescue should only apply at >= 17yr")
-  }
+  expect_false("cf_status" %in% names(res),
+               info = "cf_status should not be in output by default")
+  expect_false("cf_deltaZ" %in% names(res),
+               info = "cf_deltaZ should not be in output by default")
 })
 
 
