@@ -765,6 +765,45 @@ Requires installed package — see Known Issues. Run in background from Claude C
   never used. Leftover from refactoring. Harmless but
   should be cleaned up.
 
+### Robustness audit (2026-04-14)
+
+Comprehensive audit of code patterns that could warn or
+degrade on large/unusual datasets. No blocking issues found.
+
+**Investigated and confirmed safe:**
+- **Division by zero in adult slope calculations**
+  (`adult_support.R` ~lines 823, 836): `(ap1 - ap2)` and
+  `(an1 - an2)` denominators cannot be zero because all
+  same-day duplicates are resolved before these steps run
+  (only one Include per subject-param-ageday). If zero
+  somehow occurs, it indicates an upstream bug and should
+  break loudly.
+- **Division by zero in adult BMI** (`adult_support.R`
+  ~line 1476): `ht_val` comes from included heights that
+  already passed BIV (min 50cm at loosest). Cannot be zero.
+- **HT+WT same-day pairing assumption:** Both algorithms
+  handle unpaired measurements correctly. Adult uses
+  `intersect()` for BMI days — skips if no shared days.
+  Child DOP is a secondary tiebreaker with explicit NA→Inf
+  fallback when the other param doesn't exist for a subject.
+
+**Low priority cleanup (functional but could be cleaner):**
+- [ ] **`suppressWarnings(min/max)` + `is.infinite()` pattern**
+  (child_clean.R ~lines 4006, 4109, 4117, 4126): Suppresses
+  warnings from `min()`/`max()` on empty subsets, then
+  converts `-Inf`/`Inf` to `NA`. Works correctly but masks
+  any unexpected warnings. Could be rewritten with explicit
+  `if (length(...) == 0)` guards to match the style of the
+  5 locations fixed in commit `64c186b`.
+- [ ] **`which.min`/`which.max` on empty vectors** (child,
+  ~lines 4442, 5201): Returns `integer(0)` on empty input.
+  Surrounding logic has row-count checks, so safe in
+  practice.
+- [ ] **Growing vectors with `c()` in loops** (adult,
+  ~lines 291-292, 559): O(n²) pattern — `exc_ids <- c(exc_ids, new_id)`.
+  Negligible for typical subject sizes but could slow down
+  on subjects with thousands of measurements.
+
 ### Open (adult)
 
 - [ ] **Deferred test gaps:** Error load with -5 exponent,
@@ -780,6 +819,22 @@ Requires installed package — see Known Issues. Run in background from Claude C
 
 ### Fixed (recent)
 
+- [x] **min/max warnings on empty subsets (2026-04-14):**
+  Fixed 5 locations in `child_clean.R` where `min()`/`max()`
+  on empty Include subsets produced user-visible `-Inf`
+  warnings. All replaced with explicit `if (length(...) == 0)`
+  guards. Commit `64c186b`.
+- [x] **Child BIV tests (2026-04-14):** Added 3 separate
+  focused BIV tests (WT, HT, HC) to `test-child-edge-cases.R`.
+  Each uses a minimal dataset with one extreme value and
+  verifies the correct param-specific BIV code. Commit
+  `8201e9c`.
+- [x] **Test suite overhaul (2026-04-14):** Adult tests
+  fixed for `library()` loading (was missing `library(growthcleanr)`
+  and calling unexported `cleanadult()` directly). Added 7
+  adult integration tests and 3 spanning subject tests to
+  `test-cleangrowth.R`. `permissiveness_presets()` exported.
+  `testing-reference.md` created. Commit `1797135`.
 - [x] **Exclusion code rename (2026-04-14):** All child
   exclusion codes renamed from `Exclude-{Reason}` to
   `Exclude-C-{WT|HT|HC}-{Reason}` (param-specific), using
