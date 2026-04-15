@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-github-latest (growthcleanr)
 
-**Last updated:** 2026-04-14 (testing overhaul: adult tests fixed for library(), adult integration tests added, spanning subject tests, testing-reference.md created, permissiveness_presets exported)
+**Last updated:** 2026-04-15 (full walkthrough cleanup: cat→message, dead code removal, batch_size param, walkthrough-todo-2026-04-15.md)
 
 ## Overview
 
@@ -425,7 +425,7 @@ Default: `"looser"`
 | `include.carryforward` | FALSE | Step 6 | **Deprecated** — use `cf_rescue` instead. If TRUE, skip CF detection entirely |
 | `cf_rescue` | `"standard"` | Step 6 | CF rescue mode: `"standard"` (age/interval/param-specific lookup), `"none"` (all CFs excluded), `"all"` (all CFs rescued) |
 | `cf_detail` | FALSE | Step 6 | If TRUE, add `cf_status` and `cf_deltaZ` columns to output |
-| `ewma.exp` | -1.5 | EWMA steps | Exponent for EWMA weighting |
+| `ewma.exp` | -1.5 | EWMA steps | **Legacy only.** Exponent for EWMA weighting. Child algorithm uses age-dependent exponents internally |
 | `ewma_window` | 15 | EWMA steps | Max observations on each side for EWMA |
 | `adult_cutpoint` | 20 | Preprocessing | Age (years) dividing pediatric/adult |
 | `lt3.exclude.mode` | `"default"` | Legacy | Passed to `cleanlegacy()` — re-added after accidental removal |
@@ -434,6 +434,7 @@ Default: `"looser"`
 | `ref_tables` | NULL | All reads | Pre-loaded closures from `gc_preload_refs()`; skips disk reads |
 | `cached_results` | NULL | Partial run | data.table from prior `cleangrowth()` call. Auto-detects changed subjects if `changed_subjids` is NULL; uses explicit list if both provided |
 | `changed_subjids` | NULL | Partial run | Optional vector of subject IDs to re-run. If NULL and `cached_results` provided, changed subjects are auto-detected |
+| `batch_size` | 2000 | Batching | Number of subjects per processing batch (was hardcoded, now configurable) |
 
 ### gc_preload_refs()
 
@@ -728,8 +729,8 @@ Requires installed package — see Known Issues. Run in background from Claude C
   before using `parallel = TRUE`. Will not work with
   `devtools::load_all()` only (workers need the installed
   package to access extdata via `system.file()`).
-- [ ] **Batch size hard-coded at 2,000:** Should be a
-  `batch_size` parameter on `cleangrowth()`.
+- [x] **Batch size parameterized (2026-04-15):** `batch_size`
+  parameter added to `cleangrowth()` (default 2000).
 - [x] **Batch-invariant operations moved before loop
   (2026-04-13):** `exclude.levels` definition and
   Tanner/WHO velocity reads moved before the outer loop.
@@ -813,6 +814,21 @@ degrade on large/unusual datasets. No blocking issues found.
 
 ### Fixed (recent)
 
+- [x] **Full walkthrough cleanup (2026-04-15):** Resolved 30+
+  deferred items from the full code walkthrough. Key changes:
+  all `cat()`/`print()` → `message()` for CRAN compliance
+  (50+ calls); ~70 lines of dead/commented-out code removed;
+  `batch_size` parameter added (was hardcoded 2000);
+  unnecessary `data.adult[, id := line]` removed; batching
+  dplyr → data.table; `|` → `||` short-circuit fix; `names(
+  table(subjid) > 1)` correctness fix; stale `"valid"` →
+  `".child_valid"` in `var_for_par`; NA fallback logic added
+  to `calc_and_recenter_z_scores`; `as_matrix_delta()` copied
+  to child_clean.R; `ewma.exp` documented as legacy-only;
+  conflict warning for `include.carryforward` + `cf_rescue`;
+  Stata comments condensed; clarifying comments throughout.
+  Full findings in `walkthrough-todo-2026-04-15.md`. Commit
+  `0bea2ba`.
 - [x] **min/max warnings on empty subsets (2026-04-14):**
   Fixed 5 locations in `child_clean.R` where `min()`/`max()`
   on empty Include subsets produced user-visible `-Inf`
@@ -957,9 +973,9 @@ as changes don't affect algorithm performance).
   `.Rbuildignore`:** R doesn't load subdirectories, but they
   bloat the tarball. Add `^R/deprec$` and
   `^R/modified_source_code$`. (~2 min)
-- [ ] **`cat()`/`print()` in child algorithm:** Same issue as
-  adult — `child_clean.R` and legacy files use `cat()`
-  throughout. Convert to `message()`. (~30 min)
+- [x] **`cat()`/`print()` in child algorithm (2026-04-15):**
+  All 50+ `cat()`/`print()` calls in `child_clean.R`
+  converted to `message()`. Legacy files not changed.
 
 ### Medium (pre-submission polish)
 
