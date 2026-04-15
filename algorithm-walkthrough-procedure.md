@@ -1,9 +1,11 @@
 # Algorithm Walk-Through Procedure
 
-Procedure for conducting a systematic review of a growthcleanr algorithm
-(adult or child) before major milestones (clinician validation, CRAN submission,
-significant algorithm changes). Covers code correctness, inline comments,
-parameter specs, and narrative documentation.
+Procedure for conducting a systematic review of growthcleanr code before
+major milestones (clinician validation, CRAN submission, significant algorithm
+changes). Covers the full code path: `cleangrowth()` wrapper (preprocessing,
+dispatch, output assembly), the child algorithm, and the adult algorithm.
+Checks code correctness, inline comments, parameter specs, and narrative
+documentation.
 
 ---
 
@@ -22,33 +24,35 @@ A walk-through serves four goals simultaneously:
 
 ### 1. Confirm baseline tests pass
 
-**Adult:**
+**Important:** Reinstall the package first so tests run against current code:
+```bash
+Rscript -e 'devtools::install_local(".", force=TRUE, upgrade="never")'
+```
+
+**All test files:**
 ```bash
 NOT_CRAN=true Rscript -e \
-  'devtools::load_all(quiet=TRUE); testthat::test_file("tests/testthat/test-adult-clean.R")'
+  'testthat::test_file("tests/testthat/test-cleangrowth.R")'
+
+NOT_CRAN=true Rscript -e \
+  'testthat::test_file("tests/testthat/test-child-regression.R")'
+
+NOT_CRAN=true Rscript -e \
+  'testthat::test_file("tests/testthat/test-child-edge-cases.R")'
+
+NOT_CRAN=true Rscript -e \
+  'testthat::test_file("tests/testthat/test-child-algorithms.R")'
+
+NOT_CRAN=true Rscript -e \
+  'testthat::test_file("tests/testthat/test-child-parameters.R")'
+
+NOT_CRAN=true Rscript -e \
+  'testthat::test_file("tests/testthat/test-adult-clean.R")'
 
 Rscript tests/test_harness.R loosest
 Rscript tests/test_harness.R looser
 Rscript tests/test_harness.R tighter
 Rscript tests/test_harness.R tightest
-```
-
-**Child:**
-```bash
-NOT_CRAN=true Rscript -e \
-  'devtools::load_all(quiet=TRUE); testthat::test_file("tests/testthat/test-child-regression.R")'
-
-NOT_CRAN=true Rscript -e \
-  'devtools::load_all(quiet=TRUE); testthat::test_file("tests/testthat/test-child-stress.R")'
-
-NOT_CRAN=true Rscript -e \
-  'devtools::load_all(quiet=TRUE); testthat::test_file("tests/testthat/test-child-edge-cases.R")'
-
-NOT_CRAN=true Rscript -e \
-  'devtools::load_all(quiet=TRUE); testthat::test_file("tests/testthat/test-child-algorithms.R")'
-
-NOT_CRAN=true Rscript -e \
-  'devtools::load_all(quiet=TRUE); testthat::test_file("tests/testthat/test-child-parameters.R")'
 ```
 
 All tests must pass before starting. If any fail, fix first.
@@ -61,7 +65,7 @@ Name: `walkthrough-todo-YYYY-MM-DD.md`
 
 Template:
 ```markdown
-# [Adult/Child] GC Walk-Through — Deferred To-Dos
+# GC Full Walk-Through — Deferred To-Dos
 
 Items identified during the YYYY-MM-DD walk-through that are deferred for later resolution.
 
@@ -73,10 +77,26 @@ Items identified during the YYYY-MM-DD walk-through that are deferred for later 
 
 ---
 
-## Steps walk-through (populated as walk-through proceeds)
+## Wrapper walkthrough (populated as walk-through proceeds)
+
+[cleangrowth() preprocessing, dispatch, output assembly]
+
+---
+
+## Child algorithm steps (populated as walk-through proceeds)
+
+---
+
+## Adult algorithm steps (populated as walk-through proceeds)
 ```
 
 ### 3. Identify documents to review
+
+**Wrapper (`cleangrowth()` + support functions):**
+- `R/child_clean.R` lines ~333–1855 — `cleangrowth()` entry point, preprocessing, dispatch, output assembly
+- `R/child_clean.R` support functions — `read_anthro()`, `gc_preload_refs()`, `ewma()`, `calc_and_recenter_z_scores()`, `.cf_rescue_lookup()`
+- `R/utils.R` — shared utilities
+- **No narrative document yet.** Findings go in the walkthrough todo file. A wrapper narrative should be created later (TODO).
 
 **Adult:**
 - `R/adult_clean.R` — main algorithm
@@ -95,12 +115,56 @@ Items identified during the YYYY-MM-DD walk-through that are deferred for later 
 
 ## Walk-Through Procedure
 
+### Suggested session plan (full walkthrough)
+
+| Session | Scope |
+|---------|-------|
+| 1 | Wrapper: parameter handling, partial-run mode, data construction, input validation, batching setup, exclude.levels, velocity table loading |
+| 2 | Wrapper: imperial→metric, LENGTHCM, z-score calculation, Step 2b (GA correction), parallel setup |
+| 3 | Wrapper: algorithm dispatch, output assembly, partial-run merge, bin/tri_exclude, support functions (`read_anthro`, `gc_preload_refs`) |
+| 4+ | Algorithm steps: child (Early 13, 5, 6, 7, 9, 11, 13, 15, 16, 17, 19, 21, 22), then adult (1–14). Review 1–3 steps per session. |
+
+---
+
+### Phase 0: Wrapper walkthrough
+
+The `cleangrowth()` wrapper (~lines 333–1855 of `child_clean.R`) handles
+everything before and after the algorithm steps. Review it in chunks before
+moving to algorithm steps.
+
+**For each chunk:**
+1. Read the code
+2. Apply relevant checklist items (see below — wrapper-specific items are marked **[wrapper]**)
+3. Classify findings as fix-now or defer (same criteria as algorithm steps)
+4. Log deferred items in the walkthrough todo file
+
+**Wrapper chunks to review:**
+
+| Chunk | Approx lines | What it does |
+|-------|-------------|--------------|
+| Parameter deprecation & validation | 383–410 | `weight_cap`→`adult_scale_max_lbs`, `include.carryforward`→`cf_rescue`, `prelim_infants`→`use_legacy_algorithm` |
+| Partial-run mode | 428–507 | `cached_results` / `changed_subjids` auto-detect and explicit filtering |
+| Data construction + input validation | 509–558 | `data.all.ages` build, `internal_id` creation, sex recoding, param validation, cutpoint clamping |
+| Outer batching + batch-invariant setup | 559–763 | `exclude.levels` (child + adult), velocity table loading (Tanner, WHO), batching by 2000 subjects |
+| Inner batch loop: ped/adult split | 764–782 | Age cutpoint split into `data.all` vs `data.adult`, `data.batch` reference copy |
+| Imperial→metric, LENGTHCM | 789–885 | Unit conversion, param relabeling |
+| Z-score calculation (CSD) | 888–936 | WHO/CDC closures, blending (WHO<2y, blend 2–5y, CDC>5y), HC always WHO |
+| Step 2b: GA correction (potcorr) | 940–1469 | Fenton merge, split-normal z, corrected WHO/CDC, recentering, `sd.median` file, EWMA fields |
+| Parallel setup | 796–825 | `var_for_par`, cluster creation/export |
+| Algorithm dispatch | 1470–1700 | Params passed to `cleanchild()`/`cleanlegacy()`/`cleanadult()`, adult-specific setup |
+| Output assembly | 1719–1854 | Child+adult merge, `cf_rescued`/`mean_ht`/`bin_result`, `data.batch` join, partial-run merge, `bin_exclude`/`tri_exclude`, safety check |
+
+---
+
+### Phase 1: Algorithm steps walkthrough
+
 Review 1–3 steps per session. For each step:
 
 ### Step A: Read the narrative section
 
 Find and read the step's section in the narrative document. Note what it claims
-the code does.
+the code does. (For wrapper chunks reviewed in Phase 0, there is no narrative
+yet — review code and comments only.)
 
 ### Step B: Read the code
 
@@ -109,7 +173,7 @@ Find the corresponding code in the main algorithm file and any support functions
 - **Adult:** The main loop in `adult_clean.R` dispatches to support functions in
   `adult_support.R`.
 - **Child:** Everything is in `child_clean.R` — both the main algorithm
-  (`cleanchild()`) and all support functions (`valid()`,
+  (`cleanchild()`) and all support functions (`.child_valid()`,
   `temporary_extraneous_infants()`, `calc_otl_evil_twins()`,
   `calc_and_recenter_z_scores()`, `ewma()`, etc.).
 
@@ -211,6 +275,39 @@ For each step, systematically check all items that apply. Items are marked
     for cross-parameter plausibility checks. Verify the DOP assignments are
     correct.
 
+14. **[wrapper] Input vector alignment** — All input vectors (`subjid`,
+    `param`, `agedays`, `sex`, `measurement`, `id`) must stay aligned
+    through filtering (e.g., partial-run `keep` subsetting). Check that no
+    operation reorders one vector without the others.
+
+15. **[wrapper] Batch boundary safety** — Subjects split across batches
+    would break by-subject operations. Verify batching assigns whole
+    subjects to the same batch, never splitting a subject's rows.
+
+16. **[wrapper] Column survival across merge** — The `data.batch` →
+    `full_out` merge by `line` must not drop or duplicate columns. Check
+    `all.x = TRUE` behavior when adult or child results are empty
+    (`data.table()` with 0 rows).
+
+17. **[wrapper] Adult id overwrite** — Line ~1662: `data.adult[, id := line]`
+    overwrites the user's original `id` for adult data with the `line`
+    index. Investigate whether this loses the user's id or whether
+    `internal_id` handles it. Compare with how child data preserves `id`.
+
+18. **[wrapper] Z-score blending boundary consistency** — The WHO/CDC
+    blending window in `cleangrowth()` preprocessing (lines ~908–930) must
+    match `calc_and_recenter_z_scores()` used later in Steps 11/15. Check
+    for boundary disagreements (e.g., `>=` vs `>` at 2 or 5 years).
+
+19. **[wrapper] Partial-run correctness** — Auto-detect comparison
+    (lines ~445–485) must apply the same transformations as the main path
+    (0→NaN, sex recoding). Verify the hash-based comparison is
+    order-independent within each subject (i.e., sorted before hashing).
+
+20. **[wrapper] CRAN output compliance** — `cat()`/`print()` should be
+    `message()` for CRAN. Flag any `cat()` or `print()` calls that are
+    not gated behind `if (!quietly)`.
+
 ### Step D: Classify findings
 
 **Fix now** if:
@@ -243,28 +340,36 @@ Add each deferred item to the todo file with:
 
 ### 1. Run full test suite
 
-**Adult:**
+**Important:** Reinstall the package before testing so tests run against
+current code, not a stale installed version:
+```bash
+Rscript -e 'devtools::install_local(".", force=TRUE, upgrade="never")'
+```
+
+**Integration + child + adult:**
 ```bash
 NOT_CRAN=true Rscript -e \
-  'devtools::load_all(quiet=TRUE); testthat::test_file("tests/testthat/test-adult-clean.R")'
+  'testthat::test_file("tests/testthat/test-cleangrowth.R")'
+
+NOT_CRAN=true Rscript -e \
+  'testthat::test_file("tests/testthat/test-child-regression.R")'
+
+NOT_CRAN=true Rscript -e \
+  'testthat::test_file("tests/testthat/test-child-edge-cases.R")'
+
+NOT_CRAN=true Rscript -e \
+  'testthat::test_file("tests/testthat/test-child-algorithms.R")'
+
+NOT_CRAN=true Rscript -e \
+  'testthat::test_file("tests/testthat/test-child-parameters.R")'
+
+NOT_CRAN=true Rscript -e \
+  'testthat::test_file("tests/testthat/test-adult-clean.R")'
+
 Rscript tests/test_harness.R loosest
 Rscript tests/test_harness.R looser
 Rscript tests/test_harness.R tighter
 Rscript tests/test_harness.R tightest
-```
-
-**Child:**
-```bash
-NOT_CRAN=true Rscript -e \
-  'devtools::load_all(quiet=TRUE); testthat::test_file("tests/testthat/test-child-regression.R")'
-NOT_CRAN=true Rscript -e \
-  'devtools::load_all(quiet=TRUE); testthat::test_file("tests/testthat/test-child-stress.R")'
-NOT_CRAN=true Rscript -e \
-  'devtools::load_all(quiet=TRUE); testthat::test_file("tests/testthat/test-child-edge-cases.R")'
-NOT_CRAN=true Rscript -e \
-  'devtools::load_all(quiet=TRUE); testthat::test_file("tests/testthat/test-child-algorithms.R")'
-NOT_CRAN=true Rscript -e \
-  'devtools::load_all(quiet=TRUE); testthat::test_file("tests/testthat/test-child-parameters.R")'
 ```
 
 All tests must pass.
@@ -273,10 +378,20 @@ All tests must pass.
 
 Record in session notes or CHANGELOG:
 - Date of walk-through
-- Steps covered
+- Sections covered (wrapper chunks, algorithm steps, or both)
 - Bugs found and fixed
 - Deferred items (with link to todo file)
 - Final test counts
+
+### 3. Future: Create wrapper narrative
+
+A narrative document for the `cleangrowth()` wrapper (preprocessing,
+dispatch, output assembly) does not yet exist. The child and adult
+narratives only cover what happens inside `cleanchild()` and
+`cleanadult()`. After completing the first full walkthrough, create
+a wrapper narrative document following the same format as the algorithm
+narratives. This will serve as a reference for future walkthroughs and
+for anyone reading the code.
 
 ---
 
@@ -295,6 +410,19 @@ These are the most common issues found; check for these specifically:
 | Dead grepl | `grepl("Same-day", ...)` on adult codes (no adult code contains "Same-day") |
 | BMI BIV not implemented | Parameters resolved from presets but never used in the BIV check |
 | Fixed iteration loop | `for (round in 1:3)` should be `while (change)` |
+
+---
+
+## Wrapper-Specific Patterns to Watch For
+
+| Pattern | What to look for |
+|---------|-----------------|
+| `cat()`/`print()` not `message()` | Lines ~539, 560, 767, 837 etc. use `cat()`/`print()` — CRAN requires `message()` |
+| `dplyr` in data.table code | Line ~563 uses `%>% select() %>% distinct()` — inconsistent with data.table convention and adds a dependency |
+| Stale commented-out code | Lines ~1702–1717, ~1786 — large blocks of dead commented-out code |
+| `data.adult[, id := line]` | Line ~1662 overwrites user's `id` — may lose original id for adult rows |
+| Hardcoded batch size | Batch size 2000 on line ~568 — should be a parameter |
+| `print("Batching Begin AAA")` | Line ~560 — debug print that should be removed or gated behind `quietly` |
 
 ---
 

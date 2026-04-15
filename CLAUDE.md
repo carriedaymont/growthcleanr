@@ -175,38 +175,18 @@ function (line ~142 of `child_clean.R`) generates these codes:
 | `Include` | — | All | Value passes all checks |
 | `Exclude-Missing` | Init | All | NA, NaN, agedays < 0; also HC ≥ 5y |
 | `Exclude-Not-Cleaned` | Init | HEADCM | HC with agedays > 3 × 365.25 |
-| `Exclude-C-{p}-Unit-Error-High` | 3 | HT, WT | Unit error detected (too high); corrected |
-| `Exclude-C-{p}-Unit-Error-Low` | 3 | HT, WT | Unit error detected (too low); corrected |
-| `Exclude-C-{p}-Swapped-Measurements` | 4 | HT, WT | HT/WT swapped; corrected |
-| `Exclude-C-{p}-Carried-Forward` | 6 | All | Identical to prior-day value (not rescued) |
-| `Exclude-C-{p}-Absolute-BIV` | 7 | All | Outside absolute biological limits |
-| `Exclude-C-{p}-Standardized-BIV` | 7 | All | Z-score beyond age-dependent cutoffs |
+| `Exclude-C-{p}-CF` | 6 | All | Carried forward: identical to prior-day value (not rescued) |
+| `Exclude-C-{p}-BIV` | 7 | All | Biologically implausible value (absolute or standardized) |
 | `Exclude-C-{p}-Evil-Twins` | 9 | All | Adjacent extreme value pair/group |
-| `Exclude-C-{p}-EWMA1-Extreme` | 11 | All | Extreme EWMA outlier |
-| `Exclude-C-{p}-SDE-Identical` | 13 | All | Same-day duplicate, identical value |
-| `Exclude-C-{p}-SDE-All-Exclude` | 13 | All | All same-day values excluded |
-| `Exclude-C-{p}-SDE-All-Extreme` | 13 | All | All same-day values extreme |
-| `Exclude-C-{p}-SDE-EWMA` | 13 | All | SDE resolved by EWMA comparison |
-| `Exclude-C-{p}-SDE-EWMA-All-Extreme` | 13 | All | All SDE values extreme by EWMA |
-| `Exclude-C-{p}-SDE-One-Day` | 13 | All | All measurements on single day |
-| `Exclude-C-{p}-Temporary-Extraneous-Same-Day` | 5 | All | Temp SDE (may persist) |
-| `Exclude-C-{p}-EWMA2-middle` | 15 | All | Moderate EWMA: middle value |
-| `Exclude-C-{p}-EWMA2-birth-WT` | 16 | WT | Birth weight EWMA outlier |
-| `Exclude-C-{p}-EWMA2-birth-WT-ext` | 16 | WT | Birth weight EWMA (extended) |
-| `Exclude-C-{p}-EWMA2-first` | 15 | All | Moderate EWMA: first value |
-| `Exclude-C-{p}-EWMA2-first-ext` | 15 | All | Moderate EWMA: first (extended) |
-| `Exclude-C-{p}-EWMA2-last` | 15 | All | Moderate EWMA: last value |
-| `Exclude-C-{p}-EWMA2-last-high` | 15 | All | Moderate EWMA: last (high) |
-| `Exclude-C-{p}-EWMA2-last-ext` | 15 | All | Moderate EWMA: last (extended) |
-| `Exclude-C-{p}-EWMA2-last-ext-high` | 15 | All | Moderate EWMA: last (ext, high) |
-| `Exclude-C-{p}-EWMA2-birth-HT-HC` | 16 | HT, HC | Birth HT/HC EWMA outlier |
-| `Exclude-C-{p}-EWMA2-birth-HT-HC-ext` | 16 | HT, HC | Birth HT/HC EWMA (extended) |
-| `Exclude-C-{p}-Min-diff` | 17 | HT, HC | Height/HC decreased > allowed |
-| `Exclude-C-{p}-Max-diff` | 17 | HT, HC | Height/HC increased > allowed |
-| `Exclude-C-{p}-2-meas->1-year` | 19 | All | 2 meas >1 yr apart, one excluded |
-| `Exclude-C-{p}-2-meas-<1-year` | 19 | All | 2 meas <1 yr apart, one excluded |
-| `Exclude-C-{p}-1-meas` | 19 | All | Single measurement excluded |
-| `Exclude-C-{p}-Error-load` | 21 | All | Error ratio exceeds threshold |
+| `Exclude-C-{p}-Traj-Extreme` | 11 | All | Extreme EWMA outlier (EWMA1) |
+| `Exclude-C-{p}-Identical` | Early 13, 13 | All | Same-day duplicate, identical value |
+| `Exclude-C-{p}-Extraneous` | 13 | All | Same-day extraneous value (SDE loser by EWMA or other criteria) |
+| `Exclude-C-{p}-Traj` | 15, 16 | All | Moderate EWMA outlier (EWMA2): covers middle, first, last, birth WT, birth HT/HC, and all sub-variants |
+| `Exclude-C-{p}-Abs-Diff` | 17 | HT, HC | Height/HC velocity violation (increase > max or decrease > min allowed) |
+| `Exclude-C-{p}-Pair` | 19 | All | Subject with 2 measurements, one excluded |
+| `Exclude-C-{p}-Single` | 19 | All | Subject with 1 measurement, excluded |
+| `Exclude-C-{p}-Too-Many-Errors` | 21 | All | Error ratio exceeds threshold |
+| `Exclude-C-Temp-Same-Day` | 5 | All | **Internal only** — temporary SDE flag, must be resolved before output (not param-specific) |
 
 Where `{p}` = `WT`, `HT`, or `HC` depending on the row's param.
 
@@ -217,9 +197,24 @@ assigned in `cleangrowth()` before dispatch (not param-specific).
 adult codes (was previously missing adult codes, causing silent
 NAs in factor output).
 
+**Codes NOT implemented (Steps 3/4):** Unit error recovery
+(`recover.unit.error`) and measurement swapping are legacy
+features scheduled for redesign. No `Unit-Error-*` or
+`Swapped-Measurements` codes are assigned by the child
+algorithm.
+
+**Simplified vs. detailed codes:** Unlike the adult algorithm
+which has distinct codes for each sub-step (e.g., separate
+moderate EWMA codes for firstRV vs allRV), the child algorithm
+uses simplified codes. For example, all EWMA2 exclusions use
+`Traj` regardless of whether the value was a middle, first,
+last, or birth measurement. All SDE resolutions use either
+`Identical` or `Extraneous`. The specific sub-step logic is
+in the code comments but not reflected in the exclusion code.
+
 **Legacy codes:** Exclusion codes in `pediatric_clean_legacy.R`
-were NOT renamed — the legacy algorithm retains the old code names
-for backward compatibility.
+were NOT renamed — the legacy algorithm retains the old code
+names for backward compatibility.
 
 ### CF rescue
 
@@ -760,10 +755,9 @@ Requires installed package — see Known Issues. Run in background from Claude C
 - [ ] **LENGTHCM → HEIGHTCM:** No measurement adjustment for
   the ~0.5–0.7 cm supine/standing difference. Known
   limitation; future update planned.
-- [ ] **Unused variables in Step 19:** `abs_tbd.sd`,
-  `abs_ctbd.sd`, `med_dop`, `med_cdop` are computed but
-  never used. Leftover from refactoring. Harmless but
-  should be cleaned up.
+- [x] **Unused variables in Step 19:** `abs_tbd.sd`,
+  `abs_ctbd.sd`, `med_dop`, `med_cdop` — confirmed removed
+  in current code (verified 2026-04-15).
 
 ### Robustness audit (2026-04-14)
 
