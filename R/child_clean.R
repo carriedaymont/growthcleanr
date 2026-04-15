@@ -1147,10 +1147,10 @@ cleangrowth <- function(subjid,
         tmp[, all_identical := n_on_day > 1 & n_unique_vals == 1]
 
         # Age-dependent ID selection for identicals
-        tmp[, keep_id := ifelse(agedays == 0,
-                                min(as.numeric(internal_id), na.rm = TRUE),
-                                max(as.numeric(internal_id), na.rm = TRUE)),
-            by = .(subjid, agedays)]
+        tmp[, keep_id := {
+          ids <- as.numeric(internal_id)
+          if (agedays[1L] == 0L) min(ids) else max(ids)
+        }, by = .(subjid, agedays)]
 
         # Filter out non-selected identicals
         tmp <- tmp[!(all_identical & as.numeric(internal_id) != keep_id)]
@@ -3131,10 +3131,13 @@ cleanchild <- function(data.df,
   data.df[, n_same_value := sum(exclude == "Include"), by = .(subjid, param, agedays, v)]
   data.df[, has_dup := (n_same_value > 1)]
   # Age-dependent: keep lowest internal_id at birth, highest internal_id otherwise
-  data.df[, keep_id := fifelse(agedays == 0L,
-                               min(as.numeric(internal_id[exclude == "Include"]), na.rm = TRUE),
-                               max(as.numeric(internal_id[exclude == "Include"]), na.rm = TRUE)),
-          by = .(subjid, param, agedays, v)]
+  # Guard against groups with no included rows (empty vector → -Inf/Inf warning)
+  data.df[, keep_id := {
+    incl_ids <- as.numeric(internal_id[exclude == "Include"])
+    if (length(incl_ids) == 0L) NA_real_
+    else if (agedays[1L] == 0L) min(incl_ids)
+    else max(incl_ids)
+  }, by = .(subjid, param, agedays, v)]
   data.df[has_dup & exclude == "Include" & as.numeric(internal_id) != keep_id,
           exclude := .child_exc(param, "Identical")]
   data.df[, c("n_same_value", "has_dup", "keep_id") := NULL]
@@ -3746,7 +3749,9 @@ cleanchild <- function(data.df,
   # Pre-filter: EWMA1 exclusion requires |tbc.sd| > 3.5.
   # Skip groups where no Include observation has |tbc.sd| > 3.5.
   extreme_sp <- data.df[include_mask & sp_key %in% sp_to_process,
-                        .(max_abs_tbc = max(abs(tbc.sd), na.rm = TRUE)), by = sp_key]
+                        .(max_abs_tbc = if (any(!is.na(tbc.sd)))
+                            max(abs(tbc.sd), na.rm = TRUE) else 0),
+                        by = sp_key]
   sp_to_process <- extreme_sp[max_abs_tbc > 3.5, sp_key]
   if (!quietly)
     cat(sprintf("  EWMA1 pre-filter: %d/%d groups have |tbc.sd| > 3.5\n",
@@ -3954,20 +3959,20 @@ cleanchild <- function(data.df,
 
     # Mark SDE-Identical: all values on same day are identical
     # Age 0: keep lowest internal_id, age > 0: keep highest internal_id
-    data.sde[, keep_id := fifelse(agedays == 0L,
-                                  min(as.numeric(internal_id), na.rm = TRUE),
-                                  max(as.numeric(internal_id), na.rm = TRUE)),
-             by = .(subjid, param, agedays)]
+    data.sde[, keep_id := {
+      ids <- as.numeric(internal_id)
+      if (agedays[1L] == 0L) min(ids) else max(ids)
+    }, by = .(subjid, param, agedays)]
     data.sde[uniqueN(v) == 1L & as.numeric(internal_id) != keep_id,
              exclude := .child_exc(param, "Identical"),
              by = .(subjid, param, agedays)]
 
     # Mark SDE-Identical for duplicate values within same day
     # Age-dependent internal_id selection for duplicate values
-    data.sde[, keep_id_dup := fifelse(agedays == 0L,
-                                      min(as.numeric(internal_id), na.rm = TRUE),
-                                      max(as.numeric(internal_id), na.rm = TRUE)),
-             by = .(subjid, param, agedays, v)]
+    data.sde[, keep_id_dup := {
+      ids <- as.numeric(internal_id)
+      if (agedays[1L] == 0L) min(ids) else max(ids)
+    }, by = .(subjid, param, agedays, v)]
     data.sde[, dup_count := .N, by = .(subjid, param, agedays, v)]
     # Fix SDE-Identical bug: was exclude != "Include" (backwards)
     # Should mark currently-included duplicates as SDE-Identical (matches Stata line 206: exc==0)
