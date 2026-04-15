@@ -270,38 +270,101 @@ test_that("child algorithm excludes HEADCM > 3 years from cleaning", {
 # ---------------------------------------------------------------------------
 # Test 9: Extreme values get excluded
 # ---------------------------------------------------------------------------
-test_that("child algorithm excludes biologically implausible values", {
+test_that("child BIV: single extreme weight excluded as BIV", {
 
-  # Include some extreme values alongside plausible ones
+  # 200kg at 4 years is well above the absolute BIV threshold (>35kg for <2y, >600kg for all)
+  # but we want to trigger standardized BIV, so use a value that's implausible
+  # but below the absolute cap. 200kg at 4y should trigger standardized BIV.
   d <- data.table(
     id = 1:8,
     subjid = rep("subj001", 8),
     sex = rep(0L, 8),
     param = c("HEIGHTCM", "HEIGHTCM", "HEIGHTCM", "HEIGHTCM",
               "WEIGHTKG", "WEIGHTKG", "WEIGHTKG", "WEIGHTKG"),
-    agedays = c(365, 730, 1095, 1460,
-                365, 730, 1095, 1460),
-    measurement = c(75.0, 85.0, 300.0, 100.0,   # 300cm is extreme
-                    10.0, 12.0, 14.0, 200.0)     # 200kg at 4yrs is extreme
+    agedays = c(365L, 730L, 1095L, 1460L,
+                365L, 730L, 1095L, 1460L),
+    measurement = c(75.0, 85.0, 95.0, 100.0,       # HT: normal
+                    10.0, 12.0, 14.0, 200.0)        # WT: 200kg at 4y = BIV
   )
 
   res <- cleangrowth(
-    subjid = d$subjid,
-    param = d$param,
-    agedays = d$agedays,
-    sex = d$sex,
-    measurement = d$measurement,
-    id = d$id,
+    subjid = d$subjid, param = d$param, agedays = d$agedays,
+    sex = d$sex, measurement = d$measurement, id = d$id,
     quietly = TRUE
   )
 
-  # Extreme values should be excluded (not Include)
-  extreme_ht <- res[id == 3]  # 300cm height
-  extreme_wt <- res[id == 8]  # 200kg weight
-  expect_true(grepl("Exclude", extreme_ht$exclude),
-              info = "300cm height at 3 years should be excluded")
-  expect_true(grepl("Exclude", extreme_wt$exclude),
-              info = "200kg weight at 4 years should be excluded")
+  biv_wt <- res[id == 8]
+  expect_equal(as.character(biv_wt$exclude), "Exclude-C-WT-BIV",
+               info = "200kg weight at 4 years should be Exclude-C-WT-BIV")
+
+  # Normal values should not be BIV
+  expect_false(any(grepl("BIV", res[id != 8]$exclude)),
+               info = "Normal values should not be excluded as BIV")
+})
+
+test_that("child BIV: single extreme height excluded as BIV", {
+
+  # 300cm exceeds absolute BIV threshold (>244cm)
+  d <- data.table(
+    id = 1:8,
+    subjid = rep("subj001", 8),
+    sex = rep(0L, 8),
+    param = c("HEIGHTCM", "HEIGHTCM", "HEIGHTCM", "HEIGHTCM",
+              "WEIGHTKG", "WEIGHTKG", "WEIGHTKG", "WEIGHTKG"),
+    agedays = c(365L, 730L, 1095L, 1460L,
+                365L, 730L, 1095L, 1460L),
+    measurement = c(75.0, 85.0, 300.0, 100.0,      # HT: 300cm at 3y = BIV
+                    10.0, 12.0, 14.0, 16.0)         # WT: normal
+  )
+
+  res <- cleangrowth(
+    subjid = d$subjid, param = d$param, agedays = d$agedays,
+    sex = d$sex, measurement = d$measurement, id = d$id,
+    quietly = TRUE
+  )
+
+  biv_ht <- res[id == 3]
+  expect_equal(as.character(biv_ht$exclude), "Exclude-C-HT-BIV",
+               info = "300cm height at 3 years should be Exclude-C-HT-BIV")
+
+  # Normal values should not be BIV
+  expect_false(any(grepl("BIV", res[id != 3]$exclude)),
+               info = "Normal values should not be excluded as BIV")
+})
+
+test_that("child BIV: single extreme head circumference excluded as BIV", {
+
+  # 80cm HC exceeds absolute BIV threshold (>75cm)
+  # HC only cleaned for agedays <= 3*365.25 (1095.75)
+  d <- data.table(
+    id = 1:10,
+    subjid = rep("subj001", 10),
+    sex = rep(0L, 10),
+    param = c("HEIGHTCM", "HEIGHTCM", "HEIGHTCM",
+              "WEIGHTKG", "WEIGHTKG", "WEIGHTKG",
+              "HEADCM", "HEADCM", "HEADCM", "HEADCM"),
+    agedays = c(0L, 365L, 730L,
+                0L, 365L, 730L,
+                0L, 90L, 365L, 730L),
+    measurement = c(50.0, 75.0, 85.0,              # HT: normal
+                    3.5, 10.0, 12.0,               # WT: normal
+                    35.0, 40.0, 46.0, 80.0)        # HC: 80cm at 2y = BIV
+  )
+
+  res <- cleangrowth(
+    subjid = d$subjid, param = d$param, agedays = d$agedays,
+    sex = d$sex, measurement = d$measurement, id = d$id,
+    quietly = TRUE
+  )
+
+  biv_hc <- res[id == 10]
+  expect_equal(as.character(biv_hc$exclude), "Exclude-C-HC-BIV",
+               info = "80cm HC at 2 years should be Exclude-C-HC-BIV")
+
+  # Normal HC values should not be BIV
+  hc_normal <- res[param == "HEADCM" & id != 10]
+  expect_false(any(grepl("BIV", hc_normal$exclude)),
+               info = "Normal HC values should not be excluded as BIV")
 })
 
 # ---------------------------------------------------------------------------
