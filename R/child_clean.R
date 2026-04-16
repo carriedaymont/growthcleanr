@@ -371,8 +371,7 @@ cleangrowth <- function(subjid,
   result <- NULL
 
   sd.orig_uncorr <- agemonths <- ageyears_2b <- intwt <- fengadays <- pmagedays <- cagedays <-
-    unmod_zscore <- fen_wt_m <- fen_wt_su <- fen_wt_sl <- fen_ht_m <- fen_ht_su <- fen_ht_sl <-
-    fen_hc_m <- fen_hc_su <- fen_hc_sl <- cwho_cv <- ccdc_cv <-
+    unmod_zscore <- fen_param <- M <- S_upper <- S_lower <- cwho_cv <- ccdc_cv <-
     sd.c_cdc <- sd.c_who <- sd.c <- sd.corr <- seq_win <- sd.corr_abssumdiff <-
     sd.orig_abssumdiff <- orig_colnames <- ctbc.sd <- sum_sde <- no_sde <-
     sum_val <- no_dup_val <- no_outliers <- no_bigdiff <- nottoofar <- nnte <-
@@ -802,8 +801,9 @@ cleangrowth <- function(subjid,
         fentlms_foraga <- fread(
           system.file(file.path("extdata", "fentlms_foraga.csv.gz"),
                       package = "growthcleanr"))
-        fentlms_forz <- fread(
-          system.file(file.path("extdata", "fentlms_forz.csv.gz"),
+        # Fenton 2025 reference: M, S_upper, S_lower from extracted curves (CSD method)
+        fenton_ref <- fread(
+          system.file(file.path("extdata", "fenton2025_ms_lookup_smoothed.csv"),
                       package = "growthcleanr"))
 
         # Subset to potcorr subject rows only (typically <1% of data)
@@ -838,44 +838,41 @@ cleangrowth <- function(subjid,
         # replace fengadays with pmagedays to facilitate merging
         pc[, fengadays := pmagedays]
 
-        # Fenton merge 2: gestational age -> Fenton z-score parameters
+        # Fenton merge 2: gestational age -> Fenton 2025 reference (M, S_upper, S_lower)
+        # Map gc param names to Fenton reference param names for long-format merge
+        pc[, fen_param := fcase(
+          param == "WEIGHTKG", "weight",
+          param == "HEIGHTCM", "length",
+          param == "HEADCM",   "headcirc"
+        )]
         pc <- merge(
-          pc, fentlms_forz, by = c("sex", "fengadays"),
+          pc, fenton_ref[, .(sex, ga_days, param, M, S_upper, S_lower)],
+          by.x = c("sex", "fengadays", "fen_param"),
+          by.y = c("sex", "ga_days", "param"),
           all.x = TRUE)
 
         # Reset potcorr_wt when Fenton merge fails
-        # Equivalent to Stata lines 306-308
-        # If merge failed (fen_wt_m is NA), reset potcorr_wt for that row
-        pc[potcorr_wt == TRUE & is.na(fen_wt_m), potcorr_wt := FALSE]
+        # Only check weight rows (potcorr_wt is only TRUE on WEIGHTKG rows)
+        pc[potcorr_wt == TRUE & is.na(M), potcorr_wt := FALSE]
         # Recalculate subject-level potcorr
         pc[, potcorr := any(potcorr_wt), by = subjid]
 
-        # --- Fenton 2025 z-score calculation (split-S, L=1) ---
-        # Fenton 2025 uses a split-normal approach: separate S values for
-        # measurements above (S_upper) and below (S_lower) the median.
+        # --- Fenton 2025 z-score calculation (CSD method) ---
+        # Uses S_upper and S_lower extracted from plotted Fenton 2025 curves.
+        # CSD: z = (v - M) / (S * M), with S_upper when v >= M, S_lower when v < M.
         # Units: weight M is in grams, length/HC M is in cm.
         pc[, v_fenton := fifelse(param == "WEIGHTKG", v * 1000, v)]
 
-        # Select M, S_upper, S_lower by param type
-        pc[, fen_m := fcase(param == "WEIGHTKG", fen_wt_m,
-                                   param == "HEIGHTCM", fen_ht_m,
-                                   param == "HEADCM",   fen_hc_m)]
-        pc[, fen_su := fcase(param == "WEIGHTKG", fen_wt_su,
-                                    param == "HEIGHTCM", fen_ht_su,
-                                    param == "HEADCM",   fen_hc_su)]
-        pc[, fen_sl := fcase(param == "WEIGHTKG", fen_wt_sl,
-                                    param == "HEIGHTCM", fen_ht_sl,
-                                    param == "HEADCM",   fen_hc_sl)]
-
-        # Split-normal z-score: use S_upper when above median, S_lower when below
+        # CSD z-score: S_upper/S_lower are proportional SDs (CV-like),
+        # so absolute SD = S * M
         pc[, unmod_zscore := fifelse(
-          v_fenton >= fen_m,
-          (v_fenton - fen_m) / (fen_su * fen_m),
-          (v_fenton - fen_m) / (fen_sl * fen_m)
+          v_fenton >= M,
+          (v_fenton - M) / (S_upper * M),
+          (v_fenton - M) / (S_lower * M)
         )]
 
         # Clean up temporary variables
-        pc[, c("v_fenton", "fen_m", "fen_su", "fen_sl") := NULL]
+        pc[, c("v_fenton", "fen_param", "M", "S_upper", "S_lower") := NULL]
 
         # Assign Fenton z-score as initial sd.corr for potcorr subjects
         pc[potcorr == TRUE & !is.na(unmod_zscore),

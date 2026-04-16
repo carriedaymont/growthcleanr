@@ -238,16 +238,18 @@ NULL
 #'
 NULL
 
-#' Fenton Growth Curve Z-Scores
+#' Fenton 2025 Growth Reference (M, S_upper, S_lower)
 #'
-#' Fenton growth curves with premature infant z-scores for height and head
-#'circumference
+#' Fenton 2025 growth reference for premature infants. Contains median (M) and
+#' upper/lower standard deviations (S_upper, S_lower) extracted from plotted
+#' Fenton 2025 curves, for weight, length, and head circumference by sex and
+#' gestational age in days. Used with the CSD method for z-score calculation.
 #'
-#' @name fentlms_forz
+#' @name fenton2025_ms_lookup_smoothed
 #'
-#' @section fentlms_forz.csv.gz:
+#' @section fenton2025_ms_lookup_smoothed.csv:
 #'
-#' Used in function `cleangrowth()`
+#' Used in function `cleangrowth()` for GA correction (Step 2b).
 #'
 #'
 NULL
