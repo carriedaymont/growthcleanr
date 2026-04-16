@@ -224,16 +224,16 @@ NULL
 #'
 NULL
 
-#' Fenton Growth Curves
+#' Fenton Weight-to-GA Lookup
 #'
-#' Fenton growth curves with premature infant data with sex, age, and integer
-#' weight
+#' Fenton growth curves with premature infant data mapping sex and integer
+#' weight (grams, rounded to nearest 10) to estimated gestational age in days.
 #'
-#' @name fentlms_foraga
+#' @name fent_foraga
 #'
-#' @section fentlms_foraga.csv.gz:
+#' @section fent_foraga.csv.gz:
 #'
-#' Used in function `cleangrowth()`
+#' Used in function `cleangrowth()` for GA correction (Step 2b).
 #'
 #'
 NULL

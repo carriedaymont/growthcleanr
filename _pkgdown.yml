@@ -69,8 +69,8 @@ reference:
       - who_ht_maxvel_2sd
       - who_ht_vel_2sd
       - who_ht_vel_3sd
-      - fentlms_foraga
-      - fentlms_forz
+      - fent_foraga
+      - fenton2025_ms_lookup_smoothed
       - growth_cdc_ext_infants
       - growth_who_ext
       - rc-reference-medians

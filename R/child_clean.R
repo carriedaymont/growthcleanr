@@ -798,8 +798,8 @@ cleangrowth <- function(subjid,
 
       if (has_potcorr) {
         # Read Fenton reference data (only when potcorr subjects exist)
-        fentlms_foraga <- fread(
-          system.file(file.path("extdata", "fentlms_foraga.csv.gz"),
+        fent_foraga <- fread(
+          system.file(file.path("extdata", "fent_foraga.csv.gz"),
                       package = "growthcleanr"))
         # Fenton 2025 reference: M, S_upper, S_lower from extracted curves (CSD method)
         fenton_ref <- fread(
@@ -817,7 +817,7 @@ cleangrowth <- function(subjid,
 
         # Fenton merge 1: weight -> estimated gestational age
         pc <- merge(
-          pc, fentlms_foraga, by = c("sex", "intwt"),
+          pc, fent_foraga, by = c("sex", "intwt"),
           all.x = TRUE)
 
         # Propagate fengadays ONLY from potcorr_wt rows

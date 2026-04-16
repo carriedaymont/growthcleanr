@@ -462,8 +462,8 @@ the algorithm detect implausible measurements.
 |------------|--------|----------|
 | `growthfile_who.csv.gz` | WHO 2006 | HT/WT age < 5y; all HEADCM |
 | `growthfile_cdc_ext_infants.csv.gz` | CDC 2000 extended | HT/WT age ≥ 2y |
-| `fentlms_foraga.csv.gz` | Fenton | Weight → est. gestational age |
-| `fentlms_forz.csv.gz` | Fenton | GA-corrected z-scores |
+| `fent_foraga.csv.gz` | Fenton | Weight → est. gestational age |
+| `fenton2025_ms_lookup_smoothed.csv` | Fenton 2025 | M, S_upper, S_lower for CSD z-scores |
 | `rcfile-2023-08-15_format.csv.gz` | Derived | Recentering medians |
 
 ### Z-score variants
