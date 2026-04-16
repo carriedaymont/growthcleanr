@@ -10,19 +10,14 @@ cleangrowth(
   agedays,
   sex,
   measurement,
-  recover.unit.error = FALSE,
   sd.extreme = 25,
   z.extreme = 25,
   error.load.mincount = 2,
   error.load.threshold = 0.5,
-  lt3.exclude.mode = "default",
   sd.recenter = NA,
-  sdmedian.filename = "",
-  sdrecentered.filename = "",
   include.carryforward = FALSE,
   cf_rescue = "standard",
   cf_detail = FALSE,
-  ewma.exp = -1.5,
   ref.data.path = "",
   log.path = NA,
   parallel = FALSE,
@@ -32,14 +27,13 @@ cleangrowth(
   adult_permissiveness = "looser",
   adult_scale_max_lbs = Inf,
   weight_cap,
-  prelim_infants = NULL,
-  use_legacy_algorithm = FALSE,
   ewma_window = 15,
   id = NULL,
   ref_tables = NULL,
   cached_results = NULL,
   changed_subjids = NULL,
-  tri_exclude = FALSE
+  tri_exclude = FALSE,
+  batch_size = 2000
 )
 }
 \arguments{
@@ -60,11 +54,6 @@ metric during algorithm calculations.}
 \item{measurement}{Numeric vector containing the actual measurement data.  Weight must be in
 kilograms (kg), and linear measurements (height vs. length) in centimeters (cm).}
 
-\item{recover.unit.error}{Indicates whether the cleaning algorithm should
-attempt to identify unit errors (I.e. inches vs. cm, lbs vs. kg). If unit
-errors are identified, the value will be corrected and retained within the
-cleaning algorithm as a valid measurement.  Defaults to FALSE.}
-
 \item{sd.extreme}{Measurements more than sd.extreme standard deviations from
 the mean (either above or below) will be flagged as invalid. Defaults to 25.}
 
@@ -77,30 +66,10 @@ considering excluding all measurements. Defaults to 2.}
 \item{error.load.threshold}{threshold of percentage of excluded measurement count to included measurement
 count that must be exceeded before excluding all measurements of either parameter. Defaults to 0.5.}
 
-\item{sd.recenter}{specifies how to recenter medians.
-
-\strong{Child algorithm (default, \code{use_legacy_algorithm = FALSE}):} This
-parameter is ignored. Recentering always uses the built-in reference file
-(\code{rcfile-2023-08-15_format.csv.gz}), which was derived independently of
-any input dataset.
-
-\strong{Legacy algorithm only (\code{use_legacy_algorithm = TRUE}):} May be a
-data frame or table with median SD-scores per day of life by gender and
-parameter, or \code{"NHANES"} or \code{"derive"} as a character vector.
-\itemize{
-\item If a data set, columns must include param, sex, agedays, and sd.median
-\item If \code{"nhanes"}, use NHANES reference medians
-\item If \code{"derive"}, derive medians from input data
-\item If \code{NA} (default): derive from input if N >= 5,000, otherwise use NHANES
-}}
-
-\item{sdmedian.filename}{Legacy algorithm only. Name of file to save sd.median
-data calculated on the input dataset to as CSV. Defaults to "", for which this
-data will not be saved.}
-
-\item{sdrecentered.filename}{Legacy algorithm only. Name of file to save
-re-centered data to as CSV. Defaults to "", for which this data will not be
-saved. Ignored by the child algorithm.}
+\item{sd.recenter}{Optional. A data.table with columns \code{param}, \code{sex},
+\code{agedays}, and \code{sd.median} to use for recentering instead of the
+built-in reference file (\code{rcfile-2023-08-15_format.csv.gz}). Defaults to
+NA, which uses the built-in file.}
 
 \item{include.carryforward}{Deprecated. Use \code{cf_rescue} instead.
 \code{include.carryforward = TRUE} maps to \code{cf_rescue = "all"}.
@@ -120,14 +89,6 @@ columns in the output. \code{cf_status} is one of: NA (not a CF candidate),
 "CF-NR" (CF, does not meet rescue criteria), or "CF-Resc" (CF, meets rescue
 criteria). \code{cf_deltaZ} is the absolute z-score difference used for rescue
 evaluation. Defaults to FALSE.}
-
-\item{ewma.exp}{Exponent to use for weighting measurements in the
-exponentially weighted moving average calculations. Defaults to -1.5.
-This exponent should be negative in order to weight growth measurements
-closer to the measurement being evaluated more strongly. Exponents that are
-further from zero (e.g. -3) will increase the relative influence of
-measurements close in time to the measurement being evaluated compared to
-using the default exponent.}
 
 \item{ref.data.path}{Path to reference data. If not supplied, the year 2000
 Centers for Disease Control (CDC) reference data will be used.}
@@ -158,14 +119,6 @@ for all adult BIV limits, EWMA caps, height bands, etc. See
 weight data. Weights at or above this value are excluded. Defaults to Inf.}
 
 \item{weight_cap}{Deprecated. Use \code{adult_scale_max_lbs} instead.}
-
-\item{prelim_infants}{Deprecated. Use \code{use_legacy_algorithm} instead.
-Old mapping: \code{prelim_infants = TRUE} → child algorithm (use_legacy_algorithm = FALSE);
-\code{prelim_infants = FALSE} → legacy algorithm (use_legacy_algorithm = TRUE).}
-
-\item{use_legacy_algorithm}{Logical. If TRUE, run the legacy pediatric algorithm
-(\code{cleanlegacy}, formerly \code{cleanbatch}). If FALSE (default), run the child
-algorithm (\code{cleanchild}), which includes enhanced methods for children 0-2 years.}
 
 \item{id}{Vector of unique ids for each row in the database.}
 
@@ -198,20 +151,24 @@ Defaults to NULL.}
 \item{tri_exclude}{Logical. If TRUE, include a \code{tri_exclude} column in the output
 that classifies each row as \code{"Include"}, \code{"Same-Day"} (same-day extraneous
 values), or \code{"Exclude"} (all other exclusions). Defaults to FALSE.}
+
+\item{batch_size}{Number of subjects per processing batch. Subjects are never split
+across batches. Defaults to 2000.}
 }
 \value{
-Vector of exclusion codes for each of the input measurements.
+A data.table with columns: \code{id} (user-provided row identifier),
+\code{exclude} (exclusion code or \code{"Include"}), \code{param},
+\code{cf_rescued}, \code{sd.orig_who}, \code{sd.orig_cdc}, \code{sd.orig},
+\code{tbc.sd}, \code{ctbc.sd}, \code{final_tbc}. Adult rows additionally
+include \code{mean_ht} and \code{bin_result} (NA for child rows).
 
-Possible values for each code are:
-\itemize{
-\item 'Include', 'Unit-Error-High', 'Unit-Error-Low', 'Swapped-Measurements', 'Missing',
-\item 'Exclude-Carried-Forward', 'Exclude-SD-Cutoff', 'Exclude-EWMA-Extreme', 'Exclude-EWMA-Extreme-Pair',
-\item 'Exclude-Extraneous-Same-Day',
-\item 'Exclude-EWMA-8', 'Exclude-EWMA-9', 'Exclude-EWMA-10', 'Exclude-EWMA-11', 'Exclude-EWMA-12', 'Exclude-EWMA-13', 'Exclude-EWMA-14',
-\item 'Exclude-Min-Height-Change', 'Exclude-Max-Height-Change',
-\item 'Exclude-Pair-Delta-17', 'Exclude-Pair-Delta-18', 'Exclude-Pair-Delta-19',
-\item 'Exclude-Single-Outlier', 'Exclude-Too-Many-Errors', 'Exclude-Too-Many-Errors-Other-Parameter'
-}
+Child exclusion codes: \code{Exclude-C-CF}, \code{Exclude-C-BIV},
+\code{Exclude-C-Evil-Twins}, \code{Exclude-C-Traj-Extreme},
+\code{Exclude-C-Identical}, \code{Exclude-C-Extraneous},
+\code{Exclude-C-Traj}, \code{Exclude-C-Abs-Diff},
+\code{Exclude-C-Pair}, \code{Exclude-C-Single},
+\code{Exclude-C-Too-Many-Errors}, \code{Exclude-Missing},
+\code{Exclude-Not-Cleaned}.
 }
 \description{
 Clean growth measurements

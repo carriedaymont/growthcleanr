@@ -18,11 +18,6 @@ All of the following options may be set as additional parameters in the call to
 
 The following options change the behavior of the growthcleanr algorithm.
 
-- `recover.unit.error` - default `FALSE`; when `FALSE`, measurements identified
-  as unit errors (e.g., apparent height values in inches instead of centimeters)
-  will be flagged but not corrected, when `TRUE` these values will be corrected
-  and included as valid measurements for cleaning.
-
 - `sd.extreme` - default `25`; a very extreme value check on modified
   (recentered) Z-scores used as a first-pass elimination of clearly implausible
   values, often due to misplaced decimals.
@@ -40,16 +35,13 @@ configured to be lower values, measurements eliminated at the early step which
 checks against these extreme values will not be further considered using later
 techniques.
 
-- `include.carryforward` - default `FALSE`; if set to `TRUE`, `growthcleanr`
-  will skip algorithm step 9, which identifies carried forward measurements, and
-  will not flag these values for exclusion.
+- `include.carryforward` - deprecated; use `cf_rescue` instead.
+  `include.carryforward = TRUE` maps to `cf_rescue = "all"`.
 
-- `ewma.exp` - default `-1.5`; the exponent used for weighting measurements when
-  calculating exponentially weighted moving average (EWMA). This exponent should
-  be negative to weight growth measurements closer to the measurement being
-  evaluated more strongly. Exponents that are further from zero (e.g., `-3`)
-  will increase the relative influence of measurements close in time to the
-  measurement being evaluated compared to using the default exponent.
+- `cf_rescue` - default `"standard"`; controls carried-forward value handling.
+  `"standard"` uses age/interval/param-specific lookup thresholds to rescue
+  values with small z-score differences. `"none"` excludes all carried-forward
+  values. `"all"` rescues all carried-forward values (no CF exclusions).
 
 - `ref.data.path` - defaults to using CDC reference data from year 2000; supply
   a file path to use alternate reference data. Note that when running from an
@@ -65,31 +57,11 @@ techniques.
   (e.g., if 3 of 5 WTs are excluded, and 5 corresponding HTs are included, this
   exceeds the 0.5 threshold and the other two WTs will be excluded).
 
-- `lt3.exclude.mode` - default `default`; determines type of exclusion procedure
-  to use for 1 or 2 measurements of one type without matching same ageday
-  measurements for the other parameter. Options include:
-
-  - `default` - standard growthcleanr approach
-  - `flag.both` - in case of two measurements with at least one beyond
-    thresholds, flag both instead of one (as in default)
-
-- `sd.recenter` - default `NA`; specifies how to recenter medians. May be a data frame
-  or table w/median SD-scores per day of life by gender and parameter, or "`nhanes`"
-  or "`derive`" as a character vector.
-
-  - If `sd.recenter` is specified as a data set, use the data set
-  - If `sd.recenter` is specified as "`nhanes`", use NHANES reference medians
-  - If `sd.recenter` is specified as "`derive`", derive from input
-  - If `sd.recenter` is not specified or `NA`:
-    - If the input set has at least 5,000 observations, derive medians from input
-    - If the input set has fewer than 5,000 observations, use NHANES
-
-  If specifying a data set, columns must include param, sex, agedays, and sd.median
-  (referred to elsewhere as "modified Z-score"), and those medians will be used for
-  centering. This data set must include a row for every ageday present in the dataset
-  to be cleaned; the NHANES reference medians include a row for every ageday in the
-  range (731-7305 days). A summary of how the NHANES reference medians were derived is
-  below under [NHANES reference data](#nhanes-reference-medians-1).
+- `sd.recenter` - default `NA`; specifies how to recenter medians. The child
+  algorithm always uses the built-in reference file
+  (`rcfile-2023-08-15_format.csv.gz`), which was derived independently of any
+  input dataset. Custom recentering via a user-supplied data.table is supported;
+  columns must include param, sex, agedays, and sd.median.
 
 - `adult_cutpoint` - default `20`; number between 18 and 20, describing age
   limit in years above which the pediatric algorithm should not apply (<
@@ -97,11 +69,9 @@ techniques.
   Numbers outside this range will be changed to the closest number within the
   range.
 
-- `weight_cap` - default `Inf`; weight_cap Positive number, describing a weight
-  cap in kg (rounded to the nearest .1, +/- .1) within an adult dataset. This
-  may be used when a dataset shared for research is known to clamp values for
-  privacy reasons. If there is no weight cap, set to Inf (default). This option
-  is not used with pediatric subjects.
+- `adult_scale_max_lbs` - default `Inf`; physical scale upper limit in pounds
+  for adult weight data. Weights at or above this value are excluded. (Replaces
+  the deprecated `weight_cap` parameter.)
 
 ## Operational options
 
@@ -119,55 +89,25 @@ effect on the algorithm itself.
   returned by the `getDoParWorkers()` function in the `foreach` package. Note
   that processing in parallel may affect overall system performance.
 
-- `sdmedian.filename` - filename for optionally saving sd.median data calculated
-  on the input dataset to as CSV. Defaults to `""`, for which this data will not
-  be saved. Use for extracting medians for parallel processing scenarios other
-  than the built-in parallel option. See notes on [large data sets](#largedata)
-  for details.
-
-- `sdrecentered.filename` - filename to save re-centered data to as CSV.
-  Defaults to "", for which this data will not be saved. Useful for
-  post-processing and debugging.
-
-- `adult_columns_filename` - default `""`; Name of file to save original adult
-  data, with additional output columns to as CSV. Defaults to "", for which this
-  data will not be saved. Useful for post-analysis. For more information on this
-  output, please see README.
-
 - `quietly` - default `TRUE`; when `TRUE`, displays function messages and will
   output log files when `parallel` is `TRUE`.
 
 - `log.path` - default `"."`; sets directory for batch log file output when
   processing with `parallel = TRUE`. A new directory will be created if necessary.
 
-## NHANES reference medians
+## Recentering reference data
 
-`growthcleanr`
-[releases](https://github.com/carriedaymont/growthcleanr/releases) up to 1.2.4
-offered two options for recentering medians, either the default of deriving
-medians from the input set, or supplying an externally-defined set of medians.
-These left out an option for researchers working with either small datasets or
-with data which might otherwise not be representative of the population, as
-deriving medians from the input set in those cases might be problematic. To
-provide a standard default reference to address these latter cases, a set of
-medians were derived from the [National Health and Nutrition Examination
-Survey](https://wwwn.cdc.gov/nchs/nhanes/Default.aspx) (NHANES). A summary of
-that process is below. As of release 1.2.5, the default behavior is:
+The child algorithm uses a built-in reference file
+(`rcfile-2023-08-15_format.csv.gz`) for recentering z-scores. This file was
+derived from NHANES data and is used automatically; users do not need to
+configure recentering for most use cases.
 
-- If `sd.recenter` is specified as a data set, use the data set
-- If `sd.recenter` is specified as `nhanes`, use NHANES
-- If `sd.recenter` is specified as `derive`, derive from input
-- If `sd.recenter` is not specified or `NA`:
-  - If the input set has at least 5,000 observations, derive medians from input
-  - If the input set has fewer than 5,000 observations, use NHANES
-
-With the verbose `cleangrowth()` option `quietly = FALSE`, the recentering
-medians approach used will be noted in the output. If the input set has fewer
-than 100 observations for any age-year, this will also be noted in the output.
+Custom recentering is supported via the `sd.recenter` parameter by passing a
+data.table with columns `param`, `sex`, `agedays`, and `sd.median`.
 
 ### Derivation process
 
-The NHANES reference medians are based primarily on data from NHANES 2009-2010
+The built-in reference medians are based primarily on data from NHANES 2009-2010
 through 2017-2018, including approximately 39,000 heights/lengths and weights
 from children and adolescents between the ages of 0 months and <240 months.
 Weight and height SD scores were calculated from the [L, M, and S

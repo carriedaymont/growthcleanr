@@ -6,7 +6,7 @@
 (linked mode). For each excluded value, finds all other values with the
 same measurement that are still "Include" — including extraneous values
 whose is_rv flag may have been cleared by redo_identify_rv(). Marks them
-with "\if{html}{\out{<code>}}-RV-propagated". This is forward-only propagation (firstRV →
+with "\if{html}{\out{<code>}}-RV-Propagated". This is forward-only propagation (firstRV →
 later RVs + extraneous), unlike Step 4W's bidirectional scale-max propagation.}
 \usage{
 propagate_to_rv(exc_codes, w_subj_df, w_subj_keep)
@@ -26,7 +26,7 @@ Propagate firstRV exclusions forward to RV copies and extraneous values
 (linked mode). For each excluded value, finds all other values with the
 same measurement that are still "Include" — including extraneous values
 whose is_rv flag may have been cleared by redo_identify_rv(). Marks them
-with "\if{html}{\out{<code>}}-RV-propagated". This is forward-only propagation (firstRV →
+with "\if{html}{\out{<code>}}-RV-Propagated". This is forward-only propagation (firstRV →
 later RVs + extraneous), unlike Step 4W's bidirectional scale-max propagation.
 }
 \keyword{internal}

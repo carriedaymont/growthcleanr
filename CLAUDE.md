@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-github-latest (growthcleanr)
 
-**Last updated:** 2026-04-16 (legacy removal: deleted pediatric_clean_legacy.R, pediatric_support_legacy.R, R/deprec/, R/modified_source_code/, legacy extdata; removed legacy parameters from cleangrowth())
+**Last updated:** 2026-04-16 (doc cleanup: deleted orphaned man pages, fixed stale vignettes, regenerated roxygen, removed dead code/comments, `as_matrix_delta` now internal)
 
 ## Overview
 
@@ -51,7 +51,7 @@ This CLAUDE.md covers both the child and adult algorithms.
 
 | File | What it contains |
 |------|------------------|
-| `R/child_clean.R` | `cleangrowth()` entry point + exports (top of file); `gc_preload_refs()` (pre-loads reference closures for repeated calls); `cleanchild()` main algorithm + support functions (`.child_valid()`, `.child_exc()`, `temporary_extraneous_infants()`, `calc_otl_evil_twins()`, `calc_and_recenter_z_scores()`, `ewma()`, `ewma_cache_init()`/`ewma_cache_update()`, `get_dop()`, `read_anthro()`) |
+| `R/child_clean.R` | `cleangrowth()` entry point + exports (top of file); `gc_preload_refs()` (pre-loads reference closures for repeated calls); `cleanchild()` main algorithm + support functions (`.child_valid()`, `.child_exc()`, `temporary_extraneous_infants()`, `calc_otl_evil_twins()`, `calc_and_recenter_z_scores()`, `ewma()`, `as_matrix_delta()` (internal), `ewma_cache_init()`/`ewma_cache_update()`, `get_dop()`, `read_anthro()`) |
 | `R/utils.R` | Shared utilities (does NOT contain `.child_valid()`) |
 | `R/adult_clean.R` | `cleanadult()` main algorithm — permissiveness framework, 14 steps |
 | `R/adult_support.R` | Adult support functions — permissiveness presets, EWMA, BIV, height groups, evil twins, error load, etc. |
@@ -741,6 +741,18 @@ degrade on large/unusual datasets. No blocking issues found.
 
 See git history for full details on each fix.
 
+- **Doc/dead-code cleanup (2026-04-16):** Deleted 6 orphaned
+  man pages for removed extdata files. Removed dead `nnte`
+  column assignment and unused NULL declarations (`sum_val`,
+  `no_dup_val`, `no_outliers`, `no_bigdiff`, `nottoofar`,
+  `nnte_full`). Fixed 3 stale comments (legacy file refs).
+  Cleaned `_pkgdown.yml` (removed deleted functions/datasets).
+  Updated vignettes (removed `prelim-infants-algorithm.Rmd`,
+  fixed stale params in `configuration.Rmd`, `usage.Rmd`,
+  `large-data-sets.Rmd`). Fixed `ewma()` roxygen (added
+  missing `@param` tags, separated from `as_matrix_delta`).
+  `as_matrix_delta` now internal (removed from exports).
+  Regenerated all man pages via `roxygenise()`.
 - **Legacy removal (2026-04-16):** Deleted
   `pediatric_clean_legacy.R`, `pediatric_support_legacy.R`,
   `R/deprec/`, `R/modified_source_code/`, 5 legacy extdata
@@ -812,9 +824,10 @@ as changes don't affect algorithm performance).
   NAMESPACE but not declared in DESCRIPTION. Add to Imports.
   (~2 min)
 - [ ] **Vignettes excluded via `.Rbuildignore`:** `^vignettes$`
-  prevents vignette building. Either fix vignettes to build
-  cleanly or remove vignette files. (~1–4 hours depending on
-  vignette state)
+  prevents vignette building. Stale parameter references cleaned
+  up (2026-04-16): removed `prelim-infants-algorithm.Rmd`,
+  updated `configuration.Rmd`, `usage.Rmd`, `large-data-sets.Rmd`.
+  Still need to verify vignettes build cleanly or remove them.
 - [ ] **Package tarball > 5 MB:** `inst/extdata/` alone is
   ~5.3 MB. `test_syngrowth_sas_output_compare.csv.gz` (1.8 MB)
   is the largest — move to a companion data package or remove
@@ -840,6 +853,12 @@ as changes don't affect algorithm performance).
 - [ ] **Verify `LICENSE` file exists:** DESCRIPTION says
   `MIT + file LICENSE`. Confirm plain `LICENSE` file (not
   just `LICENSE.md`) is at package root.
+- [x] **Orphaned man pages cleaned up (2026-04-16):** Deleted
+  `bmianthro.Rd`, `lenanthro.Rd`, `weianthro.Rd`,
+  `nhanes-reference-medians.Rd`, `growth_cdc_ext.Rd`,
+  `fentlms_forz.Rd`. Regenerated `cleangrowth.Rd`, `ewma.Rd`,
+  `fenton2025_ms_lookup_smoothed.Rd` via `roxygenise()`.
+  `as_matrix_delta` removed from exports (internal helper).
 - [ ] **Roxygen return value outdated for `cleangrowth()`:**
   Still describes "Vector of exclusion codes" — should describe
   the data.table with all columns including adult-specific

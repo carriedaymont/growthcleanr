@@ -82,23 +82,17 @@ For complete information about the options that can be set on the
 `cleangrowth()` function, see [Configuration](#configuration). Below are a few
 additional examples:
 
-This example shows three configuration options in use:
+This example shows two configuration options in use:
 
 ```{r, eval = FALSE}
 cleaned_data <- data[,
   gcr_result_both := cleangrowth(
     subjid, param, agedays, sex, measurement,
-    lt3.exclude.mode = "flag.both",
     ref.data.path = "inst/extdata/",
     quietly = FALSE
   )
 ]
 ```
-
-- `lt3.exclude.mode = "flag.both"` will exclude both measurements for a
-  subject if they only have two unexcluded measurements of one parameter type
-  with at least one implausible value and no same age-day measurements of the
-  other parameter.
 
 - `ref.data.path = "inst/extdata"` shouldn't be necessary if you have the
   `growthcleanr` package installed, but if you are running it from its

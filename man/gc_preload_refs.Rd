@@ -12,11 +12,10 @@ extdata directory. Pass an explicit path only if using custom reference
 files.}
 }
 \value{
-A named list with three \code{read_anthro} closures:
+A named list with two \code{read_anthro} closures:
 \describe{
-\item{mtz_cdc_prelim}{CDC-only, prelim_infants = TRUE (used by child algorithm)}
-\item{mtz_who_prelim}{WHO+CDC, prelim_infants = TRUE (used by child algorithm)}
-\item{mtz_cdc}{CDC-only, prelim_infants = FALSE (used by legacy algorithm)}
+\item{mtz_cdc_prelim}{CDC-only (used by child algorithm)}
+\item{mtz_who_prelim}{WHO+CDC (used by child algorithm)}
 }
 }
 \description{

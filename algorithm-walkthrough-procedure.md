@@ -140,7 +140,7 @@ moving to algorithm steps.
 
 | Chunk | Approx lines | What it does |
 |-------|-------------|--------------|
-| Parameter deprecation & validation | 383–410 | `weight_cap`→`adult_scale_max_lbs`, `include.carryforward`→`cf_rescue`, `prelim_infants`→`use_legacy_algorithm` |
+| Parameter deprecation & validation | 333–365 | `weight_cap`→`adult_scale_max_lbs`, `include.carryforward`→`cf_rescue` |
 | Partial-run mode | 428–507 | `cached_results` / `changed_subjids` auto-detect and explicit filtering |
 | Data construction + input validation | 509–558 | `data.all.ages` build, `internal_id` creation, sex recoding, param validation, cutpoint clamping |
 | Outer batching + batch-invariant setup | 559–763 | `exclude.levels` (child + adult), velocity table loading (Tanner, WHO), batching by 2000 subjects |
@@ -149,7 +149,7 @@ moving to algorithm steps.
 | Z-score calculation (CSD) | 888–936 | WHO/CDC closures, blending (WHO<2y, blend 2–5y, CDC>5y), HC always WHO |
 | Step 2b: GA correction (potcorr) | 940–1469 | Fenton merge, split-normal z, corrected WHO/CDC, recentering, `sd.median` file, EWMA fields |
 | Parallel setup | 796–825 | `var_for_par`, cluster creation/export |
-| Algorithm dispatch | 1470–1700 | Params passed to `cleanchild()`/`cleanlegacy()`/`cleanadult()`, adult-specific setup |
+| Algorithm dispatch | 1470–1700 | Params passed to `cleanchild()`/`cleanadult()`, adult-specific setup |
 | Output assembly | 1719–1854 | Child+adult merge, `cf_rescued`/`mean_ht`/`bin_result`, `data.batch` join, partial-run merge, `bin_exclude`/`tri_exclude`, safety check |
 
 ---
@@ -221,9 +221,9 @@ For each step, systematically check all items that apply. Items are marked
 
    **[child] Configurable parameter defaults** — Verify that configurable
    parameter defaults match the code and narrative. The child algorithm has
-   ~13 configurable parameters (e.g., `sd.extreme`, `error.load.threshold`,
-   `ewma_window`, `lt3.exclude.mode`, `recover.unit.error`). No permissiveness
-   levels for 3.0.0.
+   configurable parameters (e.g., `sd.extreme`, `error.load.threshold`,
+   `ewma_window`, `cf_rescue`, `batch_size`). No permissiveness levels for
+   3.0.0.
 
 7. **[both] Step linkage** — "Prior Step" and "Next Step" in each narrative
    summary table must match actual algorithm flow. Renumbered or reordered

@@ -374,8 +374,7 @@ cleangrowth <- function(subjid,
     unmod_zscore <- fen_param <- M <- S_upper <- S_lower <- cwho_cv <- ccdc_cv <-
     sd.c_cdc <- sd.c_who <- sd.c <- sd.corr <- seq_win <- sd.corr_abssumdiff <-
     sd.orig_abssumdiff <- orig_colnames <- ctbc.sd <- sum_sde <- no_sde <-
-    sum_val <- no_dup_val <- no_outliers <- no_bigdiff <- nottoofar <- nnte <-
-    nnte_full <- NULL
+    NULL
 
   # preprocessing ----
 
@@ -1118,9 +1117,8 @@ cleangrowth <- function(subjid,
     # WHO reference for HC only goes up to 5 years
     data.all[param == "HEADCM" & agedays >= 5*365.25, exclude := 'Exclude-Missing']
 
-    # Set nnte=FALSE for all rows (NNTE was not helpful for efficiency;
-    # deterministic pre-filters in CF Step 6 and SDE Step 13 are better)
-    data.all[, nnte := FALSE]
+    # NNTE removed: deterministic pre-filters in CF Step 6 and SDE Step 13
+    # are used instead.
     # pediatric: cleanbatch (most of steps) ----
 
     # NOTE: the rest of cleangrowth's steps are done through cleanbatch().
@@ -1620,6 +1618,14 @@ gc_preload_refs <- function(path = "") {
   )
 }
 
+# Convert vector of ages (days) into pairwise absolute-difference matrix.
+# Used by ewma() for age-gap weighting.
+as_matrix_delta <- function(agedays) {
+  n <- length(agedays)
+  delta <- abs(matrix(rep(agedays, n), n, byrow = TRUE) - agedays)
+  return(delta)
+}
+
 #' Exponentially Weighted Moving Average (EWMA)
 #'
 #' \code{ewma} calculates the exponentially weighted moving average (EWMA) for a set of numeric observations over time.
@@ -1631,6 +1637,12 @@ gc_preload_refs <- function(path = "") {
 #' @param ewma.exp Exponent to use for weighting.
 #'
 #' @param ewma.adjacent Specify whether EWMA values excluding adjacent measurements should be calculated.  Defaults to TRUE.
+#'
+#' @param window Maximum number of observations on each side for EWMA weighting.
+#'   Default 15. Set to Inf to disable windowing.
+#'
+#' @param cache_env Optional environment for caching EWMA intermediate results.
+#'   Used internally for performance. Defaults to NULL.
 #'
 #' @return Data frame with 3 variables:
 #' * The first variable (ewma.all) contains the EWMA at observation time
@@ -1658,18 +1670,6 @@ gc_preload_refs <- function(path = "") {
 #'
 #' # Calculate exponentially weighted moving average
 #' e_df <- ewma(df_stats$agedays, sd, ewma.exp = -1.5)
-#' Convert vector of ages (days) into pairwise absolute-difference matrix.
-#' Used by ewma() for age-gap weighting. Also defined in
-#' pediatric_support_legacy.R for the legacy algorithm.
-#'
-#' @keywords internal
-#' @noRd
-as_matrix_delta <- function(agedays) {
-  n <- length(agedays)
-  delta <- abs(matrix(rep(agedays, n), n, byrow = TRUE) - agedays)
-  return(delta)
-}
-
 ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 15, cache_env = NULL) {
   # window parameter limits EWMA to max window positions on each side.
   # Default 15 is the R design choice; pass window = 25 to match Stata behavior.
@@ -2434,9 +2434,7 @@ calc_and_recenter_z_scores <- function(df, cn, ref.data.path,
   thresholds
 }
 
-# Main pediatric growthcleanr function -- infants cleanbatch
-# internal supporting functions for pediatrics can be found in: infants_support.R
-# note
+# Main child growthcleanr function (cleanchild)
 
 #' Function to clean data (optionally in batches):
 #' 4.  Dataset split (optional)
@@ -2498,13 +2496,13 @@ cleanchild <- function(data.df,
 
   # avoid no visible warning errors
   sum_sde <- no_sde <- cf <- wholehalfimp <- seq_win <- cs <- absdiff <-
-    sd.orig_uncorr <- seq_win <- absdiff <- wholehalfimp <- ageyears <- ctbc.sd <-
+    sd.orig_uncorr <- ageyears <- ctbc.sd <-
     originator_row <- cf_string_id <- ageday_has_include <-
     ..col_replace <- c.ewma.all <- pot_excl <- c.dewma.all <- p_plus <-
-    p_minus <- ctbc.sd <- c.ewma.all <- tbc_diff_next <- tbc_diff_prior <-
+    p_minus <- tbc_diff_next <- tbc_diff_prior <-
     tbc_diff_plus_next <- tbc.p_plus <- tbc_diff_plus_prior <-
     tbc_diff_minus_next <- tbc.p_minus <- tbc_diff_minus_prior <- addcrithigh <-
-    addcritlow <- tbc_dop <- i.tbc.sd <- rowind <- abssum <- c.dewma.all <-
+    addcritlow <- tbc_dop <- i.tbc.sd <- rowind <- abssum <-
     whoagegrp_ht <- d_agedays <- mindiff <- maxdiff <- who_mindiff_ht <-
     who_maxdiff_ht <- mindiff_prior <- maxdiff_prior <- whoinc.age.hc <-
     who_maxdiff_hc <- who_mindiff_hc <- diff_prev <-
@@ -4896,8 +4894,7 @@ cleanchild <- function(data.df,
 
   # Base set: non-excluded rows. All exclusion codes start with "Exclude-"
   # (including Exclude-Missing and Exclude-Not-Cleaned), so this single
-  # grepl catches everything. "Swapped-Measurements", "Unit-Error-*" etc.
-  # are legacy codes that don't start with "Exclude" — they remain valid.
+  # grepl catches everything. "Include" does not match, so included rows pass.
   keep <- !grepl("^Exclude", exclude)
 
   if (include.temporary.extraneous)

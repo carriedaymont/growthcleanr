@@ -14,6 +14,12 @@ ewma(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 15, cache_env = NULL)
 \item{ewma.exp}{Exponent to use for weighting.}
 
 \item{ewma.adjacent}{Specify whether EWMA values excluding adjacent measurements should be calculated.  Defaults to TRUE.}
+
+\item{window}{Maximum number of observations on each side for EWMA weighting.
+Default 15. Set to Inf to disable windowing.}
+
+\item{cache_env}{Optional environment for caching EWMA intermediate results.
+Used internally for performance. Defaults to NULL.}
 }
 \value{
 Data frame with 3 variables:
