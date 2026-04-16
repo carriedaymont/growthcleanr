@@ -219,7 +219,7 @@ cleanadult <- function(df,
     # =========================================================================
 
     h_subj_df <- copy(df[param %in% c("HEIGHTCM", "HEIGHTIN") & slog, ])
-    h_subj_df <- h_subj_df[order(ageyears, as.numeric(internal_id)), ]
+    h_subj_df <- h_subj_df[order(ageyears, internal_id), ]
 
     h_subj_keep <- rep("Include", nrow(h_subj_df))
     h_extraneous <- rep(FALSE, nrow(h_subj_df))
@@ -250,7 +250,7 @@ cleanadult <- function(df,
     # =========================================================================
 
     w_subj_df <- copy(df[param %in% c("WEIGHTKG", "WEIGHTLBS") & slog, ])
-    w_subj_df <- w_subj_df[order(ageyears, as.numeric(internal_id)), ]
+    w_subj_df <- w_subj_df[order(ageyears, internal_id), ]
 
     w_subj_keep <- rep("Include", nrow(w_subj_df))
     w_extraneous <- rep(FALSE, nrow(w_subj_df))
@@ -545,13 +545,13 @@ cleanadult <- function(df,
           s_df$absdiff_medmed <- abs(s_df$meas_m - medmed)
 
           if (daystot == 1) {
-            s_df <- s_df[order(s_df$absdiff_daymed, -as.numeric(s_df$internal_id)), ]
+            s_df <- s_df[order(s_df$absdiff_daymed, -s_df$internal_id), ]
           } else if (daystot >= 4 & sderatio < 0.5) {
             s_df <- s_df[order(s_df$absdiff_nonsdemed, s_df$absdiff_daymed,
-                               -as.numeric(s_df$internal_id)), ]
+                               -s_df$internal_id), ]
           } else {
             s_df <- s_df[order(s_df$absdiff_medmed, s_df$absdiff_nonsdemed,
-                               s_df$absdiff_daymed, -as.numeric(s_df$internal_id)), ]
+                               s_df$absdiff_daymed, -s_df$internal_id), ]
           }
 
           keeper_id <- s_df$internal_id[1]
@@ -732,7 +732,7 @@ cleanadult <- function(df,
       # loss/gain group rescue.
       # Codes: Height-Window-All (no viable w2) or Height-Window (outside w2)
 
-      h_subj_df <- h_subj_df[order(h_subj_df$ageyears, as.numeric(h_subj_df$internal_id)), ]
+      h_subj_df <- h_subj_df[order(h_subj_df$ageyears, h_subj_df$internal_id), ]
 
       w2_window <- ht_band * 2.54 + 0.12
       w2_groups <- lapply(unique(h_subj_df$meas_m), function(x) {
@@ -942,13 +942,13 @@ cleanadult <- function(df,
           s_df$absdiff_medmed <- abs(s_df$meas_m - medmed)
 
           if (daystot == 1) {
-            s_df <- s_df[order(s_df$absdiff_daymed, -as.numeric(s_df$internal_id)), ]
+            s_df <- s_df[order(s_df$absdiff_daymed, -s_df$internal_id), ]
           } else if (daystot >= 4 & sderatio < 0.5) {
             s_df <- s_df[order(s_df$absdiff_nonsdemed, s_df$absdiff_daymed,
-                               -as.numeric(s_df$internal_id)), ]
+                               -s_df$internal_id), ]
           } else {
             s_df <- s_df[order(s_df$absdiff_medmed, s_df$absdiff_nonsdemed,
-                               s_df$absdiff_daymed, -as.numeric(s_df$internal_id)), ]
+                               s_df$absdiff_daymed, -s_df$internal_id), ]
           }
 
           keeper_id <- s_df$internal_id[1]

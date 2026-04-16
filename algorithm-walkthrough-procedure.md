@@ -181,10 +181,10 @@ For each step, systematically check all items that apply. Items are marked
 **[adult]**, **[child]**, or **[both]**.
 
 1. **[both] Sort order determinism** — Every `order()` or sort call that could
-   have ties must include an `as.numeric(internal_id)` tiebreaker. `internal_id`
-   is character (created in `cleangrowth()`), so numeric conversion is required
-   for correct sort order. Look for any call like `order(ageyears)` or
-   `order(agedays)` without an internal_id tiebreaker.
+   have ties must include an `internal_id` tiebreaker. `internal_id` is an
+   integer assigned in id-sorted order by `cleangrowth()`. No numeric conversion
+   needed. Look for any call like `order(ageyears)` or `order(agedays)` without
+   an internal_id tiebreaker.
 
    **[child only] Birth tiebreaking** — At agedays == 0, the algorithm keeps
    the *lowest* internal_id (earliest measurement, before postnatal fluid

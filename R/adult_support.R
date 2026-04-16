@@ -862,7 +862,7 @@ compute_trajectory_fails <- function(meas, age_days, err = 5) {
 #' @keywords internal
 evil_twins <- function(w_subj_df, wtallow_formula = "piecewise") {
   # Need at least 3 included values for pairs guard
-  inc_df <- w_subj_df[order(w_subj_df$age_days, as.numeric(w_subj_df$internal_id)), ]
+  inc_df <- w_subj_df[order(w_subj_df$age_days, w_subj_df$internal_id), ]
   exc_ids <- character(0)
 
   while (TRUE) {
@@ -871,7 +871,7 @@ evil_twins <- function(w_subj_df, wtallow_formula = "piecewise") {
     n <- nrow(working)
     if (n < 3) break
 
-    working <- working[order(working$age_days, as.numeric(working$internal_id)), ]
+    working <- working[order(working$age_days, working$internal_id), ]
 
     # Compute interval-based caps (etcap) between adjacent values
     age_diff_days <- diff(working$age_days)
@@ -910,7 +910,7 @@ evil_twins <- function(w_subj_df, wtallow_formula = "piecewise") {
     # Among OOB observations, find the most deviant
     oob_working <- working[working$oob, ]
     # Sort: most deviant first, then highest weight, then lowest internal_id
-    oob_working <- oob_working[order(-oob_working$absd_med, -oob_working$meas_m, as.numeric(oob_working$internal_id)), ]
+    oob_working <- oob_working[order(-oob_working$absd_med, -oob_working$meas_m, oob_working$internal_id), ]
 
     # Exclude the most deviant one
     exc_ids <- c(exc_ids, as.character(oob_working$internal_id[1]))
@@ -997,7 +997,7 @@ remove_ewma_wt <- function(subj_df, wtallow_formula = "piecewise",
       cand_idx <- which(criteria_new)
       # internal_id tiebreaker for sort determinism
       ord <- order(-absdewma[cand_idx], subj_df$age_days[cand_idx],
-                   as.numeric(subj_df$internal_id[cand_idx]))
+                   subj_df$internal_id[cand_idx])
       to_rem <- cand_idx[ord[1]]
 
       rem_ids <- c(rem_ids, as.character(subj_df$internal_id[to_rem]))
@@ -1074,7 +1074,7 @@ remove_mod_ewma_wt <- function(full_inc_df, exc_label = "Exclude-A-Traj-Moderate
                                mod_ewma_f = 0.75,
                                perclimit_low = 0.5, perclimit_mid = 0.4,
                                perclimit_high = 0.0) {
-  inc_df <- full_inc_df[order(full_inc_df$ageyears, as.numeric(full_inc_df$internal_id)), ]
+  inc_df <- full_inc_df[order(full_inc_df$ageyears, full_inc_df$internal_id), ]
   exclusions <- character(0)
 
   for (round_num in seq_len(max_rounds)) {
@@ -1377,7 +1377,7 @@ eval_2d_nonord <- function(w_subj_df, w_subj_keep, wtallow_formula = "piecewise"
   }
 
   # Compute wtallow for each adjacent pair
-  w_sorted <- w_subj_df[order(w_subj_df$age_days, as.numeric(w_subj_df$internal_id)), ]
+  w_sorted <- w_subj_df[order(w_subj_df$age_days, w_subj_df$internal_id), ]
   n <- nrow(w_sorted)
   any_outside <- FALSE
 
