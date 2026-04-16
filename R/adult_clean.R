@@ -178,12 +178,11 @@ cleanadult <- function(df,
     added_cols <- c(added_cols, "ageyears")
   }
 
-  # internal_id is a sequential character created by cleangrowth() for
+  # internal_id is a sequential integer created by cleangrowth() for
   # deterministic sorting and tiebreaking. The user's original id is
   # preserved untouched in the id column throughout.
-  # Character type is set at creation in cleangrowth() so named vector
-  # indexing works correctly (integer keys do positional indexing;
-  # character keys do named indexing).
+  # Named vectors (h_subj_keep, w_subj_keep) use as.character(internal_id)
+  # for names, since R named vector keys are always character.
   df[, result := "Include"]
   df[, mean_ht := as.numeric(NA)]
   df[, loss_groups := as.numeric(NA)]
@@ -1218,7 +1217,7 @@ cleanadult <- function(df,
 
     if (length(h_subj_keep) > 0) {
       h_out <- data.table(
-        internal_id = names(h_subj_keep),
+        internal_id = as.integer(names(h_subj_keep)),
         keep = h_subj_keep,
         mean_ht = meanht,
         loss_grp = loss_groups,
@@ -1233,7 +1232,7 @@ cleanadult <- function(df,
     }
     if (length(w_subj_keep) > 0) {
       w_out <- data.table(
-        internal_id = names(w_subj_keep),
+        internal_id = as.integer(names(w_subj_keep)),
         keep = w_subj_keep,
         extraneous = w_extraneous
       )

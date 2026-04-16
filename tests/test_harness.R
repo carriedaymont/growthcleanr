@@ -27,7 +27,7 @@ if (!perm_level %in% valid_levels) {
 # Load data
 input_file <- file.path(here::here(), "inst", "testdata", "adult-gc-test-ALL-PHASES.csv")
 df <- fread(input_file)
-df[, internal_id := as.character(seq_len(.N))]
+df[, internal_id := seq_len(.N)]
 
 # Run algorithm at selected permissiveness level
 cat(sprintf("Running algorithm at permissiveness = '%s'...\n", perm_level))

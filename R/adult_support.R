@@ -862,7 +862,7 @@ compute_trajectory_fails <- function(meas, age_days, err = 5) {
 #' @keywords internal
 evil_twins <- function(w_subj_df, wtallow_formula = "piecewise") {
   # Need at least 3 included values for pairs guard
-  inc_df <- w_subj_df[order(w_subj_df$age_days, w_subj_df$internal_id), ]
+  inc_df <- w_subj_df[order(w_subj_df$age_days, as.numeric(w_subj_df$internal_id)), ]
   exc_ids <- character(0)
 
   while (TRUE) {
@@ -871,7 +871,7 @@ evil_twins <- function(w_subj_df, wtallow_formula = "piecewise") {
     n <- nrow(working)
     if (n < 3) break
 
-    working <- working[order(working$age_days, working$internal_id), ]
+    working <- working[order(working$age_days, as.numeric(working$internal_id)), ]
 
     # Compute interval-based caps (etcap) between adjacent values
     age_diff_days <- diff(working$age_days)
@@ -910,7 +910,7 @@ evil_twins <- function(w_subj_df, wtallow_formula = "piecewise") {
     # Among OOB observations, find the most deviant
     oob_working <- working[working$oob, ]
     # Sort: most deviant first, then highest weight, then lowest internal_id
-    oob_working <- oob_working[order(-oob_working$absd_med, -oob_working$meas_m, oob_working$internal_id), ]
+    oob_working <- oob_working[order(-oob_working$absd_med, -oob_working$meas_m, as.numeric(oob_working$internal_id)), ]
 
     # Exclude the most deviant one
     exc_ids <- c(exc_ids, as.character(oob_working$internal_id[1]))

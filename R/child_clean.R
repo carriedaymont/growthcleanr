@@ -59,7 +59,7 @@
 #     surrounding measurements to identify outliers, giving more weight to
 #     temporally closer values.
 #   - tbc.sd (To-Be-Cleaned SD score): Recentered z-score used throughout
-#   - DOP (Designated Other Parameter): For weight->height, for height/HC->weight
+#   - DOP (Designated Other Parameter): For weight->height, for height->weight, for HC->height
 #   - Evil Twins: Multiple consecutive extreme values that fooled earlier steps
 #
 ################################################################################
@@ -80,7 +80,7 @@
 #
 # SORT ORDER:
 #   Critical for deterministic results. Primary sort:
-#     data.table::setkey(data.df, subjid, param, agedays, id)
+#     data.table::setkey(data.df, subjid, param, agedays, internal_id)
 #
 #   The 'id' field is required and should be unique per row. For datasets
 #   with multiple measurements on the same day, 'id' serves as a tiebreaker
@@ -527,13 +527,17 @@ cleangrowth <- function(subjid,
     ))
   )
 
-  # Keep user's id as 'id' (matches Stata), create 'internal_id' for R processing
-  # id is required in input data
+  # Keep user's id as 'id', create 'internal_id' for R processing.
+  # internal_id is a sequential integer assigned AFTER sorting by the canonical key
+  # (subjid, param, agedays, id). This ensures internal_id reflects id-sorted order,
+  # so results are deterministic regardless of input row order.
+  # id is required in input data.
   if (length(id) != length(measurement)) {
     stop("id must be provided and have the same length as measurement")
   }
   data.all.ages[, id := id]
-  data.all.ages[, internal_id := as.character(seq_len(.N))]  # Character for consistent type across child/adult
+  setkey(data.all.ages, subjid, param, agedays, id)
+  data.all.ages[, internal_id := seq_len(.N)]
 
   # quality checks
   if (!is.numeric(adult_cutpoint)){
@@ -953,7 +957,7 @@ cleangrowth <- function(subjid,
       data.all[, potcorr := any(potcorr_wt, na.rm = TRUE), by = subjid]
 
       # ensure deterministic order
-      setkey(data.all, subjid, param, agedays, id)
+      setkey(data.all, subjid, param, agedays, internal_id)
 
       # --- Potcorr optimization: skip all reference merges if no potcorr subjects ---
       has_potcorr <- any(data.all$potcorr, na.rm = TRUE)
@@ -1213,11 +1217,8 @@ cleangrowth <- function(subjid,
       data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, TRUE)]
     }
 
-    # sort by subjid, param, agedays
-    # Include id in setkey for deterministic SDE order
-    # Without id, SDEs (same subjid/param/agedays) have undefined order, causing different
-    # index values in sequential vs parallel mode
-    setkey(data.all, subjid, param, agedays, id)
+    # sort by subjid, param, agedays, internal_id for deterministic SDE order
+    setkey(data.all, subjid, param, agedays, internal_id)
 
     # add a new convenience index for bookkeeping
     data.all[, index := 1:.N]
@@ -1313,8 +1314,7 @@ cleangrowth <- function(subjid,
     setkey(data.all, param, sex, agedays)
     data.all <- sd.recenter[data.all]
 
-    # Include id for deterministic order
-    setkey(data.all, subjid, param, agedays, id)
+    setkey(data.all, subjid, param, agedays, internal_id)
     data.all[, tbc.sd := sd.orig - sd.median]
     if (use_child_algorithm){
       # separate out corrected and noncorrected values
@@ -2750,12 +2750,6 @@ calc_and_recenter_z_scores <- function(df, cn, ref.data.path,
                    cn.orig_who * who_weight[smooth_val])/3]
 
   # otherwise use WHO and CDC for older and younger, respectively
-  ### CP REPLACE D
-  # who_val <- df$param == "HEADCM" |
-  #   df$agedays/365.25 < 2
-  # df[who_val | (smooth_val & is.na(df$cn.orig_cdc)),
-  #    cn.orig := df$cn.orig_who[who_val  | (smooth_val & is.na(df$cn.orig_cdc))]]
-
   who_val <- df$param == "HEADCM" | df$agedays/365.25 < 2
   df[who_val, cn.orig := df$cn.orig_who[who_val]]
 
@@ -2770,7 +2764,6 @@ calc_and_recenter_z_scores <- function(df, cn, ref.data.path,
   df[smooth_val & is.na(cn.orig_who), cn.orig := cn.orig_cdc]
 
 
-  ### CP REPLACE U
   # now recenter -- already has the sd.median from the original recentering
   setkey(df, subjid, param, agedays)
 
@@ -2969,10 +2962,10 @@ cleanchild <- function(data.df,
     absval <- comp_diff <- err_ratio <-
     NULL
 
-  # Use id instead of index for deterministic SDE order
-  # index depends on input order, which can vary between batches
-  # id is user-provided and deterministic
-  data.df <- data.table(data.df, key = c('subjid', 'param', 'agedays', 'id'))
+  # Use internal_id for deterministic SDE order. internal_id is an integer
+  # assigned in id-sorted order by cleangrowth(), so results are deterministic
+  # regardless of input row order.
+  data.df <- data.table(data.df, key = c('subjid', 'param', 'agedays', 'internal_id'))
   # Recreate index for batch processing
   # index was created on full dataset before batching (line 1022), so batches have
   # non-contiguous indices. This breaks merge/subset operations that use index.
@@ -3031,8 +3024,8 @@ cleanchild <- function(data.df,
           exclude := .child_exc(param, "Identical")]
   data.df[, c("n_same_value", "has_dup", "keep_id") := NULL]
 
-  # Include id for deterministic SDE order
-  setkey(data.df, subjid, param, agedays, id)
+  # Include internal_id for deterministic SDE order
+  setkey(data.df, subjid, param, agedays, internal_id)
 
   # 5: temporary SDEs ----
 
@@ -3968,7 +3961,7 @@ cleanchild <- function(data.df,
   # 1. Only one value per same-day contributes to EWMA (matches Stata behavior)
   # 2. The diff calculation for exponent is correct (no same-day 0 diffs)
   ewma_df <- data.sde[exclude == "Include" & !(was_temp_sde)]
-  setkey(ewma_df, subjid, param, agedays, id)
+  setkey(ewma_df, subjid, param, agedays, internal_id)
 
   # For each subject and parameter, calculate before/after gaps and assign exponent
   ewma_df[, c("diff_before", "diff_after") :=
@@ -4074,7 +4067,7 @@ cleanchild <- function(data.df,
   # Keep only original columns (drop any extras from SDE processing)
   extra_cols <- setdiff(names(data.df), keep_cols_sde)
   if (length(extra_cols) > 0L) data.df[, (extra_cols) := NULL]
-  setkey(data.df, subjid, param, agedays, id)
+  setkey(data.df, subjid, param, agedays, internal_id)
 
   # 15-16: moderate EWMA ----
   # Restructured to use global iterations for efficiency
@@ -5338,7 +5331,6 @@ cleanchild <- function(data.df,
   return(data.df[, ..return_cols])
 }
 
-# Oriignal Valid Toggled off
 # Supporting pediatric growthcleanr functions
 # Supporting functions for pediatric piece of algorithm
 

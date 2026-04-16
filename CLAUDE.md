@@ -288,7 +288,7 @@ BMI (computed internally) for some threshold decisions.
 
 Called internally by `cleangrowth()`. Input: data.table with
 `id`, `internal_id`, `subjid`, `sex`, `agedays`, `param`,
-`measurement`. `internal_id` is a sequential numeric created
+`measurement`. `internal_id` is a sequential integer created
 by `cleangrowth()` for deterministic sorting and tiebreaking.
 Accepts HEIGHTCM/HEIGHTIN and WEIGHTKG/WEIGHTLBS (converts
 internally). Sex is not used by the algorithm but required by
@@ -298,9 +298,9 @@ the package interface.
 `mean_ht`, and optionally `bin_result` (default ON),
 `extraneous`, `loss_groups`, `gain_groups`. Internal columns
 (`meas_m`, `ageyears`, `age_days`) are dropped. The user's
-original `id` is preserved: `cleanadult()` swaps `internal_id`
-into the `id` column at entry for internal processing and
-restores the user's `id` at exit.
+original `id` is preserved untouched. `internal_id` (integer)
+is used for all internal sorting and named vector indexing
+(via `as.character()` for names, `as.integer()` for join keys).
 
 ### Adult Algorithm Steps
 
@@ -409,7 +409,7 @@ Default: `"looser"`
 | Rounding tolerance | None (removed) | 0.12 cm/kg on all threshold comparisons |
 | Head circumference | Supported (WHO only, ≤3y cleaned) | Not applicable |
 | `perclimit` scope | N/A | 11Wa: subject-level max wt; 11Wb: observation-level |
-| Sort determinism | `setkey(data.df, subjid, param, agedays, internal_id)` | All sorts include `internal_id` (as character) as final tiebreaker |
+| Sort determinism | `setkey(data.df, subjid, param, agedays, internal_id)` | All sorts include `internal_id` (integer) as final tiebreaker; `as.character()` used for named vector keys |
 | Missing-as-infinity | N/A | `ifelse(is.na(...), Inf, ...)` for edge EWMA values |
 
 ---
@@ -888,20 +888,21 @@ degrade on large/unusual datasets. No blocking issues found.
   failures), adult 198/198 unit + 1508/1508 regression at
   all 4 levels, test-utils.R 6 pre-existing failures.
 - [x] **`internal_id` for all internal sorting/tiebreaking
-  (2026-04-12):** Both child and adult algorithms use
-  `internal_id` (sequential integer `1:N`, created by
-  `cleangrowth()`) for all internal sorting, tiebreaking,
-  and ordering. The user's original `id` (any type) is
-  preserved untouched and returned in output.
-  **Child:** `internal_id` added to all 7 `.SDcols` and
-  column-select locations that were missing it (lines 3344,
-  3521, 4132, 4276, 4375, 4907, 5027 in `child_clean.R`).
-  **Adult:** `cleanadult()` converts `internal_id` to
-  character at entry (`as.character()`) so all named vector
-  indexing (which uses character keys in R) works correctly.
-  The user's `id` is saved, `internal_id` is swapped into
-  the `id` column for internal processing, and the user's
-  `id` is restored at exit. All 28 `$id` references in
+  (2026-04-12, updated 2026-04-16):** Both child and adult
+  algorithms use `internal_id` (sequential integer `1:N`,
+  created by `cleangrowth()`) for all internal sorting,
+  tiebreaking, and ordering. The user's original `id` (any
+  type) is preserved untouched and returned in output.
+  **Assignment order (2026-04-16):** `internal_id` is assigned
+  AFTER `setkey(data.all.ages, subjid, param, agedays, id)`,
+  so it reflects `id`-sorted order. This ensures results are
+  deterministic regardless of input row order.
+  **Type (2026-04-16):** Changed from character to integer.
+  All `setkey()` calls now sort correctly (integer, not
+  lexicographic). Adult named vectors use `as.character()`
+  for names and `as.integer()` for output join keys.
+  **Child:** `internal_id` in all `setkey()` and `.SDcols`
+  locations. **Adult:** All 28 `$id` references in
   `adult_support.R` renamed to `$internal_id`.
   `cleangrowth()` no longer overwrites `data.adult$id`
   with `line`.
