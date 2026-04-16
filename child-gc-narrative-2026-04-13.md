@@ -148,9 +148,9 @@ SDEs, carried-forward values) are included:
 - `valid(df, include.temporary.extraneous = TRUE)` — also
  includes "Exclude-C-Temp-Same-Day"
 - `valid(df, include.extraneous = TRUE)` — also includes
- "Exclude-C-{WT|HT|HC}-Extraneous"
+ "Exclude-C-Extraneous"
 - `valid(df, include.carryforward = TRUE)` — also includes
- "Exclude-C-{WT|HT|HC}-CF"
+ "Exclude-C-CF"
 
 The valid function works by checking the text of the exclude
 column rather than using factor ordering. It uses `grepl("^Exclude", ...)`
@@ -745,17 +745,17 @@ uncorr, sd.orig_uncorr) when the child algorithm was used.
 | `Unit-Error-Low` | 3 | HT, WT | Unit error detected (value too low); corrected in-place |
 | `Swapped-Measurements` | 4 | HT, WT | Height and weight appear swapped; corrected in-place |
 | `Exclude-C-Temp-Same-Day` | 5 | All | Temp SDE (may persist if not resolved by Step 13) |
-| `Exclude-C-{WT\|HT\|HC}-CF` | 6 | All | Value identical to prior-day value (not rescued) |
-| `Exclude-C-{WT\|HT\|HC}-BIV` | 7 | All | Outside absolute or standardized biological limits |
-| `Exclude-C-{WT\|HT\|HC}-Evil-Twins` | 9 | All | Adjacent extreme value pair/group |
-| `Exclude-C-{WT\|HT\|HC}-Traj-Extreme` | 11 | All | Extreme EWMA outlier |
-| `Exclude-C-{WT\|HT\|HC}-Identical` | 13 | All | Same-day duplicate with identical value |
-| `Exclude-C-{WT\|HT\|HC}-Extraneous` | 13 | All | Same-day extraneous (resolved by EWMA, all extreme, or single day) |
-| `Exclude-C-{WT\|HT\|HC}-Traj` | 15/16 | All | Moderate EWMA outlier (all sub-rules collapsed) |
-| `Exclude-C-{WT\|HT\|HC}-Abs-Diff` | 17 | HT, HC | Height/HC velocity exceeded allowed limits |
-| `Exclude-C-{WT\|HT\|HC}-Pair` | 19 | All | 2 measurements, one excluded |
-| `Exclude-C-{WT\|HT\|HC}-Single` | 19 | All | Single measurement excluded |
-| `Exclude-C-{WT\|HT\|HC}-Too-Many-Errors` | 21 | All | Error ratio exceeds threshold |
+| `Exclude-C-CF` | 6 | All | Value identical to prior-day value (not rescued) |
+| `Exclude-C-BIV` | 7 | All | Outside absolute or standardized biological limits |
+| `Exclude-C-Evil-Twins` | 9 | All | Adjacent extreme value pair/group |
+| `Exclude-C-Traj-Extreme` | 11 | All | Extreme EWMA outlier |
+| `Exclude-C-Identical` | 13 | All | Same-day duplicate with identical value |
+| `Exclude-C-Extraneous` | 13 | All | Same-day extraneous (resolved by EWMA, all extreme, or single day) |
+| `Exclude-C-Traj` | 15/16 | All | Moderate EWMA outlier (all sub-rules collapsed) |
+| `Exclude-C-Abs-Diff` | 17 | HT, HC | Height/HC velocity exceeded allowed limits |
+| `Exclude-C-Pair` | 19 | All | 2 measurements, one excluded |
+| `Exclude-C-Single` | 19 | All | Single measurement excluded |
+| `Exclude-C-Too-Many-Errors` | 21 | All | Error ratio exceeds threshold |
 
 Note: Exclusion codes are not parameter-specific — the param
 is in the data row (e.g., `Exclude-C-CF` applies to WT, HT, and HC).
@@ -872,7 +872,7 @@ or are handled within other steps in the child algorithm.
 | | |
 |---|---|
 | **Scope** | All parameters |
-| **Exclusion codes** | `Exclude-C-{WT|HT|HC}-Identical`, `Exclude-C-{WT|HT|HC}-Extraneous` |
+| **Exclusion codes** | `Exclude-C-Identical`, `Exclude-C-Extraneous` |
 | **Code location** | See code |
 
 ### Overview
@@ -902,7 +902,7 @@ Runs on `data.df` before any other cleaning step.
  Include rows
 3. If count > 1, select one to keep via **age-dependent id
  rule** (birth: lowest id; other ages: highest id)
-4. Others → `Exclude-C-{WT|HT|HC}-Identical`
+4. Others → `Exclude-C-Identical`
 
 Handles partial identicals: [10.5, 10.5, 11.2] excludes
 one 10.5 but leaves 11.2 untouched.
@@ -954,7 +954,7 @@ For subject-params with data on only ONE unique day
 1. **SDE-All-Extreme**: If the closest
  value to the day's median is still `> 2` SD away, ALL
  values on that day are marked
- `Exclude-C-{WT|HT|HC}-Extraneous`. Threshold: strict `> 2`.
+ `Exclude-C-Extraneous`. Threshold: strict `> 2`.
 
 2. **DOP medians**: For one-day SDEs,
  cross-parameter medians provide a secondary sort key.
@@ -965,7 +965,7 @@ For subject-params with data on only ONE unique day
  - `absdiff_rel_to_median` ascending
  - `absdiff_dop_for_sort` ascending (Inf if NA)
  - Age-dependent `internal_id` tiebreaker
- Keep first; others → `Exclude-C-{WT|HT|HC}-Extraneous`
+ Keep first; others → `Exclude-C-Extraneous`
 
 **Phase B3: SDE-EWMA resolution**
 
@@ -980,12 +980,12 @@ For subject-params with data on multiple days:
 4. `absdewma = |tbc.sd - spa_ewma|` for each row
 5. **SDE-All-Extreme**: If
  `min_absdewma > 1` for a group with 2+ eligible values,
- all → `Exclude-C-{WT|HT|HC}-Extraneous`. Threshold: strict
+ all → `Exclude-C-Extraneous`. Threshold: strict
  `> 1`.
 6. **SDE-EWMA selection**: Sort eligible
  values by `absdewma` ascending, age-dependent
  `internal_id` tiebreaker. Keep first → Include; others
- → `Exclude-C-{WT|HT|HC}-Extraneous`
+ → `Exclude-C-Extraneous`
 
 **Phase B4: Merge back**
 
@@ -1159,7 +1159,7 @@ the check has never fired in testing.
 | **Operates on** | Valid rows including temp SDEs, excluding single-measurement subject-params |
 | **Prior step** | Step 5 (Temporary SDEs) |
 | **Next step** | Step 7 (BIV) |
-| **Exclusion code** | `Exclude-C-{WT|HT|HC}-CF` |
+| **Exclusion code** | `Exclude-C-CF` |
 | **Rescue codes** | `Rescued`, `Rescued-Imperial`, `Rescued-Adol`, `Rescued-Adol-Imperial` (in `cf_rescued` column) |
 | **Code location** | See code |
 | **Controlled by** | `include.carryforward` parameter (if TRUE, skip entirely) |
@@ -1341,7 +1341,7 @@ algorithm steps.
 9. **Parameter scope:** All 3 parameters handled.
  wholehalfimp has HC-specific logic.
 10. **Factor levels:** All 4 rescue codes exist in
- `exclude.levels`. `Exclude-C-{WT|HT|HC}-CF` also exists.
+ `exclude.levels`. `Exclude-C-CF` also exists.
 11. **Sort order:** `setorder(cf_subset, subjid, param,
  agedays, id)` ensures deterministic CF
  detection order.
@@ -1356,7 +1356,7 @@ algorithm steps.
 | **Operates on** | Valid rows including temp SDEs |
 | **Prior step** | Step 6 (Carried Forwards) |
 | **Next step** | Step 9 (Evil Twins) |
-| **Exclusion codes** | `Exclude-C-{WT|HT|HC}-BIV` |
+| **Exclusion codes** | `Exclude-C-BIV` |
 | **Code location** | See code |
 
 ### Overview
@@ -1408,7 +1408,7 @@ to match the intended behavior documented in CLAUDE.md.
 ### Standardized BIV thresholds
 
 Uses **unrecentered** z-scores (`sd.orig_uncorr`). Rows
-already marked `Exclude-C-{WT|HT|HC}-BIV` are skipped (the
+already marked `Exclude-C-BIV` are skipped (the
 `exclude != abs_biv` guard) to preserve the more specific
 code.
 
@@ -1473,7 +1473,7 @@ changes which SDE value is most plausible.
  preprocessing. Removed.
 8. **Parameter scope:** All 3 params handled with
  param-specific thresholds.
-9. **Factor levels:** `Exclude-C-{WT|HT|HC}-BIV` exists in
+9. **Factor levels:** `Exclude-C-BIV` exists in
  `exclude.levels` (absolute and standardized BIV collapsed
  into one code).
 10. **Efficiency:** `valid_set` could be refreshed after
@@ -1491,7 +1491,7 @@ changes which SDE value is most plausible.
 | **Operates on** | Valid rows, excluding temp SDEs, requiring 3+ total rows per subject-param |
 | **Prior step** | Step 7 (BIV) |
 | **Next step** | Step 11 (EWMA1 — Extreme EWMA) |
-| **Exclusion code** | `Exclude-C-{WT|HT|HC}-Evil-Twins` |
+| **Exclusion code** | `Exclude-C-Evil-Twins` |
 | **Code location** | See code |
 
 ### Overview
@@ -1560,7 +1560,7 @@ processed. For each:
  - Highest `med_diff` (furthest from median)
  - Highest `|tbc.sd|` (most extreme overall)
  - Lowest `id` (deterministic tiebreaker)
- d. Exclude that one value (`Exclude-C-{WT|HT|HC}-Evil-Twins`)
+ d. Exclude that one value (`Exclude-C-Evil-Twins`)
  e. Recalculate OTL on remaining Include values
  f. Break if < 2 Include values remain
 
@@ -1602,7 +1602,7 @@ back to `data.df` in bulk.
  falsely flagged when correction moves one z-score
  close to the neighbor but not the other.
 8. **Parameter scope:** All 3 params handled uniformly.
-9. **Factor levels:** `Exclude-C-{WT|HT|HC}-Evil-Twins` exists in
+9. **Factor levels:** `Exclude-C-Evil-Twins` exists in
  `exclude.levels`.
 10. **Efficiency:** Good — pre-filter checks for any OTL
  globally before entering per-group loop. Only
@@ -1619,7 +1619,7 @@ back to `data.df` in bulk.
 | **Operates on** | Include values only (no temp SDEs), requiring 3+ per subject-param |
 | **Prior step** | Step 9 (Evil Twins) |
 | **Next step** | Step 13 (Final SDE Resolution) |
-| **Exclusion code** | `Exclude-C-{WT|HT|HC}-Traj-Extreme` |
+| **Exclusion code** | `Exclude-C-Traj-Extreme` |
 | **Code location** | See code |
 
 ### Overview
@@ -1761,7 +1761,7 @@ result.
  when `ctbc.sd == tbc.sd` (copies instead). This is
  correct for non-potcorr subjects.
 7. **Parameter scope:** All 3 params handled uniformly.
-8. **Factor levels:** `Exclude-C-{WT|HT|HC}-Traj-Extreme` exists in
+8. **Factor levels:** `Exclude-C-Traj-Extreme` exists in
  `exclude.levels`.
 9. **Efficiency:** Good — two levels of pre-filtering
  (count + extreme), targeted SDE recalc, and
@@ -1781,7 +1781,7 @@ result.
 | **Operates on** | Include values only (no temp SDEs), 3+ per subject-param |
 | **Prior step** | Step 13 (Final SDE Resolution) |
 | **Next step** | Step 17 (Height/HC Velocity) |
-| **Exclusion codes** | `Exclude-C-{WT|HT|HC}-Traj` (all moderate EWMA sub-rules collapsed into one code) |
+| **Exclusion codes** | `Exclude-C-Traj` (all moderate EWMA sub-rules collapsed into one code) |
 | **Code location** | See code |
 
 ### Overview
@@ -1990,7 +1990,7 @@ updates. DOP snapshot refreshed each iteration.
 | **Operates on** | Valid rows excluding temp SDEs, 2+ per subject-param |
 | **Prior step** | Steps 15/16 (EWMA2) |
 | **Next step** | Step 19 (Pairs and Singles) |
-| **Exclusion codes** | `Exclude-C-{HT|HC}-Abs-Diff` |
+| **Exclusion codes** | `Exclude-C-Abs-Diff` |
 | **Code location** | See code |
 
 ### Overview
@@ -2144,7 +2144,7 @@ For **exactly 2 measurements:**
  each while-loop iteration.
 8. **Parameter scope:** HT and HC only. HC has separate
  velocity tables, tighter tolerances, and no Tanner.
-9. **Factor levels:** `Exclude-C-{HT|HC}-Abs-Diff` exists in
+9. **Factor levels:** `Exclude-C-Abs-Diff` exists in
  `exclude.levels`.
 10. **Unused variables in Step 19 closure:** `abs_tbd.sd`,
  `abs_ctbd.sd`, `med_dop`, `med_cdop` are computed but
@@ -2162,7 +2162,7 @@ For **exactly 2 measurements:**
 | **Operates on** | Include rows with 1–2 remaining measurements per subject-param |
 | **Prior step** | Step 17 (Height/HC Velocity) |
 | **Next step** | Step 21 (Error Load) |
-| **Exclusion codes** | `Exclude-C-{WT|HT|HC}-Pair`, `Exclude-C-{WT|HT|HC}-Single` |
+| **Exclusion codes** | `Exclude-C-Pair`, `Exclude-C-Single` |
 | **Code location** | See code |
 
 ### Overview
@@ -2192,9 +2192,9 @@ For 2 remaining measurements:
  with lowest `id` as tiebreaker
 4. Apply exclusion:
  - `|diff_tbc| > 4 & (|diff_ctbc| > 4 or NA) &
- gap >= 365.25` → `Exclude-C-{WT|HT|HC}-Pair`
+ gap >= 365.25` → `Exclude-C-Pair`
  - `|diff_tbc| > 2.5 & (|diff_ctbc| > 2.5 or NA) &
- gap < 365.25` → `Exclude-C-{WT|HT|HC}-Pair`
+ gap < 365.25` → `Exclude-C-Pair`
 5. If one excluded, re-evaluate remaining as single
 
 ### Single evaluation
@@ -2202,7 +2202,7 @@ For 2 remaining measurements:
 For 1 remaining measurement:
 - `(|tbc.sd| > 3 & comp_diff > 5)` OR
  `(|tbc.sd| > 5 & no DOP data)`
- → `Exclude-C-{WT|HT|HC}-Single`
+ → `Exclude-C-Single`
 
 ### Checklist findings
 
@@ -2228,7 +2228,7 @@ For 1 remaining measurement:
 | **Operates on** | All rows |
 | **Prior step** | Step 19 (Pairs and Singles) |
 | **Next step** | Step 22 (Output) |
-| **Exclusion code** | `Exclude-C-{WT|HT|HC}-Too-Many-Errors` |
+| **Exclusion code** | `Exclude-C-Too-Many-Errors` |
 | **Code location** | See code |
 
 ### Overview
@@ -2250,7 +2250,7 @@ all remaining Include values are also excluded.
 5. If `err_ratio > error.load.threshold` (default 0.5)
  AND `n_errors >= error.load.mincount`
  (default 2): all Include rows →
- `Exclude-C-{WT|HT|HC}-Too-Many-Errors`
+ `Exclude-C-Too-Many-Errors`
 
 ### Checklist findings
 
@@ -2268,7 +2268,7 @@ all remaining Include values are also excluded.
  are data structure artifacts, not cleaning errors.
 4. **Parameter scope:** All 3 params, grouped by
  `(subjid, param)`.
-5. **Factor level:** `Exclude-C-{WT|HT|HC}-Too-Many-Errors` exists.
+5. **Factor level:** `Exclude-C-Too-Many-Errors` exists.
 6. **Stale nnte comment** removed.
 
 ---

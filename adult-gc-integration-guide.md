@@ -197,9 +197,9 @@ Dependencies (all already imported by package):
 | `Exclude-A-Scale-Max-Identical` | 4W | All weights identical at scale max |
 | `Exclude-A-Scale-Max-RV-Propagated` | 4W | RV copy of scale-max exclusion (linked mode) |
 | `Exclude-A-Evil-Twins` | 9Wa | Adjacent pair with implausible weight difference |
-| `Exclude-A-Traj-Ext` | 9Wb | Extreme EWMA outlier (independent mode) |
-| `Exclude-A-Traj-Extreme-firstRV` | 9Wb | Extreme EWMA outlier (linked firstRV pass) |
-| `Exclude-A-Traj-Extreme-allRV` | 9Wb | Extreme EWMA outlier (linked allRV pass) |
+| `Exclude-A-Traj-Extreme` | 9Wb | Extreme EWMA outlier (independent mode) |
+| `Exclude-A-Traj-Extremereme-firstRV` | 9Wb | Extreme EWMA outlier (linked firstRV pass) |
+| `Exclude-A-Traj-Extremereme-allRV` | 9Wb | Extreme EWMA outlier (linked allRV pass) |
 | `Exclude-A-Ord-Pair` | 10Ha | 2D height pair outside band (one excluded) |
 | `Exclude-A-Ord-Pair-All` | 10Ha | 2D height pair outside band (all excluded) |
 | `Exclude-A-Window` | 10Hb | 3+D height outside window (one excluded) |

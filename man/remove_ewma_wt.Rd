@@ -7,7 +7,7 @@
 remove_ewma_wt(
   subj_df,
   wtallow_formula = "piecewise",
-  exc_label = "Exclude-A-Traj-Ext",
+  exc_label = "Exclude-A-Traj-Extreme",
   ewma_window = 15
 )
 }

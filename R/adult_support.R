@@ -940,7 +940,7 @@ evil_twins <- function(w_subj_df, wtallow_formula = "piecewise") {
 #' @return Named character vector: id -> exc_label for excluded values
 #' @keywords internal
 remove_ewma_wt <- function(subj_df, wtallow_formula = "piecewise",
-                           exc_label = "Exclude-A-Traj-Ext",
+                           exc_label = "Exclude-A-Traj-Extreme",
                            ewma_window = 15) {
   orig_subj_df <- subj_df
   rem_ids <- character(0)
@@ -1022,7 +1022,7 @@ remove_ewma_wt <- function(subj_df, wtallow_formula = "piecewise",
 #' (linked mode). For each excluded value, finds all other values with the
 #' same measurement that are still "Include" — including extraneous values
 #' whose is_rv flag may have been cleared by redo_identify_rv(). Marks them
-#' with "<code>-RV-propagated". This is forward-only propagation (firstRV →
+#' with "<code>-RV-Propagated". This is forward-only propagation (firstRV →
 #' later RVs + extraneous), unlike Step 4W's bidirectional scale-max propagation.
 #' @param exc_codes Named character vector: id -> exclusion code (from firstRV pass)
 #' @param w_subj_df Current working weight data (must have meas_m, id columns)

@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-github-latest (growthcleanr)
 
-**Last updated:** 2026-04-16 (remove param indicators from exclusion codes)
+**Last updated:** 2026-04-16 (exclusion code walkthrough: Traj-Ext→Traj-Extreme, missing factor levels, narrative sync)
 
 ## Overview
 
@@ -342,8 +342,9 @@ restores the user's `id` at exit.
 | `Exclude-A-Scale-Max-Identical` | 4W | All weights identical at scale max |
 | `Exclude-A-Scale-Max-RV-Propagated` | 4W | RV copy of scale-max exclusion (linked mode) |
 | `Exclude-A-Evil-Twins` | 9Wa | Adjacent pair with implausible weight difference |
-| `Exclude-A-Traj-Ext` | 9Wb | Extreme EWMA outlier (independent mode) |
+| `Exclude-A-Traj-Extreme` | 9Wb | Extreme EWMA outlier (independent mode) |
 | `Exclude-A-Traj-Extreme-firstRV` | 9Wb | Extreme EWMA outlier (linked firstRV pass) |
+| `Exclude-A-Traj-Extreme-firstRV-RV-Propagated` | 9Wb | RV copy of firstRV extreme exclusion (linked mode) |
 | `Exclude-A-Traj-Extreme-allRV` | 9Wb | Extreme EWMA outlier (linked allRV pass) |
 | `Exclude-A-Ord-Pair` | 10Ha | 2D height pair outside band (one excluded) |
 | `Exclude-A-Ord-Pair-All` | 10Ha | 2D height pair outside band (all excluded) |
@@ -352,6 +353,7 @@ restores the user's `id` at exit.
 | `Exclude-A-2D-Ordered` | 11Wa | 2D ordered weight pair outside wtallow/perclimit |
 | `Exclude-A-2D-Non-Ordered` | 11Wa2 | 2D non-ordered weight pair |
 | `Exclude-A-Traj-Moderate` | 11Wb | Moderate EWMA outlier (independent or firstRV) |
+| `Exclude-A-Traj-Moderate-RV-Propagated` | 11Wb | RV copy of firstRV moderate exclusion (linked mode) |
 | `Exclude-A-Traj-Moderate-allRV` | 11Wb | Moderate EWMA outlier (linked allRV pass) |
 | `Exclude-A-Traj-Moderate-Error-Load` | 11Wb | 4+ consecutive moderate EWMA candidates |
 | `Exclude-A-Traj-Moderate-Error-Load-RV` | 11Wb | Error load escalation to entire patient (linked) |
@@ -815,6 +817,20 @@ degrade on large/unusual datasets. No blocking issues found.
 
 ### Fixed (recent)
 
+- [x] **Exclusion code walkthrough (2026-04-16):**
+  Full walkthrough focused on exclusion codes. Found and fixed:
+  missing `Exclude-A-Traj-Extreme-firstRV-RV-Propagated` factor
+  level (latent bug — would silently produce NA if triggered);
+  `Exclude-A-Traj-Ext` → `Exclude-A-Traj-Extreme` rename for
+  consistency with linked mode codes; silently broken error-load
+  test (`test-child-parameters.R` used old code name, always
+  matched 0 rows); stale `-N` suffix in adult narrative (4
+  locations); child narrative updated to remove param indicators
+  (~37 occurrences); 3 stale code comments fixed; added
+  `Exclude-A-Traj-Moderate-RV-Propagated` and
+  `Exclude-A-Traj-Extreme-firstRV-RV-Propagated` to CLAUDE.md
+  canonical table. All tests pass. Details in
+  `walkthrough-todo-2026-04-16.md`.
 - [x] **Remove param from exclusion codes (2026-04-16):**
   Removed param indicators (-WT-, -HT-, -HC-) from all child
   and adult exclusion codes. Child: `Exclude-C-{WT|HT|HC}-{Reason}`

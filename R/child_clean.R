@@ -693,9 +693,10 @@ cleangrowth <- function(subjid,
     "Exclude-A-Evil-Twins",
     "Exclude-A-Identical",
     "Exclude-A-Extraneous",
-    "Exclude-A-Traj-Ext",
+    "Exclude-A-Traj-Extreme",
     "Exclude-A-Traj-Extreme-firstRV",
     "Exclude-A-Traj-Extreme-allRV",
+    "Exclude-A-Traj-Extreme-firstRV-RV-Propagated",
     "Exclude-A-Ord-Pair",
     "Exclude-A-Ord-Pair-All",
     "Exclude-A-Window",
@@ -3413,7 +3414,7 @@ cleanchild <- function(data.df,
 
   valid_set <- .child_valid(data.df, include.temporary.extraneous = TRUE)
 
-  # identify absolute cutoffs — all BIV codes are now param-specific Exclude-C-{WT|HT|HC}-BIV
+  # identify absolute cutoffs — all use Exclude-C-BIV (not param-specific; param is in the data)
   # Min weight: <0.2 kg for first year, <1 kg after
   data.df[valid_set & param == "WEIGHTKG" & v < 0.2 & agedays <= 365,
           exclude := "Exclude-C-BIV"]
@@ -4046,7 +4047,7 @@ cleanchild <- function(data.df,
     }
   }, by = .(subjid, param, agedays)]
 
-  # Assign SDE-Extraneous exclusions: keep_id gets Include, others get Exclude-C-{param}-Extraneous
+  # Assign SDE-Extraneous exclusions: keep_id gets Include, others get Exclude-C-Extraneous
   data.sde[exclude %in% c("Exclude-C-Temp-Same-Day", "Include") &
              id == keep_id_ewma,
            exclude := "Include"]

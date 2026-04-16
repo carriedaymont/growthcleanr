@@ -489,7 +489,7 @@ None. This step has no configurable parameters.
 | Prior Step | 9Wa: Evil Twins |
 | Next Step | 10W: Final SDE Weight Resolution |
 | Distinct/RVs | Independent: all values participate. Linked: firstRV pass (non-RV only), then propagate, then allRV pass. |
-| Exclusion Codes | `Exclude-A-Traj-Ext-N` (independent), `Exclude-A-Traj-Extreme-firstRV-N` (linked), `Exclude-A-Traj-Extreme-allRV-N` (linked) |
+| Exclusion Codes | `Exclude-A-Traj-Extreme` (independent), `Exclude-A-Traj-Extreme-firstRV` (linked), `Exclude-A-Traj-Extreme-allRV` (linked) |
 | Configurable parameter names | `wtallow_formula`, `repval_handling` |
 
 ***Overview:***
@@ -536,7 +536,7 @@ The threshold is computed dynamically per observation: `compute_et_limit(min_gap
    e. **Negative outlier:** dewma_all < -(threshold + 0.12) AND dewma_before < -(0.9×threshold + 0.12) AND dewma_after < -(0.9×threshold + 0.12)
    f. Missing directional dewma (edge values) → Inf, confirming exclusion
    g. Among candidates, select the one with largest |dewma_all|, then earliest age, then lowest id
-   h. Exclude with code `"Exclude-A-Traj-Ext-N"`
+   h. Exclude with code `"Exclude-A-Traj-Ext"`
    i. Rebuild EWMA for next round (window boundaries shift after removal)
 3. Iterate until no candidates or <3 values remain (no artificial round limit)
 4. After exclusions: re-identify RVs on remaining values
@@ -928,7 +928,7 @@ Checks the full subject weight history (`w_subj_keep`), not just currently inclu
 | Prior Step | 11Wa2: 2D Non-Ordered Weight Pairs |
 | Next Step | 13: Distinct Single (1D) |
 | Distinct/RVs | Independent: single pass, RVs as full participants. Linked: firstRV pass (non-RV only) with RV propagation, then allRV pass. |
-| Exclusion Codes | `Exclude-A-Traj-Moderate-N`, `Exclude-A-Traj-Moderate-allRV-N`, `Exclude-A-Traj-Moderate-Error-Load-N`, `Exclude-A-Traj-Moderate-Error-Load-RV-N` |
+| Exclusion Codes | `Exclude-A-Traj-Moderate`, `Exclude-A-Traj-Moderate-allRV`, `Exclude-A-Traj-Moderate-Error-Load`, `Exclude-A-Traj-Moderate-Error-Load-RV` |
 | Configurable parameter names | `wtallow_formula`, `ewma_window`, `repval_handling`, `mod_ewma_f`, `perclimit_low`, `perclimit_mid`, `perclimit_high` |
 
 ***Overview:***
@@ -1044,8 +1044,8 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
 
 **Linked mode:**
 1. **firstRV pass:** Run `remove_mod_ewma_wt()` on non-RV values only. Label: `"Exclude-A-Traj-Moderate"`.
-   - **Error load RV escalation:** If any error-load value has RV copies, escalate the entire patient — all remaining Include values get `"Exclude-A-Traj-Moderate-Error-Load-RV-N"`.
-   - **Non-error-load propagation:** Propagate exclusions to RV copies via `propagate_to_rv()` (appends `-RV-propagated` suffix).
+   - **Error load RV escalation:** If any error-load value has RV copies, escalate the entire patient — all remaining Include values get `"Exclude-A-Traj-Moderate-Error-Load-RV"`.
+   - **Non-error-load propagation:** Propagate exclusions to RV copies via `propagate_to_rv()` (appends `-RV-Propagated` suffix).
    - Re-identify RVs on remaining values.
 2. **allRV pass:** Run `remove_mod_ewma_wt()` on all remaining values (RVs now participate). Label: `"Exclude-A-Traj-Moderate-allRV"`.
 

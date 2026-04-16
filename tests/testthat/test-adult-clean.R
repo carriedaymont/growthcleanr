@@ -803,7 +803,7 @@ test_that("full test dataset passes 1220/1220", {
     # Regex for old EWMA round codes → new Traj format (round number stripped)
     result <- sub(
       "^Exclude-Adult-EWMA-Extreme round \\d+$",
-      "Exclude-A-Traj-Ext", result)
+      "Exclude-A-Traj-Extreme", result)
     result <- sub(
       "^Exclude-Adult-EWMA-Extreme-firstRV round \\d+$",
       "Exclude-A-Traj-Extreme-firstRV", result)

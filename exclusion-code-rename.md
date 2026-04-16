@@ -65,7 +65,7 @@ Changes: Add `Exclude-Missing` (assigned in `cleangrowth()` wrapper). Add parame
 | Exclude-A-Extraneous | Exclude-A-Extraneous | Remove parameter |
 | Exclude-A-Identical | Exclude-A-Identical | Remove parameter |
 | Exclude-A-Extraneous | Exclude-A-Extraneous | Remove parameter |
-| Exclude-A-Traj-Ext-N | Exclude-A-Traj-Ext | Remove parameter and -N suffix |
+| Exclude-A-Traj-Ext-N | Exclude-A-Traj-Extreme | Remove parameter, -N suffix, and expand abbreviation |
 | Exclude-A-Traj-Extreme-firstRV-N | Exclude-A-Traj-Extreme-firstRV | Remove parameter and -N suffix |
 | Exclude-A-Traj-Extreme-allRV-N | Exclude-A-Traj-Extreme-allRV | Remove parameter and -N suffix |
 | Exclude-A-Ord-Pair | Exclude-A-Ord-Pair | Remove parameter |

@@ -144,8 +144,8 @@ test_that("error load parameters affect error-load exclusions", {
   out_lenient <- run_child_subset(100, error.load.threshold = 0.99,
                                    error.load.mincount = 10)
 
-  n_errload_agg <- sum(out_aggressive$result$exclude == "Exclude-Error-load")
-  n_errload_len <- sum(out_lenient$result$exclude == "Exclude-Error-load")
+  n_errload_agg <- sum(out_aggressive$result$exclude == "Exclude-C-Too-Many-Errors")
+  n_errload_len <- sum(out_lenient$result$exclude == "Exclude-C-Too-Many-Errors")
 
   # Aggressive should find at least as many error-load as lenient
   expect_gte(n_errload_agg, n_errload_len)

@@ -56,8 +56,6 @@ Rscript tests/test_harness.R tightest
 ```
 
 All tests must pass before starting. If any fail, fix first.
-(Child `test-child-algorithms.R` has 6 known failures for unimplemented
-`cf_rescue_threshold` — these are pre-existing and acceptable.)
 
 ### 2. Create a dated todo file
 
