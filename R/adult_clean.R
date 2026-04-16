@@ -554,7 +554,6 @@ cleanadult <- function(df,
                                s_df$absdiff_daymed, -s_df$internal_id), ]
           }
 
-          keeper_id <- s_df$internal_id[1]
           rem_ids <- c(rem_ids, s_df$internal_id[-1])
         }
 
@@ -951,7 +950,6 @@ cleanadult <- function(df,
                                s_df$absdiff_daymed, -s_df$internal_id), ]
           }
 
-          keeper_id <- s_df$internal_id[1]
           rem_ids <- c(rem_ids, s_df$internal_id[-1])
         }
 

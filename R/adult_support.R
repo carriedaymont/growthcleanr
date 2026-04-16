@@ -1404,7 +1404,6 @@ eval_2d_nonord <- function(w_subj_df, w_subj_keep, wtallow_formula = "piecewise"
   sde_codes <- c("Exclude-A-Identical", "Exclude-A-Extraneous")
   prior_nonSDE <- any(
     w_subj_keep[all_wt_ids] != "Include" &
-    w_subj_keep[all_wt_ids] != "temp extraneous" &
     !w_subj_keep[all_wt_ids] %in% sde_codes &
     w_subj_keep[all_wt_ids] != "" &
     !is.na(w_subj_keep[all_wt_ids])

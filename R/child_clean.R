@@ -198,6 +198,10 @@
 #'   "CF-NR" (CF, does not meet rescue criteria), or "CF-Resc" (CF, meets rescue
 #'   criteria). \code{cf_deltaZ} is the absolute z-score difference used for rescue
 #'   evaluation. Defaults to FALSE.
+#' @param debug Logical. If TRUE, include diagnostic columns in the output for
+#'   algorithm debugging. Currently emits six \code{ewma1_it1.*} columns capturing
+#'   EWMA values from the first iteration of Step 11 (EWMA1 Extreme), useful for
+#'   investigating why a particular row was flagged. Defaults to FALSE.
 #' @param ref.data.path Path to reference data. If not supplied, the year 2000
 #' Centers for Disease Control (CDC) reference data will be used.
 #' @param log.path Path to log file output when running in parallel (non-quiet mode). Default is NA. A new
@@ -310,6 +314,7 @@ cleangrowth <- function(subjid,
                         include.carryforward = FALSE,
                         cf_rescue = "standard",
                         cf_detail = FALSE,
+                        debug = FALSE,
                         ref.data.path = "",
                         log.path = NA,
                         parallel = FALSE,
@@ -1147,6 +1152,7 @@ cleangrowth <- function(subjid,
         include.carryforward = include.carryforward,
         cf_rescue = cf_rescue,
         cf_detail = cf_detail,
+        debug = debug,
         sd.extreme = sd.extreme,
         z.extreme = z.extreme,
         exclude.levels = exclude.levels,
@@ -1177,6 +1183,7 @@ cleangrowth <- function(subjid,
         include.carryforward = include.carryforward,
         cf_rescue = cf_rescue,
         cf_detail = cf_detail,
+        debug = debug,
         sd.extreme = sd.extreme,
         z.extreme = z.extreme,
         exclude.levels = exclude.levels,
@@ -2456,6 +2463,7 @@ cleanchild <- function(data.df,
                                include.carryforward,
                                cf_rescue = "standard",
                                cf_detail = FALSE,
+                               debug = FALSE,
                                sd.extreme,
                                z.extreme,
                                exclude.levels,
@@ -3270,9 +3278,9 @@ cleanchild <- function(data.df,
             by = .(subjid, param),
             .SDcols = c('index', 'id', 'internal_id', 'param', 'sex', 'agedays', 'tbc.sd', 'ctbc.sd', 'exclude')]
 
-    # Capture EWMA1 iteration 1 values for debugging (always saved; adds 6 columns).
-    # Future: consider gating behind a debug parameter.
-    if (iteration == 1) {
+    # Capture EWMA1 iteration 1 values for debugging (gated behind `debug`).
+    # Adds 6 columns to output for diagnosing why a row was flagged in Step 11.
+    if (debug && iteration == 1) {
       # Copy EWMA values from first iteration to permanent columns
       # Naming: ewma1_it1.ewma_all, ewma1_it1.ewma_before, ewma1_it1.dewma_all, etc.
       ewma1_cols <- c("ewma.all", "ewma.before", "ewma.after", "dewma.all", "dewma.before", "dewma.after")
@@ -3822,13 +3830,13 @@ cleanchild <- function(data.df,
 
               # Birth WT
               df[agedays == 0 & c(agedays[2:.N], NA) < 365.25 & dewma.all > 3 & (c.dewma.all > 3 | is.na(c.dewma.all)) & addcrithigh,
-                 pot_excl := "Exclude-C-Traj"]
+                 pot_excl := .child_exc(param, "Traj")]
               df[agedays == 0 & c(agedays[2:.N], NA) < 365.25 & dewma.all < -3 & (c.dewma.all < -3 | is.na(c.dewma.all)) & addcritlow,
-                 pot_excl := "Exclude-C-Traj"]
+                 pot_excl := .child_exc(param, "Traj")]
               df[agedays == 0 & c(agedays[2:.N], NA) >= 365.25 & dewma.all > 4 & (c.dewma.all > 4 | is.na(c.dewma.all)) & addcrithigh,
-                 pot_excl := "Exclude-C-Traj"]
+                 pot_excl := .child_exc(param, "Traj")]
               df[agedays == 0 & c(agedays[2:.N], NA) >= 365.25 & dewma.all < -4 & (c.dewma.all < -4 | is.na(c.dewma.all)) & addcritlow,
-                 pot_excl := "Exclude-C-Traj"]
+                 pot_excl := .child_exc(param, "Traj")]
 
               # First
               df[first_meas & (c(agedays[2:.N], NA) - agedays < 365.25) & dewma.all > 2 & (c.dewma.all > 2 | is.na(c.dewma.all)) & addcrithigh,
@@ -4637,14 +4645,10 @@ cleanchild <- function(data.df,
 
         exclude_all[ind_all == idx] <- df[index == idx, val_excl]
 
-        # Continue iterating — after excluding 1 candidate, new violations may emerge
-        if (count_exclude >= 1){
-          testing <- TRUE
-
-          df <- df[index != idx, ]
-        } else {
-          testing <- FALSE
-        }
+        # Continue iterating — after excluding 1 candidate, new violations may emerge.
+        # count_exclude > 0 outer guard makes count_exclude >= 1 always true here.
+        testing <- TRUE
+        df <- df[index != idx, ]
       } else {
         testing <- FALSE
       }
@@ -4852,11 +4856,14 @@ cleanchild <- function(data.df,
     }
   }
 
-  # Add EWMA1 iteration 1 columns if they exist (pattern: ewma1_it1.ewma_*, ewma1_it1.dewma_*)
-  ewma1_it1_cols <- grep("^ewma1_it1\\.", names(data.df), value = TRUE)
-  for (col in ewma1_it1_cols) {
-    if (!(col %in% return_cols)) {
-      return_cols <- c(return_cols, col)
+  # Add EWMA1 iteration 1 debug columns when debug=TRUE
+  # (created in Step 11 only when debug=TRUE; pattern: ewma1_it1.ewma_*, ewma1_it1.dewma_*)
+  if (debug) {
+    ewma1_it1_cols <- grep("^ewma1_it1\\.", names(data.df), value = TRUE)
+    for (col in ewma1_it1_cols) {
+      if (!(col %in% return_cols)) {
+        return_cols <- c(return_cols, col)
+      }
     }
   }
 

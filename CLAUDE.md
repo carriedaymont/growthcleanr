@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-github-latest (growthcleanr)
 
-**Last updated:** 2026-04-16 (doc cleanup: deleted orphaned man pages, fixed stale vignettes, regenerated roxygen, removed dead code/comments, `as_matrix_delta` now internal)
+**Last updated:** 2026-04-16 (added `debug` parameter to gate `ewma1_it1.*` columns; small dead-code cleanup: Step 17 inner if branch, adult `keeper_id`, `"temp extraneous"` filter; Step 15 Birth WT codes use `.child_exc()`)
 
 ## Overview
 
@@ -409,6 +409,7 @@ Default: `"looser"`
 | `include.carryforward` | FALSE | Step 6 | **Deprecated** — use `cf_rescue` instead. If TRUE, skip CF detection entirely |
 | `cf_rescue` | `"standard"` | Step 6 | CF rescue mode: `"standard"` (age/interval/param-specific lookup), `"none"` (all CFs excluded), `"all"` (all CFs rescued) |
 | `cf_detail` | FALSE | Step 6 | If TRUE, add `cf_status` and `cf_deltaZ` columns to output |
+| `debug` | FALSE | Step 11, output | If TRUE, emit 6 `ewma1_it1.*` columns capturing EWMA values from the first iteration of Step 11 (EWMA1 Extreme), useful for diagnosing why a row was flagged. Off by default to keep standard output lean. |
 | `ewma_window` | 15 | EWMA steps | Max observations on each side for EWMA |
 | `adult_cutpoint` | 20 | Preprocessing | Age (years) dividing pediatric/adult |
 | `quietly` | TRUE | All | Suppress progress messages |
@@ -741,6 +742,15 @@ degrade on large/unusual datasets. No blocking issues found.
 
 See git history for full details on each fix.
 
+- **Pre-walkthrough cleanup (2026-04-16):** Added `debug = FALSE`
+  parameter to `cleangrowth()` and `cleanchild()`; gates 6
+  `ewma1_it1.*` columns (created in Step 11 only when `debug=TRUE`,
+  emitted in output only when `debug=TRUE`). Resolved deferred
+  walkthrough items: Step 17 dead inner `if (count_exclude >= 1)`
+  branch collapsed; adult dead `keeper_id` removed (2 locations);
+  adult dead `"temp extraneous"` filter removed in `eval_2d_nonord()`;
+  Step 15 Birth WT block now uses `.child_exc(param, "Traj")` for
+  consistency with surrounding code (was 4 hardcoded literals).
 - **Doc/dead-code cleanup (2026-04-16):** Deleted 6 orphaned
   man pages for removed extdata files. Removed dead `nnte`
   column assignment and unused NULL declarations (`sum_val`,

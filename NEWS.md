@@ -2,23 +2,30 @@
 
 ## Added
 
-- New child algorithm (`child_clean.R`) is now the default pediatric path, replacing the legacy pediatric algorithm. The legacy algorithm is retained for backward compatibility via `use_legacy_algorithm = TRUE`.
+- New child algorithm (`child_clean.R`) is now the default and only pediatric path.
 - Adult algorithm (`cleanadult()`) rewritten with permissiveness framework: four exclusion levels (`loosest`, `looser`, `tighter`, `tightest`), default `looser`.
 - Adult algorithm: Step 1B BMI BIV check (same-day ht+wt pairs forming implausible BMI; only active at `loosest` permissiveness).
 - Adult algorithm: dynamic while loop for evil twins exclusion (previously fixed 3 rounds).
-- Comprehensive test suite: 220 adult unit tests; 1483 adult regression tests at all 4 permissiveness levels; child regression and edge case tests.
+- `cf_rescue` parameter (default `"standard"`) replaces `include.carryforward` (deprecated). Supports age/interval/param/rounding-specific rescue thresholds via lookup, plus `"none"` and `"all"` modes.
+- `cf_detail` parameter — adds `cf_status` and `cf_deltaZ` columns to output for CF rescue diagnostics.
+- `debug` parameter (default `FALSE`) — gates emission of `ewma1_it1.*` diagnostic columns from Step 11.
+- `gc_preload_refs()` and `cached_results` / `changed_subjids` parameters for partial re-runs and reference-table caching.
+- `batch_size` parameter (default 2000) — number of subjects per outer batch.
+- Comprehensive test suite: 198 adult unit tests; 1508 adult regression tests at all 4 permissiveness levels; child regression and edge case tests.
 
 ## Changed
 
 - `cleangrowth()` entry point moved from `growth.R` into `child_clean.R`; `growth.R` removed.
-- `prelim_infants` parameter deprecated — triggers a warning and maps to `use_legacy_algorithm`.
 - `weight_cap` parameter deprecated — renamed to `adult_scale_max_lbs`.
 - `cat()` → `message()` throughout for CRAN compliance.
+- Output: `cleangrowth()` now returns a data.table with multiple columns (z-scores, recentered z-scores, `cf_rescued`, adult `mean_ht` / `bin_result`, etc.) instead of a character vector.
 
 ## Deprecated / Removed
 
+- Legacy pediatric algorithm and associated parameters removed (`use_legacy_algorithm`, `prelim_infants`, `lt3.exclude.mode`, `ewma.exp`, `recover.unit.error`).
 - `adjustcarryforward()` and associated helpers (`testacf_func.R`) removed.
 - `growth.R` removed (contents merged into `child_clean.R`).
+- `R/deprec/` and `R/modified_source_code/` directories removed.
 
 ---
 
