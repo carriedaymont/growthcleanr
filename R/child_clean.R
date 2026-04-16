@@ -695,9 +695,9 @@ cleangrowth <- function(subjid,
       # removing z calculations, as they are not used
       # for infants, use z and who
       measurement.to.z <- if (!is.null(ref_tables)) ref_tables$mtz_cdc_prelim else
-        read_anthro(ref.data.path, cdc.only = TRUE, prelim_infants = TRUE)
+        read_anthro(ref.data.path, cdc.only = TRUE)
       measurement.to.z_who <- if (!is.null(ref_tables)) ref_tables$mtz_who_prelim else
-        read_anthro(ref.data.path, cdc.only = FALSE, prelim_infants = TRUE)
+        read_anthro(ref.data.path, cdc.only = FALSE)
 
       # calculate "standard deviation" scores
       if (!quietly)
@@ -1404,8 +1404,6 @@ cleangrowth <- function(subjid,
 #'
 #' @param path Path to supplied reference anthro data. Defaults to package anthro tables.
 #' @param cdc.only Whether or not only CDC data should be used. Defaults to false.
-#' @param prelim_infants Ignored (retained for backward compatibility). The child
-#'   algorithm reference tables are always used.
 #'
 #' @return Function for calculating BMI based on measurement, age in days, sex, and measurement value.
 #' @export
@@ -1420,7 +1418,7 @@ cleangrowth <- function(subjid,
 #' afunc <- read_anthro(path = system.file("extdata", package = "growthcleanr"),
 #'                      cdc.only = TRUE)
 #' }
-read_anthro <- function(path = "", cdc.only = FALSE, prelim_infants = TRUE) {
+read_anthro <- function(path = "", cdc.only = FALSE) {
   # avoid "no visible bindings" warning
   src <- param <- sex <- age <- ret <- m <- NULL
   csdneg <- csdpos <- s <- NULL
@@ -2276,11 +2274,9 @@ calc_and_recenter_z_scores <- function(df, cn, ref.data.path,
   # for infants, use z and who
   # Use pre-built closures if provided (avoids repeated disk reads from call sites)
   if (is.null(measurement.to.z))
-    measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE,
-                                    prelim_infants = TRUE)
+    measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE)
   if (is.null(measurement.to.z_who))
-    measurement.to.z_who <- read_anthro(ref.data.path, cdc.only = FALSE,
-                                        prelim_infants = TRUE)
+    measurement.to.z_who <- read_anthro(ref.data.path, cdc.only = FALSE)
 
   # calculate "standard deviation" scores
   df[, cn.orig_cdc := measurement.to.z(param, agedays, sex, get(cn), TRUE)]
@@ -3650,7 +3646,7 @@ cleanchild <- function(data.df,
   # This is expensive, so we do it once upfront
   # Build measurement.to.z_who once here (avoids 2 disk reads inside calc_and_recenter_z_scores)
   measurement.to.z_who_15 <- if (!is.null(ref_tables)) ref_tables$mtz_who_prelim else
-    read_anthro(ref.data.path, cdc.only = FALSE, prelim_infants = TRUE)
+    read_anthro(ref.data.path, cdc.only = FALSE)
   valid_for_zscore <- data.df$sp_key %in% sp_to_process_15 & !is.na(data.df$p_plus)
   if (sum(valid_for_zscore) > 0) {
     zscore_subset <- data.df[valid_for_zscore]

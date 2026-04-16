@@ -121,18 +121,18 @@ test_that("stress test: exclusion category counts match expected", {
   # algorithm intentionally changes. Run the test once with new code,
   # read the printed counts, and update here.
   #
-  # Frozen counts — updated 2026-04-16: exclusion codes no longer param-specific;
-  # per-param counts merged. Update these when algorithm intentionally changes.
-  expect_equal(catcount("Include"), 29194)
-  expect_equal(catcount("Exclude-C-Extraneous"), 929)     # was HT 312 + WT 617
-  expect_equal(catcount("Exclude-C-Evil-Twins"), 734)      # was HT 630 + WT 104
-  expect_equal(catcount("Exclude-C-Traj"), 613)            # was HT 360 + WT 253
-  expect_equal(catcount("Exclude-C-BIV"), 606)             # was HT 545 + WT 61
+  # Frozen counts — updated 2026-04-16: updated for Fenton 2025 CSD z-scores
+  # and exclusion code rename (codes no longer param-specific).
+  expect_equal(catcount("Include"), 29295)
+  expect_equal(catcount("Exclude-C-Extraneous"), 929)
+  expect_equal(catcount("Exclude-C-Evil-Twins"), 735)
+  expect_equal(catcount("Exclude-C-Traj"), 613)
+  expect_equal(catcount("Exclude-C-BIV"), 606)
   expect_equal(catcount("Exclude-C-Too-Many-Errors"), 401)
-  expect_equal(catcount("Exclude-C-CF"), 378)              # was HT 209 + WT 169
+  expect_equal(catcount("Exclude-C-CF"), 276)
   expect_equal(catcount("Exclude-C-Abs-Diff"), 156)
-  expect_equal(catcount("Exclude-C-Traj-Extreme"), 58)     # was HT 39 + WT 19
-  expect_equal(catcount("Exclude-C-Identical"), 31)        # was HT 17 + WT 14
+  expect_equal(catcount("Exclude-C-Traj-Extreme"), 58)
+  expect_equal(catcount("Exclude-C-Identical"), 31)
   expect_equal(catcount("Exclude-Missing"), 1)
 
   # 11 distinct categories present (was 18 with param-specific codes)

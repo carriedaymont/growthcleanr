@@ -4,15 +4,12 @@
 \alias{read_anthro}
 \title{Function to calculate z-scores and csd-scores based on anthro tables.}
 \usage{
-read_anthro(path = "", cdc.only = FALSE, prelim_infants = TRUE)
+read_anthro(path = "", cdc.only = FALSE)
 }
 \arguments{
 \item{path}{Path to supplied reference anthro data. Defaults to package anthro tables.}
 
 \item{cdc.only}{Whether or not only CDC data should be used. Defaults to false.}
-
-\item{prelim_infants}{Ignored (retained for backward compatibility). The child
-algorithm reference tables are always used.}
 }
 \value{
 Function for calculating BMI based on measurement, age in days, sex, and measurement value.

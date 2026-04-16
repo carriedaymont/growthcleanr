@@ -859,10 +859,9 @@ as changes don't affect algorithm performance).
   `fentlms_forz.Rd`. Regenerated `cleangrowth.Rd`, `ewma.Rd`,
   `fenton2025_ms_lookup_smoothed.Rd` via `roxygenise()`.
   `as_matrix_delta` removed from exports (internal helper).
-- [ ] **Roxygen return value outdated for `cleangrowth()`:**
-  Still describes "Vector of exclusion codes" — should describe
-  the data.table with all columns including adult-specific
-  ones (`mean_ht`, `bin_result`). (~15 min)
+- [x] **Roxygen return value for `cleangrowth()`:** Updated to
+  describe data.table with all columns. (Fixed prior to
+  2026-04-16; confirmed in generated `cleangrowth.Rd`.)
 - [ ] **`plyr` dependency:** Only used for `ddply` in parallel
   adult dispatch. Long-term: replace with
   `data.table`/`foreach` equivalent. (~2 hours)
