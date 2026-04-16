@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-github-latest (growthcleanr)
 
-**Last updated:** 2026-04-16 (exclusion code walkthrough: Traj-Ext→Traj-Extreme, missing factor levels, narrative sync)
+**Last updated:** 2026-04-16 (legacy removal: deleted pediatric_clean_legacy.R, pediatric_support_legacy.R, R/deprec/, R/modified_source_code/, legacy extdata; removed legacy parameters from cleangrowth())
 
 ## Overview
 
@@ -32,18 +32,14 @@ chat.
 |-----------|--------|--------------|-------|
 | Child | Active, primary | `child_clean.R` | Default pediatric path in v3.0.0 |
 | Adult | **Closed pending validation** | `adult_clean.R` + `adult_support.R` | Permissiveness framework, 4 exclusion levels. Do not modify without checking with Carrie first. |
-| Legacy pediatric | Deprecated | `pediatric_clean_legacy.R` | `use_legacy_algorithm = TRUE` |
-| `adjustcarryforward()` | Deprecated | removed in v3.0.0 | CF adjustment utility; present on Main/CRAN, removed from `efficiency-updates` |
 
-The child algorithm replaces the legacy pediatric algorithm.
-The legacy pediatric algorithm is maintained for backward
-compatibility (`use_legacy_algorithm = TRUE`).
-`prelim_infants` is deprecated — it triggers a warning and
-maps to `use_legacy_algorithm` (verified; tested in
-test-child-regression.R and test-cleangrowth.R). The
-user-facing `prelim_infants` parameter has no other effect;
-internal `read_anthro(prelim_infants = TRUE)` calls are
-hardcoded and independent of the user-facing parameter.
+**Legacy removed (2026-04-16):** The legacy pediatric algorithm
+(`pediatric_clean_legacy.R`, `pediatric_support_legacy.R`),
+`R/deprec/`, `R/modified_source_code/`, and associated
+parameters (`use_legacy_algorithm`, `prelim_infants`,
+`lt3.exclude.mode`, `ewma.exp`, `recover.unit.error`) have all
+been removed. Prior CRAN versions (v2.2.0) retain the legacy
+code for backward compatibility.
 
 This CLAUDE.md covers both the child and adult algorithms.
 
@@ -56,9 +52,7 @@ This CLAUDE.md covers both the child and adult algorithms.
 | File | What it contains |
 |------|------------------|
 | `R/child_clean.R` | `cleangrowth()` entry point + exports (top of file); `gc_preload_refs()` (pre-loads reference closures for repeated calls); `cleanchild()` main algorithm + support functions (`.child_valid()`, `.child_exc()`, `temporary_extraneous_infants()`, `calc_otl_evil_twins()`, `calc_and_recenter_z_scores()`, `ewma()`, `ewma_cache_init()`/`ewma_cache_update()`, `get_dop()`, `read_anthro()`) |
-| `R/pediatric_clean_legacy.R` | Legacy pediatric algorithm (`use_legacy_algorithm = TRUE`); deprecated, retained for backward compatibility |
-| ~~`R/growth.R`~~ | Removed in v3.0.0 — `cleangrowth()` moved into `child_clean.R` |
-| `R/utils.R` | Shared utilities (does NOT contain `.child_valid()` or `valid()` — see note below) |
+| `R/utils.R` | Shared utilities (does NOT contain `.child_valid()`) |
 | `R/adult_clean.R` | `cleanadult()` main algorithm — permissiveness framework, 14 steps |
 | `R/adult_support.R` | Adult support functions — permissiveness presets, EWMA, BIV, height groups, evil twins, error load, etc. |
 | `inst/extdata/` | Reference tables (growth charts, recentering file, velocity tables) |
@@ -86,8 +80,7 @@ cleaning steps (see Complete List of Steps below).
 Two layered batching systems:
 
 1. **Outer wrapper** (memory management): Divides subjects
-   into batches of 2,000. Batch size is hard-coded — should
-   be parameterized (future work).
+   into batches (default 2,000, configurable via `batch_size`).
 
 2. **Inner batching** (parallelism): Subdivides for parallel
    processing. With `parallel = FALSE` (current default),
@@ -199,12 +192,6 @@ assigned in `cleangrowth()` before dispatch.
 adult codes (was previously missing adult codes, causing silent
 NAs in factor output).
 
-**Codes NOT implemented (Steps 3/4):** Unit error recovery
-(`recover.unit.error`) and measurement swapping are legacy
-features scheduled for redesign. No `Unit-Error-*` or
-`Swapped-Measurements` codes are assigned by the child
-algorithm.
-
 **Simplified vs. detailed codes:** Unlike the adult algorithm
 which has distinct codes for each sub-step (e.g., separate
 moderate EWMA codes for firstRV vs allRV), the child algorithm
@@ -213,10 +200,6 @@ uses simplified codes. For example, all EWMA2 exclusions use
 last, or birth measurement. All SDE resolutions use either
 `Identical` or `Extraneous`. The specific sub-step logic is
 in the code comments but not reflected in the exclusion code.
-
-**Legacy codes:** Exclusion codes in `pediatric_clean_legacy.R`
-were NOT renamed — the legacy algorithm retains the old code
-names for backward compatibility.
 
 ### CF rescue
 
@@ -418,31 +401,27 @@ Default: `"looser"`
 
 | Parameter | Default | Used in | Description |
 |-----------|---------|---------|-------------|
-| `recover.unit.error` | FALSE | Step 3 | Attempt to identify and correct unit errors |
 | `sd.extreme` | 25 | Step 7 | SD-score cutoff for extreme exclusion |
 | `z.extreme` | 25 | Step 7 | Z-score cutoff for extreme exclusion |
 | `error.load.mincount` | 2 | Step 21 | Min exclusions before evaluating error load |
 | `error.load.threshold` | 0.5 | Step 21 | Error ratio above this excludes all |
-| `sd.recenter` | NA | Recentering | Child always uses fixed file |
+| `sd.recenter` | NA | Recentering | Default uses built-in rcfile; pass a data.table for custom recentering |
 | `include.carryforward` | FALSE | Step 6 | **Deprecated** — use `cf_rescue` instead. If TRUE, skip CF detection entirely |
 | `cf_rescue` | `"standard"` | Step 6 | CF rescue mode: `"standard"` (age/interval/param-specific lookup), `"none"` (all CFs excluded), `"all"` (all CFs rescued) |
 | `cf_detail` | FALSE | Step 6 | If TRUE, add `cf_status` and `cf_deltaZ` columns to output |
-| `ewma.exp` | -1.5 | EWMA steps | **Legacy only.** Exponent for EWMA weighting. Child algorithm uses age-dependent exponents internally |
 | `ewma_window` | 15 | EWMA steps | Max observations on each side for EWMA |
 | `adult_cutpoint` | 20 | Preprocessing | Age (years) dividing pediatric/adult |
-| `lt3.exclude.mode` | `"default"` | Legacy | Passed to `cleanlegacy()` — re-added after accidental removal |
-| `use_legacy_algorithm` | FALSE | Dispatch | If TRUE, use legacy pediatric algorithm |
 | `quietly` | TRUE | All | Suppress progress messages |
 | `ref_tables` | NULL | All reads | Pre-loaded closures from `gc_preload_refs()`; skips disk reads |
 | `cached_results` | NULL | Partial run | data.table from prior `cleangrowth()` call. Auto-detects changed subjects if `changed_subjids` is NULL; uses explicit list if both provided |
 | `changed_subjids` | NULL | Partial run | Optional vector of subject IDs to re-run. If NULL and `cached_results` provided, changed subjects are auto-detected |
-| `batch_size` | 2000 | Batching | Number of subjects per processing batch (was hardcoded, now configurable) |
+| `batch_size` | 2000 | Batching | Number of subjects per processing batch |
 
 ### gc_preload_refs()
 
-Exported function that pre-loads all three `read_anthro()` closures once
-and returns them as a named list. Avoids ~0.93 sec of disk reads per
-`cleangrowth()` call (replaces 3 `read_anthro()` calls, ~0.31 sec each).
+Exported function that pre-loads both `read_anthro()` closures once
+and returns them as a named list. Avoids ~0.6 sec of disk reads per
+`cleangrowth()` call (replaces 2 `read_anthro()` calls).
 Benchmarked on 200 subjects: standard 4.46 sec → preloaded 3.40 sec
 (1.06 sec saved/call, ~15 hours over 50K reps). Load time: 0.46 sec (once).
 
@@ -463,7 +442,7 @@ refs <- gc_preload_refs()
 result <- cleangrowth(..., ref_tables = refs)
 ```
 
-Returns: `list(mtz_cdc_prelim, mtz_who_prelim, mtz_cdc)`.
+Returns: `list(mtz_cdc_prelim, mtz_who_prelim)`.
 
 ### Partial run (cached_results)
 
@@ -552,14 +531,7 @@ full list. `cleangrowth()` currently exposes only
 
 ## Key Concepts for Code Work
 
-### The `.child_valid()` function (formerly `valid()`)
-
-**Renamed from `valid()` to `.child_valid()` (2026-04-14)** to
-avoid collision with the legacy `valid()` in
-`pediatric_support_legacy.R`. R's alphabetical file loading
-caused the legacy version to overwrite the child version when
-both were named `valid()`. The legacy `valid()` remains
-unchanged. **Do not create additional copies of either function.**
+### The `.child_valid()` function
 
 Critical gatekeeper — returns a logical vector of which rows
 are eligible for each step. The `include.*` flags control
@@ -634,24 +606,18 @@ coverage gaps, run instructions).
 
 | File | Tests | Assertions | Scope |
 |------|-------|------------|-------|
-| `test-cleangrowth.R` | 14 | 92 | `cleangrowth()` API: legacy pediatric, adult integration (7 tests), child-adult spanning (3 tests), deprecation |
-| `test-child-regression.R` | 9 | 54 | Frozen counts, spot checks, cross-sample stability, Missing, HC, preload_refs, changed_subjids |
+| `test-cleangrowth.R` | 13 | ~80 | `cleangrowth()` API: adult integration (7 tests), child-adult spanning (3 tests) |
+| `test-child-regression.R` | 8 | ~48 | Frozen counts, spot checks, cross-sample stability, Missing, HC, preload_refs, changed_subjids |
 | `test-child-algorithms.R` | 24 | ~40 | CF rescue (modes + threshold cells), Evil Twins/OTL (1/2/3 unit errors + collateral), Error Load (threshold/mincount/constructed), HC boundary, cf_detail, parallel, GA correction (potcorr + near-potcorr), Birth EWMA2 (extreme/normal WT, extreme HT), LENGTHCM identity |
-| `test-child-parameters.R` | 9 | 21 | use_legacy_algorithm, sd.recenter, include.carryforward, sd.extreme, ewma_window, error.load params, recover.unit.error, imperial units, LENGTHCM |
+| `test-child-parameters.R` | 7 | ~15 | include.carryforward, sd.extreme, ewma_window, error.load params, imperial units, LENGTHCM |
 | `test-child-edge-cases.R` | 12 | 24 | Single subject, sparse data, all-NA, mixed NA, SDE-Identical, negative agedays, HEADCM >3yr, extreme values, density mix, CF, deterministic |
 | `test-adult-clean.R` | 198 | 198 | All 14 adult steps, 4 permissiveness levels, edge cases (via `cleanadult()` directly) |
-| **Total** | **266** | **~429** | |
+| **Total** | **262** | **~405** | |
 
 Additional test files not actively maintained:
 `test-cdc.R` (not modified in v3.0.0); `test-utils.R` (10
 failures — old API without `id` parameter, tests utility
 functions `splitinput`, `recode_sex`, `longwide`, `simple_bmi`).
-
-**Not tested (by design):** Steps 3 (unit error recovery) and
-4 (swapped measurements) are legacy features scheduled for
-redesign. Do not write tests for the current implementation —
-they would need to be rewritten anyway and would slow down
-the redesign.
 
 Run with:
 ```bash
@@ -714,54 +680,12 @@ Requires installed package — see Known Issues. Run in background from Claude C
 
 ### Open (child)
 
-- [x] **`stop()` → `warning()` in Step 5:** Already resolved.
-  All duplicate-Include safety checks (Step 5 line ~2795,
-  Step 13 lines ~3502–3504 and ~3514) use `warning()`.
-  CLAUDE.md item was never ticked.
-- [x] **Parallel processing fixed (2026-04-04):** Three bugs
-  were causing failures:
-  1. `internal_id` not passed to `temporary_extraneous_infants()`
-     at 7 call sites — fixed by adding to column subset
-  2. `internal_id` dropped inside the function at line 2373
-     (small copy didn't include it) — fixed in keyby select
-  3. `ewma_cache_init`/`ewma_cache_update` missing from child
-     `var_for_par` — added. `.paropts` updated to load
-     `"growthcleanr"` on workers.
-  **Requirement:** Package must be installed (`devtools::install_local()`)
-  before using `parallel = TRUE`. Will not work with
-  `devtools::load_all()` only (workers need the installed
-  package to access extdata via `system.file()`).
-- [x] **Batch size parameterized (2026-04-15):** `batch_size`
-  parameter added to `cleangrowth()` (default 2000).
-- [x] **Batch-invariant operations moved before loop
-  (2026-04-13):** `exclude.levels` definition and
-  Tanner/WHO velocity reads moved before the outer loop.
-  `read_anthro()` calls already optimized via `ref_tables`.
-- [x] **Exclusion code rename (2026-04-14):** Child codes
-  renamed to `Exclude-C-{Reason}` format; adult `-N` round
-  suffix removed from trajectory codes; `Missing` →
-  `Exclude-Missing`; `Not cleaned` → `Exclude-Not-Cleaned`.
-  `exclude.levels` updated to include all adult codes. Legacy
-  codes in `pediatric_clean_legacy.R` were NOT renamed.
-  Param indicators (-WT-, -HT-, -HC-) removed from all codes
-  (2026-04-16) — codes are not param-specific; param is in
-  the data.
-- [x] **CF rescue thresholds (2026-04-14):** Replaced fixed
-  thresholds (0.05/0.10 with wholehalfimp, teen age cutoffs)
-  with age/interval/param/rounding-specific lookup via
-  `.cf_rescue_lookup()`. Three levels: 0.05 (slow growth),
-  0.20 (moderate), 0.40 (fast growth), plus NR (no rescue).
-  No string-length or teen restriction. Three modes via
-  `cf_rescue` parameter: "standard" (lookup), "none", "all".
-  `include.carryforward` deprecated. Thresholds derived from
-  100K synthetic tracker population; methodology in
-  `__Pipeline/CF-exploration/cf-threshold-schemes.md`.
 - [ ] **LENGTHCM → HEIGHTCM:** No measurement adjustment for
   the ~0.5–0.7 cm supine/standing difference. Known
   limitation; future update planned.
-- [x] **Unused variables in Step 19:** `abs_tbd.sd`,
-  `abs_ctbd.sd`, `med_dop`, `med_cdop` — confirmed removed
-  in current code (verified 2026-04-15).
+- **`parallel = TRUE` requires installed package.** Will fail
+  with `load_all()` only — workers need `system.file()` access
+  to extdata. Install with `devtools::install_local(".")` first.
 
 ### Robustness audit (2026-04-14)
 
@@ -808,129 +732,42 @@ degrade on large/unusual datasets. No blocking issues found.
   UW scaling edge cases (very low/high UW).
 - [ ] **Performance:** `setkey(df, subjid)` optimization
   deferred.
-- [x] **Integration tests through `cleangrowth()`:** 7 tests
-  added to `test-cleangrowth.R` exercising the full
-  `cleangrowth()` → `cleanadult()` path: output columns,
-  imperial units, permissiveness passthrough, scale_max_lbs,
-  weight_cap deprecation, id preservation, spanning subject
-  output structure.
+- [ ] **Deferred test gaps:** Error load with -5 exponent,
+  UW scaling edge cases (very low/high UW).
+- [ ] **Performance:** `setkey(df, subjid)` optimization
+  deferred.
 
-### Fixed (recent)
+### Fixed (recent — condensed 2026-04-16)
 
-- [x] **Exclusion code walkthrough (2026-04-16):**
-  Full walkthrough focused on exclusion codes. Found and fixed:
-  missing `Exclude-A-Traj-Extreme-firstRV-RV-Propagated` factor
-  level (latent bug — would silently produce NA if triggered);
-  `Exclude-A-Traj-Ext` → `Exclude-A-Traj-Extreme` rename for
-  consistency with linked mode codes; silently broken error-load
-  test (`test-child-parameters.R` used old code name, always
-  matched 0 rows); stale `-N` suffix in adult narrative (4
-  locations); child narrative updated to remove param indicators
-  (~37 occurrences); 3 stale code comments fixed; added
-  `Exclude-A-Traj-Moderate-RV-Propagated` and
-  `Exclude-A-Traj-Extreme-firstRV-RV-Propagated` to CLAUDE.md
-  canonical table. All tests pass. Details in
-  `walkthrough-todo-2026-04-16.md`.
-- [x] **Remove param from exclusion codes (2026-04-16):**
-  Removed param indicators (-WT-, -HT-, -HC-) from all child
-  and adult exclusion codes. Child: `Exclude-C-{WT|HT|HC}-{Reason}`
-  → `Exclude-C-{Reason}` (e.g., `Exclude-C-WT-BIV` →
-  `Exclude-C-BIV`). Adult: `Exclude-A-{WT|HT}-{Reason}` →
-  `Exclude-A-{Reason}` (e.g., `Exclude-A-WT-BIV` →
-  `Exclude-A-BIV`). Codes are not param-specific — the param
-  for each row is in the data. `.child_exc()` updated to take
-  only reason (not param). `exclude.levels` updated.
-- [x] **Full walkthrough cleanup (2026-04-15):** Resolved 30+
-  deferred items from the full code walkthrough. Key changes:
-  all `cat()`/`print()` → `message()` for CRAN compliance
-  (50+ calls); ~70 lines of dead/commented-out code removed;
-  `batch_size` parameter added (was hardcoded 2000);
-  unnecessary `data.adult[, id := line]` removed; batching
-  dplyr → data.table; `|` → `||` short-circuit fix; `names(
-  table(subjid) > 1)` correctness fix; stale `"valid"` →
-  `".child_valid"` in `var_for_par`; NA fallback logic added
-  to `calc_and_recenter_z_scores`; `as_matrix_delta()` copied
-  to child_clean.R; `ewma.exp` documented as legacy-only;
-  conflict warning for `include.carryforward` + `cf_rescue`;
-  Stata comments condensed; clarifying comments throughout.
-  Full findings in `walkthrough-todo-2026-04-15.md`. Commit
-  `0bea2ba`.
-- [x] **min/max warnings on empty subsets (2026-04-14):**
-  Fixed 5 locations in `child_clean.R` where `min()`/`max()`
-  on empty Include subsets produced user-visible `-Inf`
-  warnings. All replaced with explicit `if (length(...) == 0)`
-  guards. Commit `64c186b`.
-- [x] **Child BIV tests (2026-04-14):** Added 3 separate
-  focused BIV tests (WT, HT, HC) to `test-child-edge-cases.R`.
-  Each uses a minimal dataset with one extreme value and
-  verifies the correct BIV exclusion code. Commit `8201e9c`.
-- [x] **Test suite overhaul (2026-04-14):** Adult tests
-  fixed for `library()` loading (was missing `library(growthcleanr)`
-  and calling unexported `cleanadult()` directly). Added 7
-  adult integration tests and 3 spanning subject tests to
-  `test-cleangrowth.R`. `permissiveness_presets()` exported.
-  `testing-reference.md` created. Commit `1797135`.
-- [x] **Exclusion code rename (2026-04-14):** All child
-  exclusion codes renamed from `Exclude-{Reason}` to
-  `Exclude-C-{Reason}`, using `.child_exc(reason)` helper.
-  `Missing` → `Exclude-Missing`, `Not cleaned` →
-  `Exclude-Not-Cleaned` (shared codes assigned in
-  `cleangrowth()`). Adult: `-N` round suffix removed from
-  trajectory codes. `exclude.levels` updated to include all
-  adult codes (was missing them, causing silent NAs in factor
-  output). `valid()` renamed to `.child_valid()` in
-  `child_clean.R` to avoid collision with legacy `valid()` in
-  `pediatric_support_legacy.R`. `lt3.exclude.mode` parameter
-  re-added to `cleangrowth()` with default `"default"` (was
-  accidentally removed but `cleanlegacy()` still requires it).
-  Legacy codes in `pediatric_clean_legacy.R` NOT renamed.
-  Tests: child 200/207 (7 pre-existing CF rescue + parallel
-  failures), adult 198/198 unit + 1508/1508 regression at
-  all 4 levels, test-utils.R 6 pre-existing failures.
-- [x] **`internal_id` for all internal sorting/tiebreaking
-  (2026-04-12, updated 2026-04-16):** Both child and adult
-  algorithms use `internal_id` (sequential integer `1:N`,
-  created by `cleangrowth()`) for all internal sorting,
-  tiebreaking, and ordering. The user's original `id` (any
-  type) is preserved untouched and returned in output.
-  **Assignment order (2026-04-16):** `internal_id` is assigned
-  AFTER `setkey(data.all.ages, subjid, param, agedays, id)`,
-  so it reflects `id`-sorted order. This ensures results are
-  deterministic regardless of input row order.
-  **Type (2026-04-16):** Changed from character to integer.
-  All `setkey()` calls now sort correctly (integer, not
-  lexicographic). Adult named vectors use `as.character()`
-  for names and `as.integer()` for output join keys.
-  **Child:** `internal_id` in all `setkey()` and `.SDcols`
-  locations. **Adult:** All 28 `$id` references in
-  `adult_support.R` renamed to `$internal_id`.
-  `cleangrowth()` no longer overwrites `data.adult$id`
-  with `line`.
-- [x] **Child error load bug fix (2026-04-12):** Step 21
-  used hardcoded `.4` threshold instead of the configurable
-  `error.load.threshold` parameter (default 0.5). Fixed to
-  use the parameter. This changes behavior: 2 rows in
-  syngrowth that were excluded at 0.4 are now included at
-  the correct 0.5 threshold.
-- [x] **Outer batching wrapper defeated:** Lines 440–441
-  overwrote batch filter with all subjects. Fixed.
-- [x] **Missing data bug:** NA measurements coded as
-  SDE-EWMA instead of Missing. Root cause: duplicate
-  `valid()` definitions in two files; R's alphabetical
-  load order caused the unfixed copy to overwrite the
-  fixed one. Fixed in v3.0.0. Further prevented by
-  renaming child version to `.child_valid()` (2026-04-14).
-- [x] **BIV threshold for preterm weights:** Previous
-  threshold excluded legitimate preterm weights (0.7–1.0
-  kg). Changed to <0.2 kg for agedays ≤ 365 and <1 kg
-  for agedays > 365.
-- [x] **CF rescue re-inclusion:** Rescued CFs are now set
-  back to `exclude = "Include"` so they participate in
-  downstream steps.
-- [x] **`calc_and_recenter_z_scores()` blending bug:**
-  CDC-only cutoff was `>= 4 years` instead of `> 5 years`.
-  Confirmed bug — confused WHO/CDC blending window with
-  corrected/uncorrected smoothing window.
+See git history for full details on each fix.
+
+- **Legacy removal (2026-04-16):** Deleted
+  `pediatric_clean_legacy.R`, `pediatric_support_legacy.R`,
+  `R/deprec/`, `R/modified_source_code/`, 5 legacy extdata
+  files. Removed parameters: `use_legacy_algorithm`,
+  `prelim_infants`, `lt3.exclude.mode`, `ewma.exp`,
+  `recover.unit.error`. Simplified `read_anthro()` (removed
+  individual WHO txt path), `gc_preload_refs()` (2 closures,
+  not 3), recentering (removed NHANES/derive string paths),
+  dispatch (direct `cleanchild()` only), `var_for_par`
+  (removed legacy functions).
+- **Exclusion code work (2026-04-14–16):** Codes renamed to
+  `Exclude-C-{Reason}` / `Exclude-A-{Reason}` format; param
+  indicators removed; `Missing` → `Exclude-Missing`; adult
+  `-N` round suffix removed; `.child_exc()` helper;
+  `exclude.levels` updated with all adult codes.
+- **CF rescue thresholds (2026-04-14):** Age/interval/param-
+  specific lookup tables replace fixed thresholds.
+- **internal_id (2026-04-12–16):** Sequential integer for all
+  internal sorting; user `id` preserved untouched.
+- **Walkthrough cleanups (2026-04-15–16):** 30+ items: `cat()`
+  → `message()`, dead code removal, `batch_size` parameter,
+  correctness fixes.
+- **Earlier fixes:** BIV preterm threshold, error load bug
+  (hardcoded .4 → parameter), missing data bug (duplicate
+  `valid()` definitions), CF rescue re-inclusion, z-score
+  blending bug, parallel processing fixes, outer batching
+  wrapper fix.
 
 ---
 
@@ -993,13 +830,10 @@ as changes don't affect algorithm performance).
 - [x] **`cat()`/`print()` in `cleanadult()`:** Changed to
   `message()` for CRAN-preferred output handling. (Fixed
   2026-04-03)
-- [ ] **`R/deprec/` and `R/modified_source_code/` not in
-  `.Rbuildignore`:** R doesn't load subdirectories, but they
-  bloat the tarball. Add `^R/deprec$` and
-  `^R/modified_source_code$`. (~2 min)
+- [x] **`R/deprec/` and `R/modified_source_code/` removed
+  (2026-04-16):** Entire directories deleted.
 - [x] **`cat()`/`print()` in child algorithm (2026-04-15):**
-  All 50+ `cat()`/`print()` calls in `child_clean.R`
-  converted to `message()`. Legacy files not changed.
+  All `cat()`/`print()` calls converted to `message()`.
 
 ### Medium (pre-submission polish)
 
@@ -1048,12 +882,10 @@ as changes don't affect algorithm performance).
 
 Things that have caused bugs before or fail silently:
 
-- **Do not create additional `valid()`/`.child_valid()`
-  definitions.** Two copies in different files caused the
-  missing data bug (R's alphabetical load order made the wrong
-  copy win). Child version is `.child_valid()` in
-  `child_clean.R`; legacy version is `valid()` in
-  `pediatric_support_legacy.R`. Do not add a third.
+- **Do not create additional `.child_valid()` definitions.**
+  `.child_valid()` is defined in `child_clean.R`. Do not
+  duplicate it in other files — R loads all `.R` files
+  alphabetically and the later definition wins silently.
 - **`parallel = TRUE` requires installed package.** Will fail
   with `load_all()` only — workers need `system.file()` access
   to extdata. Install with `devtools::install_local(".")` first.

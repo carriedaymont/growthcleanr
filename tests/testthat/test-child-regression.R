@@ -284,41 +284,7 @@ test_that("child algorithm: HEADCM measurements are processed", {
   expect_gt(sum(hc_results$exclude == "Include"), 0)
 })
 
-# ---------------------------------------------------------------------------
-# Test 7: Backward compatibility — prelim_infants deprecation
-# ---------------------------------------------------------------------------
-test_that("prelim_infants = TRUE produces deprecation warning and runs child algorithm", {
-
-  d5 <- .sg_peds[subjid %in% unique(.sg$subjid)[1:5]]
-
-  # prelim_infants = TRUE should warn and produce child algorithm results
-  expect_warning(
-    res_pi <- cleangrowth(
-      subjid = d5$subjid,
-      param = d5$param,
-      agedays = d5$agedays,
-      sex = d5$sex,
-      measurement = d5$measurement,
-      id = d5$id,
-      prelim_infants = TRUE,
-      quietly = TRUE
-    ),
-    regexp = "prelim_infants.*deprecated"
-  )
-
-  # Should produce same results as default (child algorithm)
-  res_default <- cleangrowth(
-    subjid = d5$subjid,
-    param = d5$param,
-    agedays = d5$agedays,
-    sex = d5$sex,
-    measurement = d5$measurement,
-    id = d5$id,
-    quietly = TRUE
-  )
-
-  expect_equal(as.character(res_pi$exclude), as.character(res_default$exclude))
-})
+# (Test 7 removed — prelim_infants parameter removed in v3.0.0)
 
 # ---------------------------------------------------------------------------
 # Test 8: gc_preload_refs() + ref_tables produce identical results to full run

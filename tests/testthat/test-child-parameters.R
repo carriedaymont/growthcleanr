@@ -34,44 +34,7 @@ run_child_subset <- function(n_subjects, ...) {
   return(list(input = d, result = res))
 }
 
-# ---------------------------------------------------------------------------
-# Test 1: use_legacy_algorithm routes to legacy pediatric code
-# ---------------------------------------------------------------------------
-test_that("use_legacy_algorithm = TRUE runs legacy code and produces different results", {
-
-  out_child <- run_child_subset(50)
-  out_legacy <- run_child_subset(50, use_legacy_algorithm = TRUE)
-
-  # Both return the same number of rows
-  expect_equal(nrow(out_child$result), nrow(out_legacy$result))
-
-  # Results should differ (algorithms are different)
-  child_excl <- as.character(out_child$result$exclude)
-  legacy_excl <- as.character(out_legacy$result$exclude)
-  # At least some differences expected
-  expect_true(any(child_excl != legacy_excl),
-              info = "Child and legacy algorithms should produce at least some different results")
-
-  # Both should have valid exclusion codes
-  expect_false(any(is.na(out_legacy$result$exclude)))
-})
-
-# ---------------------------------------------------------------------------
-# Test 2: sd.recenter options
-# ---------------------------------------------------------------------------
-test_that("sd.recenter parameter is accepted and runs without error", {
-
-  out_nhanes <- run_child_subset(50, sd.recenter = "NHANES")
-  out_none <- run_child_subset(50, sd.recenter = "none")
-
-  # Both produce same row count and valid results
-  expect_equal(nrow(out_nhanes$result), nrow(out_none$result))
-  expect_false(any(is.na(out_nhanes$result$exclude)))
-  expect_false(any(is.na(out_none$result$exclude)))
-
-  # Recentering changes z-scores but may not always change exclusion codes
-  # on small subsets — just verify both run without error
-})
+# (Test 1 and Test 2 removed — legacy algorithm removed in v3.0.0)
 
 # ---------------------------------------------------------------------------
 # Test 3: include.carryforward controls whether CFs are kept or excluded
@@ -157,18 +120,7 @@ test_that("error load parameters affect error-load exclusions", {
 # lt3.exclude.mode test removed — parameter was removed from cleangrowth()
 # (walkthrough-todo-2026-04-13, D6)
 
-# ---------------------------------------------------------------------------
-# Test 8: recover.unit.error parameter
-# ---------------------------------------------------------------------------
-test_that("recover.unit.error parameter is accepted and doesn't crash", {
-
-  out_recover <- run_child_subset(50, recover.unit.error = TRUE)
-  out_no_recover <- run_child_subset(50, recover.unit.error = FALSE)
-
-  # Both complete without error
-  expect_equal(nrow(out_recover$result), nrow(out_recover$input))
-  expect_equal(nrow(out_no_recover$result), nrow(out_no_recover$input))
-})
+# (Test 8 removed — recover.unit.error parameter removed in v3.0.0)
 
 # ---------------------------------------------------------------------------
 # Test 9: Imperial unit conversion (HEIGHTIN, WEIGHTLBS)

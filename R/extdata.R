@@ -1,33 +1,3 @@
-#' BMI Anthro
-#'
-#' Part of default CDC-derived tables
-#'
-#' Contains BMI data for calculating BMI
-#'
-#' @name bmianthro
-#'
-#' @section bmianthro.txt.gz:
-#'
-#' Used in function `cleangrowth()`
-#'
-#'
-NULL
-
-#' CDC Growth Percentile Table
-#'
-#' Part of default CDC-derived tables
-#'
-#' Contains percentiles for various ages, gender, and weights, pre-calculated by CDC
-#'
-#' @name growth_cdc_ext
-#'
-#' @section growthfile_cdc_ext.csv.gz:
-#'
-#' Used in function `cleangrowth()`
-#'
-#'
-NULL
-
 #' CDC Growth Percentile Table for Infants
 #'
 #' Part of default CDC-derived tables
@@ -58,21 +28,6 @@ NULL
 #'
 NULL
 
-#' Length to Age Table
-#'
-#' Part of default CDC-derived tables
-#'
-#' Contains percentiles for various ages, gender, and weights, pre-calculated by CDC
-#'
-#' @name lenanthro
-#'
-#' @section lenanthro.txt.gz:
-#'
-#' Used in function `cleangrowth()`
-#'
-#'
-NULL
-
 #' Infants reference medians
 #'
 #' Contains reference median values for default recentering in the infants
@@ -81,20 +36,6 @@ NULL
 #' @name rc-reference-medians
 #'
 #' @section rcfile-2023-08-15_format.csv.gz:
-#'
-#' Used in function `cleangrowth()`
-#'
-#'
-NULL
-
-#' NHANES reference medians
-#'
-#' Contains reference median values for default recentering, derived from NHANES
-#' years 2009-2018
-#'
-#' @name nhanes-reference-medians
-#'
-#' @section nhanes-reference-medians.csv.gz:
 #'
 #' Used in function `cleangrowth()`
 #'
@@ -144,21 +85,6 @@ NULL
 #' @section tanner_ht_vel_with_2sd.csv.gz:
 #'
 #' Used in function `acf_answers()`
-#'
-#'
-NULL
-
-#' Weight Anthro Table
-#'
-#' Part of default CDC-derived tables
-#'
-#' Contains median and standard deviation for weight by age and gender
-#'
-#' @name weianthro
-#'
-#' @section weianthro.csv.gz:
-#'
-#' Used in function `cleangrowth()`
 #'
 #'
 NULL

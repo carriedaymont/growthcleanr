@@ -97,10 +97,9 @@
 #   - clean_infants_with_sde(): Final SDE resolution (Step 13)
 #   - Various EWMA calculation helpers
 #
-# Additional support functions are in pediatric_support.R:
+# Additional support functions defined in this file:
 #   - .child_valid(): Identifies included/partially-included rows
-#   - swap_parameters(): Finds DOP values for comparison
-#   - temporary_extraneous(): Generic SDE resolution (used in Step 5)
+#   - temporary_extraneous_infants(): SDE resolution (used in Step 5)
 #
 ################################################################################
 # USAGE NOTES
@@ -171,10 +170,6 @@
 #' @param sex Vector identifying the gender of the subject, may be 'M', 'm', or 0 for males, vs. 'F', 'f' or 1 for females.
 #' @param measurement Numeric vector containing the actual measurement data.  Weight must be in
 #'   kilograms (kg), and linear measurements (height vs. length) in centimeters (cm).
-#' @param recover.unit.error Indicates whether the cleaning algorithm should
-#' attempt to identify unit errors (I.e. inches vs. cm, lbs vs. kg). If unit
-#' errors are identified, the value will be corrected and retained within the
-#' cleaning algorithm as a valid measurement.  Defaults to FALSE.
 #' @param sd.extreme Measurements more than sd.extreme standard deviations from
 #' the mean (either above or below) will be flagged as invalid. Defaults to 25.
 #' @param z.extreme Measurements with an absolute z-score greater than
@@ -183,28 +178,10 @@
 #' considering excluding all measurements. Defaults to 2.
 #' @param error.load.threshold threshold of percentage of excluded measurement count to included measurement
 #' count that must be exceeded before excluding all measurements of either parameter. Defaults to 0.5.
-#' @param sd.recenter specifies how to recenter medians.
-#'
-#' \strong{Child algorithm (default, \code{use_legacy_algorithm = FALSE}):} This
-#' parameter is ignored. Recentering always uses the built-in reference file
-#' (\code{rcfile-2023-08-15_format.csv.gz}), which was derived independently of
-#' any input dataset.
-#'
-#' \strong{Legacy algorithm only (\code{use_legacy_algorithm = TRUE}):} May be a
-#' data frame or table with median SD-scores per day of life by gender and
-#' parameter, or \code{"NHANES"} or \code{"derive"} as a character vector.
-#' \itemize{
-#'   \item If a data set, columns must include param, sex, agedays, and sd.median
-#'   \item If \code{"nhanes"}, use NHANES reference medians
-#'   \item If \code{"derive"}, derive medians from input data
-#'   \item If \code{NA} (default): derive from input if N >= 5,000, otherwise use NHANES
-#' }
-#' @param sdmedian.filename Legacy algorithm only. Name of file to save sd.median
-#' data calculated on the input dataset to as CSV. Defaults to "", for which this
-#' data will not be saved.
-#' @param sdrecentered.filename Legacy algorithm only. Name of file to save
-#' re-centered data to as CSV. Defaults to "", for which this data will not be
-#' saved. Ignored by the child algorithm.
+#' @param sd.recenter Optional. A data.table with columns \code{param}, \code{sex},
+#'   \code{agedays}, and \code{sd.median} to use for recentering instead of the
+#'   built-in reference file (\code{rcfile-2023-08-15_format.csv.gz}). Defaults to
+#'   NA, which uses the built-in file.
 #' @param include.carryforward Deprecated. Use \code{cf_rescue} instead.
 #'   \code{include.carryforward = TRUE} maps to \code{cf_rescue = "all"}.
 #'   \code{include.carryforward = FALSE} (old default) maps to \code{cf_rescue = "standard"}.
@@ -221,11 +198,6 @@
 #'   "CF-NR" (CF, does not meet rescue criteria), or "CF-Resc" (CF, meets rescue
 #'   criteria). \code{cf_deltaZ} is the absolute z-score difference used for rescue
 #'   evaluation. Defaults to FALSE.
-#' @param ewma.exp \strong{Legacy algorithm only.} Exponent for weighting
-#' measurements in the EWMA calculations. Defaults to -1.5. Only used when
-#' \code{use_legacy_algorithm = TRUE}. The child algorithm computes
-#' age-dependent exponents internally (-1.5 for gaps \eqn{\le}1y, -3.5 for
-#' gaps \eqn{\ge}3y, linear interpolation between).
 #' @param ref.data.path Path to reference data. If not supplied, the year 2000
 #' Centers for Disease Control (CDC) reference data will be used.
 #' @param log.path Path to log file output when running in parallel (non-quiet mode). Default is NA. A new
@@ -247,12 +219,6 @@
 #' @param adult_scale_max_lbs Physical scale upper limit in pounds for adult
 #'   weight data. Weights at or above this value are excluded. Defaults to Inf.
 #' @param weight_cap Deprecated. Use `adult_scale_max_lbs` instead.
-#' @param prelim_infants Deprecated. Use `use_legacy_algorithm` instead.
-#'   Old mapping: `prelim_infants = TRUE` → child algorithm (use_legacy_algorithm = FALSE);
-#'   `prelim_infants = FALSE` → legacy algorithm (use_legacy_algorithm = TRUE).
-#' @param use_legacy_algorithm Logical. If TRUE, run the legacy pediatric algorithm
-#'   (`cleanlegacy`, formerly `cleanbatch`). If FALSE (default), run the child
-#'   algorithm (`cleanchild`), which includes enhanced methods for children 0-2 years.
 #' @param ref_tables Optional. Pre-loaded reference closures from \code{\link{gc_preload_refs}}.
 #'   When provided, skips all \code{read_anthro()} file reads (~0.93 sec per call on 200
 #'   subjects; ~13 hours saved over 50K calls). Recommended for repeated calls (e.g.,
@@ -282,17 +248,19 @@
 #' @param batch_size Number of subjects per processing batch. Subjects are never split
 #'   across batches. Defaults to 2000.
 #'
-#' @return Vector of exclusion codes for each of the input measurements.
+#' @return A data.table with columns: \code{id} (user-provided row identifier),
+#'   \code{exclude} (exclusion code or \code{"Include"}), \code{param},
+#'   \code{cf_rescued}, \code{sd.orig_who}, \code{sd.orig_cdc}, \code{sd.orig},
+#'   \code{tbc.sd}, \code{ctbc.sd}, \code{final_tbc}. Adult rows additionally
+#'   include \code{mean_ht} and \code{bin_result} (NA for child rows).
 #'
-#'    Possible values for each code are:
-#'
-#' * 'Include', 'Unit-Error-High', 'Unit-Error-Low', 'Swapped-Measurements', 'Missing',
-#' *  'Exclude-Carried-Forward', 'Exclude-SD-Cutoff', 'Exclude-EWMA-Extreme', 'Exclude-EWMA-Extreme-Pair',
-#' *  'Exclude-Extraneous-Same-Day',
-#' *  'Exclude-EWMA-8', 'Exclude-EWMA-9', 'Exclude-EWMA-10', 'Exclude-EWMA-11', 'Exclude-EWMA-12', 'Exclude-EWMA-13', 'Exclude-EWMA-14',
-#' *  'Exclude-Min-Height-Change', 'Exclude-Max-Height-Change',
-#' *  'Exclude-Pair-Delta-17', 'Exclude-Pair-Delta-18', 'Exclude-Pair-Delta-19',
-#' *  'Exclude-Single-Outlier', 'Exclude-Too-Many-Errors', 'Exclude-Too-Many-Errors-Other-Parameter'
+#'   Child exclusion codes: \code{Exclude-C-CF}, \code{Exclude-C-BIV},
+#'   \code{Exclude-C-Evil-Twins}, \code{Exclude-C-Traj-Extreme},
+#'   \code{Exclude-C-Identical}, \code{Exclude-C-Extraneous},
+#'   \code{Exclude-C-Traj}, \code{Exclude-C-Abs-Diff},
+#'   \code{Exclude-C-Pair}, \code{Exclude-C-Single},
+#'   \code{Exclude-C-Too-Many-Errors}, \code{Exclude-Missing},
+#'   \code{Exclude-Not-Cleaned}.
 #' @md
 #'
 #' @export
@@ -334,19 +302,14 @@ cleangrowth <- function(subjid,
                         agedays,
                         sex,
                         measurement,
-                        recover.unit.error = FALSE,
                         sd.extreme = 25,
                         z.extreme = 25,
                         error.load.mincount = 2,
                         error.load.threshold = 0.5,
-                        lt3.exclude.mode = "default",
                         sd.recenter = NA,
-                        sdmedian.filename = "",
-                        sdrecentered.filename = "",
                         include.carryforward = FALSE,
                         cf_rescue = "standard",
                         cf_detail = FALSE,
-                        ewma.exp = -1.5,
                         ref.data.path = "",
                         log.path = NA,
                         parallel = FALSE,
@@ -356,8 +319,6 @@ cleangrowth <- function(subjid,
                         adult_permissiveness = "looser",
                         adult_scale_max_lbs = Inf,
                         weight_cap,
-                        prelim_infants = NULL,
-                        use_legacy_algorithm = FALSE,
                         ewma_window = 15,
                         id = NULL,
                         ref_tables = NULL,
@@ -368,18 +329,7 @@ cleangrowth <- function(subjid,
                         {
   # ewma_window: number of neighbors on each side for EWMA weighting.
   # Default 15 is the R design choice; set to 25 to match Stata behavior.
-  # Handle prelim_infants deprecation: old param (TRUE = child, FALSE = legacy) is
-  # now inverted and replaced by use_legacy_algorithm (TRUE = legacy, FALSE = child).
-  if (!is.null(prelim_infants)) {
-    warning(
-      "The `prelim_infants` parameter is deprecated. ",
-      "Use `use_legacy_algorithm = TRUE` to run the legacy pediatric algorithm instead. ",
-      "Mapping: prelim_infants = TRUE → use_legacy_algorithm = FALSE (child algorithm); ",
-      "prelim_infants = FALSE → use_legacy_algorithm = TRUE (legacy algorithm).",
-      call. = FALSE
-    )
-    use_legacy_algorithm <- !prelim_infants
-  }
+
   # Handle weight_cap deprecation → adult_scale_max_lbs
   if (!missing(weight_cap)) {
     warning(
@@ -412,9 +362,6 @@ cleangrowth <- function(subjid,
 
   # Validate cf_rescue
   cf_rescue <- match.arg(cf_rescue, c("standard", "none", "all"))
-
-  # Internal variable: TRUE means use child algorithm (new default)
-  use_child_algorithm <- !use_legacy_algorithm
 
   # avoid "no visible binding" warnings
   N <- age_years <- batch <- exclude <- index <- line <- NULL
@@ -579,113 +526,24 @@ cleangrowth <- function(subjid,
   # visible in data.table j expressions within cleanchild()
 
   # enumerate the different exclusion levels
-  if (use_child_algorithm){
-    exclude.levels.peds <- c(
-      'Include',
-      'Exclude-Missing',
-      'Exclude-Not-Cleaned',
-      'Exclude-C-Temp-Same-Day',
-      # child exclusion codes (not param-specific; param is in the data)
-      'Exclude-C-CF',
-      'Exclude-C-Traj-Extreme',
-      'Exclude-C-Identical',
-      'Exclude-C-Extraneous',
-      'Exclude-C-Traj',
-      'Exclude-C-Abs-Diff',
-      'Exclude-C-Pair',
-      'Exclude-C-Single',
-      'Exclude-C-Too-Many-Errors',
-      'Exclude-C-BIV',
-      'Exclude-C-Evil-Twins',
-      # legacy codes (used by cleanlegacy() path only)
-      'Unit-Error-High',
-      'Unit-Error-Low',
-      'Unit-Error-Possible',
-      'Swapped-Measurements',
-      'Exclude',
-      'Missing',
-      'Not cleaned',
-      'Exclude-Temporary-Extraneous-Same-Day',
-      'Exclude-Carried-Forward',
-      'Exclude-EWMA-Extreme',
-      'Exclude-EWMA-Extreme-Pair',
-      'Exclude-SDE-Identical',
-      'Exclude-SDE-All-Extreme',
-      'Exclude-SDE-EWMA',
-      'Exclude-SDE-One-Day',
-      'Exclude-Extraneous-Same-Day',
-      'Exclude-SD-Cutoff',
-      'Exclude-EWMA-8',
-      'Exclude-EWMA-9',
-      'Exclude-EWMA-10',
-      'Exclude-EWMA-11',
-      'Exclude-EWMA-12',
-      'Exclude-EWMA-13',
-      'Exclude-EWMA-14',
-      'Exclude-Min-Height-Change',
-      'Exclude-Max-Height-Change',
-      'Exclude-Pair-Delta-17',
-      'Exclude-Pair-Delta-18',
-      'Exclude-Pair-Delta-19',
-      'Exclude-Single-Outlier',
-      'Exclude-Too-Many-Errors',
-      'Exclude-Too-Many-Errors-Other-Parameter',
-      "Exclude-EWMA2-middle",
-      "Exclude-EWMA2-birth-WT",
-      "Exclude-EWMA2-birth-WT-ext",
-      "Exclude-EWMA2-first",
-      "Exclude-EWMA2-first-ext",
-      "Exclude-EWMA2-last",
-      "Exclude-EWMA2-last-high",
-      "Exclude-EWMA2-last-ext",
-      "Exclude-EWMA2-last-ext-high",
-      "Exclude-EWMA2-birth-HT-HC",
-      "Exclude-EWMA2-birth-HT-HC-ext",
-      "Exclude-Min-diff",
-      "Exclude-Max-diff",
-      "Exclude-2-meas->1-year",
-      "Exclude-2-meas-<1-year",
-      "Exclude-1-meas",
-      "Exclude-Error-load",
-      "Exclude-Absolute-BIV",
-      "Exclude-Standardized-BIV",
-      "Exclude-Evil-Twins",
-      "Exclude-EWMA1-Extreme"
-    )
-  } else {
-    exclude.levels.peds <- c(
-      'Include',
-      'Exclude-Missing',
-      'Exclude-Not-Cleaned',
-      'Unit-Error-High',
-      'Unit-Error-Low',
-      'Unit-Error-Possible',
-      'Swapped-Measurements',
-      'Exclude',
-      'Missing',
-      'Exclude-Temporary-Extraneous-Same-Day',
-      'Exclude-Carried-Forward',
-      'Exclude-SD-Cutoff',
-      'Exclude-EWMA-Extreme',
-      'Exclude-EWMA-Extreme-Pair',
-      'Exclude-Extraneous-Same-Day',
-      'Exclude-EWMA-8',
-      'Exclude-EWMA-9',
-      'Exclude-EWMA-10',
-      'Exclude-EWMA-11',
-      'Exclude-EWMA-12',
-      'Exclude-EWMA-13',
-      'Exclude-EWMA-14',
-      'Exclude-Min-Height-Change',
-      'Exclude-Max-Height-Change',
-      'Exclude-Pair-Delta-17',
-      'Exclude-Pair-Delta-18',
-      'Exclude-Pair-Delta-19',
-      'Exclude-Single-Outlier',
-      'Exclude-Too-Many-Errors',
-      'Exclude-Too-Many-Errors-Other-Parameter'
-    )
-  }
+  exclude.levels.peds <- c(
+    'Include',
+    'Exclude-Missing',
+    'Exclude-Not-Cleaned',
+    'Exclude-C-Temp-Same-Day',
+    # child exclusion codes (not param-specific; param is in the data)
+    'Exclude-C-CF',
+    'Exclude-C-Traj-Extreme',
+    'Exclude-C-Identical',
+    'Exclude-C-Extraneous',
+    'Exclude-C-Traj',
+    'Exclude-C-Abs-Diff',
+    'Exclude-C-Pair',
+    'Exclude-C-Single',
+    'Exclude-C-Too-Many-Errors',
+    'Exclude-C-BIV',
+    'Exclude-C-Evil-Twins'
+  )
 
   # Adult exclusion codes used by cleanadult()
   # Not param-specific; param is in the data
@@ -730,27 +588,7 @@ cleangrowth <- function(subjid,
   setnames(tanner.ht.vel, colnames(tanner.ht.vel), gsub('_', '.', colnames(tanner.ht.vel)))
   setkey(tanner.ht.vel, sex, tanner.months)
 
-  # WHO velocity tables — only needed for legacy algorithm.
-  # The child algorithm loads its own HT and HC velocity files inside cleanchild().
-  if (!use_child_algorithm){
-    who_max_ht_vel_path <- ifelse(
-      ref.data.path == "",
-      system.file(file.path("extdata", "who_ht_maxvel_3sd.csv.gz"), package = "growthcleanr"),
-      file.path(ref.data.path, "who_ht_maxvel_3sd.csv.gz")
-    )
-    who_ht_vel_3sd_path <- ifelse(
-      ref.data.path == "",
-      system.file(file.path("extdata", "who_ht_vel_3sd.csv.gz"), package = "growthcleanr"),
-      file.path(ref.data.path, "who_ht_vel_3sd.csv.gz")
-    )
-    who.max.ht.vel <- fread(who_max_ht_vel_path)
-    who.ht.vel <- fread(who_ht_vel_3sd_path)
-    setkey(who.max.ht.vel, sex, whoagegrp_ht)
-    setkey(who.ht.vel, sex, whoagegrp_ht)
-    who.ht.vel <- merge(who.ht.vel, who.max.ht.vel, by = c('sex', 'whoagegrp_ht'), all = TRUE)
-    setnames(who.ht.vel, colnames(who.ht.vel), gsub('_', '.', colnames(who.ht.vel)))
-    setkey(who.ht.vel, sex, whoagegrp.ht)
-  }
+  # WHO velocity tables are loaded inside cleanchild() (HT and HC separately).
 
   # --- Parallel setup (once, before outer batch loop) ---
   # Create a single cluster for both child and adult dispatch across all
@@ -763,15 +601,13 @@ cleangrowth <- function(subjid,
     }
     var_for_par <- c(
       # Child algorithm functions
-      "temporary_extraneous", ".child_valid", "swap_parameters",
-      "na_as_false", "ewma", "read_anthro", "as_matrix_delta",
+      ".child_valid",
+      "ewma", "read_anthro", "as_matrix_delta",
       "temporary_extraneous_infants",
       "get_dop", "calc_otl_evil_twins",
       "calc_and_recenter_z_scores",
       ".child_exc", ".cf_rescue_lookup",
       "ewma_cache_init", "ewma_cache_update",
-      # Legacy algorithm functions
-      "valid",
       # Adult algorithm functions
       "cleanadult",
       "permissiveness_presets", "resolve_permissiveness",
@@ -856,9 +692,8 @@ cleangrowth <- function(subjid,
     data.all[param == 'LENGTHCM', param := 'HEIGHTCM']
 
     # calculate z/sd scores
-    if(use_child_algorithm){
-      if (!quietly)
-        message(sprintf("[%s] Calculating z-scores...", Sys.time()))
+    if (!quietly)
+      message(sprintf("[%s] Calculating z-scores...", Sys.time()))
       # removing z calculations, as they are not used
       # for infants, use z and who
       measurement.to.z <- if (!is.null(ref_tables)) ref_tables$mtz_cdc_prelim else
@@ -1203,20 +1038,6 @@ cleangrowth <- function(subjid,
                            with = FALSE]
 
 
-    } else {
-      # calculate z scores
-      if (!quietly)
-        message(sprintf("[%s] Calculating z-scores...", Sys.time()))
-      measurement.to.z <- if (!is.null(ref_tables)) ref_tables$mtz_cdc else
-        read_anthro(ref.data.path, cdc.only = TRUE)
-      data.all[, z.orig := measurement.to.z(param, agedays, sex, v)]
-
-      # calculate "standard deviation" scores
-      if (!quietly)
-        message(sprintf("[%s] Calculating SD-scores...", Sys.time()))
-      data.all[, sd.orig := measurement.to.z(param, agedays, sex, v, TRUE)]
-    }
-
     # sort by subjid, param, agedays, internal_id for deterministic SDE order
     setkey(data.all, subjid, param, agedays, internal_id)
 
@@ -1257,54 +1078,21 @@ cleangrowth <- function(subjid,
     if (!quietly)
       message(sprintf("[%s] Re-centering data...", Sys.time()))
 
-    # see function definition below for explanation of the re-centering process
-    # returns a data table indexed by param, sex, agedays. can use NHANES reference
-    # data, derive from input, or use user-supplied data.
+    # Recentering: use built-in reference file or user-supplied data.table
     if (!is.data.table(sd.recenter)) {
-      # INFANTS CHANGES:
-      # use recentering file derived from work, independent of sex
-      if (use_child_algorithm){
-        infants_reference_medians_path <- ifelse(
-          ref.data.path == "",
-          system.file(file.path("extdata",
-                                "rcfile-2023-08-15_format.csv.gz"),
-                      package = "growthcleanr"),
-          file.path(ref.data.path, "rcfile-2023-08-15_format.csv.gz")
-        )
-        sd.recenter <- fread(infants_reference_medians_path)
-        if (!quietly)
-          message(sprintf("[%s] Using infants reference medians...", Sys.time()))
-      } else if ((is.character(sd.recenter) &
-                  tolower(sd.recenter) == "nhanes") |
-                 (!(is.character(sd.recenter) &
-                    tolower(sd.recenter) == "derive") & (data.all[, .N] < 5000))) {
-
-        # Use NHANES medians if the string "nhanes" is specified instead of a data.table
-        # or if sd.recenter is not specified as "derive" and N < 5000.
-
-        nhanes_reference_medians_path <- ifelse(
-          ref.data.path == "",
-          system.file(file.path("extdata", "nhanes-reference-medians.csv.gz"), package = "growthcleanr"),
-          file.path(ref.data.path, "nhanes-reference-medians.csv.gz")
-        )
-        sd.recenter <- fread(nhanes_reference_medians_path)
-        if (!quietly)
-          message(sprintf("[%s] Using NHANES reference medians...", Sys.time()))
-      } else {
-        # Derive medians from input data
-        sd.recenter <- data.all[exclude < 'Exclude', sd_median(param, sex, agedays, sd.orig)]
-        if (!quietly)
-          message(sprintf("[%s] Using re-centering medians derived from input...", Sys.time()))
-        if (sdmedian.filename != "") {
-          write.csv(sd.recenter, sdmedian.filename, row.names = FALSE)
-          if (!quietly)
-            message(sprintf("[%s] Wrote re-centering medians to %s...", Sys.time(), sdmedian.filename))
-        }
-      }
-    } else {
-      # Use specified data
+      rc_path <- ifelse(
+        ref.data.path == "",
+        system.file(file.path("extdata",
+                              "rcfile-2023-08-15_format.csv.gz"),
+                    package = "growthcleanr"),
+        file.path(ref.data.path, "rcfile-2023-08-15_format.csv.gz")
+      )
+      sd.recenter <- fread(rc_path)
       if (!quietly)
-        message(sprintf("[%s] Using specified re-centering medians...", Sys.time()))
+        message(sprintf("[%s] Using built-in reference medians...", Sys.time()))
+    } else {
+      if (!quietly)
+        message(sprintf("[%s] Using user-supplied re-centering medians...", Sys.time()))
     }
 
     # ensure recentering medians are sorted correctly
@@ -1316,17 +1104,7 @@ cleangrowth <- function(subjid,
 
     setkey(data.all, subjid, param, agedays, internal_id)
     data.all[, tbc.sd := sd.orig - sd.median]
-    if (use_child_algorithm){
-      # separate out corrected and noncorrected values
-      data.all[, ctbc.sd := sd.corr - sd.median]
-    }
-
-
-    if (sdrecentered.filename != "") {
-      write.csv(data.all, sdrecentered.filename, row.names = FALSE)
-      if (!quietly)
-        message(sprintf("[%s] Wrote re-centered data to %s...", Sys.time(), sdrecentered.filename))
-    }
+    data.all[, ctbc.sd := sd.corr - sd.median]
 
     # notification: ensure awareness of small subsets in data
     if (!quietly) {
@@ -1343,15 +1121,9 @@ cleangrowth <- function(subjid,
     # WHO reference for HC only goes up to 5 years
     data.all[param == "HEADCM" & agedays >= 5*365.25, exclude := 'Exclude-Missing']
 
-    if (use_child_algorithm){
-      # Removed NNTE calculation - was not helpful for efficiency
-      # NNTE tried to predict "won't need EWMA" based on trajectory smoothness, but:
-      # 1. Prediction-based filtering is less effective than deterministic filtering
-      # 2. Better approach: pre-filter based on what's PHYSICALLY POSSIBLE (no SDEs, no duplicate values)
-      # 3. Those deterministic filters are now in CF Step 6 and SDE Step 13
-      # Set nnte=FALSE for all rows so existing filters become no-ops
-      data.all[, nnte := FALSE]
-    }
+    # Set nnte=FALSE for all rows (NNTE was not helpful for efficiency;
+    # deterministic pre-filters in CF Step 6 and SDE Step 13 are better)
+    data.all[, nnte := FALSE]
     # pediatric: cleanbatch (most of steps) ----
 
     # NOTE: the rest of cleangrowth's steps are done through cleanbatch().
@@ -1370,46 +1142,25 @@ cleangrowth <- function(subjid,
     if (!quietly)
       message(sprintf("[%s] Cleaning growth data in %d batch(es)...", Sys.time(), num.batches))
     if (num.batches == 1) {
-      if (!use_child_algorithm){
-        ret.df <- cleanlegacy(data.all,
-                             log.path = log.path,
-                             quietly = quietly,
-                             parallel = parallel,
-                             measurement.to.z = measurement.to.z,
-                             ewma.fields = ewma.fields,
-                             ewma.exp = ewma.exp,
-                             recover.unit.error = recover.unit.error,
-                             include.carryforward = include.carryforward,
-                             sd.extreme = sd.extreme,
-                             z.extreme = z.extreme,
-                             exclude.levels = exclude.levels,
-                             tanner.ht.vel = tanner.ht.vel,
-                             who.ht.vel = who.ht.vel,
-                             lt3.exclude.mode = lt3.exclude.mode,
-                             error.load.threshold = error.load.threshold,
-                             error.load.mincount = error.load.mincount)
-      } else {
-        ret.df <- cleanchild(
-          data.all,
-          log.path = log.path,
-          quietly = quietly,
-          parallel = parallel,
-          measurement.to.z = measurement.to.z,
-          ewma.fields = ewma.fields,
-          recover.unit.error = recover.unit.error,
-          include.carryforward = include.carryforward,
-          cf_rescue = cf_rescue,
-          cf_detail = cf_detail,
-          sd.extreme = sd.extreme,
-          z.extreme = z.extreme,
-          exclude.levels = exclude.levels,
-          tanner.ht.vel = tanner.ht.vel,
-          error.load.threshold = error.load.threshold,
-          error.load.mincount = error.load.mincount,
-          ref.data.path = ref.data.path,
-          ewma_window = ewma_window,
-          ref_tables = ref_tables)
-      }
+      ret.df <- cleanchild(
+        data.all,
+        log.path = log.path,
+        quietly = quietly,
+        parallel = parallel,
+        measurement.to.z = measurement.to.z,
+        ewma.fields = ewma.fields,
+        include.carryforward = include.carryforward,
+        cf_rescue = cf_rescue,
+        cf_detail = cf_detail,
+        sd.extreme = sd.extreme,
+        z.extreme = z.extreme,
+        exclude.levels = exclude.levels,
+        tanner.ht.vel = tanner.ht.vel,
+        error.load.threshold = error.load.threshold,
+        error.load.mincount = error.load.mincount,
+        ref.data.path = ref.data.path,
+        ewma_window = ewma_window,
+        ref_tables = ref_tables)
     } else {
       # create log directory if necessary
       if (!is.na(log.path)) {
@@ -1417,57 +1168,30 @@ cleangrowth <- function(subjid,
         ifelse(!dir.exists(log.path), dir.create(log.path, recursive = TRUE), FALSE)
       }
 
-      if (!use_child_algorithm){
-        ret.df <- ddply(
-          data.all,
-          .(batch),
-          cleanlegacy,
-          .parallel = parallel,
-          .paropts = list(.packages = "data.table"),
-          log.path = log.path,
-          quietly = quietly,
-          parallel = parallel,
-          measurement.to.z = measurement.to.z,
-          ewma.fields = ewma.fields,
-          ewma.exp = ewma.exp,
-          recover.unit.error = recover.unit.error,
-          include.carryforward = include.carryforward,
-          sd.extreme = sd.extreme,
-          z.extreme = z.extreme,
-          exclude.levels = exclude.levels,
-          tanner.ht.vel = tanner.ht.vel,
-          who.ht.vel = who.ht.vel,
-          lt3.exclude.mode = lt3.exclude.mode,
-          error.load.threshold = error.load.threshold,
-          error.load.mincount = error.load.mincount
-        )
-      } else {
-        ret.df <- ddply(
-          data.all,
-          .(batch),
-          cleanchild,
-          .parallel = parallel,
-          .paropts = list(.packages = c("data.table", "growthcleanr")),
-          log.path = log.path,
-          quietly = quietly,
-          parallel = parallel,
-          measurement.to.z = measurement.to.z,
-          ewma.fields = ewma.fields,
-          recover.unit.error = recover.unit.error,
-          include.carryforward = include.carryforward,
-          cf_rescue = cf_rescue,
-          cf_detail = cf_detail,
-          sd.extreme = sd.extreme,
-          z.extreme = z.extreme,
-          exclude.levels = exclude.levels,
-          tanner.ht.vel = tanner.ht.vel,
-          error.load.threshold = error.load.threshold,
-          error.load.mincount = error.load.mincount,
-          ref.data.path = ref.data.path,
-          ewma_window = ewma_window,
-          ref_tables = ref_tables
-        )
-      }
+      ret.df <- ddply(
+        data.all,
+        .(batch),
+        cleanchild,
+        .parallel = parallel,
+        .paropts = list(.packages = c("data.table", "growthcleanr")),
+        log.path = log.path,
+        quietly = quietly,
+        parallel = parallel,
+        measurement.to.z = measurement.to.z,
+        ewma.fields = ewma.fields,
+        include.carryforward = include.carryforward,
+        cf_rescue = cf_rescue,
+        cf_detail = cf_detail,
+        sd.extreme = sd.extreme,
+        z.extreme = z.extreme,
+        exclude.levels = exclude.levels,
+        tanner.ht.vel = tanner.ht.vel,
+        error.load.threshold = error.load.threshold,
+        error.load.mincount = error.load.mincount,
+        ref.data.path = ref.data.path,
+        ewma_window = ewma_window,
+        ref_tables = ref_tables
+      )
     }
 
 
@@ -1685,7 +1409,8 @@ cleangrowth <- function(subjid,
 #'
 #' @param path Path to supplied reference anthro data. Defaults to package anthro tables.
 #' @param cdc.only Whether or not only CDC data should be used. Defaults to false.
-#' @param prelim_infants TRUE/FALSE. Run the in-development release of the infants algorithm (expands pediatric algorithm to improve performance for children 0 – 2 years). Not recommended for use in research. For more information regarding the logic of the algorithm, see the vignette 'Preliminary Infants Algorithm.' Defaults to FALSE.
+#' @param prelim_infants Ignored (retained for backward compatibility). The child
+#'   algorithm reference tables are always used.
 #'
 #' @return Function for calculating BMI based on measurement, age in days, sex, and measurement value.
 #' @export
@@ -1700,137 +1425,26 @@ cleangrowth <- function(subjid,
 #' afunc <- read_anthro(path = system.file("extdata", package = "growthcleanr"),
 #'                      cdc.only = TRUE)
 #' }
-read_anthro <- function(path = "", cdc.only = FALSE, prelim_infants = FALSE) {
+read_anthro <- function(path = "", cdc.only = FALSE, prelim_infants = TRUE) {
   # avoid "no visible bindings" warning
   src <- param <- sex <- age <- ret <- m <- NULL
   csdneg <- csdpos <- s <- NULL
 
-  # set correct path based on input reference table path (if any)
-  if (!prelim_infants){
-    weianthro_path <- ifelse(
+  # Child algorithm reference tables (consolidated WHO + infants CDC)
+  weianthro_path <- lenanthro_path <- bmianthro_path <-
+    ifelse(
       path == "",
-      system.file(file.path("extdata", "weianthro.txt.gz"), package = "growthcleanr"),
-      file.path(path, "weianthro.txt.gz")
+      system.file(file.path("extdata", "growthfile_who.csv.gz"), package = "growthcleanr"),
+      file.path(path, "growthfile_who.csv.gz")
     )
-    lenanthro_path <- ifelse(
-      path == "",
-      system.file(file.path("extdata", "lenanthro.txt.gz"), package = "growthcleanr"),
-      file.path(path, "lenanthro.txt.gz")
-    )
-    bmianthro_path <- ifelse(
-      path == "",
-      system.file(file.path("extdata", "bmianthro.txt.gz"), package = "growthcleanr"),
-      file.path(path, "bmianthro.txt.gz")
-    )
-    growth_cdc_ext_path <- ifelse(
-      path == "",
-      system.file(file.path("extdata", "growthfile_cdc_ext.csv.gz"), package = "growthcleanr"),
-      file.path(path, "growthfile_cdc_ext.csv.gz")
-    )
-  } else {
-    weianthro_path <- lenanthro_path <- bmianthro_path <-
-      ifelse(
-        path == "",
-        system.file(file.path("extdata", "growthfile_who.csv.gz"), package = "growthcleanr"),
-        file.path(path, "growthfile_who.csv.gz")
-      )
-    growth_cdc_ext_path <- ifelse(
-      path == "",
-      system.file(file.path("extdata", "growthfile_cdc_ext_infants.csv.gz"), package = "growthcleanr"),
-      file.path(path, "growthfile_cdc_ext_infants.csv.gz")
-    )
-  }
+  growth_cdc_ext_path <- ifelse(
+    path == "",
+    system.file(file.path("extdata", "growthfile_cdc_ext_infants.csv.gz"), package = "growthcleanr"),
+    file.path(path, "growthfile_cdc_ext_infants.csv.gz")
+  )
   growth_cdc_ext <- read.csv(gzfile(growth_cdc_ext_path))
 
-  l <- if (!prelim_infants){
-    list(
-      with(
-        read.table(gzfile(weianthro_path), header = TRUE),
-        data.frame(
-          src = 'WHO',
-          param = 'WEIGHTKG',
-          sex = sex - 1,
-          age,
-          l,
-          m,
-          s,
-          csdpos = as.double(NA),
-          csdneg = as.double(NA)
-        )
-      ),
-      with(
-        read.table(gzfile(lenanthro_path), header = TRUE),
-        data.frame(
-          src = 'WHO',
-          param = 'HEIGHTCM',
-          sex = sex - 1,
-          age,
-          l,
-          m,
-          s,
-          csdpos = as.double(NA),
-          csdneg = as.double(NA)
-        )
-      ),
-      with(
-        read.table(gzfile(bmianthro_path), header = TRUE),
-        data.frame(
-          src = 'WHO',
-          param = 'BMI',
-          sex = sex - 1,
-          age,
-          l,
-          m,
-          s,
-          csdpos = as.double(NA),
-          csdneg = as.double(NA)
-        )
-      ),
-      with(
-        growth_cdc_ext,
-        data.frame(
-          src = 'CDC',
-          param = 'WEIGHTKG',
-          sex,
-          age = agedays,
-          l = cdc_wt_l,
-          m = cdc_wt_m,
-          s = cdc_wt_s,
-          csdpos = cdc_wt_csd_pos,
-          csdneg = cdc_wt_csd_neg
-        )
-      ),
-      with(
-        growth_cdc_ext,
-        data.frame(
-          src = 'CDC',
-          param = 'HEIGHTCM',
-          sex,
-          age = agedays,
-          l = cdc_ht_l,
-          m = cdc_ht_m,
-          s = cdc_ht_s,
-          csdpos = cdc_ht_csd_pos,
-          csdneg = cdc_ht_csd_neg
-        )
-      ),
-      with(
-        growth_cdc_ext,
-        data.frame(
-          src = 'CDC',
-          param = 'BMI',
-          sex,
-          age = agedays,
-          l = cdc_bmi_l,
-          m = cdc_bmi_m,
-          s = cdc_bmi_s,
-          csdpos = cdc_bmi_csd_pos,
-          csdneg = cdc_bmi_csd_neg
-        )
-      )
-    )
-  } else {
-    list(
+  l <- list(
       with(
         read.csv(gzfile(weianthro_path), header = TRUE),
         data.frame(
@@ -1944,7 +1558,6 @@ read_anthro <- function(path = "", cdc.only = FALSE, prelim_infants = FALSE) {
         )
       )
     )
-  }
 
   anthro <- rbindlist(l)
 
@@ -1984,11 +1597,10 @@ read_anthro <- function(path = "", cdc.only = FALSE, prelim_infants = FALSE) {
 #'   extdata directory. Pass an explicit path only if using custom reference
 #'   files.
 #'
-#' @return A named list with three \code{read_anthro} closures:
+#' @return A named list with two \code{read_anthro} closures:
 #'   \describe{
-#'     \item{mtz_cdc_prelim}{CDC-only, prelim_infants = TRUE (used by child algorithm)}
-#'     \item{mtz_who_prelim}{WHO+CDC, prelim_infants = TRUE (used by child algorithm)}
-#'     \item{mtz_cdc}{CDC-only, prelim_infants = FALSE (used by legacy algorithm)}
+#'     \item{mtz_cdc_prelim}{CDC-only (used by child algorithm)}
+#'     \item{mtz_who_prelim}{WHO+CDC (used by child algorithm)}
 #'   }
 #'
 #' @export
@@ -2006,9 +1618,8 @@ read_anthro <- function(path = "", cdc.only = FALSE, prelim_infants = FALSE) {
 #' }
 gc_preload_refs <- function(path = "") {
   list(
-    mtz_cdc_prelim = read_anthro(path, cdc.only = TRUE,  prelim_infants = TRUE),
-    mtz_who_prelim = read_anthro(path, cdc.only = FALSE, prelim_infants = TRUE),
-    mtz_cdc        = read_anthro(path, cdc.only = TRUE,  prelim_infants = FALSE)
+    mtz_cdc_prelim = read_anthro(path, cdc.only = TRUE),
+    mtz_who_prelim = read_anthro(path, cdc.only = FALSE)
   )
 }
 
@@ -2851,7 +2462,6 @@ cleanchild <- function(data.df,
                                parallel,
                                measurement.to.z,
                                ewma.fields,
-                               recover.unit.error,
                                include.carryforward,
                                cf_rescue = "standard",
                                cf_detail = FALSE,
