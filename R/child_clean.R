@@ -139,15 +139,14 @@
 #
 
 
-# Helper: generate param-specific child exclusion code
-# Usage: .child_exc("WEIGHTKG", "BIV") -> "Exclude-C-WT-BIV"
-#        .child_exc("HEIGHTCM", "CF")  -> "Exclude-C-HT-CF"
-#        .child_exc("HEADCM", "Traj")  -> "Exclude-C-HC-Traj"
+# Helper: generate child exclusion code
+# Usage: .child_exc("WEIGHTKG", "BIV") -> "Exclude-C-BIV"
+#        .child_exc("HEIGHTCM", "CF")  -> "Exclude-C-CF"
+# param_val is accepted but ignored — codes are no longer param-specific.
+# The param_val argument is retained to avoid changing ~40 call sites.
 # Vectorized over param_val (works in data.table j expressions).
 .child_exc <- function(param_val, suffix) {
-  p <- data.table::fifelse(param_val == "WEIGHTKG", "WT",
-         data.table::fifelse(param_val == "HEIGHTCM", "HT", "HC"))
-  paste0("Exclude-C-", p, "-", suffix)
+  paste0("Exclude-C-", suffix)
 }
 
   #### R-Oxygen Markup (Hidden)
@@ -582,18 +581,18 @@ cleangrowth <- function(subjid,
       'Exclude-Missing',
       'Exclude-Not-Cleaned',
       'Exclude-C-Temp-Same-Day',
-      # param-specific child codes (WT/HT/HC)
-      paste0("Exclude-C-", c("WT", "HT", "HC"), "-CF"),
-      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Traj-Extreme"),
-      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Identical"),
-      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Extraneous"),
-      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Traj"),
-      paste0("Exclude-C-", c("HT", "HC"), "-Abs-Diff"),
-      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Pair"),
-      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Single"),
-      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Too-Many-Errors"),
-      paste0("Exclude-C-", c("WT", "HT", "HC"), "-BIV"),
-      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Evil-Twins"),
+      # child exclusion codes (not param-specific; param is in the data)
+      'Exclude-C-CF',
+      'Exclude-C-Traj-Extreme',
+      'Exclude-C-Identical',
+      'Exclude-C-Extraneous',
+      'Exclude-C-Traj',
+      'Exclude-C-Abs-Diff',
+      'Exclude-C-Pair',
+      'Exclude-C-Single',
+      'Exclude-C-Too-Many-Errors',
+      'Exclude-C-BIV',
+      'Exclude-C-Evil-Twins',
       # legacy codes (used by cleanlegacy() path only)
       'Unit-Error-High',
       'Unit-Error-Low',
@@ -685,35 +684,31 @@ cleangrowth <- function(subjid,
   }
 
   # Adult exclusion codes used by cleanadult()
+  # Not param-specific; param is in the data
   exclude.levels.adult <- c(
-    "Exclude-A-HT-BIV",
-    "Exclude-A-WT-BIV",
-    "Exclude-A-WT-Scale-Max",
-    "Exclude-A-WT-Scale-Max-Identical",
-    "Exclude-A-WT-Scale-Max-RV-Propagated",
-    "Exclude-A-WT-Evil-Twins",
-    "Exclude-A-HT-Identical",
-    "Exclude-A-HT-Extraneous",
-    "Exclude-A-WT-Identical",
-    "Exclude-A-WT-Extraneous",
-    "Exclude-A-WT-Traj-Ext",
-    "Exclude-A-WT-Traj-Extreme-firstRV",
-    "Exclude-A-WT-Traj-Extreme-allRV",
-    "Exclude-A-HT-Ord-Pair",
-    "Exclude-A-HT-Ord-Pair-All",
-    "Exclude-A-HT-Window",
-    "Exclude-A-HT-Window-All",
-    "Exclude-A-WT-2D-Ordered",
-    "Exclude-A-WT-2D-Non-Ordered",
-    "Exclude-A-WT-Traj-Moderate",
-    "Exclude-A-WT-Traj-Moderate-allRV",
-    "Exclude-A-WT-Traj-Moderate-RV-propagated",
-    "Exclude-A-WT-Traj-Moderate-Error-Load",
-    "Exclude-A-WT-Traj-Moderate-Error-Load-RV",
-    "Exclude-A-HT-Single",
-    "Exclude-A-WT-Single",
-    "Exclude-A-HT-Too-Many-Errors",
-    "Exclude-A-WT-Too-Many-Errors"
+    "Exclude-A-BIV",
+    "Exclude-A-Scale-Max",
+    "Exclude-A-Scale-Max-Identical",
+    "Exclude-A-Scale-Max-RV-Propagated",
+    "Exclude-A-Evil-Twins",
+    "Exclude-A-Identical",
+    "Exclude-A-Extraneous",
+    "Exclude-A-Traj-Ext",
+    "Exclude-A-Traj-Extreme-firstRV",
+    "Exclude-A-Traj-Extreme-allRV",
+    "Exclude-A-Ord-Pair",
+    "Exclude-A-Ord-Pair-All",
+    "Exclude-A-Window",
+    "Exclude-A-Window-All",
+    "Exclude-A-2D-Ordered",
+    "Exclude-A-2D-Non-Ordered",
+    "Exclude-A-Traj-Moderate",
+    "Exclude-A-Traj-Moderate-allRV",
+    "Exclude-A-Traj-Moderate-RV-Propagated",
+    "Exclude-A-Traj-Moderate-Error-Load",
+    "Exclude-A-Traj-Moderate-Error-Load-RV",
+    "Exclude-A-Single",
+    "Exclude-A-Too-Many-Errors"
   )
   exclude.levels <- c(exclude.levels.peds, exclude.levels.adult)
 
@@ -1727,14 +1722,8 @@ cleangrowth <- function(subjid,
   if (tri_exclude) {
     # Child SDE codes: Identical and Extraneous for each param
     # Adult SDE codes: same pattern with -A- prefix
-    child_sde_codes <- c(
-      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Identical"),
-      paste0("Exclude-C-", c("WT", "HT", "HC"), "-Extraneous")
-    )
-    adult_sde_codes <- c(
-      "Exclude-A-HT-Identical", "Exclude-A-HT-Extraneous",
-      "Exclude-A-WT-Identical", "Exclude-A-WT-Extraneous"
-    )
+    child_sde_codes <- c("Exclude-C-Identical", "Exclude-C-Extraneous")
+    adult_sde_codes <- c("Exclude-A-Identical", "Exclude-A-Extraneous")
     sde_codes <- c(child_sde_codes, adult_sde_codes)
 
     all_results[, tri_exclude := fifelse(
@@ -3155,7 +3144,7 @@ cleanchild <- function(data.df,
 
     # Check if CFs exist before rescue processing
     # This optimization skips rescue logic if no CFs are present (matches Stata lines 775-780)
-    any_cf <- any(grepl("^Exclude-C-(WT|HT|HC)-CF$", data.df$exclude))
+    any_cf <- any(data.df$exclude == "Exclude-C-CF")
     if (!quietly)
       message(sprintf("  CF rescue pre-filter: CFs exist = %s", any_cf))
 
@@ -3194,8 +3183,8 @@ cleanchild <- function(data.df,
     # Temporarily remove them, do CF calculations, then add them back (like Stata's subjidresc approach)
 
     # Save SDE-Identical rows and remove from data.df temporarily
-    sde_identical_rows <- data.df[grepl("^Exclude-C-(WT|HT|HC)-Identical$", exclude)]
-    data.df <- data.df[!grepl("^Exclude-C-(WT|HT|HC)-Identical$", exclude)]
+    sde_identical_rows <- data.df[exclude == "Exclude-C-Identical"]
+    data.df <- data.df[!exclude == "Exclude-C-Identical"]
 
     # Complete rewrite of CF string detection
     # Previous approach used v.orig sort + position indexing which failed when
@@ -3220,7 +3209,7 @@ cleanchild <- function(data.df,
     # The ageday_has_include check only applies to CFs (for rescue eligibility), not originators
 
     # Initialize variables
-    data.df[, cf_binary := grepl("^Exclude-C-(WT|HT|HC)-CF$", exclude)]
+    data.df[, cf_binary := exclude == "Exclude-C-CF"]
 
     # Process by subject-param to maintain ordering
     data.df[, ':=' (
@@ -3427,78 +3416,78 @@ cleanchild <- function(data.df,
   # identify absolute cutoffs — all BIV codes are now param-specific Exclude-C-{WT|HT|HC}-BIV
   # Min weight: <0.2 kg for first year, <1 kg after
   data.df[valid_set & param == "WEIGHTKG" & v < 0.2 & agedays <= 365,
-          exclude := "Exclude-C-WT-BIV"]
+          exclude := "Exclude-C-BIV"]
   data.df[valid_set & param == "WEIGHTKG" & v < 1 & agedays > 365,
-          exclude := "Exclude-C-WT-BIV"]
+          exclude := "Exclude-C-BIV"]
   # Max weight at birth
   data.df[valid_set & param == "WEIGHTKG" & v > 10.5 &
             agedays == 0,
-          exclude := "Exclude-C-WT-BIV"]
+          exclude := "Exclude-C-BIV"]
   # Max weight for <2y
   data.df[valid_set & param == "WEIGHTKG" & v > 35 &
             ageyears < 2,
-          exclude := "Exclude-C-WT-BIV"]
+          exclude := "Exclude-C-BIV"]
   # Max weight for all based on published data
   data.df[valid_set & param == "WEIGHTKG" & v > 600,
-          exclude := "Exclude-C-WT-BIV"]
+          exclude := "Exclude-C-BIV"]
 
   # Min/max HT based on analysis in do file from
   # Also, 18 is z=-6 for 22 0/7 in Fenton and 65 is z=6 for 40 0/7
   data.df[valid_set & param == "HEIGHTCM" & v < 18,
-          exclude := "Exclude-C-HT-BIV"]
+          exclude := "Exclude-C-BIV"]
   data.df[valid_set & param == "HEIGHTCM" & v > 244,
-          exclude := "Exclude-C-HT-BIV"]
+          exclude := "Exclude-C-BIV"]
   data.df[valid_set & param == "HEIGHTCM" & v > 65 &
             agedays == 0,
-          exclude := "Exclude-C-HT-BIV"]
+          exclude := "Exclude-C-BIV"]
 
   # Min/max HC based on analysis in do file from Oct 11 2022
   # Also, 13 is z=-6 for 22 0/7 in Fenton and
   data.df[valid_set & param == "HEADCM" & v < 13,
-          exclude := "Exclude-C-HC-BIV"]
+          exclude := "Exclude-C-BIV"]
   data.df[valid_set & param == "HEADCM" & v > 75,
-          exclude := "Exclude-C-HC-BIV"]
+          exclude := "Exclude-C-BIV"]
   data.df[valid_set & param == "HEADCM" & v > 50 &
             agedays == 0,
-          exclude := "Exclude-C-HC-BIV"]
+          exclude := "Exclude-C-BIV"]
 
-  # Standardized BIV — same param-specific code (Exclude-C-{WT|HT|HC}-BIV)
+  # Standardized BIV — same code (Exclude-C-BIV)
   # Skip rows already marked BIV (absolute) to avoid overwriting
   # NOTE: This is the only step where an exclusion code can overwrite a non-temporary exclusion
   # code (e.g., this could overwrite CF codes). No other steps should overwrite non-temporary codes.
-  biv_pattern <- "^Exclude-C-(WT|HT|HC)-BIV$"
+  biv_pattern <- "^Exclude-C-BIV$"
 
   # identify z cutoff
   # ***Note, using unrecentered values***
   #  *For weight only do after birth
   data.df[valid_set & param == "WEIGHTKG" & sd.orig_uncorr < -25 &
             ageyears < 1 & !grepl(biv_pattern, exclude),
-          exclude := "Exclude-C-WT-BIV"]
+          exclude := "Exclude-C-BIV"]
   data.df[valid_set & param == "WEIGHTKG" & sd.orig_uncorr < -15 &
             ageyears >= 1 & !grepl(biv_pattern, exclude),
-          exclude := "Exclude-C-WT-BIV"]
+          exclude := "Exclude-C-BIV"]
   data.df[valid_set & param == "WEIGHTKG" & sd.orig_uncorr > 22 &
             !grepl(biv_pattern, exclude),
-          exclude := "Exclude-C-WT-BIV"]
+          exclude := "Exclude-C-BIV"]
 
   # *Max z-score for height based on analysis of CHOP data because 15/25 too loose for upper limits
   data.df[valid_set & param == "HEIGHTCM" & sd.orig_uncorr < -25 &
             ageyears < 1 & !grepl(biv_pattern, exclude),
-          exclude := "Exclude-C-HT-BIV"]
+          exclude := "Exclude-C-BIV"]
   data.df[valid_set & param == "HEIGHTCM" & sd.orig_uncorr < -15 &
             ageyears >= 1 & !grepl(biv_pattern, exclude),
-          exclude := "Exclude-C-HT-BIV"]
+          exclude := "Exclude-C-BIV"]
   data.df[valid_set & param == "HEIGHTCM" & sd.orig_uncorr > 8 &
             !grepl(biv_pattern, exclude),
-          exclude := "Exclude-C-HT-BIV"]
+          exclude := "Exclude-C-BIV"]
 
   # head circumference
   data.df[valid_set & param == "HEADCM" & sd.orig_uncorr < -15 &
             !grepl(biv_pattern, exclude),
-          exclude := "Exclude-C-HC-BIV"]
+          exclude := "Exclude-C-BIV"]
   data.df[valid_set & param == "HEADCM" & sd.orig_uncorr > 15 &
             !grepl(biv_pattern, exclude),
-          exclude := "Exclude-C-HC-BIV"]
+          exclude := "Exclude-C-BIV"]
 
   # 7d.  Replace exc_*=0 if exc_*==2 & redo step 5 (temporary extraneous)
   data.df[exclude == 'Exclude-C-Temp-Same-Day', exclude := 'Include']
@@ -3602,7 +3591,7 @@ cleanchild <- function(data.df,
       }
 
       # Collect lines marked for exclusion
-      excl <- df$line[grepl("^Exclude-C-(WT|HT|HC)-Evil-Twins$", df$exclude)]
+      excl <- df$line[df$exclude == "Exclude-C-Evil-Twins"]
       if (length(excl) > 0L) et_excl_lines <- c(et_excl_lines, excl)
     }
 
@@ -3666,7 +3655,7 @@ cleanchild <- function(data.df,
       message(sprintf("  EWMA1 iteration %d: %d subject-params", iteration, length(sp_to_process)))
 
     # Track which rows had EWMA1 exclusions before this iteration
-    data.df[sp_key %in% sp_to_process, had_ewma1_before := grepl("^Exclude-C-(WT|HT|HC)-Traj-Extreme$", exclude)]
+    data.df[sp_key %in% sp_to_process, had_ewma1_before := exclude == "Exclude-C-Traj-Extreme"]
 
     # Process each subject-param - ONE exclusion per subject-param per iteration
     data.df[sp_key %in% sp_to_process,
@@ -3759,7 +3748,7 @@ cleanchild <- function(data.df,
 
     # Find subject-params with NEW exclusions this iteration
     data.df[sp_key %in% sp_to_process, has_new_excl :=
-              grepl("^Exclude-C-(WT|HT|HC)-Traj-Extreme$", exclude) & !had_ewma1_before]
+              exclude == "Exclude-C-Traj-Extreme" & !had_ewma1_before]
     sp_with_new_excl <- unique(data.df[has_new_excl == TRUE, sp_key])
     subjects_with_new_excl <- unique(data.df[has_new_excl == TRUE, subjid])
 
@@ -4204,7 +4193,7 @@ cleanchild <- function(data.df,
             by = .(subjid, param)]
 
     # Track exclusions before this iteration
-    ewma2_codes <- paste0("Exclude-C-", c("WT", "HT", "HC"), "-Traj")
+    ewma2_codes <- "Exclude-C-Traj"
     data.df[sp_key %in% sp_to_process, had_ewma2_before := (exclude %in% ewma2_codes)]
 
     # Process each subject-param - ONE exclusion per subject-param per iteration
@@ -4295,13 +4284,13 @@ cleanchild <- function(data.df,
 
               # Birth WT
               df[agedays == 0 & c(agedays[2:.N], NA) < 365.25 & dewma.all > 3 & (c.dewma.all > 3 | is.na(c.dewma.all)) & addcrithigh,
-                 pot_excl := "Exclude-C-WT-Traj"]
+                 pot_excl := "Exclude-C-Traj"]
               df[agedays == 0 & c(agedays[2:.N], NA) < 365.25 & dewma.all < -3 & (c.dewma.all < -3 | is.na(c.dewma.all)) & addcritlow,
-                 pot_excl := "Exclude-C-WT-Traj"]
+                 pot_excl := "Exclude-C-Traj"]
               df[agedays == 0 & c(agedays[2:.N], NA) >= 365.25 & dewma.all > 4 & (c.dewma.all > 4 | is.na(c.dewma.all)) & addcrithigh,
-                 pot_excl := "Exclude-C-WT-Traj"]
+                 pot_excl := "Exclude-C-Traj"]
               df[agedays == 0 & c(agedays[2:.N], NA) >= 365.25 & dewma.all < -4 & (c.dewma.all < -4 | is.na(c.dewma.all)) & addcritlow,
-                 pot_excl := "Exclude-C-WT-Traj"]
+                 pot_excl := "Exclude-C-Traj"]
 
               # First
               df[first_meas & (c(agedays[2:.N], NA) - agedays < 365.25) & dewma.all > 2 & (c.dewma.all > 2 | is.na(c.dewma.all)) & addcrithigh,
@@ -4415,7 +4404,7 @@ cleanchild <- function(data.df,
       .child_valid(data.df, include.temporary.extraneous = FALSE) &
       data.df$subjid %in% subj_with_birth
 
-    ewma2_hthc_codes <- paste0("Exclude-C-", c("HT", "HC"), "-Traj")
+    ewma2_hthc_codes <- "Exclude-C-Traj"
     data.df[sp_key %in% sp_to_process, had_ewma2_before := (exclude %in% ewma2_hthc_codes)]
 
     data.df[step16_filter,
@@ -5263,9 +5252,9 @@ cleanchild <- function(data.df,
 
   # Non-error codes that should be excluded from both numerator AND denominator
   # CF rescue codes removed — rescued CFs are now "Include" (stored in cf_rescued column)
-  non_error_codes <- c(paste0("Exclude-C-", c("WT", "HT", "HC"), "-Identical"),
-                       paste0("Exclude-C-", c("WT", "HT", "HC"), "-Extraneous"),
-                       paste0("Exclude-C-", c("WT", "HT", "HC"), "-CF"),
+  non_error_codes <- c("Exclude-C-Identical",
+                       "Exclude-C-Extraneous",
+                       "Exclude-C-CF",
                        "Exclude-Missing",
                        "Exclude-Not-Cleaned")
 
@@ -5371,9 +5360,9 @@ cleanchild <- function(data.df,
   if (include.temporary.extraneous)
     keep <- keep | exclude == "Exclude-C-Temp-Same-Day"
   if (include.extraneous)
-    keep <- keep | grepl("^Exclude-C-(WT|HT|HC)-Extraneous$", exclude)
+    keep <- keep | exclude == "Exclude-C-Extraneous"
   if (include.carryforward)
-    keep <- keep | grepl("^Exclude-C-(WT|HT|HC)-CF$", exclude)
+    keep <- keep | exclude == "Exclude-C-CF"
 
   return(keep)
 }

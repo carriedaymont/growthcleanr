@@ -230,7 +230,7 @@ cleanadult <- function(df,
     # Exclude heights outside BIV limits (overall_ht_min / overall_ht_max).
     # No need to check for same-day duplicates before BIV because all
     # values outside these limits are excluded regardless.
-    step <- "Exclude-A-HT-BIV"
+    step <- "Exclude-A-BIV"
     if (nrow(h_subj_df) > 0) {
       criteria <- remove_biv(h_subj_df, "height", biv_df)
       h_subj_keep[criteria] <- step
@@ -260,7 +260,7 @@ cleanadult <- function(df,
     # --- 1W: BIV (Biologically Implausible Values) ---
     # Exclude weights outside BIV limits (overall_wt_min / overall_wt_max).
     if (nrow(w_subj_df) > 0) {
-      step <- "Exclude-A-WT-BIV"
+      step <- "Exclude-A-BIV"
       criteria <- remove_biv(w_subj_df, "weight", biv_df)
       w_subj_keep[criteria] <- step
       w_subj_df <- w_subj_df[!criteria, ]
@@ -293,11 +293,11 @@ cleanadult <- function(df,
         }
       }
       if (length(exc_ht_bmi) > 0) {
-        h_subj_keep[exc_ht_bmi] <- "Exclude-A-HT-BIV"
+        h_subj_keep[exc_ht_bmi] <- "Exclude-A-BIV"
         h_subj_df <- h_subj_df[!h_subj_df$internal_id %in% exc_ht_bmi, ]
       }
       if (length(exc_wt_bmi) > 0) {
-        w_subj_keep[exc_wt_bmi] <- "Exclude-A-WT-BIV"
+        w_subj_keep[exc_wt_bmi] <- "Exclude-A-BIV"
         w_subj_df <- w_subj_df[!w_subj_df$internal_id %in% exc_wt_bmi, ]
       }
     }
@@ -423,15 +423,15 @@ cleanadult <- function(df,
 
       # Set exclusion codes — RV copies get distinct code in linked mode
       if (all_wc) {
-        step <- "Exclude-A-WT-Scale-Max-Identical"
+        step <- "Exclude-A-Scale-Max-Identical"
         w_subj_keep[impl_ids] <- step
       } else if (length(nonrv_exc_ids) > 0) {
-        w_subj_keep[nonrv_exc_ids] <- "Exclude-A-WT-Scale-Max"
+        w_subj_keep[nonrv_exc_ids] <- "Exclude-A-Scale-Max"
         if (length(rv_exc_ids) > 0) {
           if (repval_handling == "linked") {
-            w_subj_keep[rv_exc_ids] <- "Exclude-A-WT-Scale-Max-RV-Propagated"
+            w_subj_keep[rv_exc_ids] <- "Exclude-A-Scale-Max-RV-Propagated"
           } else {
-            w_subj_keep[rv_exc_ids] <- "Exclude-A-WT-Scale-Max"
+            w_subj_keep[rv_exc_ids] <- "Exclude-A-Scale-Max"
           }
         }
       }
@@ -465,7 +465,7 @@ cleanadult <- function(df,
           (max(et_df$meas_m) - min(et_df$meas_m)) > (min_et_cap + 0.12)) {
         et_exc_ids <- evil_twins(et_df, wtallow_formula = wtallow_formula)
         if (length(et_exc_ids) > 0) {
-          w_subj_keep[et_exc_ids] <- "Exclude-A-WT-Evil-Twins"
+          w_subj_keep[et_exc_ids] <- "Exclude-A-Evil-Twins"
           w_subj_df <- w_subj_df[!w_subj_df$internal_id %in% et_exc_ids, ]
           if (nrow(w_subj_df) > 0) {
             w_subj_df <- identify_rv(w_subj_df)
@@ -490,7 +490,7 @@ cleanadult <- function(df,
     # Tiebreaker for non-identical: highest internal_id (later measurement).
 
     if (nrow(h_subj_df) > 0 & any(h_subj_df$extraneous)) {
-      step <- "Exclude-A-HT-Identical"
+      step <- "Exclude-A-Identical"
 
       dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
 
@@ -517,7 +517,7 @@ cleanadult <- function(df,
         dup_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
       }
 
-      step <- "Exclude-A-HT-Extraneous"
+      step <- "Exclude-A-Extraneous"
 
       if (any(h_subj_df$extraneous)) {
         sde_days <- unique(h_subj_df$age_days[h_subj_df$extraneous])
@@ -603,7 +603,7 @@ cleanadult <- function(df,
                                            uw = min(firstRV_df$meas_m))
               if (fr_range > (min_et_fr + 0.12)) {
                 fr_result <- remove_ewma_wt(firstRV_df, wtallow_formula = wtallow_formula,
-                                            exc_label = "Exclude-A-WT-Traj-Extreme-firstRV",
+                                            exc_label = "Exclude-A-Traj-Extreme-firstRV",
                                             ewma_window = ewma_window)
                 if (length(fr_result) > 0) {
                   w_subj_keep[names(fr_result)] <- fr_result
@@ -629,7 +629,7 @@ cleanadult <- function(df,
                                            uw = min(inc_df_all$meas_m))
               if (ar_range > (min_et_ar + 0.12)) {
                 ar_result <- remove_ewma_wt(inc_df_all, wtallow_formula = wtallow_formula,
-                                            exc_label = "Exclude-A-WT-Traj-Extreme-allRV",
+                                            exc_label = "Exclude-A-Traj-Extreme-allRV",
                                             ewma_window = ewma_window)
                 if (length(ar_result) > 0) {
                   w_subj_keep[names(ar_result)] <- ar_result
@@ -722,9 +722,9 @@ cleanadult <- function(df,
 
         # Assign code: -All if no frequency rescue, otherwise without -All
         step <- if (keepht1 | keepht2) {
-          "Exclude-A-HT-Ord-Pair"
+          "Exclude-A-Ord-Pair"
         } else {
-          "Exclude-A-HT-Ord-Pair-All"
+          "Exclude-A-Ord-Pair-All"
         }
       }
 
@@ -773,10 +773,10 @@ cleanadult <- function(df,
       }
 
       if (best_w2 != "none") {
-        step <- "Exclude-A-HT-Window"
+        step <- "Exclude-A-Window"
         criteria[!h_subj_df$meas_m %in% w2_groups[[as.character(best_w2)]]] <- TRUE
       } else {
-        step <- "Exclude-A-HT-Window-All"
+        step <- "Exclude-A-Window-All"
         criteria <- rep(TRUE, nrow(h_subj_df))
       }
 
@@ -885,7 +885,7 @@ cleanadult <- function(df,
     # =========================================================================
 
     if (nrow(w_subj_df) > 0 & any(w_subj_df$extraneous)) {
-      step <- "Exclude-A-WT-Identical"
+      step <- "Exclude-A-Identical"
 
       dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
 
@@ -913,7 +913,7 @@ cleanadult <- function(df,
         dup_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
       }
 
-      step <- "Exclude-A-WT-Extraneous"
+      step <- "Exclude-A-Extraneous"
 
       if (any(w_subj_df$extraneous)) {
         sde_days <- unique(w_subj_df$age_days[w_subj_df$extraneous])
@@ -1032,7 +1032,7 @@ cleanadult <- function(df,
     }
 
     if (pair_distinct) {
-      step <- "Exclude-A-WT-2D-Ordered"
+      step <- "Exclude-A-2D-Ordered"
 
       wt_first <- w_nonrv$meas_m[1]
       wt_last <- w_nonrv$meas_m[nrow(w_nonrv)]
@@ -1074,7 +1074,7 @@ cleanadult <- function(df,
       # STEP 11Wa2: 2D NON-ORDERED WEIGHT PAIRS
       # =========================================================================
 
-      step <- "Exclude-A-WT-2D-Non-Ordered"
+      step <- "Exclude-A-2D-Non-Ordered"
       nonord_exc_ids <- eval_2d_nonord(w_subj_df, w_subj_keep,
                                        wtallow_formula = wtallow_formula)
       if (length(nonord_exc_ids) > 0) {
@@ -1102,7 +1102,7 @@ cleanadult <- function(df,
                          (max_perc > 0 & min_perc_ratio < max_perc)
 
           mod_result <- if (can_trigger) {
-            remove_mod_ewma_wt(inc_df, exc_label = "Exclude-A-WT-Traj-Moderate",
+            remove_mod_ewma_wt(inc_df, exc_label = "Exclude-A-Traj-Moderate",
                                wtallow_formula = wtallow_formula,
                                ewma_window = ewma_window,
                                mod_ewma_f = mod_ewma_f,
@@ -1135,7 +1135,7 @@ cleanadult <- function(df,
 
           # Moderate firstRV uses same label as independent (matches Stata convention)
           fr_result <- if (can_trigger_fr) {
-            remove_mod_ewma_wt(firstRV_df, exc_label = "Exclude-A-WT-Traj-Moderate",
+            remove_mod_ewma_wt(firstRV_df, exc_label = "Exclude-A-Traj-Moderate",
                                wtallow_formula = wtallow_formula,
                                ewma_window = ewma_window,
                                mod_ewma_f = mod_ewma_f,
@@ -1162,7 +1162,7 @@ cleanadult <- function(df,
 
               if (length(rv_of_el) > 0) {
                 remaining_inc <- names(w_subj_keep)[w_subj_keep == "Include"]
-                w_subj_keep[remaining_inc] <- "Exclude-A-WT-Traj-Moderate-Error-Load-RV"
+                w_subj_keep[remaining_inc] <- "Exclude-A-Traj-Moderate-Error-Load-RV"
               }
             }
 
@@ -1194,7 +1194,7 @@ cleanadult <- function(df,
                              (max_perc_limit_all > 0 & min_perc_all < max_perc_limit_all)
 
           ar_result <- if (can_trigger_all) {
-            remove_mod_ewma_wt(inc_df_all, exc_label = "Exclude-A-WT-Traj-Moderate-allRV",
+            remove_mod_ewma_wt(inc_df_all, exc_label = "Exclude-A-Traj-Moderate-allRV",
                                wtallow_formula = wtallow_formula,
                                ewma_window = ewma_window,
                                mod_ewma_f = mod_ewma_f,
@@ -1255,10 +1255,10 @@ cleanadult <- function(df,
     if (length(exc_1d_ids) > 0) {
       df[df$internal_id %in% exc_1d_ids & df$result == "Include" &
            param %in% c("HEIGHTCM", "HEIGHTIN"),
-         result := "Exclude-A-HT-Single"]
+         result := "Exclude-A-Single"]
       df[df$internal_id %in% exc_1d_ids & df$result == "Include" &
            param %in% c("WEIGHTKG", "WEIGHTLBS"),
-         result := "Exclude-A-WT-Single"]
+         result := "Exclude-A-Single"]
     }
   }
 
@@ -1269,10 +1269,10 @@ cleanadult <- function(df,
     if (length(exc_el_ids) > 0) {
       df[df$internal_id %in% exc_el_ids & df$result == "Include" &
            param %in% c("HEIGHTCM", "HEIGHTIN"),
-         result := "Exclude-A-HT-Too-Many-Errors"]
+         result := "Exclude-A-Too-Many-Errors"]
       df[df$internal_id %in% exc_el_ids & df$result == "Include" &
            param %in% c("WEIGHTKG", "WEIGHTLBS"),
-         result := "Exclude-A-WT-Too-Many-Errors"]
+         result := "Exclude-A-Too-Many-Errors"]
     }
   }
 

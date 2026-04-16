@@ -101,23 +101,19 @@ test_that("child algorithm: exclusion counts match expected on 100 subjects", {
   }
 
   # Frozen expected counts (100 subjects, 832 rows, sd.recenter = "NHANES")
-  # Updated for CF rescue lookup thresholds (2026-04-14): WT-CF 43→30, Include 599→612
+  # Updated: exclusion codes no longer param-specific; per-param counts merged
   expect_equal(nrow(res), 832)
   expect_equal(catcount("Include"), 612)
-  expect_equal(catcount("Exclude-C-HT-Extraneous"), 67)
-  expect_equal(catcount("Exclude-C-WT-Extraneous"), 66)
-  expect_equal(catcount("Exclude-C-WT-CF"), 30)
-  expect_equal(catcount("Exclude-C-HT-CF"), 32)
-  expect_equal(catcount("Exclude-C-WT-Identical"), 8)
-  expect_equal(catcount("Exclude-C-HT-BIV"), 5)
-  expect_equal(catcount("Exclude-C-HT-Identical"), 5)
-  expect_equal(catcount("Exclude-C-HT-Abs-Diff"), 3)
-  expect_equal(catcount("Exclude-C-WT-Traj"), 2)
-  expect_equal(catcount("Exclude-C-HT-Traj"), 1)
-  expect_equal(catcount("Exclude-C-WT-Evil-Twins"), 1)
+  expect_equal(catcount("Exclude-C-Extraneous"), 133)  # was HT 67 + WT 66
+  expect_equal(catcount("Exclude-C-CF"), 62)            # was HT 32 + WT 30
+  expect_equal(catcount("Exclude-C-Identical"), 13)     # was HT 5 + WT 8
+  expect_equal(catcount("Exclude-C-BIV"), 5)
+  expect_equal(catcount("Exclude-C-Abs-Diff"), 3)
+  expect_equal(catcount("Exclude-C-Traj"), 3)           # was HT 1 + WT 2
+  expect_equal(catcount("Exclude-C-Evil-Twins"), 1)
 
-  # Exactly 12 distinct categories present
-  expect_equal(length(unique(as.character(res$exclude))), 12)
+  # Exactly 8 distinct categories present (was 12 with param-specific codes)
+  expect_equal(length(unique(as.character(res$exclude))), 8)
 })
 
 # ---------------------------------------------------------------------------
@@ -135,37 +131,37 @@ test_that("child algorithm: spot-check individual records", {
   # Include — normal measurement
   expect_equal(gcr_result(res, 23751), "Include")
 
-  # Exclude-C-HT-Extraneous — same-day extraneous (HEIGHTCM)
-  expect_equal(gcr_result(res, 23755), "Exclude-C-HT-Extraneous")
+  # Exclude-C-Extraneous — same-day extraneous (HEIGHTCM)
+  expect_equal(gcr_result(res, 23755), "Exclude-C-Extraneous")
 
-  # Exclude-C-{param}-CF — carried forward (repeated value from prior visit)
-  expect_equal(gcr_result(res, 3), "Exclude-C-HT-CF")
-  expect_equal(gcr_result(res, 4), "Exclude-C-WT-CF")
+  # Exclude-C-CF — carried forward (repeated value from prior visit)
+  expect_equal(gcr_result(res, 3), "Exclude-C-CF")
+  expect_equal(gcr_result(res, 4), "Exclude-C-CF")
 
-  # Exclude-C-WT-Identical — same-day identical value (WEIGHTKG)
-  expect_equal(gcr_result(res, 67275), "Exclude-C-WT-Identical")
+  # Exclude-C-Identical — same-day identical value (WEIGHTKG)
+  expect_equal(gcr_result(res, 67275), "Exclude-C-Identical")
 
-  # Exclude-C-HT-Extraneous — same-day extraneous (HEIGHTCM)
-  expect_equal(gcr_result(res, 40091), "Exclude-C-HT-Extraneous")
+  # Exclude-C-Extraneous — same-day extraneous (HEIGHTCM)
+  expect_equal(gcr_result(res, 40091), "Exclude-C-Extraneous")
 
-  # Exclude-C-HT-BIV — biologically implausible value (313.6 cm at 434 days)
-  expect_equal(gcr_result(res, 40108), "Exclude-C-HT-BIV")
+  # Exclude-C-BIV — biologically implausible value (313.6 cm at 434 days)
+  expect_equal(gcr_result(res, 40108), "Exclude-C-BIV")
 
-  # Exclude-C-WT-Traj — EWMA pass 2 middle exclusion (WEIGHTKG)
-  expect_equal(gcr_result(res, 7), "Exclude-C-WT-Traj")
+  # Exclude-C-Traj — EWMA pass 2 middle exclusion (WEIGHTKG)
+  expect_equal(gcr_result(res, 7), "Exclude-C-Traj")
 
-  # Exclude-C-HT-Abs-Diff — height difference violation
-  expect_equal(gcr_result(res, 38718), "Exclude-C-HT-Abs-Diff")
+  # Exclude-C-Abs-Diff — height difference violation
+  expect_equal(gcr_result(res, 38718), "Exclude-C-Abs-Diff")
 
   # ID 25251 was Exclude-Error-load when threshold was hardcoded at 0.4;
   # now Include at default threshold=0.5
   expect_equal(gcr_result(res, 25251), "Include")
 
-  # Exclude-C-HT-BIV — standardized biologically implausible (HEIGHTCM)
-  expect_equal(gcr_result(res, 25257), "Exclude-C-HT-BIV")
+  # Exclude-C-BIV — standardized biologically implausible (HEIGHTCM)
+  expect_equal(gcr_result(res, 25257), "Exclude-C-BIV")
 
-  # Exclude-C-WT-Evil-Twins — evil twin detection (WEIGHTKG)
-  expect_equal(gcr_result(res, 25258), "Exclude-C-WT-Evil-Twins")
+  # Exclude-C-Evil-Twins — evil twin detection (WEIGHTKG)
+  expect_equal(gcr_result(res, 25258), "Exclude-C-Evil-Twins")
 })
 
 # ---------------------------------------------------------------------------
@@ -182,13 +178,13 @@ test_that("child algorithm: within-subject exclusions stable at 50 vs 100 subjec
   # Records that exist in both 50- and 100-subject subsets
   # These within-subject results should be identical
   stable_ids <- c(
-    3,      # CF (Exclude-C-HT-CF)
-    4,      # CF (Exclude-C-WT-CF)
-    67275,  # Identical (Exclude-C-WT-Identical)
-    40108,  # BIV (Exclude-C-HT-BIV)
-    40091,  # Extraneous (Exclude-C-HT-Extraneous)
+    3,      # CF (Exclude-C-CF)
+    4,      # CF (Exclude-C-CF)
+    67275,  # Identical (Exclude-C-Identical)
+    40108,  # BIV (Exclude-C-BIV)
+    40091,  # Extraneous (Exclude-C-Extraneous)
     23751,  # Include
-    23755   # Extraneous (Exclude-C-HT-Extraneous)
+    23755   # Extraneous (Exclude-C-Extraneous)
   )
 
   for (sid in stable_ids) {

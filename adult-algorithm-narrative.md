@@ -126,7 +126,7 @@ Weight steps (include steps shared by HT and WT):
 | Prior Step | None (first step) |
 | Next Step | 2W: Repeated Values (Weight); 3H: Temp SDE (Height) |
 | Distinct/RVs | N/A — runs before RV identification |
-| Exclusion Code | `Exclude-A-HT-BIV`, `Exclude-A-WT-BIV` |
+| Exclusion Code | `Exclude-A-BIV`, `Exclude-A-BIV` |
 | Configurable parameter names | `overall_ht_min`, `overall_ht_max`, `overall_wt_min`, `overall_wt_max`, `overall_bmi_min`, `overall_bmi_max` |
 
 ***Overview:***
@@ -287,7 +287,7 @@ None. This step has no configurable parameters.
 | Prior Step | 3W: Temp SDE |
 | Next Step | 9Wa: Evil Twins |
 | Distinct/RVs | EWMA and adjacency use firstRV (non-RV) values; RVs of excluded cap values are also excluded |
-| Exclusion Codes | `Exclude-A-WT-Scale-Max`, `Exclude-A-WT-Scale-Max-Identical`, `Exclude-A-WT-Scale-Max-RV-Propagated` |
+| Exclusion Codes | `Exclude-A-Scale-Max`, `Exclude-A-Scale-Max-Identical`, `Exclude-A-Scale-Max-RV-Propagated` |
 | Configurable parameter names | `scale_max_lbs` |
 
 ***Overview:***
@@ -423,7 +423,7 @@ All thresholds include the standard 0.12 kg rounding tolerance (see Rounding Tol
 | Prior Step | 3H: Temp SDE (temporary flagging) |
 | Next Step | 10H: Height Distinct Pairs |
 | Distinct/RVs | Height does not use RV tracking |
-| Exclusion Codes | `Exclude-A-HT-Identical`, `Exclude-A-HT-Extraneous` |
+| Exclusion Codes | `Exclude-A-Identical`, `Exclude-A-Extraneous` |
 | Configurable parameter names | None |
 
 ***Overview:***
@@ -452,7 +452,7 @@ None. This step has no configurable parameters.
 **Part A — Identical values:**
 1. All values (including those temporarily marked extraneous by Step 3H) remain in `h_subj_df`; extraneous flags identify which days have duplicates
 2. On each day with extraneous values, identify measurements that appear more than once (exact match on meas_m)
-3. Keep the first occurrence (lowest id); exclude the rest with `Exclude-A-HT-Identical`
+3. Keep the first occurrence (lowest id); exclude the rest with `Exclude-A-Identical`
 4. Re-run `temp_sde()` to update extraneous flags on remaining values
 
 **Part B — Non-identical SDEs:**
@@ -469,7 +469,7 @@ None. This step has no configurable parameters.
    - **Category 1:** closest to day-median, tiebreaker highest id
    - **Category 2:** closest to non-SDE median, then day-median, then highest id
    - **Category 3:** closest to median-of-medians, then non-SDE median, then day-median, then highest id
-5. Keep the first value after sorting; exclude the rest with `Exclude-A-HT-Extraneous`
+5. Keep the first value after sorting; exclude the rest with `Exclude-A-Extraneous`
 
 ***Rationale for selected decisions:***
 
@@ -489,7 +489,7 @@ None. This step has no configurable parameters.
 | Prior Step | 9Wa: Evil Twins |
 | Next Step | 10W: Final SDE Weight Resolution |
 | Distinct/RVs | Independent: all values participate. Linked: firstRV pass (non-RV only), then propagate, then allRV pass. |
-| Exclusion Codes | `Exclude-A-WT-Traj-Ext-N` (independent), `Exclude-A-WT-Traj-Extreme-firstRV-N` (linked), `Exclude-A-WT-Traj-Extreme-allRV-N` (linked) |
+| Exclusion Codes | `Exclude-A-Traj-Ext-N` (independent), `Exclude-A-Traj-Extreme-firstRV-N` (linked), `Exclude-A-Traj-Extreme-allRV-N` (linked) |
 | Configurable parameter names | `wtallow_formula`, `repval_handling` |
 
 ***Overview:***
@@ -536,16 +536,16 @@ The threshold is computed dynamically per observation: `compute_et_limit(min_gap
    e. **Negative outlier:** dewma_all < -(threshold + 0.12) AND dewma_before < -(0.9×threshold + 0.12) AND dewma_after < -(0.9×threshold + 0.12)
    f. Missing directional dewma (edge values) → Inf, confirming exclusion
    g. Among candidates, select the one with largest |dewma_all|, then earliest age, then lowest id
-   h. Exclude with code `"Exclude-A-WT-Traj-Ext-N"`
+   h. Exclude with code `"Exclude-A-Traj-Ext-N"`
    i. Rebuild EWMA for next round (window boundaries shift after removal)
 3. Iterate until no candidates or <3 values remain (no artificial round limit)
 4. After exclusions: re-identify RVs on remaining values
 
 **Linked mode (two-pass):**
-1. **firstRV pass:** Run `remove_ewma_wt()` on non-RV values only, with label `"Exclude-A-WT-Traj-Extreme-firstRV"`. Apply same range gate (cap_short + 0.12) to firstRV subset.
+1. **firstRV pass:** Run `remove_ewma_wt()` on non-RV values only, with label `"Exclude-A-Traj-Extreme-firstRV"`. Apply same range gate (cap_short + 0.12) to firstRV subset.
 2. Propagate firstRV exclusions to their RV copies via `propagate_to_rv()`
 3. Re-identify RVs on remaining values
-4. **allRV pass:** Run `remove_ewma_wt()` on all remaining non-extraneous values (RVs now participate), with label `"Exclude-A-WT-Traj-Extreme-allRV"`. Apply range gate (minimum ET cap + 0.12) to remaining subset.
+4. **allRV pass:** Run `remove_ewma_wt()` on all remaining non-extraneous values (RVs now participate), with label `"Exclude-A-Traj-Extreme-allRV"`. Apply range gate (minimum ET cap + 0.12) to remaining subset.
 5. Re-identify RVs after allRV exclusions
 
 ***Rationale for selected decisions:***
@@ -568,7 +568,7 @@ The threshold is computed dynamically per observation: `compute_et_limit(min_gap
 | Prior Step | 9H: Final SDE Height Resolution |
 | Next Step | 10W: Final SDE Weight Resolution |
 | Distinct/RVs | Height does not use RV tracking |
-| Exclusion Codes | `Exclude-A-HT-Ord-Pair-All`, `Exclude-A-HT-Ord-Pair`, `Exclude-A-HT-Window-All`, `Exclude-A-HT-Window` |
+| Exclusion Codes | `Exclude-A-Ord-Pair-All`, `Exclude-A-Ord-Pair`, `Exclude-A-Window-All`, `Exclude-A-Window` |
 | Configurable parameter names | `ht_band`, `allow_ht_loss`, `allow_ht_gain` |
 
 ***Overview:***
@@ -621,8 +621,8 @@ Subjects with only 1 distinct height skip this step entirely.
    c. If neither rescue applies: mark all values for exclusion
    d. **Frequency rescue:** If `keepht1` (ht_1 count ≥ ht_2 count × 4/3), rescue ht_1 values. Same for keepht2.
 4. **Exclusion code:**
-   - `Exclude-A-HT-Ord-Pair` if frequency rescue saved some values
-   - `Exclude-A-HT-Ord-Pair-All` if no frequency rescue (all excluded)
+   - `Exclude-A-Ord-Pair` if frequency rescue saved some values
+   - `Exclude-A-Ord-Pair-All` if no frequency rescue (all excluded)
 
 **Step 10Hb: 3+ Distinct Heights**
 
@@ -632,8 +632,8 @@ Subjects with only 1 distinct height skip this step entirely.
 3. Require w2/o2 ratio ≥ 3/2 for a window to be viable
 4. If multiple viable windows: select by highest score (`tot_w2 + 0.5 * numdistinct_w2`); ties broken by largest mean absolute distance from w2 mean to o2 values
 5. If one viable window: use it
-6. If no viable window: exclude all values (`Exclude-A-HT-Window-All`)
-7. Exclude values outside the best window (`Exclude-A-HT-Window`)
+6. If no viable window: exclude all values (`Exclude-A-Window-All`)
+7. Exclude values outside the best window (`Exclude-A-Window`)
 
 ***Part 2 — Loss group rescue (if `allow_ht_loss = TRUE`):***
 1. Only evaluated if any values are still marked for exclusion after w2 evaluation
@@ -729,7 +729,7 @@ This step computes a representative mean height for each subject, used later for
 | Prior Step | 9Wb: Extreme EWMA |
 | Next Step | 11H: Mean Height; 11Wa: Distinct Ordered Pairs (Weight) |
 | Distinct/RVs | Non-SDE median uses firstRV (non-RV) values only; re-identifies RVs after exclusions |
-| Exclusion Codes | `Exclude-A-WT-Identical`, `Exclude-A-WT-Extraneous` |
+| Exclusion Codes | `Exclude-A-Identical`, `Exclude-A-Extraneous` |
 | Configurable parameter names | None |
 
 ***Overview:***
@@ -776,7 +776,7 @@ See Step 9H for full details on categories, sorting, and tiebreakers.
 | Prior Step | 10W: Final SDE Weight Resolution |
 | Next Step | 11Wa2: 2D Non-Ordered Weight Pairs |
 | Distinct/RVs | Routing uses firstRV (non-RV) numdistinct and ordering; allRV override for non-ordered detection; evaluation uses firstRV values |
-| Exclusion Codes | `Exclude-A-WT-2D-Ordered` |
+| Exclusion Codes | `Exclude-A-2D-Ordered` |
 | Configurable parameter names | `wtallow_formula` |
 
 ***Overview:***
@@ -871,7 +871,7 @@ See `wtallow-formulas.md` for the complete specification of all formulas, UW adj
 | Prior Step | 11Wa: 2D Ordered Weight Pairs |
 | Next Step | 11Wb: Moderate EWMA |
 | Distinct/RVs | Uses allRV (all included values) for both detection and evaluation |
-| Exclusion Codes | `Exclude-A-WT-2D-Non-Ordered` |
+| Exclusion Codes | `Exclude-A-2D-Non-Ordered` |
 | Configurable parameter names | `wtallow_formula` |
 
 ***Overview:***
@@ -883,7 +883,7 @@ The step applies a four-rule decision tree: (1) if all adjacent different-value 
 ***Key terms and variable names:***
 
 - **any_outside** — TRUE if any adjacent pair of different-value observations has a weight difference exceeding wtallow for that pair's time gap
-- **prior_nonSDE** — TRUE if the subject has any prior weight exclusions that are not SDE-related (not `Include`, `temp extraneous`, `Exclude-A-HT-Identical`, `Exclude-A-WT-Identical`, `Exclude-A-HT-Extraneous`, `Exclude-A-WT-Extraneous`, empty string, or NA)
+- **prior_nonSDE** — TRUE if the subject has any prior weight exclusions that are not SDE-related (not `Include`, `temp extraneous`, `Exclude-A-Identical`, `Exclude-A-Identical`, `Exclude-A-Extraneous`, `Exclude-A-Extraneous`, empty string, or NA)
 - **dominant_pct** — proportion of observations belonging to the more common value: `max(count_v1, count_v2) / total`
 - **minority_val** — the less common of the two distinct values
 
@@ -907,7 +907,7 @@ Same as Step 11Wa — uses `compute_wtallow()` with `wtallow_formula`. UW for ea
 
 ***Prior non-SDE exclusion check:***
 
-Checks the full subject weight history (`w_subj_keep`), not just currently included observations. Uses exact code matching (not substring search) to identify SDE codes. Codes that do NOT count as "prior non-SDE": `Include`, `temp extraneous`, `Exclude-A-HT-Identical`, `Exclude-A-WT-Identical`, `Exclude-A-HT-Extraneous`, `Exclude-A-WT-Extraneous`, empty string, NA. Everything else — including `Exclude-A-WT-Scale-Max-Identical` — counts as a prior non-SDE exclusion.
+Checks the full subject weight history (`w_subj_keep`), not just currently included observations. Uses exact code matching (not substring search) to identify SDE codes. Codes that do NOT count as "prior non-SDE": `Include`, `temp extraneous`, `Exclude-A-Identical`, `Exclude-A-Identical`, `Exclude-A-Extraneous`, `Exclude-A-Extraneous`, empty string, NA. Everything else — including `Exclude-A-Scale-Max-Identical` — counts as a prior non-SDE exclusion.
 
 ***Rationale for selected decisions:***
 
@@ -928,7 +928,7 @@ Checks the full subject weight history (`w_subj_keep`), not just currently inclu
 | Prior Step | 11Wa2: 2D Non-Ordered Weight Pairs |
 | Next Step | 13: Distinct Single (1D) |
 | Distinct/RVs | Independent: single pass, RVs as full participants. Linked: firstRV pass (non-RV only) with RV propagation, then allRV pass. |
-| Exclusion Codes | `Exclude-A-WT-Traj-Moderate-N`, `Exclude-A-WT-Traj-Moderate-allRV-N`, `Exclude-A-WT-Traj-Moderate-Error-Load-N`, `Exclude-A-WT-Traj-Moderate-Error-Load-RV-N` |
+| Exclusion Codes | `Exclude-A-Traj-Moderate-N`, `Exclude-A-Traj-Moderate-allRV-N`, `Exclude-A-Traj-Moderate-Error-Load-N`, `Exclude-A-Traj-Moderate-Error-Load-RV-N` |
 | Configurable parameter names | `wtallow_formula`, `ewma_window`, `repval_handling`, `mod_ewma_f`, `perclimit_low`, `perclimit_mid`, `perclimit_high` |
 
 ***Overview:***
@@ -1043,11 +1043,11 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
 **Independent mode:** Single pass with all values (including RVs) as full participants.
 
 **Linked mode:**
-1. **firstRV pass:** Run `remove_mod_ewma_wt()` on non-RV values only. Label: `"Exclude-A-WT-Traj-Moderate"`.
-   - **Error load RV escalation:** If any error-load value has RV copies, escalate the entire patient — all remaining Include values get `"Exclude-A-WT-Traj-Moderate-Error-Load-RV-N"`.
+1. **firstRV pass:** Run `remove_mod_ewma_wt()` on non-RV values only. Label: `"Exclude-A-Traj-Moderate"`.
+   - **Error load RV escalation:** If any error-load value has RV copies, escalate the entire patient — all remaining Include values get `"Exclude-A-Traj-Moderate-Error-Load-RV-N"`.
    - **Non-error-load propagation:** Propagate exclusions to RV copies via `propagate_to_rv()` (appends `-RV-propagated` suffix).
    - Re-identify RVs on remaining values.
-2. **allRV pass:** Run `remove_mod_ewma_wt()` on all remaining values (RVs now participate). Label: `"Exclude-A-WT-Traj-Moderate-allRV"`.
+2. **allRV pass:** Run `remove_mod_ewma_wt()` on all remaining values (RVs now participate). Label: `"Exclude-A-Traj-Moderate-allRV"`.
 
 ***Rationale for selected decisions:***
 
@@ -1072,7 +1072,7 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
 | Prior Step | 11Wb: Moderate EWMA |
 | Next Step | 14: Error Load |
 | Distinct/RVs | Weight uses firstRV for numdistinct. Remaining RVs are treated as Include. |
-| Exclusion Codes | `Exclude-A-HT-Single`, `Exclude-A-WT-Single` |
+| Exclusion Codes | `Exclude-A-Single`, `Exclude-A-Single` |
 | Configurable parameter names | `single_ht_min_bmi`, `single_ht_max_bmi`, `single_wt_min_bmi`, `single_wt_max_bmi`, `single_ht_min_nobmi`, `single_ht_max_nobmi`, `single_wt_min_nobmi`, `single_wt_max_nobmi`, `single_bmi_min`, `single_bmi_max` |
 
 ***Overview:***
@@ -1144,7 +1144,7 @@ The step runs as a two-pass loop over each subject (both passes use the same log
 | Prior Step | 13: Single Distinct (1D) |
 | Next Step | None (final step) |
 | Distinct/RVs | Weight uses firstRV exclusion codes for error counting |
-| Exclusion Codes | `Exclude-A-HT-Too-Many-Errors`, `Exclude-A-WT-Too-Many-Errors` |
+| Exclusion Codes | `Exclude-A-Too-Many-Errors`, `Exclude-A-Too-Many-Errors` |
 | Configurable parameter names | `error_load_threshold` |
 
 ***Overview:***
@@ -1168,23 +1168,23 @@ This is the final step. It evaluates whether a subject has too many errors relat
 ***Which exclusion codes count as errors:***
 
 **Height errors:**
-- `Exclude-A-HT-BIV`
-- `Exclude-A-HT-Single` (1D)
-- `Exclude-A-HT-Ord-Pair`
-- `Exclude-A-HT-Ord-Pair-All`
-- `Exclude-A-HT-Window`
-- `Exclude-A-HT-Window-All`
+- `Exclude-A-BIV`
+- `Exclude-A-Single` (1D)
+- `Exclude-A-Ord-Pair`
+- `Exclude-A-Ord-Pair-All`
+- `Exclude-A-Window`
+- `Exclude-A-Window-All`
 
 **Weight errors:**
-- `Exclude-A-WT-BIV`
-- `Exclude-A-WT-Single` (1D)
-- `Exclude-A-WT-2D-Ordered`
-- `Exclude-A-WT-2D-Non-Ordered`
-- `Exclude-A-WT-Scale-Max`
-- `Exclude-A-WT-Scale-Max-Identical`
-- `Exclude-A-WT-Scale-Max-RV-Propagated`
+- `Exclude-A-BIV`
+- `Exclude-A-Single` (1D)
+- `Exclude-A-2D-Ordered`
+- `Exclude-A-2D-Non-Ordered`
+- `Exclude-A-Scale-Max`
+- `Exclude-A-Scale-Max-Identical`
+- `Exclude-A-Scale-Max-RV-Propagated`
 - `Exclude-A-Evil-Twins`
-- All `Exclude-A-WT-Traj-*` codes (Extreme and Moderate, all rounds and variants)
+- All `Exclude-A-Traj-*` codes (Extreme and Moderate, all rounds and variants)
 
 **NOT counted as errors:**
 - Same-day identical / extraneous (SDE) — excluded from denominator entirely

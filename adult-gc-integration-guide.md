@@ -192,40 +192,35 @@ Dependencies (all already imported by package):
 | Code | Step | Description |
 |------|------|-------------|
 | `Include` | — | Not excluded |
-| `Exclude-A-HT-BIV` | 1H | Biologically implausible height |
-| `Exclude-A-WT-BIV` | 1W | Biologically implausible weight |
-| `Exclude-A-WT-Scale-Max` | 4W | Weight at scale maximum |
-| `Exclude-A-WT-Scale-Max-Identical` | 4W | All weights identical at scale max |
-| `Exclude-A-WT-Scale-Max-RV-Propagated` | 4W | RV copy of scale-max exclusion (linked mode) |
+| `Exclude-A-BIV` | 1H/1W | Biologically implausible value (height, weight, or BMI) |
+| `Exclude-A-Scale-Max` | 4W | Weight at scale maximum |
+| `Exclude-A-Scale-Max-Identical` | 4W | All weights identical at scale max |
+| `Exclude-A-Scale-Max-RV-Propagated` | 4W | RV copy of scale-max exclusion (linked mode) |
 | `Exclude-A-Evil-Twins` | 9Wa | Adjacent pair with implausible weight difference |
-| `Exclude-A-WT-Traj-Ext-N` | 9Wb | Extreme EWMA outlier (independent mode) |
-| `Exclude-A-WT-Traj-Extreme-firstRV-N` | 9Wb | Extreme EWMA outlier (linked firstRV pass) |
-| `Exclude-A-WT-Traj-Extreme-allRV-N` | 9Wb | Extreme EWMA outlier (linked allRV pass) |
-| `Exclude-A-HT-Ord-Pair` | 10Ha | 2D height pair outside band (one excluded) |
-| `Exclude-A-HT-Ord-Pair-All` | 10Ha | 2D height pair outside band (all excluded) |
-| `Exclude-A-HT-Window` | 10Hb | 3+D height outside window (one excluded) |
-| `Exclude-A-HT-Window-All` | 10Hb | 3+D height outside window (all excluded) |
-| `Exclude-A-WT-2D-Ordered` | 11Wa | 2D ordered weight pair outside wtallow/perclimit |
-| `Exclude-A-WT-2D-Non-Ordered` | 11Wa2 | 2D non-ordered weight pair |
-| `Exclude-A-WT-Traj-Moderate-N` | 11Wb | Moderate EWMA outlier (independent or firstRV) |
-| `Exclude-A-WT-Traj-Moderate-allRV-N` | 11Wb | Moderate EWMA outlier (linked allRV pass) |
-| `Exclude-A-WT-Traj-Moderate-Error-Load-N` | 11Wb | 4+ consecutive moderate EWMA candidates |
-| `Exclude-A-WT-Traj-Moderate-Error-Load-RV-N` | 11Wb | Error load escalation to entire patient (linked) |
-| `Exclude-A-HT-Single` | 13 | 1D height outside limits |
-| `Exclude-A-WT-Single` | 13 | 1D weight outside limits |
-| `Exclude-A-HT-Too-Many-Errors` | 14 | Error ratio > threshold |
-| `Exclude-A-WT-Too-Many-Errors` | 14 | Error ratio > threshold |
+| `Exclude-A-Traj-Ext` | 9Wb | Extreme EWMA outlier (independent mode) |
+| `Exclude-A-Traj-Extreme-firstRV` | 9Wb | Extreme EWMA outlier (linked firstRV pass) |
+| `Exclude-A-Traj-Extreme-allRV` | 9Wb | Extreme EWMA outlier (linked allRV pass) |
+| `Exclude-A-Ord-Pair` | 10Ha | 2D height pair outside band (one excluded) |
+| `Exclude-A-Ord-Pair-All` | 10Ha | 2D height pair outside band (all excluded) |
+| `Exclude-A-Window` | 10Hb | 3+D height outside window (one excluded) |
+| `Exclude-A-Window-All` | 10Hb | 3+D height outside window (all excluded) |
+| `Exclude-A-2D-Ordered` | 11Wa | 2D ordered weight pair outside wtallow/perclimit |
+| `Exclude-A-2D-Non-Ordered` | 11Wa2 | 2D non-ordered weight pair |
+| `Exclude-A-Traj-Moderate` | 11Wb | Moderate EWMA outlier (independent or firstRV) |
+| `Exclude-A-Traj-Moderate-allRV` | 11Wb | Moderate EWMA outlier (linked allRV pass) |
+| `Exclude-A-Traj-Moderate-Error-Load` | 11Wb | 4+ consecutive moderate EWMA candidates |
+| `Exclude-A-Traj-Moderate-Error-Load-RV` | 11Wb | Error load escalation to entire patient (linked) |
+| `Exclude-A-Single` | 13 | 1D value outside limits (height, weight, or BMI) |
+| `Exclude-A-Too-Many-Errors` | 14 | Error ratio > threshold |
 
 ### Same-Day Event (SDE) Codes
 
 | Code | Steps | Description |
 |------|-------|-------------|
-| `Exclude-A-HT-Identical` | 9H | Same-day identical heights (keep one) |
-| `Exclude-A-HT-Extraneous` | 9H | Same-day non-identical height (SDE loser) |
-| `Exclude-A-WT-Identical` | 10W | Same-day identical weights (keep one) |
-| `Exclude-A-WT-Extraneous` | 10W | Same-day non-identical weight (SDE loser) |
+| `Exclude-A-Identical` | 9H/10W | Same-day identical values (keep one) |
+| `Exclude-A-Extraneous` | 9H/10W | Same-day non-identical value (SDE loser) |
 
-**Note:** N in trajectory (Traj) codes = the iteration of the EWMA exclusion loop in which the value was excluded.
+Exclusion codes are no longer param-specific — the same code is used regardless of whether the excluded value is height or weight.
 
 ---
 

@@ -81,7 +81,7 @@ test_that("single weight BIV is correctly excluded", {
   )
   out <- run_clean(df)
   expect_equal(nrow(out), 1)
-  expect_equal(res(out, 1), "Exclude-A-WT-BIV")
+  expect_equal(res(out, 1), "Exclude-A-BIV")
 })
 
 test_that("single height BIV is correctly excluded", {
@@ -94,7 +94,7 @@ test_that("single height BIV is correctly excluded", {
   )
   out <- run_clean(df)
   expect_equal(nrow(out), 1)
-  expect_equal(res(out, 1), "Exclude-A-HT-BIV")
+  expect_equal(res(out, 1), "Exclude-A-BIV")
 })
 
 test_that("weight BIV low boundary is correctly excluded", {
@@ -106,7 +106,7 @@ test_that("weight BIV low boundary is correctly excluded", {
     measurement = 15
   )
   out <- run_clean(df)
-  expect_equal(res(out, 1), "Exclude-A-WT-BIV")
+  expect_equal(res(out, 1), "Exclude-A-BIV")
 })
 
 test_that("height BIV low boundary is correctly excluded", {
@@ -118,7 +118,7 @@ test_that("height BIV low boundary is correctly excluded", {
     measurement = 40
   )
   out <- run_clean(df)
-  expect_equal(res(out, 1), "Exclude-A-HT-BIV")
+  expect_equal(res(out, 1), "Exclude-A-BIV")
 })
 
 test_that("values at BIV boundary are not excluded as BIV", {
@@ -131,7 +131,7 @@ test_that("values at BIV boundary are not excluded as BIV", {
     make_df("biv_edge", "WEIGHTKG", 10500, 500, id = 4)
   )
   out <- run_clean(df, permissiveness = "loosest")
-  expect_true(all(!out$result %in% c("Exclude-A-HT-BIV", "Exclude-A-WT-BIV")))
+  expect_true(all(!out$result %in% c("Exclude-A-BIV", "Exclude-A-BIV")))
 })
 
 test_that("BMI BIV: implausibly low BMI pair excluded at loosest", {
@@ -143,8 +143,8 @@ test_that("BMI BIV: implausibly low BMI pair excluded at loosest", {
     make_df("bmi_low", "WEIGHTKG", 10000, 25, id = 2)
   )
   out <- run_clean(df, permissiveness = "loosest")
-  expect_equal(res(out, 1), "Exclude-A-HT-BIV")
-  expect_equal(res(out, 2), "Exclude-A-WT-BIV")
+  expect_equal(res(out, 1), "Exclude-A-BIV")
+  expect_equal(res(out, 2), "Exclude-A-BIV")
 })
 
 test_that("BMI BIV: implausibly high BMI pair excluded at loosest", {
@@ -155,8 +155,8 @@ test_that("BMI BIV: implausibly high BMI pair excluded at loosest", {
     make_df("bmi_high", "WEIGHTKG", 10000, 100, id = 2)
   )
   out <- run_clean(df, permissiveness = "loosest")
-  expect_equal(res(out, 1), "Exclude-A-HT-BIV")
-  expect_equal(res(out, 2), "Exclude-A-WT-BIV")
+  expect_equal(res(out, 1), "Exclude-A-BIV")
+  expect_equal(res(out, 2), "Exclude-A-BIV")
 })
 
 test_that("BMI BIV: valid BMI pair not excluded at loosest", {
@@ -166,8 +166,8 @@ test_that("BMI BIV: valid BMI pair not excluded at loosest", {
     make_df("bmi_ok", "WEIGHTKG", 10000, 70, id = 2)
   )
   out <- run_clean(df, permissiveness = "loosest")
-  expect_true(res(out, 1) != "Exclude-A-HT-BIV")
-  expect_true(res(out, 2) != "Exclude-A-WT-BIV")
+  expect_true(res(out, 1) != "Exclude-A-BIV")
+  expect_true(res(out, 2) != "Exclude-A-BIV")
 })
 
 test_that("BMI BIV: no same-day pair means no BMI BIV check", {
@@ -179,8 +179,8 @@ test_that("BMI BIV: no same-day pair means no BMI BIV check", {
     make_df("bmi_noday", "WEIGHTKG", 10001, 25, id = 2)
   )
   out <- run_clean(df, permissiveness = "loosest")
-  expect_true(res(out, 1) != "Exclude-A-HT-BIV")
-  expect_true(res(out, 2) != "Exclude-A-WT-BIV")
+  expect_true(res(out, 1) != "Exclude-A-BIV")
+  expect_true(res(out, 2) != "Exclude-A-BIV")
 })
 
 
@@ -235,7 +235,7 @@ test_that("multiple subjects run independently", {
   out <- run_clean(df)
   expect_equal(res(out, 1), "Include")
   expect_equal(res(out, 2), "Include")
-  expect_equal(res(out, 3), "Exclude-A-WT-BIV")
+  expect_equal(res(out, 3), "Exclude-A-BIV")
   expect_equal(res(out, 4), "Include")
 })
 
@@ -248,9 +248,9 @@ test_that("dataset with mix of BIV and valid values", {
   )
   out <- run_clean(df)
   expect_equal(res(out, 1), "Include")
-  expect_equal(res(out, 2), "Exclude-A-HT-BIV")
+  expect_equal(res(out, 2), "Exclude-A-BIV")
   expect_equal(res(out, 3), "Include")
-  expect_equal(res(out, 4), "Exclude-A-WT-BIV")
+  expect_equal(res(out, 4), "Exclude-A-BIV")
 })
 
 
@@ -269,7 +269,7 @@ test_that("weight at scale max is excluded when scale_max_lbs is set", {
     make_df("cap", "WEIGHTKG", 10300, scale_max_kg, id = 4)  # at scale max
   )
   out <- run_clean(df, scale_max_lbs = 400)
-  expect_equal(res(out, 4), "Exclude-A-WT-Scale-Max")
+  expect_equal(res(out, 4), "Exclude-A-Scale-Max")
 })
 
 test_that("weight cap is not triggered when scale_max_lbs = Inf (default)", {
@@ -282,8 +282,8 @@ test_that("weight cap is not triggered when scale_max_lbs = Inf (default)", {
   )
   out <- run_clean(df)  # default scale_max_lbs = Inf
   # Should not be weight cap — may be something else or Include
-  expect_true(res(out, 4) != "Exclude-A-WT-Scale-Max")
-  expect_true(res(out, 4) != "Exclude-A-WT-Scale-Max-Identical")
+  expect_true(res(out, 4) != "Exclude-A-Scale-Max")
+  expect_true(res(out, 4) != "Exclude-A-Scale-Max-Identical")
 })
 
 test_that("weight cap identical excludes when only distinct weight equals scale max", {
@@ -295,7 +295,7 @@ test_that("weight cap identical excludes when only distinct weight equals scale 
     make_df("cap_id", "WEIGHTKG", 10200, scale_max_kg, id = 3)
   )
   out <- run_clean(df, scale_max_lbs = 400)
-  expect_true(all(out$result == "Exclude-A-WT-Scale-Max-Identical"))
+  expect_true(all(out$result == "Exclude-A-Scale-Max-Identical"))
 })
 
 
@@ -313,11 +313,11 @@ test_that("same-day identical heights are handled correctly", {
   out <- run_clean(df)
   # One should be identical, one should be included
   results <- out$result
-  expect_equal(sum(results == "Exclude-A-HT-Identical"), 1)
+  expect_equal(sum(results == "Exclude-A-Identical"), 1)
   expect_equal(sum(results == "Include"), 2)
   # Lower id kept (id=1 included, id=2 excluded)
   expect_equal(res(out, 1), "Include")
-  expect_equal(res(out, 2), "Exclude-A-HT-Identical")
+  expect_equal(res(out, 2), "Exclude-A-Identical")
 })
 
 test_that("same-day non-identical heights — extraneous excluded", {
@@ -329,7 +329,7 @@ test_that("same-day non-identical heights — extraneous excluded", {
   )
   out <- run_clean(df)
   # One should be extraneous, two included
-  expect_equal(sum(out$result == "Exclude-A-HT-Extraneous"), 1)
+  expect_equal(sum(out$result == "Exclude-A-Extraneous"), 1)
   expect_equal(sum(out$result == "Include"), 2)
 })
 
@@ -340,10 +340,10 @@ test_that("same-day identical weights are handled correctly", {
     make_df("sdi_wt", "WEIGHTKG", 10365, 75, id = 3)
   )
   out <- run_clean(df)
-  expect_equal(sum(out$result == "Exclude-A-WT-Identical"), 1)
+  expect_equal(sum(out$result == "Exclude-A-Identical"), 1)
   expect_equal(sum(out$result == "Include"), 2)
   expect_equal(res(out, 1), "Include")
-  expect_equal(res(out, 2), "Exclude-A-WT-Identical")
+  expect_equal(res(out, 2), "Exclude-A-Identical")
 })
 
 
@@ -363,7 +363,7 @@ test_that("evil twins detected for implausibly large weight change", {
   )
   out <- run_clean(df)
   # The 165kg value should be excluded as evil twin (most deviant from median)
-  expect_equal(res(out, 2), "Exclude-A-WT-Evil-Twins")
+  expect_equal(res(out, 2), "Exclude-A-Evil-Twins")
 })
 
 test_that("evil twins not triggered when weight range <= cap", {
@@ -376,7 +376,7 @@ test_that("evil twins not triggered when weight range <= cap", {
   )
   out <- run_clean(df)
   # Should NOT be evil twins
-  expect_true(res(out, 2) != "Exclude-A-WT-Evil-Twins")
+  expect_true(res(out, 2) != "Exclude-A-Evil-Twins")
 })
 
 test_that("evil twins: dynamic while loop resolves more than 3 OOB pairs", {
@@ -397,8 +397,8 @@ test_that("evil twins: dynamic while loop resolves more than 3 OOB pairs", {
   )
   out <- run_clean(df)
   # All four 220-kg values should be excluded as evil twins
-  expect_equal(sum(out$result == "Exclude-A-WT-Evil-Twins"), 4)
-  expect_equal(res(out, 8), "Exclude-A-WT-Evil-Twins")  # 4th pair — only caught by while loop
+  expect_equal(sum(out$result == "Exclude-A-Evil-Twins"), 4)
+  expect_equal(res(out, 8), "Exclude-A-Evil-Twins")  # 4th pair — only caught by while loop
 })
 
 
@@ -452,7 +452,7 @@ test_that("2D heights outside band are excluded", {
   )
   out <- run_clean(df)
   # Both should be excluded as 2D (no frequency rescue with equal counts)
-  expect_true(all(out$result == "Exclude-A-HT-Ord-Pair-All"))
+  expect_true(all(out$result == "Exclude-A-Ord-Pair-All"))
 })
 
 test_that("ht_band parameter changes 2D outcome", {
@@ -467,7 +467,7 @@ test_that("ht_band parameter changes 2D outcome", {
   out3 <- run_clean(df, ht_band = 3)
   out4 <- run_clean(df, ht_band = 4)
 
-  expect_true(all(out3$result == "Exclude-A-HT-Ord-Pair-All"))
+  expect_true(all(out3$result == "Exclude-A-Ord-Pair-All"))
   expect_true(all(out4$result == "Include"))
 })
 
@@ -480,7 +480,7 @@ test_that("3+D heights — values outside w2 window excluded", {
   )
   out <- run_clean(df)
   # At least some should be excluded as 3+D
-  excluded <- out$result[grepl("HT-Window", out$result)]
+  excluded <- out$result[grepl("Window", out$result)]
   expect_true(length(excluded) > 0)
 })
 
@@ -501,7 +501,7 @@ test_that("moderate EWMA catches moderate outlier among normals", {
     make_df("mod", "WEIGHTKG", 10150, 75, id = 6)
   )
   out <- run_clean(df)
-  expect_true(grepl("Exclude-A-WT-Traj-Moderate", res(out, 3)))
+  expect_true(grepl("Exclude-A-Traj-Moderate", res(out, 3)))
 })
 
 
@@ -513,14 +513,14 @@ test_that("1D single height outside limits is excluded", {
   # Single height below 1D no-BMI minimum (122 cm at loosest)
   df <- make_df("1d_ht", "HEIGHTCM", 10000, 100)
   out <- run_clean(df, permissiveness = "loosest")
-  expect_equal(res(out, 1), "Exclude-A-HT-Single")
+  expect_equal(res(out, 1), "Exclude-A-Single")
 })
 
 test_that("1D single weight outside limits is excluded", {
   # Single weight above 1D no-BMI maximum (350 kg at loosest)
   df <- make_df("1d_wt", "WEIGHTKG", 10000, 400)
   out <- run_clean(df, permissiveness = "loosest")
-  expect_equal(res(out, 1), "Exclude-A-WT-Single")
+  expect_equal(res(out, 1), "Exclude-A-Single")
 })
 
 test_that("1D single height within limits is included", {
@@ -548,7 +548,7 @@ test_that("1D custom limits work", {
   out_default <- run_clean(df)
   out_custom  <- run_clean(df, single_ht_min_nobmi = 140)
   expect_equal(res(out_default, 1), "Include")
-  expect_equal(res(out_custom, 1), "Exclude-A-HT-Single")
+  expect_equal(res(out_custom, 1), "Exclude-A-Single")
 })
 
 
@@ -569,8 +569,8 @@ test_that("error load triggered when too many exclusions", {
   )
   out <- run_clean(df)
   # 3 BIV + 2 remaining: ratio 3/5 = 0.6 > 0.41
-  expect_equal(sum(out$result == "Exclude-A-HT-BIV"), 3)
-  expect_equal(sum(out$result == "Exclude-A-HT-Too-Many-Errors"), 2)
+  expect_equal(sum(out$result == "Exclude-A-BIV"), 3)
+  expect_equal(sum(out$result == "Exclude-A-Too-Many-Errors"), 2)
 })
 
 
@@ -677,7 +677,7 @@ test_that("2D ordered weight pairs excluded when ratio below perclimit", {
     make_df("2dord", "WEIGHTKG", 10400, 90, id = 4)
   )
   out <- run_clean(df)
-  expect_true(all(out$result == "Exclude-A-WT-2D-Ordered"))
+  expect_true(all(out$result == "Exclude-A-2D-Ordered"))
 })
 
 
@@ -752,46 +752,46 @@ test_that("full test dataset passes 1220/1220", {
     shared <- c("Inc" = "Include")
     # Short names from Stata + old full R names
     wt_map <- c(
-      "BIV" = "Exclude-A-WT-BIV",
-      "Exclude-Adult-BIV" = "Exclude-A-WT-BIV",
-      "400" = "Exclude-A-WT-Scale-Max",
-      "Exclude-Adult-Scale-Max" = "Exclude-A-WT-Scale-Max",
-      "400 only wt" = "Exclude-A-WT-Scale-Max-Identical",
-      "Exclude-Adult-Scale-Max-Identical" = "Exclude-A-WT-Scale-Max-Identical",
-      "RV 400" = "Exclude-A-WT-Scale-Max",
-      "Exclude-Adult-Scale-Max-RV-propagated" = "Exclude-A-WT-Scale-Max-RV-Propagated",
-      "Evil twins" = "Exclude-A-WT-Evil-Twins",
-      "Exclude-Adult-Evil-Twins" = "Exclude-A-WT-Evil-Twins",
-      "Same-day-identical" = "Exclude-A-WT-Identical",
-      "Exclude-Adult-Identical-Same-Day" = "Exclude-A-WT-Identical",
-      "Same-day-extraneous" = "Exclude-A-WT-Extraneous",
-      "Exclude-Adult-Extraneous-Same-Day" = "Exclude-A-WT-Extraneous",
-      "2D Ord" = "Exclude-A-WT-2D-Ordered",
-      "Exclude-Adult-Weight-Distinct-2D-Ordered" = "Exclude-A-WT-2D-Ordered",
-      "2D Non-Ord" = "Exclude-A-WT-2D-Non-Ordered",
-      "Exclude-Adult-Distinct-Non-Ordered-Pairs" = "Exclude-A-WT-2D-Non-Ordered",
-      "1D" = "Exclude-A-WT-Single",
-      "Exclude-Adult-Distinct-Single" = "Exclude-A-WT-Single",
-      "Error load" = "Exclude-A-WT-Too-Many-Errors",
-      "Exclude-Adult-Too-Many-Errors" = "Exclude-A-WT-Too-Many-Errors"
+      "BIV" = "Exclude-A-BIV",
+      "Exclude-Adult-BIV" = "Exclude-A-BIV",
+      "400" = "Exclude-A-Scale-Max",
+      "Exclude-Adult-Scale-Max" = "Exclude-A-Scale-Max",
+      "400 only wt" = "Exclude-A-Scale-Max-Identical",
+      "Exclude-Adult-Scale-Max-Identical" = "Exclude-A-Scale-Max-Identical",
+      "RV 400" = "Exclude-A-Scale-Max",
+      "Exclude-Adult-Scale-Max-RV-propagated" = "Exclude-A-Scale-Max-RV-Propagated",
+      "Evil twins" = "Exclude-A-Evil-Twins",
+      "Exclude-Adult-Evil-Twins" = "Exclude-A-Evil-Twins",
+      "Same-day-identical" = "Exclude-A-Identical",
+      "Exclude-Adult-Identical-Same-Day" = "Exclude-A-Identical",
+      "Same-day-extraneous" = "Exclude-A-Extraneous",
+      "Exclude-Adult-Extraneous-Same-Day" = "Exclude-A-Extraneous",
+      "2D Ord" = "Exclude-A-2D-Ordered",
+      "Exclude-Adult-Weight-Distinct-2D-Ordered" = "Exclude-A-2D-Ordered",
+      "2D Non-Ord" = "Exclude-A-2D-Non-Ordered",
+      "Exclude-Adult-Distinct-Non-Ordered-Pairs" = "Exclude-A-2D-Non-Ordered",
+      "1D" = "Exclude-A-Single",
+      "Exclude-Adult-Distinct-Single" = "Exclude-A-Single",
+      "Error load" = "Exclude-A-Too-Many-Errors",
+      "Exclude-Adult-Too-Many-Errors" = "Exclude-A-Too-Many-Errors"
     )
     ht_map <- c(
-      "BIV" = "Exclude-A-HT-BIV",
-      "Exclude-Adult-BIV" = "Exclude-A-HT-BIV",
-      "Same-day-identical" = "Exclude-A-HT-Identical",
-      "Exclude-Adult-Identical-Same-Day" = "Exclude-A-HT-Identical",
-      "Same-day-extraneous" = "Exclude-A-HT-Extraneous",
-      "Exclude-Adult-Extraneous-Same-Day" = "Exclude-A-HT-Extraneous",
-      "3+D no w2 to keep" = "Exclude-A-HT-Window-All",
-      "Exclude-Adult-Height-Window-All" = "Exclude-A-HT-Window-All",
-      "3+D outside w2" = "Exclude-A-HT-Window",
-      "Exclude-Adult-Height-Window" = "Exclude-A-HT-Window",
-      "Exclude-Adult-Height-Ordered-Pairs" = "Exclude-A-HT-Ord-Pair",
-      "Exclude-Adult-Height-Ordered-Pairs-All" = "Exclude-A-HT-Ord-Pair-All",
-      "1D" = "Exclude-A-HT-Single",
-      "Exclude-Adult-Distinct-Single" = "Exclude-A-HT-Single",
-      "Error load" = "Exclude-A-HT-Too-Many-Errors",
-      "Exclude-Adult-Too-Many-Errors" = "Exclude-A-HT-Too-Many-Errors"
+      "BIV" = "Exclude-A-BIV",
+      "Exclude-Adult-BIV" = "Exclude-A-BIV",
+      "Same-day-identical" = "Exclude-A-Identical",
+      "Exclude-Adult-Identical-Same-Day" = "Exclude-A-Identical",
+      "Same-day-extraneous" = "Exclude-A-Extraneous",
+      "Exclude-Adult-Extraneous-Same-Day" = "Exclude-A-Extraneous",
+      "3+D no w2 to keep" = "Exclude-A-Window-All",
+      "Exclude-Adult-Height-Window-All" = "Exclude-A-Window-All",
+      "3+D outside w2" = "Exclude-A-Window",
+      "Exclude-Adult-Height-Window" = "Exclude-A-Window",
+      "Exclude-Adult-Height-Ordered-Pairs" = "Exclude-A-Ord-Pair",
+      "Exclude-Adult-Height-Ordered-Pairs-All" = "Exclude-A-Ord-Pair-All",
+      "1D" = "Exclude-A-Single",
+      "Exclude-Adult-Distinct-Single" = "Exclude-A-Single",
+      "Error load" = "Exclude-A-Too-Many-Errors",
+      "Exclude-Adult-Too-Many-Errors" = "Exclude-A-Too-Many-Errors"
     )
     mapping <- c(shared,
                  if (p == "WT") wt_map else ht_map)
@@ -803,25 +803,25 @@ test_that("full test dataset passes 1220/1220", {
     # Regex for old EWMA round codes → new Traj format (round number stripped)
     result <- sub(
       "^Exclude-Adult-EWMA-Extreme round \\d+$",
-      "Exclude-A-WT-Traj-Ext", result)
+      "Exclude-A-Traj-Ext", result)
     result <- sub(
       "^Exclude-Adult-EWMA-Extreme-firstRV round \\d+$",
-      "Exclude-A-WT-Traj-Extreme-firstRV", result)
+      "Exclude-A-Traj-Extreme-firstRV", result)
     result <- sub(
       "^Exclude-Adult-EWMA-Extreme-allRV round \\d+$",
-      "Exclude-A-WT-Traj-Extreme-allRV", result)
+      "Exclude-A-Traj-Extreme-allRV", result)
     result <- sub(
       "^Exclude-Adult-EWMA-Moderate round \\d+$",
-      "Exclude-A-WT-Traj-Moderate", result)
+      "Exclude-A-Traj-Moderate", result)
     result <- sub(
       "^Exclude-Adult-EWMA-Moderate-allRV round \\d+$",
-      "Exclude-A-WT-Traj-Moderate-allRV", result)
+      "Exclude-A-Traj-Moderate-allRV", result)
     result <- sub(
       "^Exclude-Adult-EWMA-Moderate-Error-Load round \\d+$",
-      "Exclude-A-WT-Traj-Moderate-Error-Load", result)
+      "Exclude-A-Traj-Moderate-Error-Load", result)
     result <- sub(
       "^Exclude-Adult-EWMA-Moderate-Error-Load-RV round \\d+$",
-      "Exclude-A-WT-Traj-Moderate-Error-Load-RV", result)
+      "Exclude-A-Traj-Moderate-Error-Load-RV", result)
     result
   }
 
@@ -869,7 +869,7 @@ test_that("HEIGHTIN BIV detection works in cm", {
   # 10 inches = 25.4 cm — below 50cm BIV limit
   df <- make_df("ht_in_biv", "HEIGHTIN", 10000, 10)
   out <- run_clean(df)
-  expect_equal(res(out, 1), "Exclude-A-HT-BIV")
+  expect_equal(res(out, 1), "Exclude-A-BIV")
 })
 
 
@@ -940,8 +940,8 @@ test_that("explicit override takes precedence over preset", {
   out_tight <- run_clean(df, permissiveness = "tightest")
   out_ovr <- run_clean(df, permissiveness = "tightest",
                         overall_ht_min = 50)
-  expect_equal(res(out_tight, 1), "Exclude-A-HT-BIV")
-  expect_true(res(out_ovr, 1) != "Exclude-A-HT-BIV")
+  expect_equal(res(out_tight, 1), "Exclude-A-BIV")
+  expect_true(res(out_ovr, 1) != "Exclude-A-BIV")
 })
 
 test_that("tightest excludes more than loosest on borderline data", {

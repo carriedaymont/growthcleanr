@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-github-latest (growthcleanr)
 
-**Last updated:** 2026-04-15 (full walkthrough cleanup: cat→message, dead code removal, batch_size param, walkthrough-todo-2026-04-15.md)
+**Last updated:** 2026-04-16 (remove param indicators from exclusion codes)
 
 ## Overview
 
@@ -165,33 +165,35 @@ output must expect a data.table, not a vector.
 
 ## Complete List of Exclusion Codes (child algorithm)
 
-Child exclusion codes now follow the `Exclude-C-{WT|HT|HC}-{Reason}`
-format, making them param-specific. The `.child_exc()` helper
+Child exclusion codes follow the `Exclude-C-{Reason}` format.
+Codes are NOT param-specific — the param for each row is in
+the data (the `param` column). The `.child_exc()` helper
 function (line ~142 of `child_clean.R`) generates these codes:
-`.child_exc(param, reason)` → `Exclude-C-{param}-{reason}`.
+`.child_exc(reason)` → `Exclude-C-{reason}`.
 
-| Code pattern | Step | Param | Description |
+| Code | Step | Param | Description |
 |------|------|-------|-------------|
 | `Include` | — | All | Value passes all checks |
 | `Exclude-Missing` | Init | All | NA, NaN, agedays < 0; also HC ≥ 5y |
 | `Exclude-Not-Cleaned` | Init | HEADCM | HC with agedays > 3 × 365.25 |
-| `Exclude-C-{p}-CF` | 6 | All | Carried forward: identical to prior-day value (not rescued) |
-| `Exclude-C-{p}-BIV` | 7 | All | Biologically implausible value (absolute or standardized) |
-| `Exclude-C-{p}-Evil-Twins` | 9 | All | Adjacent extreme value pair/group |
-| `Exclude-C-{p}-Traj-Extreme` | 11 | All | Extreme EWMA outlier (EWMA1) |
-| `Exclude-C-{p}-Identical` | Early 13, 13 | All | Same-day duplicate, identical value |
-| `Exclude-C-{p}-Extraneous` | 13 | All | Same-day extraneous value (SDE loser by EWMA or other criteria) |
-| `Exclude-C-{p}-Traj` | 15, 16 | All | Moderate EWMA outlier (EWMA2): covers middle, first, last, birth WT, birth HT/HC, and all sub-variants |
-| `Exclude-C-{p}-Abs-Diff` | 17 | HT, HC | Height/HC velocity violation (increase > max or decrease > min allowed) |
-| `Exclude-C-{p}-Pair` | 19 | All | Subject with 2 measurements, one excluded |
-| `Exclude-C-{p}-Single` | 19 | All | Subject with 1 measurement, excluded |
-| `Exclude-C-{p}-Too-Many-Errors` | 21 | All | Error ratio exceeds threshold |
-| `Exclude-C-Temp-Same-Day` | 5 | All | **Internal only** — temporary SDE flag, must be resolved before output (not param-specific) |
+| `Exclude-C-CF` | 6 | All | Carried forward: identical to prior-day value (not rescued) |
+| `Exclude-C-BIV` | 7 | All | Biologically implausible value (absolute or standardized) |
+| `Exclude-C-Evil-Twins` | 9 | All | Adjacent extreme value pair/group |
+| `Exclude-C-Traj-Extreme` | 11 | All | Extreme EWMA outlier (EWMA1) |
+| `Exclude-C-Identical` | Early 13, 13 | All | Same-day duplicate, identical value |
+| `Exclude-C-Extraneous` | 13 | All | Same-day extraneous value (SDE loser by EWMA or other criteria) |
+| `Exclude-C-Traj` | 15, 16 | All | Moderate EWMA outlier (EWMA2): covers middle, first, last, birth WT, birth HT/HC, and all sub-variants |
+| `Exclude-C-Abs-Diff` | 17 | HT, HC | Height/HC velocity violation (increase > max or decrease > min allowed) |
+| `Exclude-C-Pair` | 19 | All | Subject with 2 measurements, one excluded |
+| `Exclude-C-Single` | 19 | All | Subject with 1 measurement, excluded |
+| `Exclude-C-Too-Many-Errors` | 21 | All | Error ratio exceeds threshold |
+| `Exclude-C-Temp-Same-Day` | 5 | All | **Internal only** — temporary SDE flag, must be resolved before output |
 
-Where `{p}` = `WT`, `HT`, or `HC` depending on the row's param.
+Codes are shared across all params — use the `param` column
+in the data to determine which parameter a code applies to.
 
 **`Exclude-Missing` and `Exclude-Not-Cleaned`** are shared codes
-assigned in `cleangrowth()` before dispatch (not param-specific).
+assigned in `cleangrowth()` before dispatch.
 
 **`exclude.levels`** has been updated to include all child and
 adult codes (was previously missing adult codes, causing silent
@@ -335,29 +337,29 @@ restores the user's `id` at exit.
 | Code | Step | Description |
 |------|------|-------------|
 | `Include` | — | Not excluded |
-| `Exclude-A-HT-BIV` | 1H | Biologically implausible height |
-| `Exclude-A-WT-BIV` | 1W | Biologically implausible weight |
-| `Exclude-A-WT-Scale-Max` | 4W | Weight at scale maximum |
-| `Exclude-A-WT-Scale-Max-Identical` | 4W | All weights identical at scale max |
-| `Exclude-A-WT-Scale-Max-RV-Propagated` | 4W | RV copy of scale-max exclusion (linked mode) |
-| `Exclude-A-WT-Evil-Twins` | 9Wa | Adjacent pair with implausible weight difference |
-| `Exclude-A-WT-Traj-Ext` | 9Wb | Extreme EWMA outlier (independent mode) |
-| `Exclude-A-WT-Traj-Extreme-firstRV` | 9Wb | Extreme EWMA outlier (linked firstRV pass) |
-| `Exclude-A-WT-Traj-Extreme-allRV` | 9Wb | Extreme EWMA outlier (linked allRV pass) |
-| `Exclude-A-HT-Ord-Pair` | 10Ha | 2D height pair outside band (one excluded) |
-| `Exclude-A-HT-Ord-Pair-All` | 10Ha | 2D height pair outside band (all excluded) |
-| `Exclude-A-HT-Window` | 10Hb | 3+D height outside window (one excluded) |
-| `Exclude-A-HT-Window-All` | 10Hb | 3+D height outside window (all excluded) |
-| `Exclude-A-WT-2D-Ordered` | 11Wa | 2D ordered weight pair outside wtallow/perclimit |
-| `Exclude-A-WT-2D-Non-Ordered` | 11Wa2 | 2D non-ordered weight pair |
-| `Exclude-A-WT-Traj-Moderate` | 11Wb | Moderate EWMA outlier (independent or firstRV) |
-| `Exclude-A-WT-Traj-Moderate-allRV` | 11Wb | Moderate EWMA outlier (linked allRV pass) |
-| `Exclude-A-WT-Traj-Moderate-Error-Load` | 11Wb | 4+ consecutive moderate EWMA candidates |
-| `Exclude-A-WT-Traj-Moderate-Error-Load-RV` | 11Wb | Error load escalation to entire patient (linked) |
-| `Exclude-A-HT-Single` | 13 | 1D height outside limits |
-| `Exclude-A-WT-Single` | 13 | 1D weight outside limits |
-| `Exclude-A-HT-Too-Many-Errors` | 14 | Error ratio > threshold |
-| `Exclude-A-WT-Too-Many-Errors` | 14 | Error ratio > threshold |
+| `Exclude-A-BIV` | 1H/1W | Biologically implausible value (height or weight) |
+| `Exclude-A-Scale-Max` | 4W | Weight at scale maximum |
+| `Exclude-A-Scale-Max-Identical` | 4W | All weights identical at scale max |
+| `Exclude-A-Scale-Max-RV-Propagated` | 4W | RV copy of scale-max exclusion (linked mode) |
+| `Exclude-A-Evil-Twins` | 9Wa | Adjacent pair with implausible weight difference |
+| `Exclude-A-Traj-Ext` | 9Wb | Extreme EWMA outlier (independent mode) |
+| `Exclude-A-Traj-Extreme-firstRV` | 9Wb | Extreme EWMA outlier (linked firstRV pass) |
+| `Exclude-A-Traj-Extreme-allRV` | 9Wb | Extreme EWMA outlier (linked allRV pass) |
+| `Exclude-A-Ord-Pair` | 10Ha | 2D height pair outside band (one excluded) |
+| `Exclude-A-Ord-Pair-All` | 10Ha | 2D height pair outside band (all excluded) |
+| `Exclude-A-Window` | 10Hb | 3+D height outside window (one excluded) |
+| `Exclude-A-Window-All` | 10Hb | 3+D height outside window (all excluded) |
+| `Exclude-A-2D-Ordered` | 11Wa | 2D ordered weight pair outside wtallow/perclimit |
+| `Exclude-A-2D-Non-Ordered` | 11Wa2 | 2D non-ordered weight pair |
+| `Exclude-A-Traj-Moderate` | 11Wb | Moderate EWMA outlier (independent or firstRV) |
+| `Exclude-A-Traj-Moderate-allRV` | 11Wb | Moderate EWMA outlier (linked allRV pass) |
+| `Exclude-A-Traj-Moderate-Error-Load` | 11Wb | 4+ consecutive moderate EWMA candidates |
+| `Exclude-A-Traj-Moderate-Error-Load-RV` | 11Wb | Error load escalation to entire patient (linked) |
+| `Exclude-A-Single` | 13 | 1D measurement outside limits (height or weight) |
+| `Exclude-A-Too-Many-Errors` | 14 | Error ratio > threshold |
+
+Adult codes are NOT param-specific — the param for each row
+is in the data (the `param` column).
 
 **Note:** The `-N` round suffix (iteration number) was removed
 from adult trajectory codes in the 2026-04-14 exclusion code
@@ -367,10 +369,8 @@ rename. Trajectory codes no longer include the loop iteration.
 
 | Code | Steps | Description |
 |------|-------|-------------|
-| `Exclude-A-HT-Identical` | 9H | Same-day identical heights (keep one) |
-| `Exclude-A-HT-Extraneous` | 9H | Same-day non-identical height (SDE loser) |
-| `Exclude-A-WT-Identical` | 10W | Same-day identical weights (keep one) |
-| `Exclude-A-WT-Extraneous` | 10W | Same-day non-identical weight (SDE loser) |
+| `Exclude-A-Identical` | 9H/10W | Same-day identical values (keep one) |
+| `Exclude-A-Extraneous` | 9H/10W | Same-day non-identical value (SDE loser) |
 
 ### Adult Permissiveness Presets
 
@@ -736,13 +736,14 @@ Requires installed package — see Known Issues. Run in background from Claude C
   Tanner/WHO velocity reads moved before the outer loop.
   `read_anthro()` calls already optimized via `ref_tables`.
 - [x] **Exclusion code rename (2026-04-14):** Child codes
-  renamed to `Exclude-C-{WT|HT|HC}-{Reason}` format; adult
-  `-N` round suffix removed from trajectory codes;
-  `Exclude-A-Evil-Twins` → `Exclude-A-WT-Evil-Twins`;
-  `Missing` → `Exclude-Missing`; `Not cleaned` →
-  `Exclude-Not-Cleaned`. `exclude.levels` updated to include
-  all adult codes. Legacy codes in `pediatric_clean_legacy.R`
-  were NOT renamed.
+  renamed to `Exclude-C-{Reason}` format; adult `-N` round
+  suffix removed from trajectory codes; `Missing` →
+  `Exclude-Missing`; `Not cleaned` → `Exclude-Not-Cleaned`.
+  `exclude.levels` updated to include all adult codes. Legacy
+  codes in `pediatric_clean_legacy.R` were NOT renamed.
+  Param indicators (-WT-, -HT-, -HC-) removed from all codes
+  (2026-04-16) — codes are not param-specific; param is in
+  the data.
 - [x] **CF rescue thresholds (2026-04-14):** Replaced fixed
   thresholds (0.05/0.10 with wholehalfimp, teen age cutoffs)
   with age/interval/param/rounding-specific lookup via
@@ -814,6 +815,15 @@ degrade on large/unusual datasets. No blocking issues found.
 
 ### Fixed (recent)
 
+- [x] **Remove param from exclusion codes (2026-04-16):**
+  Removed param indicators (-WT-, -HT-, -HC-) from all child
+  and adult exclusion codes. Child: `Exclude-C-{WT|HT|HC}-{Reason}`
+  → `Exclude-C-{Reason}` (e.g., `Exclude-C-WT-BIV` →
+  `Exclude-C-BIV`). Adult: `Exclude-A-{WT|HT}-{Reason}` →
+  `Exclude-A-{Reason}` (e.g., `Exclude-A-WT-BIV` →
+  `Exclude-A-BIV`). Codes are not param-specific — the param
+  for each row is in the data. `.child_exc()` updated to take
+  only reason (not param). `exclude.levels` updated.
 - [x] **Full walkthrough cleanup (2026-04-15):** Resolved 30+
   deferred items from the full code walkthrough. Key changes:
   all `cat()`/`print()` → `message()` for CRAN compliance
@@ -837,8 +847,7 @@ degrade on large/unusual datasets. No blocking issues found.
 - [x] **Child BIV tests (2026-04-14):** Added 3 separate
   focused BIV tests (WT, HT, HC) to `test-child-edge-cases.R`.
   Each uses a minimal dataset with one extreme value and
-  verifies the correct param-specific BIV code. Commit
-  `8201e9c`.
+  verifies the correct BIV exclusion code. Commit `8201e9c`.
 - [x] **Test suite overhaul (2026-04-14):** Adult tests
   fixed for `library()` loading (was missing `library(growthcleanr)`
   and calling unexported `cleanadult()` directly). Added 7
@@ -847,16 +856,14 @@ degrade on large/unusual datasets. No blocking issues found.
   `testing-reference.md` created. Commit `1797135`.
 - [x] **Exclusion code rename (2026-04-14):** All child
   exclusion codes renamed from `Exclude-{Reason}` to
-  `Exclude-C-{WT|HT|HC}-{Reason}` (param-specific), using
-  `.child_exc(param, reason)` helper. `Missing` →
-  `Exclude-Missing`, `Not cleaned` → `Exclude-Not-Cleaned`
-  (shared codes assigned in `cleangrowth()`). Adult: `-N`
-  round suffix removed from trajectory codes;
-  `Exclude-A-Evil-Twins` → `Exclude-A-WT-Evil-Twins`.
-  `exclude.levels` updated to include all adult codes (was
-  missing them, causing silent NAs in factor output).
-  `valid()` renamed to `.child_valid()` in `child_clean.R`
-  to avoid collision with legacy `valid()` in
+  `Exclude-C-{Reason}`, using `.child_exc(reason)` helper.
+  `Missing` → `Exclude-Missing`, `Not cleaned` →
+  `Exclude-Not-Cleaned` (shared codes assigned in
+  `cleangrowth()`). Adult: `-N` round suffix removed from
+  trajectory codes. `exclude.levels` updated to include all
+  adult codes (was missing them, causing silent NAs in factor
+  output). `valid()` renamed to `.child_valid()` in
+  `child_clean.R` to avoid collision with legacy `valid()` in
   `pediatric_support_legacy.R`. `lt3.exclude.mode` parameter
   re-added to `cleangrowth()` with default `"default"` (was
   accidentally removed but `cleanlegacy()` still requires it).

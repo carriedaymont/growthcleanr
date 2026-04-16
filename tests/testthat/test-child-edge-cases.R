@@ -294,8 +294,8 @@ test_that("child BIV: single extreme weight excluded as BIV", {
   )
 
   biv_wt <- res[id == 8]
-  expect_equal(as.character(biv_wt$exclude), "Exclude-C-WT-BIV",
-               info = "200kg weight at 4 years should be Exclude-C-WT-BIV")
+  expect_equal(as.character(biv_wt$exclude), "Exclude-C-BIV",
+               info = "200kg weight at 4 years should be Exclude-C-BIV")
 
   # Normal values should not be BIV
   expect_false(any(grepl("BIV", res[id != 8]$exclude)),
@@ -324,8 +324,8 @@ test_that("child BIV: single extreme height excluded as BIV", {
   )
 
   biv_ht <- res[id == 3]
-  expect_equal(as.character(biv_ht$exclude), "Exclude-C-HT-BIV",
-               info = "300cm height at 3 years should be Exclude-C-HT-BIV")
+  expect_equal(as.character(biv_ht$exclude), "Exclude-C-BIV",
+               info = "300cm height at 3 years should be Exclude-C-BIV")
 
   # Normal values should not be BIV
   expect_false(any(grepl("BIV", res[id != 3]$exclude)),
@@ -358,8 +358,8 @@ test_that("child BIV: single extreme head circumference excluded as BIV", {
   )
 
   biv_hc <- res[id == 10]
-  expect_equal(as.character(biv_hc$exclude), "Exclude-C-HC-BIV",
-               info = "80cm HC at 2 years should be Exclude-C-HC-BIV")
+  expect_equal(as.character(biv_hc$exclude), "Exclude-C-BIV",
+               info = "80cm HC at 2 years should be Exclude-C-BIV")
 
   # Normal HC values should not be BIV
   hc_normal <- res[param == "HEADCM" & id != 10]

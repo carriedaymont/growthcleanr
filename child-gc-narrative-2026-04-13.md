@@ -757,8 +757,8 @@ uncorr, sd.orig_uncorr) when the child algorithm was used.
 | `Exclude-C-{WT\|HT\|HC}-Single` | 19 | All | Single measurement excluded |
 | `Exclude-C-{WT\|HT\|HC}-Too-Many-Errors` | 21 | All | Error ratio exceeds threshold |
 
-Note: Codes with `{WT|HT|HC}` are parameter-specific — e.g.,
-`Exclude-C-WT-CF`, `Exclude-C-HT-CF`, `Exclude-C-HC-CF`.
+Note: Exclusion codes are not parameter-specific — the param
+is in the data row (e.g., `Exclude-C-CF` applies to WT, HT, and HC).
 The `exclude.levels` list also includes legacy codes from the
 original pediatric algorithm for backward compatibility with
 datasets cleaned by older versions.

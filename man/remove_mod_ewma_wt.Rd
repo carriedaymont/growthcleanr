@@ -6,7 +6,7 @@
 \usage{
 remove_mod_ewma_wt(
   full_inc_df,
-  exc_label = "Exclude-A-WT-Traj-Moderate",
+  exc_label = "Exclude-A-Traj-Moderate",
   max_rounds = 100,
   wtallow_formula = "piecewise",
   ewma_window = 15,

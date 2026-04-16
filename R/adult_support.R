@@ -940,7 +940,7 @@ evil_twins <- function(w_subj_df, wtallow_formula = "piecewise") {
 #' @return Named character vector: id -> exc_label for excluded values
 #' @keywords internal
 remove_ewma_wt <- function(subj_df, wtallow_formula = "piecewise",
-                           exc_label = "Exclude-A-WT-Traj-Ext",
+                           exc_label = "Exclude-A-Traj-Ext",
                            ewma_window = 15) {
   orig_subj_df <- subj_df
   rem_ids <- character(0)
@@ -1049,7 +1049,7 @@ propagate_to_rv <- function(exc_codes, w_subj_df, w_subj_keep) {
     match_ids <- match_ids[w_subj_keep[match_ids] == "Include"]
 
     if (length(match_ids) > 0) {
-      prop_code <- paste0(exc_codes[exc_id], "-RV-propagated")
+      prop_code <- paste0(exc_codes[exc_id], "-RV-Propagated")
       w_subj_keep[match_ids] <- prop_code
       propagated_ids <- c(propagated_ids, match_ids)
     }
@@ -1068,7 +1068,7 @@ propagate_to_rv <- function(exc_codes, w_subj_df, w_subj_keep) {
 #' @param wtallow_formula Formula for wtallow ("piecewise", "piecewise-lower", "allofus15")
 #' @return Named character vector: id -> exclusion code for excluded values.
 #' @keywords internal
-remove_mod_ewma_wt <- function(full_inc_df, exc_label = "Exclude-A-WT-Traj-Moderate",
+remove_mod_ewma_wt <- function(full_inc_df, exc_label = "Exclude-A-Traj-Moderate",
                                max_rounds = 100, wtallow_formula = "piecewise",
                                ewma_window = 15,
                                mod_ewma_f = 0.75,
@@ -1399,12 +1399,9 @@ eval_2d_nonord <- function(w_subj_df, w_subj_keep, wtallow_formula = "piecewise"
   # Check for prior non-SDE exclusions
   # SDE codes are Identical and Extraneous (ht or wt); all others count as non-SDE.
   # Use exact matching to avoid grepl("Identical") accidentally matching
-  # "Exclude-A-WT-Scale-Max-Identical", which is a non-SDE exclusion.
+  # "Exclude-A-Scale-Max-Identical", which is a non-SDE exclusion.
   all_wt_ids <- names(w_subj_keep)
-  sde_codes <- c(
-    "Exclude-A-HT-Identical", "Exclude-A-WT-Identical",
-    "Exclude-A-HT-Extraneous", "Exclude-A-WT-Extraneous"
-  )
+  sde_codes <- c("Exclude-A-Identical", "Exclude-A-Extraneous")
   prior_nonSDE <- any(
     w_subj_keep[all_wt_ids] != "Include" &
     w_subj_keep[all_wt_ids] != "temp extraneous" &
@@ -1536,31 +1533,30 @@ eval_error_load <- function(subj_results, error_threshold = 0.41) {
     if (nrow(p_rows) == 0) next
 
     # Exclude SDEs from denominator
-    sde_codes <- c("Exclude-A-HT-Identical", "Exclude-A-HT-Extraneous",
-                   "Exclude-A-WT-Identical", "Exclude-A-WT-Extraneous")
+    sde_codes <- c("Exclude-A-Identical", "Exclude-A-Extraneous")
     non_sde <- p_rows[!p_rows$result %in% sde_codes, ]
     if (nrow(non_sde) == 0) next
 
     # Count errors
-    error_codes_ht <- c("Exclude-A-HT-BIV",
-                        "Exclude-A-HT-Single",
-                        "Exclude-A-HT-Ord-Pair",
-                        "Exclude-A-HT-Ord-Pair-All",
-                        "Exclude-A-HT-Window",
-                        "Exclude-A-HT-Window-All")
-    error_codes_wt <- c("Exclude-A-WT-BIV",
-                        "Exclude-A-WT-Single",
-                        "Exclude-A-WT-2D-Ordered",
-                        "Exclude-A-WT-2D-Non-Ordered",
-                        "Exclude-A-WT-Scale-Max",
-                        "Exclude-A-WT-Scale-Max-Identical",
-                        "Exclude-A-WT-Scale-Max-RV-Propagated",
-                        "Exclude-A-WT-Evil-Twins")
+    error_codes_ht <- c("Exclude-A-BIV",
+                        "Exclude-A-Single",
+                        "Exclude-A-Ord-Pair",
+                        "Exclude-A-Ord-Pair-All",
+                        "Exclude-A-Window",
+                        "Exclude-A-Window-All")
+    error_codes_wt <- c("Exclude-A-BIV",
+                        "Exclude-A-Single",
+                        "Exclude-A-2D-Ordered",
+                        "Exclude-A-2D-Non-Ordered",
+                        "Exclude-A-Scale-Max",
+                        "Exclude-A-Scale-Max-Identical",
+                        "Exclude-A-Scale-Max-RV-Propagated",
+                        "Exclude-A-Evil-Twins")
 
-    # EWMA-RV-propagated codes don't count as errors (same underlying error as source).
-    # Scale-Max-RV-propagated DOES count (matches Stata "RV 400" behavior).
-    is_ewma_propagated <- grepl("^Exclude-A-WT-Traj.*-RV-propagated$", non_sde$result, ignore.case = TRUE)
-    is_ewma_error <- grepl("^Exclude-A-WT-Traj", non_sde$result) & !is_ewma_propagated
+    # EWMA-RV-Propagated codes don't count as errors (same underlying error as source).
+    # Scale-Max-RV-Propagated DOES count (matches Stata "RV 400" behavior).
+    is_ewma_propagated <- grepl("^Exclude-A-Traj.*-RV-Propagated$", non_sde$result, ignore.case = TRUE)
+    is_ewma_error <- grepl("^Exclude-A-Traj", non_sde$result) & !is_ewma_propagated
     if (p == "ht") {
       n_errors <- sum((non_sde$result %in% error_codes_ht | is_ewma_error) & !is_ewma_propagated)
     } else {

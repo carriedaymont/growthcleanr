@@ -121,31 +121,23 @@ test_that("stress test: exclusion category counts match expected", {
   # algorithm intentionally changes. Run the test once with new code,
   # read the printed counts, and update here.
   #
-  # Frozen counts — updated 2026-04-14 after exclusion code rename
-  # to param-specific format (Exclude-C-{WT|HT|HC}-{Reason}).
-  # Update these when algorithm intentionally changes.
+  # Frozen counts — updated 2026-04-16: exclusion codes no longer param-specific;
+  # per-param counts merged. Update these when algorithm intentionally changes.
   expect_equal(catcount("Include"), 29194)
-  expect_equal(catcount("Exclude-C-HT-Evil-Twins"), 630)
-  expect_equal(catcount("Exclude-C-WT-Extraneous"), 617)
-  expect_equal(catcount("Exclude-C-HT-BIV"), 545)
-  expect_equal(catcount("Exclude-C-HT-Too-Many-Errors"), 401)
-  expect_equal(catcount("Exclude-C-HT-Traj"), 360)
-  expect_equal(catcount("Exclude-C-HT-Extraneous"), 312)
-  expect_equal(catcount("Exclude-C-WT-Traj"), 253)
-  expect_equal(catcount("Exclude-C-HT-CF"), 209)
-  expect_equal(catcount("Exclude-C-WT-CF"), 169)
-  expect_equal(catcount("Exclude-C-HT-Abs-Diff"), 156)
-  expect_equal(catcount("Exclude-C-WT-Evil-Twins"), 104)
-  expect_equal(catcount("Exclude-C-WT-BIV"), 61)
-  expect_equal(catcount("Exclude-C-HT-Traj-Extreme"), 39)
-  expect_equal(catcount("Exclude-C-WT-Traj-Extreme"), 19)
-  expect_equal(catcount("Exclude-C-HT-Identical"), 17)
-  expect_equal(catcount("Exclude-C-WT-Identical"), 14)
+  expect_equal(catcount("Exclude-C-Extraneous"), 929)     # was HT 312 + WT 617
+  expect_equal(catcount("Exclude-C-Evil-Twins"), 734)      # was HT 630 + WT 104
+  expect_equal(catcount("Exclude-C-Traj"), 613)            # was HT 360 + WT 253
+  expect_equal(catcount("Exclude-C-BIV"), 606)             # was HT 545 + WT 61
+  expect_equal(catcount("Exclude-C-Too-Many-Errors"), 401)
+  expect_equal(catcount("Exclude-C-CF"), 378)              # was HT 209 + WT 169
+  expect_equal(catcount("Exclude-C-Abs-Diff"), 156)
+  expect_equal(catcount("Exclude-C-Traj-Extreme"), 58)     # was HT 39 + WT 19
+  expect_equal(catcount("Exclude-C-Identical"), 31)        # was HT 17 + WT 14
   expect_equal(catcount("Exclude-Missing"), 1)
 
-  # 18 distinct categories present
+  # 11 distinct categories present (was 18 with param-specific codes)
   expect_equal(
-    length(unique(as.character(res$exclude))), 18
+    length(unique(as.character(res$exclude))), 11
   )
 })
 

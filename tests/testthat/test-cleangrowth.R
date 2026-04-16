@@ -134,39 +134,36 @@ test_that("growthcleanr works as expected on adult synthetic data", {
   expect_equal("Include", gcr_result(cd100, 18695))
   expect_equal("Include", gcr_result(cd100cp, 18695))
 
-  expect_equal("Exclude-A-HT-Identical", gcr_result(cd100, 167))
-  expect_equal("Exclude-A-HT-Identical", gcr_result(cd100cp, 167))
+  expect_equal("Exclude-A-Identical", gcr_result(cd100, 167))
+  expect_equal("Exclude-A-Identical", gcr_result(cd100cp, 167))
 
-  expect_equal("Exclude-A-HT-BIV", gcr_result(cd100, 22009))
-  expect_equal("Exclude-A-HT-BIV", gcr_result(cd100cp, 22009))
+  expect_equal("Exclude-A-BIV", gcr_result(cd100, 22009))
+  expect_equal("Exclude-A-BIV", gcr_result(cd100cp, 22009))
 
   # Results should change due to younger cutpoint
   # With default cutpoint=20, records 18-20 yrs go through child algorithm
-  expect_equal("Exclude-C-WT-Extraneous", gcr_result(cd100, 69740))
+  expect_equal("Exclude-C-Extraneous", gcr_result(cd100, 69740))
   expect_equal("Include", gcr_result(cd100cp, 69740))
 
   expect_equal("Include", gcr_result(cd100cp, 55171))
 
-  expect_equal("Exclude-C-HT-BIV", gcr_result(cd100, 25259))
-  expect_equal("Exclude-A-HT-BIV", gcr_result(cd100cp, 25259))
+  expect_equal("Exclude-C-BIV", gcr_result(cd100, 25259))
+  expect_equal("Exclude-A-BIV", gcr_result(cd100cp, 25259))
 
-  # Check counts (codes are now param-specific; use grepl for category totals)
-  catcount <- function(dt, pattern) {
-    dt[grepl(pattern, gcr_result), .N]
-  }
-  catcount_exact <- function(dt, category) {
+  # Check counts (codes are no longer param-specific; use exact matching)
+  catcount <- function(dt, category) {
     dt[gcr_result == category, .N]
   }
 
-  expect_equal(1595, catcount_exact(cd100, "Include"))
-  expect_equal(334, catcount(cd100, "Exclude-A-(HT|WT)-Extraneous"))
-  expect_equal(5, catcount(cd100, "-CF$"))
-  expect_equal(16, catcount(cd100, "Exclude-A-(HT|WT)-BIV"))
+  expect_equal(1595, catcount(cd100, "Include"))
+  expect_equal(334, catcount(cd100, "Exclude-A-Extraneous"))
+  expect_equal(5, catcount(cd100, "Exclude-C-CF"))
+  expect_equal(16, catcount(cd100, "Exclude-A-BIV"))
 
-  expect_equal(1595, catcount_exact(cd100cp, "Include"))
-  expect_equal(356, catcount(cd100cp, "Exclude-A-(HT|WT)-Extraneous"))
-  expect_equal(0, catcount(cd100cp, "-CF$"))
-  expect_equal(19, catcount(cd100cp, "Exclude-A-(HT|WT)-BIV"))
+  expect_equal(1595, catcount(cd100cp, "Include"))
+  expect_equal(356, catcount(cd100cp, "Exclude-A-Extraneous"))
+  expect_equal(0, catcount(cd100cp, "Exclude-C-CF"))
+  expect_equal(19, catcount(cd100cp, "Exclude-A-BIV"))
 
   # Missing data test for adults
   d5_miss <- copy(data_adult[subjid %in% unique(data[, subjid])[1:5]])
@@ -526,11 +523,11 @@ test_that("adult integration: adult_permissiveness parameter passes through", {
   )
 
   # 115cm should be BIV at looser (outside 120-230 range)
-  expect_equal(as.character(res_looser[id == 1]$exclude), "Exclude-A-HT-BIV",
+  expect_equal(as.character(res_looser[id == 1]$exclude), "Exclude-A-BIV",
                info = "115cm height should be BIV at looser permissiveness")
 
   # 115cm should NOT be BIV at loosest (inside 50-244 range)
-  expect_true(as.character(res_loosest[id == 1]$exclude) != "Exclude-A-HT-BIV",
+  expect_true(as.character(res_loosest[id == 1]$exclude) != "Exclude-A-BIV",
               info = "115cm height should pass BIV at loosest permissiveness")
 })
 
@@ -561,11 +558,11 @@ test_that("adult integration: adult_scale_max_lbs passes through", {
   )
 
   # With cap: scale max weight should be flagged
-  expect_equal(as.character(res_cap[id == 6]$exclude), "Exclude-A-WT-Scale-Max",
+  expect_equal(as.character(res_cap[id == 6]$exclude), "Exclude-A-Scale-Max",
                info = "136kg (=300lbs) should be flagged with scale_max_lbs=300")
 
   # Without cap: same weight should not be scale-max flagged
-  expect_true(as.character(res_nocap[id == 6]$exclude) != "Exclude-A-WT-Scale-Max",
+  expect_true(as.character(res_nocap[id == 6]$exclude) != "Exclude-A-Scale-Max",
               info = "136kg should not be scale-max flagged without cap")
 })
 
@@ -594,7 +591,7 @@ test_that("adult integration: weight_cap deprecation warns and works", {
   )
 
   # But should still work (passed through as adult_scale_max_lbs)
-  expect_equal(as.character(res[id == 6]$exclude), "Exclude-A-WT-Scale-Max",
+  expect_equal(as.character(res[id == 6]$exclude), "Exclude-A-Scale-Max",
                info = "Deprecated weight_cap should still function")
 })
 
