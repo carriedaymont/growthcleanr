@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-github-latest (growthcleanr)
 
-**Last updated:** 2026-04-17 (Session 4a CF walkthrough: removed run_cf_detection optimization; cf_rescue="all" now rescues every detected CF including shared-SPA ones, with Step 13 resolving multi-Include SPAs; HEADCM threshold placeholder moved to Known Issues; pre-session cleanup migrated D5/D6/D9+D10 to Known Issues → Open (wrapper) and fixed D4/D16 in child_clean.R)
+**Last updated:** 2026-04-17 (Session 4b Step 7 BIV walkthrough: replaced dead `sd.extreme`/`z.extreme` parameters with 8 per-cell `biv.z.*` parameters; rewrote Step 7 narrative for "current state only"; fixed Stata-style 7d comment and inaccurate "overwrites non-temp codes" note; documented that full child permissiveness framework is deferred until after v3.0.0 and that `Child-growthcleanr-permissiveness-specs.md` is to be ignored during walkthroughs/reconciliation. Session 4a: removed run_cf_detection optimization; cf_rescue="all" now rescues every detected CF including shared-SPA ones, with Step 13 resolving multi-Include SPAs; HEADCM threshold placeholder moved to Known Issues; pre-session cleanup migrated D5/D6/D9+D10 to Known Issues → Open (wrapper) and fixed D4/D16 in child_clean.R)
 
 ## Overview
 
@@ -404,8 +404,14 @@ Default: `"looser"`
 
 | Parameter | Default | Used in | Description |
 |-----------|---------|---------|-------------|
-| `sd.extreme` | 25 | Step 7 | SD-score cutoff for extreme exclusion |
-| `z.extreme` | 25 | Step 7 | Z-score cutoff for extreme exclusion |
+| `biv.z.wt.low.young` | -25 | Step 7 | Lower unrecentered CSD z cutoff for WEIGHTKG at `ageyears < 1` |
+| `biv.z.wt.low.old` | -15 | Step 7 | Lower unrecentered CSD z cutoff for WEIGHTKG at `ageyears >= 1` |
+| `biv.z.wt.high` | 22 | Step 7 | Upper unrecentered CSD z cutoff for WEIGHTKG (all ages) |
+| `biv.z.ht.low.young` | -25 | Step 7 | Lower unrecentered CSD z cutoff for HEIGHTCM at `ageyears < 1` |
+| `biv.z.ht.low.old` | -15 | Step 7 | Lower unrecentered CSD z cutoff for HEIGHTCM at `ageyears >= 1` |
+| `biv.z.ht.high` | 8 | Step 7 | Upper unrecentered CSD z cutoff for HEIGHTCM (all ages) |
+| `biv.z.hc.low` | -15 | Step 7 | Lower unrecentered CSD z cutoff for HEADCM (all ages) |
+| `biv.z.hc.high` | 15 | Step 7 | Upper unrecentered CSD z cutoff for HEADCM (all ages) |
 | `error.load.mincount` | 2 | Step 21 | Min exclusions before evaluating error load |
 | `error.load.threshold` | 0.5 | Step 21 | Error ratio above this excludes all |
 | `sd.recenter` | NA | Recentering | Default uses built-in rcfile; pass a data.table for custom recentering |
@@ -546,7 +552,7 @@ coverage gaps, run instructions).
 | `test-cleangrowth.R` | 13 | ~80 | `cleangrowth()` API: adult integration (7 tests), child-adult spanning (3 tests) |
 | `test-child-regression.R` | 8 | ~48 | Frozen counts, spot checks, cross-sample stability, Missing, HC, preload_refs, changed_subjids |
 | `test-child-algorithms.R` | 24 | ~40 | CF rescue (modes + threshold cells), Evil Twins/OTL (1/2/3 unit errors + collateral), Error Load (threshold/mincount/constructed), HC boundary, cf_detail, parallel, GA correction (potcorr + near-potcorr), Birth EWMA2 (extreme/normal WT, extreme HT), LENGTHCM identity |
-| `test-child-parameters.R` | 7 | ~15 | include.carryforward, sd.extreme, ewma_window, error.load params, imperial units, LENGTHCM |
+| `test-child-parameters.R` | 7 | ~15 | include.carryforward, biv.z.wt.high, ewma_window, error.load params, imperial units, LENGTHCM |
 | `test-child-edge-cases.R` | 12 | 24 | Single subject, sparse data, all-NA, mixed NA, SDE-Identical, negative agedays, HEADCM >3yr, extreme values, density mix, CF, deterministic |
 | `test-adult-clean.R` | 198 | 198 | All 14 adult steps, 4 permissiveness levels, edge cases (via `cleanadult()` directly) |
 | **Total** | **262** | **~405** | |
@@ -784,6 +790,23 @@ See git history for full details on each fix.
    severe obesity, Turner syndrome, growth hormone deficiency).
    Goal: verify gc handles physiologically real but extreme
    trajectories correctly — not just random perturbations.
+
+### Child permissiveness framework — deferred until after v3.0.0
+
+A full child permissiveness framework (analogous to the
+adult 4-level system) is **deferred until after v3.0.0 is
+released**. For v3.0.0, child parameters are exposed as
+individual user-settable scalars (e.g., the eight
+`biv.z.*` Step 7 cutoffs added 2026-04-17), not as
+permissiveness presets.
+
+`Child-growthcleanr-permissiveness-specs.md` contains
+draft scaffolding for the future framework and is kept in
+the repo for reference. **During walkthroughs, code
+reviews, and documentation reconciliation it should be
+ignored** — it is not part of the current implementation
+contract and is not expected to reflect current code or
+parameter names.
 
 ### Adult status (closed 2026-04-09)
 

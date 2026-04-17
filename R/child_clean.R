@@ -160,10 +160,38 @@
 #' @param sex Vector identifying the gender of the subject, may be 'M', 'm', or 0 for males, vs. 'F', 'f' or 1 for females.
 #' @param measurement Numeric vector containing the actual measurement data.  Weight must be in
 #'   kilograms (kg), and linear measurements (height vs. length) in centimeters (cm).
-#' @param sd.extreme Measurements more than sd.extreme standard deviations from
-#' the mean (either above or below) will be flagged as invalid. Defaults to 25.
-#' @param z.extreme Measurements with an absolute z-score greater than
-#' z.extreme will be flagged as invalid. Defaults to 25.
+#' @param biv.z.wt.low.young Lower unrecentered CSD z-score cutoff for
+#' WEIGHTKG under one year of age (`ageyears < 1`). Weights with
+#' `sd.orig_uncorr < biv.z.wt.low.young` are flagged as standardized BIV.
+#' Defaults to -25.
+#' @param biv.z.wt.low.old Lower unrecentered CSD z-score cutoff for
+#' WEIGHTKG at or above one year (`ageyears >= 1`). Weights with
+#' `sd.orig_uncorr < biv.z.wt.low.old` are flagged as standardized BIV.
+#' Defaults to -15.
+#' @param biv.z.wt.high Upper unrecentered CSD z-score cutoff for
+#' WEIGHTKG (all ages). Weights with `sd.orig_uncorr > biv.z.wt.high` are
+#' flagged as standardized BIV. Defaults to 22.
+#' @param biv.z.ht.low.young Lower unrecentered CSD z-score cutoff for
+#' HEIGHTCM under one year of age. Heights with
+#' `sd.orig_uncorr < biv.z.ht.low.young` are flagged as standardized BIV.
+#' Defaults to -25.
+#' @param biv.z.ht.low.old Lower unrecentered CSD z-score cutoff for
+#' HEIGHTCM at or above one year. Heights with
+#' `sd.orig_uncorr < biv.z.ht.low.old` are flagged as standardized BIV.
+#' Defaults to -15.
+#' @param biv.z.ht.high Upper unrecentered CSD z-score cutoff for HEIGHTCM
+#' (all ages). Heights with `sd.orig_uncorr > biv.z.ht.high` are flagged
+#' as standardized BIV. Defaults to 8 (tighter than the weight upper limit,
+#' based on analysis of CHOP data showing the ±15/±25 range was too loose
+#' for heights).
+#' @param biv.z.hc.low Lower unrecentered CSD z-score cutoff for HEADCM
+#' (all ages). Head-circumference values with
+#' `sd.orig_uncorr < biv.z.hc.low` are flagged as standardized BIV.
+#' Defaults to -15.
+#' @param biv.z.hc.high Upper unrecentered CSD z-score cutoff for HEADCM
+#' (all ages). Head-circumference values with
+#' `sd.orig_uncorr > biv.z.hc.high` are flagged as standardized BIV.
+#' Defaults to 15.
 #' @param error.load.mincount minimum count of exclusions on parameter before
 #' considering excluding all measurements. Defaults to 2.
 #' @param error.load.threshold threshold of percentage of excluded measurement count to included measurement
@@ -296,8 +324,14 @@ cleangrowth <- function(subjid,
                         agedays,
                         sex,
                         measurement,
-                        sd.extreme = 25,
-                        z.extreme = 25,
+                        biv.z.wt.low.young = -25,
+                        biv.z.wt.low.old = -15,
+                        biv.z.wt.high = 22,
+                        biv.z.ht.low.young = -25,
+                        biv.z.ht.low.old = -15,
+                        biv.z.ht.high = 8,
+                        biv.z.hc.low = -15,
+                        biv.z.hc.high = 15,
                         error.load.mincount = 2,
                         error.load.threshold = 0.5,
                         sd.recenter = NA,
@@ -1128,8 +1162,14 @@ cleangrowth <- function(subjid,
         cf_rescue = cf_rescue,
         cf_detail = cf_detail,
         debug = debug,
-        sd.extreme = sd.extreme,
-        z.extreme = z.extreme,
+        biv.z.wt.low.young = biv.z.wt.low.young,
+        biv.z.wt.low.old = biv.z.wt.low.old,
+        biv.z.wt.high = biv.z.wt.high,
+        biv.z.ht.low.young = biv.z.ht.low.young,
+        biv.z.ht.low.old = biv.z.ht.low.old,
+        biv.z.ht.high = biv.z.ht.high,
+        biv.z.hc.low = biv.z.hc.low,
+        biv.z.hc.high = biv.z.hc.high,
         exclude.levels = exclude.levels,
         tanner.ht.vel = tanner.ht.vel,
         error.load.threshold = error.load.threshold,
@@ -1158,8 +1198,14 @@ cleangrowth <- function(subjid,
         cf_rescue = cf_rescue,
         cf_detail = cf_detail,
         debug = debug,
-        sd.extreme = sd.extreme,
-        z.extreme = z.extreme,
+        biv.z.wt.low.young = biv.z.wt.low.young,
+        biv.z.wt.low.old = biv.z.wt.low.old,
+        biv.z.wt.high = biv.z.wt.high,
+        biv.z.ht.low.young = biv.z.ht.low.young,
+        biv.z.ht.low.old = biv.z.ht.low.old,
+        biv.z.ht.high = biv.z.ht.high,
+        biv.z.hc.low = biv.z.hc.low,
+        biv.z.hc.high = biv.z.hc.high,
         exclude.levels = exclude.levels,
         tanner.ht.vel = tanner.ht.vel,
         error.load.threshold = error.load.threshold,
@@ -2423,8 +2469,14 @@ cleanchild <- function(data.df,
                                cf_rescue = "standard",
                                cf_detail = FALSE,
                                debug = FALSE,
-                               sd.extreme,
-                               z.extreme,
+                               biv.z.wt.low.young,
+                               biv.z.wt.low.old,
+                               biv.z.wt.high,
+                               biv.z.ht.low.young,
+                               biv.z.ht.low.old,
+                               biv.z.ht.high,
+                               biv.z.hc.low,
+                               biv.z.hc.high,
                                exclude.levels,
                                tanner.ht.vel,
                                error.load.threshold,
@@ -2929,45 +2981,50 @@ cleanchild <- function(data.df,
             agedays == 0,
           exclude := "Exclude-C-BIV"]
 
-  # Standardized BIV — same code (Exclude-C-BIV)
-  # Skip rows already marked BIV (absolute) to avoid overwriting
-  # NOTE: This is the only step where an exclusion code can overwrite a non-temporary exclusion
-  # code (e.g., this could overwrite CF codes). No other steps should overwrite non-temporary codes.
+  # Standardized BIV — same exclusion code as absolute BIV (Exclude-C-BIV).
+  # The !grepl(biv_pattern, exclude) guard skips rows just assigned
+  # Exclude-C-BIV by the absolute block above, since valid_set was
+  # computed before absolute BIV ran and so still treats those rows as valid.
   biv_pattern <- "^Exclude-C-BIV$"
 
-  # identify z cutoff
-  # ***Note, using unrecentered values***
-  #  *For weight only do after birth
-  data.df[valid_set & param == "WEIGHTKG" & sd.orig_uncorr < -25 &
+  # z cutoffs use unrecentered CSD z-scores (sd.orig_uncorr).
+  # Cutoffs are set from cleangrowth() parameters (biv.z.* family).
+  # Weight
+  data.df[valid_set & param == "WEIGHTKG" & sd.orig_uncorr < biv.z.wt.low.young &
             ageyears < 1 & !grepl(biv_pattern, exclude),
           exclude := "Exclude-C-BIV"]
-  data.df[valid_set & param == "WEIGHTKG" & sd.orig_uncorr < -15 &
+  data.df[valid_set & param == "WEIGHTKG" & sd.orig_uncorr < biv.z.wt.low.old &
             ageyears >= 1 & !grepl(biv_pattern, exclude),
           exclude := "Exclude-C-BIV"]
-  data.df[valid_set & param == "WEIGHTKG" & sd.orig_uncorr > 22 &
+  data.df[valid_set & param == "WEIGHTKG" & sd.orig_uncorr > biv.z.wt.high &
             !grepl(biv_pattern, exclude),
           exclude := "Exclude-C-BIV"]
 
-  # *Max z-score for height based on analysis of CHOP data because 15/25 too loose for upper limits
-  data.df[valid_set & param == "HEIGHTCM" & sd.orig_uncorr < -25 &
+  # Height. Default upper HT cutoff (biv.z.ht.high = 8) is tighter than the
+  # weight upper cutoff based on analysis of CHOP data showing the
+  # +/-15 / +/-25 range was too loose for heights.
+  data.df[valid_set & param == "HEIGHTCM" & sd.orig_uncorr < biv.z.ht.low.young &
             ageyears < 1 & !grepl(biv_pattern, exclude),
           exclude := "Exclude-C-BIV"]
-  data.df[valid_set & param == "HEIGHTCM" & sd.orig_uncorr < -15 &
+  data.df[valid_set & param == "HEIGHTCM" & sd.orig_uncorr < biv.z.ht.low.old &
             ageyears >= 1 & !grepl(biv_pattern, exclude),
           exclude := "Exclude-C-BIV"]
-  data.df[valid_set & param == "HEIGHTCM" & sd.orig_uncorr > 8 &
+  data.df[valid_set & param == "HEIGHTCM" & sd.orig_uncorr > biv.z.ht.high &
             !grepl(biv_pattern, exclude),
           exclude := "Exclude-C-BIV"]
 
   # head circumference
-  data.df[valid_set & param == "HEADCM" & sd.orig_uncorr < -15 &
+  data.df[valid_set & param == "HEADCM" & sd.orig_uncorr < biv.z.hc.low &
             !grepl(biv_pattern, exclude),
           exclude := "Exclude-C-BIV"]
-  data.df[valid_set & param == "HEADCM" & sd.orig_uncorr > 15 &
+  data.df[valid_set & param == "HEADCM" & sd.orig_uncorr > biv.z.hc.high &
             !grepl(biv_pattern, exclude),
           exclude := "Exclude-C-BIV"]
 
-  # 7d.  Replace exc_*=0 if exc_*==2 & redo step 5 (temporary extraneous)
+  # 7d. Re-evaluate temp SDEs after BIV exclusions: reset all Exclude-C-Temp-Same-Day
+  # rows to Include, then rerun identify_temp_sde(). Rationale: absolute or
+  # standardized BIV may have excluded the prior temp-SDE "keeper" on an SPA;
+  # another value in that SPA should now be flagged instead.
   data.df[exclude == 'Exclude-C-Temp-Same-Day', exclude := 'Include']
   data.df[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-C-Temp-Same-Day']
 

@@ -106,7 +106,7 @@ Items identified during the YYYY-MM-DD walk-through that are deferred for later 
 **Child:**
 - `R/child_clean.R` — main algorithm and all support functions (single file, unlike adult's two-file split)
 - `child-gc-narrative-2026-03-18.md` — step-by-step documentation (check for current version)
-- No permissiveness spec (not applicable for 3.0.0)
+- `Child-growthcleanr-permissiveness-specs.md` — **ignore during walkthroughs.** Draft scaffolding for a future child permissiveness framework, deferred until after v3.0.0 is released. It is not part of the current implementation contract and is not expected to reflect current code or parameter names. Do not reconcile code, comments, or other narratives against it.
 - No wtallow equivalent (child uses z-score thresholds, not raw measurement limits)
 
 ---
@@ -221,9 +221,9 @@ For each step, systematically check all items that apply. Items are marked
 
    **[child] Configurable parameter defaults** — Verify that configurable
    parameter defaults match the code and narrative. The child algorithm has
-   configurable parameters (e.g., `sd.extreme`, `error.load.threshold`,
-   `ewma_window`, `cf_rescue`, `batch_size`). No permissiveness levels for
-   3.0.0.
+   configurable parameters (e.g., the eight `biv.z.*` Step 7 cutoffs,
+   `error.load.threshold`, `ewma_window`, `cf_rescue`, `batch_size`). No
+   permissiveness levels for 3.0.0.
 
    **[both] Parameters table row audit per session** — Each session must
    audit the rows of the narrative's Configurable Parameters table that

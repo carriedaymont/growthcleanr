@@ -1,6 +1,7 @@
 ## Child growthcleanr permissiveness specs
+***NOTE*** This is for future implementation.
 Date created: 2026-03-25
-Date last updated: 2026-03-25
+Date last updated: 2026-04-17
 
 The goal of this document is to define modifiable parameters that will adjust the permissiveness of the child growth cleaner algorithm. This is based on a framework first developed for adults. See the reference below. Overall, users will be able to select from one of several levels of permissiveness, which will adjust the settings for multiple parameters to predefined values. In addition to setting a level of permissiveness, users can override any individual parameter. Although the main permissiveness option will set adult and child permissiveness to the same level, users could also override that to set either adult or child to a different level.
 
@@ -295,8 +296,14 @@ These are declared parameters that may not directly affect exclusion rates but a
 | Parameter | loosest | looser | tighter | tightest |
 |-----------|---------|--------|---------|----------|
 | `recover.unit.error` (attempt unit error correction) | | FALSE | | |
-| `sd.extreme` (SD cutoff for extreme) | | 25 | | |
-| `z.extreme` (z-score cutoff for extreme) | | 25 | | |
+| `biv.z.wt.low.young` (Step 7 lower WT cutoff, age<1y) | | -25 | | |
+| `biv.z.wt.low.old` (Step 7 lower WT cutoff, age>=1y) | | -15 | | |
+| `biv.z.wt.high` (Step 7 upper WT cutoff, all ages) | | 22 | | |
+| `biv.z.ht.low.young` (Step 7 lower HT cutoff, age<1y) | | -25 | | |
+| `biv.z.ht.low.old` (Step 7 lower HT cutoff, age>=1y) | | -15 | | |
+| `biv.z.ht.high` (Step 7 upper HT cutoff, all ages) | | 8 | | |
+| `biv.z.hc.low` (Step 7 lower HC cutoff, all ages) | | -15 | | |
+| `biv.z.hc.high` (Step 7 upper HC cutoff, all ages) | | 15 | | |
 | `height.tolerance.cm` (declared but not used in child algorithm) | | 2.5 | | |
 | `adult_cutpoint` (age in years dividing child/adult) | | 20 | | |
 

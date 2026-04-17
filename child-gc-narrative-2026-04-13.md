@@ -839,8 +839,14 @@ verified against the code when each step is walked.
 | `weight_cap` | (missing) | Adult | **Deprecated** — mapped to `adult_scale_max_lbs` with a warning. |
 | `adult_permissiveness` | `"looser"` | Adult | Not walked yet; see `adult-algorithm-narrative.md`. |
 | `adult_scale_max_lbs` | `Inf` | Adult | Not walked yet. |
-| `sd.extreme` | 25 | Step 7 | Not walked yet. |
-| `z.extreme` | 25 | Step 7 | Not walked yet. |
+| `biv.z.wt.low.young` | -25 | Step 7 | Lower CSD z cutoff for WEIGHTKG at `ageyears < 1`. |
+| `biv.z.wt.low.old` | -15 | Step 7 | Lower CSD z cutoff for WEIGHTKG at `ageyears >= 1`. |
+| `biv.z.wt.high` | 22 | Step 7 | Upper CSD z cutoff for WEIGHTKG (all ages). |
+| `biv.z.ht.low.young` | -25 | Step 7 | Lower CSD z cutoff for HEIGHTCM at `ageyears < 1`. |
+| `biv.z.ht.low.old` | -15 | Step 7 | Lower CSD z cutoff for HEIGHTCM at `ageyears >= 1`. |
+| `biv.z.ht.high` | 8 | Step 7 | Upper CSD z cutoff for HEIGHTCM (all ages). |
+| `biv.z.hc.low` | -15 | Step 7 | Lower CSD z cutoff for HEADCM (all ages). |
+| `biv.z.hc.high` | 15 | Step 7 | Upper CSD z cutoff for HEADCM (all ages). |
 | `ewma_window` | 15 | EWMA steps | Not walked yet. |
 | `error.load.mincount` | 2 | Step 21 | Not walked yet. |
 | `error.load.threshold` | 0.5 | Step 21 | Not walked yet. |
@@ -1599,22 +1605,33 @@ comment in the helper).
 | **Prior step** | Step 6 (Carried Forwards) |
 | **Next step** | Step 9 (Evil Twins) |
 | **Exclusion codes** | `Exclude-C-BIV` |
-| **Code location** | See code |
+| **Code location** | `R/child_clean.R` lines ~2882–2976 |
 
 ### Overview
 
 BIV identifies measurements that are biologically impossible
-or extremely unlikely, using two approaches applied in
-sequence:
+or extremely unlikely, using two blocks applied in sequence:
 
-1. **Absolute BIV** — fixed measurement limits (e.g., weight
- cannot be negative, height cannot exceed 244 cm)
-2. **Standardized BIV** — z-score cutoffs using unrecentered
- CSD z-scores (`sd.orig_uncorr`)
+1. **Absolute BIV** — fixed limits on raw measurements (`v`).
+2. **Standardized BIV** — cutoffs on unrecentered CSD
+ z-scores (`sd.orig_uncorr`).
 
-After both, temp SDEs are re-evaluated (Step 5 rerun).
+After both blocks, the temp-SDE identification is rerun:
+all rows currently flagged `Exclude-C-Temp-Same-Day` are
+reset to `Include`, then `identify_temp_sde()` is called
+against the post-BIV state.
+
+The working `valid_set` is computed once at the top of the
+step via `.child_valid(data.df, include.temporary.extraneous
+= TRUE)` and reused across both BIV blocks. It contains
+`Include` rows and rows flagged `Exclude-C-Temp-Same-Day`;
+any other non-`Include` row is not in `valid_set` and so
+cannot be assigned `Exclude-C-BIV` here.
 
 ### Absolute BIV thresholds
+
+All conditions use strict `<` or `>` (not `<=` / `>=`). Rows
+that match get `exclude := "Exclude-C-BIV"`.
 
 **Weight (WEIGHTKG):**
 
@@ -1622,106 +1639,136 @@ After both, temp SDEs are re-evaluated (Step 5 rerun).
 |---|---|---|
 | First year (`agedays <= 365`) | `v < 0.2` kg | Published minimum viable birth weight; allows preterm |
 | After first year (`agedays > 365`) | `v < 1` kg | Minimum plausible outpatient weight |
-| Birth | `v > 10.5` kg | Maximum plausible birth weight |
-| Age < 2 years | `v > 35` kg | Highest plausible weight under 2y |
+| Birth (`agedays == 0`) | `v > 10.5` kg | Maximum plausible birth weight |
+| `ageyears < 2` | `v > 35` kg | Highest plausible weight under 2y |
 | Any age | `v > 600` kg | Published maximum human weight |
-
-***BUG FIXED (2026-03-20):*** The code previously applied
-`v < 0.2` only at `agedays == 0`, leaving ages 1–364 days
-with no minimum weight check. Fixed to `agedays <= 365`
-to match the intended behavior documented in CLAUDE.md.
 
 **Height (HEIGHTCM):**
 
-| Condition | Threshold |
-|---|---|
-| Any age | `v < 18` cm |
-| Any age | `v > 244` cm |
-| Birth | `v > 65` cm |
+| Condition | Threshold | Rationale |
+|---|---|---|
+| Any age | `v < 18` cm | Fenton z=-6 at 22 0/7 weeks |
+| Any age | `v > 244` cm | Published maximum |
+| Birth (`agedays == 0`) | `v > 65` cm | Fenton z=6 at 40 0/7 weeks |
 
 **Head circumference (HEADCM):**
 
-| Condition | Threshold |
-|---|---|
-| Any age | `v < 13` cm |
-| Any age | `v > 75` cm |
-| Birth | `v > 50` cm |
+| Condition | Threshold | Rationale |
+|---|---|---|
+| Any age | `v < 13` cm | Fenton z=-6 at 22 0/7 weeks |
+| Any age | `v > 75` cm | Published maximum |
+| Birth (`agedays == 0`) | `v > 50` cm | Birth maximum |
 
 ### Standardized BIV thresholds
 
-Uses **unrecentered** z-scores (`sd.orig_uncorr`). Rows
-already marked `Exclude-C-BIV` are skipped (the
-`exclude != abs_biv` guard) to preserve the more specific
-code.
+Uses **unrecentered** z-scores (`sd.orig_uncorr`). Each
+cutoff is a user-settable `cleangrowth()` parameter; the
+default values (shown in the tables below) preserve the
+prior hardcoded behavior. The standardized block adds a
+`!grepl(biv_pattern, exclude)` guard where
+`biv_pattern <- "^Exclude-C-BIV$"`. The guard skips rows
+that the absolute block just assigned `Exclude-C-BIV`,
+because `valid_set` was computed before the absolute block
+ran and therefore still treats those rows as valid. Rows
+originally flagged `Exclude-C-Temp-Same-Day` that were not
+hit by absolute BIV can be overwritten to `Exclude-C-BIV`
+by the standardized block; the 7d temp-SDE rerun afterward
+re-flags any SPA that still has a duplicate Include.
 
 **Weight:**
 
-| Condition | Threshold |
-|---|---|
-| Age < 1 year | `sd.orig_uncorr < -25` |
-| Age >= 1 year | `sd.orig_uncorr < -15` |
-| Any age | `sd.orig_uncorr > 22` |
+| Condition | Threshold | Parameter (default) |
+|---|---|---|
+| `ageyears < 1` | `sd.orig_uncorr < biv.z.wt.low.young` | `biv.z.wt.low.young` (-25) |
+| `ageyears >= 1` | `sd.orig_uncorr < biv.z.wt.low.old` | `biv.z.wt.low.old` (-15) |
+| Any age | `sd.orig_uncorr > biv.z.wt.high` | `biv.z.wt.high` (22) |
 
 **Height:**
 
-| Condition | Threshold |
-|---|---|
-| Age < 1 year | `sd.orig_uncorr < -25` |
-| Age >= 1 year | `sd.orig_uncorr < -15` |
-| Any age | `sd.orig_uncorr > 8` |
+| Condition | Threshold | Parameter (default) |
+|---|---|---|
+| `ageyears < 1` | `sd.orig_uncorr < biv.z.ht.low.young` | `biv.z.ht.low.young` (-25) |
+| `ageyears >= 1` | `sd.orig_uncorr < biv.z.ht.low.old` | `biv.z.ht.low.old` (-15) |
+| Any age | `sd.orig_uncorr > biv.z.ht.high` | `biv.z.ht.high` (8) |
+
+The default upper HT cutoff (`biv.z.ht.high = 8`) is
+tighter than the default upper WT cutoff
+(`biv.z.wt.high = 22`). The inline comment attributes the
+tighter HT default to analysis of CHOP data showing the
+`±15`/`±25` range was too loose for heights.
 
 **Head circumference:**
 
-| Condition | Threshold |
-|---|---|
-| Any age | `sd.orig_uncorr < -15` |
-| Any age | `sd.orig_uncorr > 15` |
+| Condition | Threshold | Parameter (default) |
+|---|---|---|
+| Any age | `sd.orig_uncorr < biv.z.hc.low` | `biv.z.hc.low` (-15) |
+| Any age | `sd.orig_uncorr > biv.z.hc.high` | `biv.z.hc.high` (15) |
 
-### Temp SDE re-evaluation
+### Temp SDE re-evaluation (7d)
 
-After BIV exclusions, temp SDEs are reset to Include and
-`identify_temp_sde()` is rerun. This is the same
-pattern as after CF detection — removing extreme values
-changes which SDE value is most plausible.
+After both BIV blocks, all rows currently flagged
+`Exclude-C-Temp-Same-Day` are reset to `Include`, then
+`identify_temp_sde()` is rerun on the full dataset. This
+mirrors the Step-5 temp-SDE logic against the post-BIV
+state: if the prior temp-SDE keeper on an SPA has just
+been excluded as BIV, another value in that SPA becomes
+the flagged duplicate.
+
+### Configurable parameters in scope for Step 7
+
+Eight user-settable standardized-BIV cutoffs:
+`biv.z.wt.low.young` (-25), `biv.z.wt.low.old` (-15),
+`biv.z.wt.high` (22), `biv.z.ht.low.young` (-25),
+`biv.z.ht.low.old` (-15), `biv.z.ht.high` (8),
+`biv.z.hc.low` (-15), `biv.z.hc.high` (15). Defaults
+reproduce the pre-configurable hardcoded thresholds.
+Absolute-BIV thresholds (`v < 0.2` kg, `v > 244` cm, etc.)
+are not user-configurable.
 
 ### Variables created and dropped
 
-- `ageyears`: Created for age threshold checks,
- dropped after Step 7 completes.
+- `ageyears`: created at the top of Step 7 for age-
+ threshold checks, dropped at the end of the step.
+- `biv_pattern`: local character scalar
+ (`"^Exclude-C-BIV$"`) used only as the
+ standardized-block guard; not stored on `data.df`.
 
 ### Checklist findings
 
-1. **BUG FIXED: Minimum weight gap for agedays 1–364.**
- Code used `agedays == 0` for the `v < 0.2` threshold;
- fixed to `agedays <= 365`. Also changed `v < 1` from
- `agedays >= 365` to `agedays > 365` to avoid overlap
- at exactly day 365.
-2. **Cleaned up:** Removed commented-out duplicate code
- and stale nnte comment.
-4. **Boundaries — all strict inequalities:** `< 0.2`,
- `< 1`, `> 10.5`, etc. A weight of exactly 0.2 kg at
- birth is NOT excluded. A z-score of exactly -25 is NOT
- excluded. These are strict `<` and `>`, not `<=`/`>=`.
-5. **Boundaries — age thresholds:** `ageyears < 1` and
- `ageyears >= 1` for Standardized-BIV use strict `<`
- and `>=`. A child at exactly 365.25 days (1.0 years)
- gets the `>= 1` thresholds.
-6. **`.child_valid()` call:** Correctly includes temp SDEs.
- `valid_set` is computed once and not refreshed between
- Absolute and Standardized BIV, but the `!= abs_biv`
- guard prevents double-exclusion.
-7. **v == 0 handler removed (2026-04-13):** Was dead code —
- `v` is already NaN for zero measurements after
- preprocessing. Removed.
-8. **Parameter scope:** All 3 params handled with
- param-specific thresholds.
-9. **Factor levels:** `Exclude-C-BIV` exists in
- `exclude.levels` (absolute and standardized BIV collapsed
- into one code).
-10. **Efficiency:** `valid_set` could be refreshed after
- Absolute-BIV to avoid checking already-excluded rows
- in Standardized-BIV. Minor — only matters for very
- large datasets.
+1. **Operates-on set.** `.child_valid(data.df,
+ include.temporary.extraneous = TRUE)` is the correct
+ selector for BIV: Include plus temp-SDE rows.
+2. **Boundaries — all strict inequalities.** `< 0.2`,
+ `< 1`, `> 10.5`, `> 244`, `< -25`, `> 22`, etc. A
+ weight of exactly 0.2 kg is not excluded; a
+ standardized z of exactly `-25` is not excluded.
+3. **Age boundary at 1 year.** Standardized BIV uses
+ `ageyears < 1` vs. `ageyears >= 1`. A child whose
+ `ageyears` equals 1 exactly falls in the `>= 1` band.
+4. **Valid-set refresh.** `valid_set` is computed once
+ and not refreshed between absolute and standardized
+ BIV. The standardized block relies on the
+ `!grepl(biv_pattern, exclude)` guard to skip rows just
+ assigned `Exclude-C-BIV` by the absolute block. Non-
+ `Include` rows other than `Exclude-C-Temp-Same-Day`
+ are not in `valid_set` and so cannot be overwritten by
+ Step 7.
+5. **Parameter scope.** All three params (WEIGHTKG,
+ HEIGHTCM, HEADCM) have their own absolute and
+ standardized thresholds.
+6. **Factor levels.** `Exclude-C-BIV` is present in
+ `exclude.levels`; absolute and standardized BIV share
+ the single code.
+7. **Standardized-BIV cutoffs are parameterized.** Eight
+ `biv.z.*` cutoffs flow from `cleangrowth()` through
+ `cleanchild()` into Step 7. Defaults reproduce prior
+ hardcoded thresholds. See the "Configurable parameters
+ in scope for Step 7" subsection above.
+8. **Efficiency (minor).** `valid_set` could be refreshed
+ after the absolute block to skip newly-excluded rows
+ in the standardized block. Current design relies on
+ the `!grepl(biv_pattern, exclude)` guard; impact is
+ limited to very large datasets.
 
 ---
 

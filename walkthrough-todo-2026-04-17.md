@@ -335,7 +335,210 @@ code touched).
 
 Scope:
 - Absolute BIV limits (per-param, per-age)
-- Standardized BIV limits (`sd.extreme`, `z.extreme` parameters)
+- Standardized BIV limits
 - Preterm weight fix (<0.2 kg first year, <1 kg after)
+- Fate of the `sd.extreme` / `z.extreme` parameters
 
-[to be populated as the walk proceeds]
+### Pre-session baseline tests
+
+After Session 4a, re-ran the child test suites against the
+installed package:
+
+- test-cleangrowth.R: 65 PASS
+- test-child-regression.R: 48 PASS
+- test-child-edge-cases.R: 28 PASS
+- test-child-algorithms.R: 41 PASS (2 baseline codetools warnings)
+- test-child-parameters.R: 13 PASS (1 expected deprecation warning)
+
+Adult suites not re-run; no adult code touched in this session.
+
+### Fix-now items
+
+### F22. `sd.extreme` / `z.extreme` replaced by eight per-cell `biv.z.*` parameters — FIXED
+- **Background.** `sd.extreme = 25` and `z.extreme = 25` were
+  declared in `cleangrowth()` and `cleanchild()` signatures
+  and documented in Roxygen as Step 7 BIV thresholds, passed
+  through the wrapper/dispatch, but never referenced anywhere
+  in `cleanchild()`. All standardized-BIV cutoffs were
+  hardcoded (`-25`, `-15`, `22`, `8`, `15`). They were live
+  in the legacy pediatric algorithm (removed 2026-04-16) and
+  never rewired. Test 4 in `test-child-parameters.R` asserted
+  `expect_gte(n_ewma_strict, n_ewma_lenient)` on two values
+  of `sd.extreme`; because the parameter was dead, both runs
+  produced identical counts and the test passed vacuously.
+- **Design decision (this session).** Remove `sd.extreme` and
+  `z.extreme` outright; replace with one scalar per
+  param/direction/age cell (eight in total). Defaults preserve
+  the prior hardcoded behavior. Standardized-z scope only —
+  absolute-BIV raw-value limits remain hardcoded.
+- **Parameters added** (all to `cleangrowth()` and
+  `cleanchild()` signatures, all Roxygen-documented):
+
+  | Parameter | Default | Applied at |
+  |---|---|---|
+  | `biv.z.wt.low.young` | -25 | WEIGHTKG, `ageyears < 1` |
+  | `biv.z.wt.low.old` | -15 | WEIGHTKG, `ageyears >= 1` |
+  | `biv.z.wt.high` | 22 | WEIGHTKG, all ages |
+  | `biv.z.ht.low.young` | -25 | HEIGHTCM, `ageyears < 1` |
+  | `biv.z.ht.low.old` | -15 | HEIGHTCM, `ageyears >= 1` |
+  | `biv.z.ht.high` | 8 | HEIGHTCM, all ages |
+  | `biv.z.hc.low` | -15 | HEADCM, all ages |
+  | `biv.z.hc.high` | 15 | HEADCM, all ages |
+
+- **Files changed:**
+  - `R/child_clean.R` — removed `sd.extreme`/`z.extreme` from
+    `cleangrowth()` signature + Roxygen (lines 163–166,
+    299–300); added the 8 new params in the same slots with
+    new Roxygen. Replaced two pass-through blocks
+    (lines ~1160–1166, ~1190–1196) with the 8 new
+    pass-throughs. Removed `sd.extreme, z.extreme` from
+    `cleanchild()` signature (lines 2472–2473); added the 8
+    new params in the same slot. Step 7 standardized-BIV
+    block now uses the param variables instead of hardcoded
+    numeric literals.
+  - `tests/testthat/test-child-parameters.R` — Test 4
+    rewritten to exercise `biv.z.wt.high = 2` vs default
+    `22` with `expect_gte(n_biv_strict, n_biv_default)`.
+    Test title/comment updated accordingly.
+  - `testing-reference.md` line 190 — row updated from
+    "sd.extreme parameter" to "biv.z.wt.high parameter".
+  - `gc-github-latest/CLAUDE.md` — two rows in the
+    Configurable Parameters (child) table replaced with
+    eight new rows; `test-child-parameters.R` scope row
+    updated (sd.extreme → biv.z.wt.high).
+  - `child-gc-narrative-2026-04-13.md` — parameters-table
+    rows 842–843 replaced with eight new rows; Step 7
+    "Standardized BIV thresholds" tables updated to show
+    parameter + default per cell; "Configurable parameters
+    in scope for Step 7" subsection rewritten.
+  - `man/cleangrowth.Rd` — regenerated via
+    `devtools::document()`.
+- **Verification.** After reinstall, all 5 child test suites
+  pass (65 / 48 / 28 / 41 / 13). Regression suite
+  (test-child-regression.R) confirms defaults preserve prior
+  behavior — no count or id mapping shifted.
+
+### F23. Step 7 narrative rewritten for "current state only" — FIXED
+- **Background.** `child-gc-narrative-2026-04-13.md` Step 7
+  section (lines ~1593–1724 pre-edit) contained history-
+  flavored content: a "BUG FIXED (2026-03-20)" block about
+  the prior `v < 0.2` gap, Checklist items describing
+  "BUG FIXED", "Cleaned up", and "v == 0 handler removed
+  (2026-04-13)"; Checklist numbering skipped 3 (2 → 4);
+  text referred to a non-existent `abs_biv` variable.
+- **Fix:** Rewrote the section top-to-bottom in present
+  tense. Removed all "BUG FIXED" / "Cleaned up" / "Removed"
+  prose. Replaced `abs_biv` mentions with accurate
+  descriptions of `biv_pattern <- "^Exclude-C-BIV$"`.
+  Rephrased the "Step 5 rerun" wording (Overview and
+  temp-SDE section) so it accurately describes
+  `identify_temp_sde()` being rerun, not all of Step 5.
+  Updated the summary table's "Code location" from "See
+  code" to a concrete line range. Added a
+  "Configurable parameters in scope for Step 7" subsection
+  listing the eight new `biv.z.*` parameters (paired with
+  F22). Checklist renumbered 1–8 consecutively.
+
+### F24. Standardized-BIV guard description corrected — FIXED
+- **File/lines:** `child-gc-narrative-2026-04-13.md`
+  pre-edit lines 1653–1655 and 1711 referenced an
+  "`exclude != abs_biv` guard" that does not exist in
+  code. Code uses `!grepl(biv_pattern, exclude)` where
+  `biv_pattern <- "^Exclude-C-BIV$"`.
+- **Fix:** Rewrote the Standardized BIV thresholds
+  preamble and Checklist item 4 to describe the actual
+  guard, its rationale (valid_set was computed before the
+  absolute block), and which rows can or cannot be
+  overwritten by Step 7 (only `Exclude-C-Temp-Same-Day`
+  rows are both in `valid_set` and have a non-`Include`
+  code at entry; no other non-Include code can be
+  overwritten).
+
+### F25. "Step 5 rerun" phrasing in narrative Overview — FIXED
+- **File/lines:** `child-gc-narrative-2026-04-13.md`
+  pre-edit line 1615 said "After both, temp SDEs are
+  re-evaluated (Step 5 rerun)." Only
+  `identify_temp_sde()` is rerun; the rest of Step 5 is
+  not.
+- **Fix:** Overview now reads "After both blocks, the
+  temp-SDE identification is rerun: all rows currently
+  flagged `Exclude-C-Temp-Same-Day` are reset to
+  `Include`, then `identify_temp_sde()` is called
+  against the post-BIV state."
+
+### F26. Stata-style 7d comment rewritten in R idiom — FIXED
+- **File/lines:** `R/child_clean.R` pre-edit line 2970 —
+  `# 7d.  Replace exc_*=0 if exc_*==2 & redo step 5
+  (temporary extraneous)` (Stata notation: `exc_*==0`
+  for Include, `exc_*==2` for Temp-Same-Day).
+- **Fix:** Replaced with "`# 7d. Re-evaluate temp SDEs
+  after BIV exclusions: reset all Exclude-C-Temp-Same-Day
+  rows to Include, then rerun identify_temp_sde().
+  Rationale: absolute or standardized BIV may have
+  excluded the prior temp-SDE "keeper" on an SPA;
+  another value in that SPA should now be flagged
+  instead.`"
+
+### F27. Inaccurate "overwriting non-temporary codes" note replaced — FIXED
+- **File/lines:** `R/child_clean.R` pre-edit lines
+  2932–2935 — inline comment claimed "This is the only
+  step where an exclusion code can overwrite a non-
+  temporary exclusion code (e.g., this could overwrite
+  CF codes)." In practice, `valid_set` is built from
+  `.child_valid(data.df, include.temporary.extraneous =
+  TRUE)`, which only admits `Include` rows and
+  `Exclude-C-Temp-Same-Day` rows. CF-excluded rows (and
+  any other non-temp Exclude) are not in `valid_set`
+  and cannot be overwritten by Step 7.
+- **Fix:** Replaced with a two-line note explaining why
+  the `!grepl(biv_pattern, exclude)` guard exists (it
+  skips rows just assigned `Exclude-C-BIV` by the
+  absolute block, because `valid_set` was computed
+  beforehand) without making the spurious "overwrite CF"
+  claim.
+
+### Session 4b deferreds (not addressed)
+
+### D24. Step 7 test coverage gaps — DEFERRED
+- **Scope.** Standardized-BIV cells have no targeted unit
+  tests (the only direct BIV tests in `test-child-edge-
+  cases.R` all exercise absolute-BIV limits). Uncovered:
+  - Preterm minimum weight (`v < 0.2` at
+    `agedays <= 365`)
+  - Post-365d minimum (`v < 1` at `agedays > 365`)
+  - Birth maxima (`v > 10.5` WT, `v > 65` HT,
+    `v > 50` HC at `agedays == 0`)
+  - `v > 35` WT at `ageyears < 2`
+  - Standardized WT `sd.orig_uncorr < biv.z.wt.low.young`,
+    `< biv.z.wt.low.old`, `> biv.z.wt.high`
+  - Analogous HT cells, HT `> biv.z.ht.high` (default 8)
+  - HC standardized `< biv.z.hc.low`, `> biv.z.hc.high`
+  - 7d temp-SDE re-evaluation after BIV (constructed case
+    where an SPA keeper gets BIV'd and the other value
+    picks up the temp-SDE flag)
+- **Why deferred.** Coverage gaps; medium effort; no
+  current accuracy issue (regression tests confirm
+  behavior unchanged under defaults, and the new Test 4
+  exercises at least one `biv.z.*` parameter path).
+- **Where fixed later.** Likely in a dedicated test-
+  coverage session for Step 7, alongside similar passes
+  for other walked steps.
+
+---
+
+## Session 4b — post-fix test results
+
+After reinstalling the package and regenerating
+`man/cleangrowth.Rd` via `devtools::document()`:
+
+- test-cleangrowth.R: 65 PASS, 0 warnings
+- test-child-regression.R: 48 PASS, 0 warnings
+- test-child-edge-cases.R: 28 PASS, 0 warnings
+- test-child-algorithms.R: 41 PASS (2 codetools warnings,
+  baseline, unchanged)
+- test-child-parameters.R: 13 PASS (1 expected deprecation
+  warning from the `include.carryforward` test, baseline,
+  unchanged)
+
+Adult suites and regression harness not re-run (no adult
+code touched).

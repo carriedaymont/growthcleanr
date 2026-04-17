@@ -64,20 +64,20 @@ test_that("include.carryforward = TRUE keeps CFs, FALSE excludes them", {
 })
 
 # ---------------------------------------------------------------------------
-# Test 4: sd.extreme parameter changes extreme EWMA exclusions
+# Test 4: biv.z.wt.high parameter changes standardized-BIV (Step 7) exclusions
 # ---------------------------------------------------------------------------
-test_that("sd.extreme parameter changes EWMA extreme exclusion behavior", {
+test_that("biv.z.wt.high parameter changes standardized-BIV exclusion behavior", {
 
-  # Very strict threshold (lower sd.extreme = more exclusions)
-  out_strict <- run_child_subset(50, sd.extreme = 3)
-  # Very lenient threshold
-  out_lenient <- run_child_subset(50, sd.extreme = 8)
+  # Very strict upper z cutoff for weight
+  out_strict  <- run_child_subset(50, biv.z.wt.high = 2)
+  # Default is 22 (very lenient)
+  out_default <- run_child_subset(50, biv.z.wt.high = 22)
 
-  n_ewma_strict <- sum(grepl("EWMA", out_strict$result$exclude))
-  n_ewma_lenient <- sum(grepl("EWMA", out_lenient$result$exclude))
+  n_biv_strict  <- sum(out_strict$result$exclude  == "Exclude-C-BIV")
+  n_biv_default <- sum(out_default$result$exclude == "Exclude-C-BIV")
 
-  # Stricter threshold should exclude at least as many
-  expect_gte(n_ewma_strict, n_ewma_lenient)
+  # Stricter threshold should exclude at least as many as the default
+  expect_gte(n_biv_strict, n_biv_default)
 })
 
 # ---------------------------------------------------------------------------

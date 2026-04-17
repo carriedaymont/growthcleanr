@@ -187,7 +187,7 @@ Tests that each configurable parameter is accepted and behaves as documented.
 | use_legacy_algorithm = TRUE | Runs legacy code, produces different results than child |
 | sd.recenter parameter | Accepted, runs without error |
 | include.carryforward | TRUE keeps CFs, FALSE excludes them |
-| sd.extreme parameter | Changes EWMA extreme exclusion behavior |
+| biv.z.wt.high parameter | Changes standardized-BIV (Step 7) exclusion behavior |
 | ewma_window parameter | Accepted, doesn't crash |
 | error load parameters | Affect error-load exclusions |
 | recover.unit.error parameter | Accepted, doesn't crash |

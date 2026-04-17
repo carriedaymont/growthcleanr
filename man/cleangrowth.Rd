@@ -10,8 +10,14 @@ cleangrowth(
   agedays,
   sex,
   measurement,
-  sd.extreme = 25,
-  z.extreme = 25,
+  biv.z.wt.low.young = -25,
+  biv.z.wt.low.old = -15,
+  biv.z.wt.high = 22,
+  biv.z.ht.low.young = -25,
+  biv.z.ht.low.old = -15,
+  biv.z.ht.high = 8,
+  biv.z.hc.low = -15,
+  biv.z.hc.high = 15,
   error.load.mincount = 2,
   error.load.threshold = 0.5,
   sd.recenter = NA,
@@ -55,11 +61,45 @@ metric during algorithm calculations.}
 \item{measurement}{Numeric vector containing the actual measurement data.  Weight must be in
 kilograms (kg), and linear measurements (height vs. length) in centimeters (cm).}
 
-\item{sd.extreme}{Measurements more than sd.extreme standard deviations from
-the mean (either above or below) will be flagged as invalid. Defaults to 25.}
+\item{biv.z.wt.low.young}{Lower unrecentered CSD z-score cutoff for
+WEIGHTKG under one year of age (\code{ageyears < 1}). Weights with
+\code{sd.orig_uncorr < biv.z.wt.low.young} are flagged as standardized BIV.
+Defaults to -25.}
 
-\item{z.extreme}{Measurements with an absolute z-score greater than
-z.extreme will be flagged as invalid. Defaults to 25.}
+\item{biv.z.wt.low.old}{Lower unrecentered CSD z-score cutoff for
+WEIGHTKG at or above one year (\code{ageyears >= 1}). Weights with
+\code{sd.orig_uncorr < biv.z.wt.low.old} are flagged as standardized BIV.
+Defaults to -15.}
+
+\item{biv.z.wt.high}{Upper unrecentered CSD z-score cutoff for
+WEIGHTKG (all ages). Weights with \code{sd.orig_uncorr > biv.z.wt.high} are
+flagged as standardized BIV. Defaults to 22.}
+
+\item{biv.z.ht.low.young}{Lower unrecentered CSD z-score cutoff for
+HEIGHTCM under one year of age. Heights with
+\code{sd.orig_uncorr < biv.z.ht.low.young} are flagged as standardized BIV.
+Defaults to -25.}
+
+\item{biv.z.ht.low.old}{Lower unrecentered CSD z-score cutoff for
+HEIGHTCM at or above one year. Heights with
+\code{sd.orig_uncorr < biv.z.ht.low.old} are flagged as standardized BIV.
+Defaults to -15.}
+
+\item{biv.z.ht.high}{Upper unrecentered CSD z-score cutoff for HEIGHTCM
+(all ages). Heights with \code{sd.orig_uncorr > biv.z.ht.high} are flagged
+as standardized BIV. Defaults to 8 (tighter than the weight upper limit,
+based on analysis of CHOP data showing the ±15/±25 range was too loose
+for heights).}
+
+\item{biv.z.hc.low}{Lower unrecentered CSD z-score cutoff for HEADCM
+(all ages). Head-circumference values with
+\code{sd.orig_uncorr < biv.z.hc.low} are flagged as standardized BIV.
+Defaults to -15.}
+
+\item{biv.z.hc.high}{Upper unrecentered CSD z-score cutoff for HEADCM
+(all ages). Head-circumference values with
+\code{sd.orig_uncorr > biv.z.hc.high} are flagged as standardized BIV.
+Defaults to 15.}
 
 \item{error.load.mincount}{minimum count of exclusions on parameter before
 considering excluding all measurements. Defaults to 2.}

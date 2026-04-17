@@ -18,22 +18,34 @@ All of the following options may be set as additional parameters in the call to
 
 The following options change the behavior of the growthcleanr algorithm.
 
-- `sd.extreme` - default `25`; a very extreme value check on modified
-  (recentered) Z-scores used as a first-pass elimination of clearly implausible
-  values, often due to misplaced decimals.
+Step 7 (BIV, Biologically Implausible Values) exposes eight user-settable
+unrecentered CSD z-score cutoffs, one per parameter, direction, and (where
+applicable) age stratum. Defaults preserve the historical hardcoded thresholds.
 
-- `z.extreme` - default `25`; similar usage as `sd.extreme`, for absolute
-  Z-scores.
+- `biv.z.wt.low.young` - default `-25`; lower cutoff for WEIGHTKG at
+  `ageyears < 1`. Weights with `sd.orig_uncorr < biv.z.wt.low.young` are
+  flagged as standardized BIV.
+- `biv.z.wt.low.old` - default `-15`; lower cutoff for WEIGHTKG at
+  `ageyears >= 1`.
+- `biv.z.wt.high` - default `22`; upper cutoff for WEIGHTKG (all ages).
+- `biv.z.ht.low.young` - default `-25`; lower cutoff for HEIGHTCM at
+  `ageyears < 1`.
+- `biv.z.ht.low.old` - default `-15`; lower cutoff for HEIGHTCM at
+  `ageyears >= 1`.
+- `biv.z.ht.high` - default `8`; upper cutoff for HEIGHTCM (all ages). Tighter
+  than the weight upper default because analysis of CHOP data showed the
+  ±15/±25 range was too loose for heights.
+- `biv.z.hc.low` - default `-15`; lower cutoff for HEADCM (all ages).
+- `biv.z.hc.high` - default `15`; upper cutoff for HEADCM (all ages).
 
 **NOTE**: many different steps in the `growthcleanr` algorithm use highly
 refined techniques to identify implausible values that require more subtlety to
-detect. These default values for `sd.extreme` and `z.extreme` are set very high
-by design to eliminate completely implausible values early in the process; these
-extreme values require none of `growthcleanr`'s additional, more subtle
-approaches to be identified as exclusions. If `sd.extreme` and `z.extreme` are
-configured to be lower values, measurements eliminated at the early step which
-checks against these extreme values will not be further considered using later
-techniques.
+detect. The `biv.z.*` defaults are set very wide by design to eliminate only
+completely implausible values early in the process; these extreme values
+require none of `growthcleanr`'s additional, more subtle approaches to be
+identified as exclusions. If any `biv.z.*` cutoff is configured to a more
+restrictive value, measurements eliminated at the BIV step will not be
+considered further by later techniques.
 
 - `include.carryforward` - deprecated; use `cf_rescue` instead.
   `include.carryforward = TRUE` maps to `cf_rescue = "all"`.
