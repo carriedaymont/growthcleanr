@@ -114,15 +114,18 @@ parameter use `by = .(subjid, param)` groupings or explicit
 filtering. This design supports the cross-parameter
 comparisons (DOP) that are central to the child algorithm.
 
-***CF rescue:*** The child algorithm has a detailed
+***CF rescue:*** The child algorithm has a lookup-based
 carried-forward rescue system (Step 6) that attempts to
-distinguish genuinely repeated measurements from data entry
-artifacts. Rescue criteria are based on z-score similarity
-between the CF value and its originator, whether the
-measurement is in whole/half imperial units, the subject's
-age, and the length of the CF string. Rescued CFs are returned
-to "Include" status with the rescue reason stored in a
-separate `cf_rescued` column.
+distinguish genuinely repeated measurements from data-entry
+artifacts. In the default `cf_rescue = "standard"` mode,
+rescue thresholds vary by age bin, interval-from-originator
+bin, parameter, and rounding type (whole/half imperial vs.
+other); a CF is rescued when its absolute z-score difference
+from the originator falls below the lookup cell's threshold.
+`cf_rescue = "none"` and `cf_rescue = "all"` provide all-or-
+nothing behavior. Rescued CFs are returned to `Include` with
+the rescue reason stored in the separate `cf_rescued` column.
+See Step 6 and `cf-rescue-thresholds.md` for details.
 
 ***EWMA (Exponentially Weighted Moving Average):*** The
 central mechanism for detecting implausible values. For each
@@ -688,14 +691,24 @@ detection, which are re-added after).
 
 ### Carried-forward variables (Step 6)
 
-| Variable | Type | Created | Description |
-|----------|------|---------|-------------|
-| `cf_binary` | logical | Step 6 | TRUE if row is a carried-forward value |
-| `originator` | logical | Step 6 | TRUE for Include values whose next value is CF |
-| `cf_string_num` | integer | Step 6 | Sequential string number per subject-param |
-| `originator_z` | numeric | Step 6 | sd.orig_uncorr of the originator |
-| `cf_string_length` | integer | Step 6 | Number of CFs in the string |
-| `wholehalfimp` | logical | Step 6 | TRUE if measurement is in whole/half imperial units |
+All of these are internal Step 6 working columns; all are
+dropped before Step 6 exits (via `cols_to_drop_6` or earlier
+cleanup).
+
+| Variable | Type | Role |
+|----------|------|------|
+| `v.orig` | numeric | Copy of the raw measurement (created in Step 5, used in Step 6 detection). |
+| `wholehalfimp` | logical | TRUE if the measurement is in whole or half imperial units. Drives the rounding dimension of the rescue lookup. |
+| `cf_binary` | logical | TRUE if the row is currently `Exclude-C-CF`. Temp, cleaned mid-step. |
+| `originator` | logical | TRUE for an Include whose next row (subject/param/ageday sort order) is a CF. Temp, cleaned mid-step. |
+| `originator_seq` | integer | `cumsum(originator)` per subject-param. Temp, cleaned mid-step. |
+| `cf_string_num` / `cs` | integer | Sequential string number per subject-param. `cs` is the alias retained through the rescue phase. |
+| `originator_z` | numeric | The originator's `sd.orig_uncorr` z-score, propagated forward to its CFs. Temp, cleaned mid-step. |
+| `seq_win` | integer | Position within a CF string: `0` for originator, `1, 2, 3, ...` for subsequent CFs. |
+| `absdiff` | numeric | \|sd.orig_uncorr − originator_z\| for each CF. |
+| `ageday_has_include` | logical | TRUE if any row on the same (subjid, param, agedays) has `exclude == "Include"`. Restricts CF rescue eligibility (not originator assignment). |
+| `orig_ageday` | integer | The originator's agedays, propagated forward to its CFs. |
+| `cf_interval` | integer | `agedays − orig_ageday` for each CF. Drives the interval dimension of the rescue lookup. |
 
 ### EWMA variables (internal, not in output)
 
@@ -767,14 +780,12 @@ datasets cleaned by older versions.
 
 | Code | Meaning |
 |------|---------|
-| `""` (empty) | Not a carried-forward value, or CF not rescued |
-| `Rescued` | Single CF, z-score difference < 0.05 |
-| `Rescued-Imperial` | Single CF, z-score diff < 0.1, whole/half imperial |
-| `Rescued-Adol` | ≥2 CFs, teen age, z-score diff < 0.05 |
-| `Rescued-Adol-Imperial` | ≥2 CFs, teen age, z-score diff < 0.1, imperial |
+| `""` (empty) | Not a CF candidate, or CF not rescued (the row stays `Exclude-C-CF`) |
+| `Rescued` | CF rescued in standard mode — \|Δz\| below the lookup threshold for the row's (age bin, interval bin, param, rounding type) cell |
+| `Rescued-All` | CF rescued because `cf_rescue = "all"` |
 
 Rescued CFs have their `exclude` column set back to
-`"Include"` — the rescue reason is only preserved in the
+`"Include"`; the rescue reason is preserved only in the
 `cf_rescued` column.
 
 ---
@@ -1155,195 +1166,265 @@ the check has never fired in testing.
 | | |
 |---|---|
 | **Scope** | All parameters |
-| **Operates on** | Valid rows including temp SDEs, excluding single-measurement subject-params |
+| **Operates on** | Valid rows (including temp SDEs), restricted to subject-parameter combinations with at least one duplicate `v.orig` value |
 | **Prior step** | Step 5 (Temporary SDEs) |
 | **Next step** | Step 7 (BIV) |
 | **Exclusion code** | `Exclude-C-CF` |
-| **Rescue codes** | `Rescued`, `Rescued-Imperial`, `Rescued-Adol`, `Rescued-Adol-Imperial` (in `cf_rescued` column) |
-| **Code location** | See code |
-| **Controlled by** | `include.carryforward` parameter (if TRUE, skip entirely) |
+| **Rescue codes** | `Rescued`, `Rescued-All` (in `cf_rescued` column) |
+| **Code location** | `child_clean.R` ~lines 2565–2880 (CF logic), support helpers `.cf_rescue_lookup()` and `.cf_get_thresholds()` at ~lines 2297–2400 |
+| **Controlled by** | `cf_rescue` parameter (`"standard"` default / `"none"` / `"all"`); `cf_detail` parameter for optional diagnostic output columns |
 
 ### Overview
 
 A carried-forward (CF) value is a measurement identical to
 the measurement on the immediately prior day for the same
-subject and parameter. CFs typically represent data entry
-artifacts (copying the previous value) rather than true
-measurements. Step 6 identifies CFs, organizes them into
-strings (consecutive sequences), evaluates each for possible
-rescue based on z-score similarity, and either excludes or
-re-includes them.
+subject and parameter. CFs typically represent data-entry
+artifacts (copying the previous value forward) rather than
+independent re-measurements. Step 6 identifies CFs, organizes
+them into "strings" that start with a non-CF originator and
+continue through consecutive CFs, and then either leaves them
+excluded or rescues them back to `Include` based on the
+selected `cf_rescue` mode.
 
-The step has four phases:
-1. CF detection
-2. Temp SDE re-evaluation (after CFs removed)
-3. CF string construction and rescue evaluation
-4. SDE-Identical row restoration
+Three rescue modes:
+
+- `cf_rescue = "standard"` (default): use the age ×
+ interval × param × rounding deltaZ lookup implemented in
+ `.cf_rescue_lookup()` / `.cf_get_thresholds()`. A CF is
+ rescued when |Δz| = |sd.orig_uncorr − originator_z| is
+ below the lookup cell's threshold. Full threshold tables
+ are in `cf-rescue-thresholds.md`.
+- `cf_rescue = "none"`: no rescue. Every detected CF stays
+ `Exclude-C-CF`.
+- `cf_rescue = "all"`: every detected CF is rescued, even
+ CFs on a same-day SPA as another non-CF Include. Step 13
+ final-SDE resolution handles the resulting multi-Include
+ SPAs.
+
+An optional `cf_detail = TRUE` adds two diagnostic columns
+to the output:
+
+- `cf_status`: `NA` for non-candidates, `"CF-Resc"` for
+ rescued CFs, `"CF-NR"` for detected CFs that were not
+ rescued.
+- `cf_deltaZ`: |sd.orig_uncorr − originator_z| for every
+ CF candidate.
 
 ### Phase 1: CF detection
 
-**Pre-filtering:** Only subject-params with at least 2
-valid measurements AND at least one duplicate value
-(`uniqueN(v.orig) < .N`) are processed. This skip
-optimization is logged.
+**Pre-filter.** Detection runs only on subject-parameter
+combinations that have (a) more than one valid measurement
+(`.child_valid(data.df, include.temporary.extraneous = TRUE)`
+returns TRUE) and (b) at least one duplicate `v.orig` value
+(`uniqueN(v.orig) < .N`). Subject-params without duplicates
+skip CF detection entirely; their CF eligibility is logged.
 
-**CF logic:**
-1. Count values per `(subjid, param, agedays)` — days with
- multiple values (SDEs) are noted
-2. For each unique ageday per subject-param, find the prior
- ageday (via `shift(agedays, type = "lag")`)
-3. Get the measurement from the prior ageday — but ONLY if
- that day had exactly 1 value. If the prior day had
- multiple values (SDEs), `single_val` is set to NA,
- preventing CF matching.
-4. A row is CF if `prior_single_val` is not NA AND
- `v.orig == prior_single_val` (exact equality, no
- tolerance)
+**Detection logic.** For each (subjid, param) that passes the
+pre-filter:
 
-**Key constraint:** CFs are only detected against single-
-value prior days. This prevents false CF detection when a
-prior day has SDEs with different values, one of which
-happens to match.
+1. Count values per (subjid, param, agedays) — days with
+ multiple values (SDEs) are identified.
+2. For each unique ageday per subject-param, look up the
+ prior unique ageday with `shift(agedays, type = "lag")`.
+3. Extract the prior ageday's value, but only if that day
+ had exactly one measurement. Days with multiple values
+ set `single_val` to `NA`, which disables CF matching.
+4. A row is CF when `!is.na(prior_single_val) & v.orig ==
+ prior_single_val` — exact equality, no tolerance.
+
+Detected CFs have `exclude` set to `Exclude-C-CF` via
+`.child_exc(param, "CF")`.
+
+**Why only single-value prior days?** Prevents false CF
+detection when a prior day has an SDE group whose values
+happen to span the current day's measurement.
 
 ### Phase 2: Temp SDE re-evaluation
 
-After CFs are marked, the dataset's remaining valid
-measurements may have changed enough to affect which SDE
-value is most plausible. If any temp SDEs exist:
-1. Reset all `Exclude-C-Temp-Same-Day` back
- to `Include`
-2. Re-run `identify_temp_sde()` (the same
- function from Step 5) on the updated dataset
+If any rows are still `Exclude-C-Temp-Same-Day` after Phase
+1, their Step-5 selection may be stale now that some
+originally Include values on the same day have been
+excluded as CFs. Step 6 re-runs temp SDE resolution:
 
-This ensures SDE selection accounts for CF removals.
+1. Reset every `Exclude-C-Temp-Same-Day` row back to
+ `Include`.
+2. Re-run `identify_temp_sde()` on the updated data — the
+ same function used in Step 5. Because CF-excluded rows
+ are not valid, temp SDE selection now accounts for the
+ CF removals.
 
-### Phase 3: CF string construction and rescue
+### Phase 3: CF string construction
 
-**3a. wholehalfimp calculation:**
+**3a. `wholehalfimp` flag.** Row-level indicator of whether a
+measurement is in whole or half imperial units; drives the
+rounding dimension of the rescue lookup.
 
-Determines whether each measurement is in whole or half
-imperial units (row-level flag, not subject-level):
-- WEIGHTKG: `v.orig * 2.20462262 mod 1 < 0.01` (whole
- pounds)
-- HEIGHTCM: `v.orig / 2.54 mod 1 < 0.01` OR
- `v.orig / 2.54 mod 0.5 < 0.01` (whole or half inches)
-- HEADCM: same as HEIGHTCM
+- `WEIGHTKG`: `abs((v.orig * 2.20462262) %% 1) < 0.01`
+ (whole pounds)
+- `HEIGHTCM`: `abs((v.orig / 2.54) %% 0.5) < 0.01` (whole
+ or half inches)
+- `HEADCM`: same formula as `HEIGHTCM`
 
-Note: For HEIGHTCM/HEADCM, the `mod 1` check is redundant
-since `mod 0.5` is a superset. Not a bug.
+**3b. SDE-Identical temporary removal.** Rows flagged
+`Exclude-C-Identical` in Early Step 13 would break the
+positional string logic below (adjacent-row `shift()`
+operations, originator detection). They are moved out of
+`data.df` into `sde_identical_rows` and re-added in Phase 5
+after rescue.
 
-**3b. SDE-Identical temporary removal:**
+**3c. `ageday_has_include`.** Per (subjid, param, agedays),
+TRUE if any row on that day has `exclude == "Include"`. CFs
+on days that also have an Include are not eligible for
+rescue — rescuing them would create multiple Includes on the
+same day. Temp SDEs are treated as non-Include here, so they
+do not block CF rescue.
 
-SDE-Identical rows are temporarily removed from `data.df`
-before string construction. They would break the
-positional CF string logic (rle, originator detection).
-They are re-added after rescue processing.
+**3d. Positional string detection.** Per (subjid, param):
 
-**3c. Positional string detection:**
-
-1. `ageday_has_include`: For each
- `(subjid, param, agedays)`, TRUE if any row has
- `exclude == "Include"`. CFs on days that also have
- Includes are **not eligible for rescue**.
-
-2. `cf_binary`: TRUE for CF rows.
-
-3. `originator`: An Include row whose NEXT
- row (in subject-param order) is a CF. Any Include can
- be an originator regardless of `ageday_has_include`.
-
-4. `cf_string_num`: Sequential string
- number per subject-param. Assigned to originators first,
- then propagated forward through consecutive CFs (via a
- loop, the relevant code section). Propagation only reaches CFs
- where `ageday_has_include` is FALSE — CFs on days with
- Includes don't get string numbers and are not eligible
- for rescue.
-
-5. `originator_z`: The originator's
- `sd.orig_uncorr` z-score. Propagated alongside
+- `cf_binary`: TRUE for rows with `exclude ==
+ "Exclude-C-CF"`.
+- `originator`: TRUE for `Include` rows whose immediate next
+ row (in subject/param/ageday sort order) is `cf_binary ==
+ TRUE`. Any Include can be an originator regardless of its
+ own `ageday_has_include` value.
+- `cf_string_num` (alias `cs`): sequential string number
+ per subject-param; `cumsum(originator)` assigns the
+ originator's number, then a loop propagates it forward
+ through consecutive CFs. Propagation reaches a CF only
+ when `ageday_has_include == FALSE`, so CFs sharing a day
+ with an Include never receive a string number and are not
+ eligible for rescue.
+- `originator_z`: the originator's `sd.orig_uncorr`
+ (pre-GA-correction) z-score, propagated forward alongside
  `cf_string_num`.
+- `seq_win`: position within the string — `0` for the
+ originator, `1, 2, 3, ...` for subsequent CFs.
+- `absdiff`: |sd.orig_uncorr − originator_z| for each CF.
+- `orig_ageday`: the originator's agedays, propagated
+ forward to the string's CFs so that `cf_interval =
+ agedays − orig_ageday` (interval from originator, in
+ days) can be used as the interval bin for the rescue
+ lookup.
 
-6. `seq_win`: Position within the
- string — 0 for the originator, 1/2/3... for CFs.
+### Phase 4: Rescue evaluation
 
-7. `absdiff`: `|sd.orig_uncorr - originator_z|`
- — how far the CF's z-score is from the originator's.
+Rescue mode behavior:
 
-**3d. Rescue evaluation:**
+**`cf_rescue = "none"`.** No action; every detected CF
+stays `Exclude-C-CF`.
 
-Rescue is applied per `(subjid, param, cs)` group. Only
-CFs with valid `seq_win` AND `ageday_has_include == FALSE`
-are evaluated. Rescue criteria depend on string length:
+**`cf_rescue = "all"`.** Every row with `exclude ==
+"Exclude-C-CF"` is re-included: `cf_rescued := "Rescued-All"`,
+`exclude := "Include"`. Unlike standard mode, `"all"` does
+not apply the `ageday_has_include` check — a CF that shares
+an SPA with another Include is still rescued. This preserves
+the caller's "ignore CFs" intent: a CF consistent with the
+trajectory should not be preferentially excluded just
+because another value landed on the same day. Any multi-
+Include SPAs produced this way are resolved by Step 13 final
+SDE.
 
-**Single CF (`max(seq_win) == 1`):**
-- `absdiff < 0.05` → rescue code
- `Rescued`
-- `absdiff >= 0.05 & absdiff < 0.1 & wholehalfimp` →
- rescue code `Rescued-Imperial`
+**`cf_rescue = "standard"`** (default). Rescue considers
+only CFs that are eligible — `seq_win > 0` and
+`ageday_has_include == FALSE`. For each eligible CF,
+`.cf_get_thresholds()` looks up a deltaZ threshold using:
 
-**Multi-CF string (`max(seq_win) > 1`):**
-Only adolescents are eligible:
-- Female (`sex == 1`) age `>= 16` years, OR
- Male (`sex == 0`) age `>= 17` years
-- Same `absdiff` thresholds as single CF, with rescue
- codes `Rescued-Adol` and
- `Rescued-Adol-Imperial`
+- **Age bin** (from `agedays`): 0–3 mo, 3–6 mo, 6–12 mo,
+ 1–2 y, 2–5 y, 5–10 y, 10–15 y, 15–20 y.
+- **Interval bin** (from `cf_interval`): <1 wk,
+ 1 wk – 1 mo, 1–6 mo, 6 mo – 1 yr, >1 yr.
+- **Param** (`HEIGHTCM`, `WEIGHTKG`, `HEADCM`).
+- **Rounding type** (`wholehalfimp` + age ≥ 2 y →
+ `imperial`, otherwise `other`).
 
-**3e. Re-inclusion:**
+The CF is rescued when the lookup cell's threshold is
+non-NA, greater than zero, and `absdiff < threshold`. Cells
+with threshold `0` encode "no rescue" (NR); cells with
+threshold `NA` encode an impossible combination (e.g.
+imperial rounding for an age bin that shouldn't plausibly
+encounter it). Rescued CFs set `cf_rescued := "Rescued"`
+and `exclude := "Include"`.
 
-Rescued CFs have their rescue reason stored in
-`cf_rescued`, then `exclude` is set back to `"Include"`.
-This means rescued CFs participate in all downstream
-algorithm steps.
+Full threshold tables and the rationale for each cell are
+in `cf-rescue-thresholds.md`; the matrices themselves are
+in `.cf_rescue_lookup()` in `child_clean.R`.
 
-### Phase 4: Cleanup
+**HEADCM placeholder.** `.cf_rescue_lookup()` currently
+reuses HEIGHTCM's matrices for HEADCM pending HC-specific
+analysis (see the inline `# placeholder: use HT thresholds`
+comment in the helper).
 
-1. SDE-Identical rows are added back to `data.df` with
- `rbind(..., fill = TRUE)` and re-sorted
-2. `v.orig` and `wholehalfimp` are dropped (no longer
- needed)
+### Phase 5: SDE-Identical restoration, cf_detail, cleanup
 
-### Checklist findings
+1. **SDE-Identical restoration.** If `sde_identical_rows`
+ has rows, rbind them back into `data.df` (`fill = TRUE`)
+ and re-sort by (subjid, param, agedays, internal_id).
+2. **cf_detail columns.** When `cf_detail = TRUE`:
+ - `cf_status := "CF-Resc"` for rows with non-empty
+ `cf_rescued`; `"CF-NR"` for CF candidates that were not
+ rescued; `NA` otherwise.
+ - `cf_deltaZ := absdiff` for all CF candidates.
+3. **Drop temp columns.** `cols_to_drop_6` drops `v.orig`,
+ `wholehalfimp`, `seq_win`, `cs`, `absdiff`,
+ `ageday_has_include`, `orig_ageday`, `cf_interval` at the
+ end of Step 6.
 
-1. **Stale comments:** Large blocks of commented-out old
- dplyr/map_lgl CF logic remain. Should be removed. A
- comment says "non NNTE values" but nnte was removed —
- comment is stale.
-2. **Unnecessary variable:** `cf_string_length`
- is computed and immediately deleted. The
- rescue logic uses `max(seq_win)` instead. Should be
- removed.
-3. **Uncleaned variables:** `seq_win`, `cs`, `absdiff`,
- and `ageday_has_include` persist in `data.df` after
- Step 6 but are never used again. Should be added to
- `cols_to_drop_6`.
-4. **Redundant wholehalfimp check:** For HEIGHTCM/HEADCM,
- the `mod 1` check is a subset of the `mod 0.5` check.
- Not a bug but could be simplified.
-5. **Boundary: `absdiff < 0.05`** — strict less-than.
- A CF with exactly `absdiff == 0.05` is NOT rescued by
- the first criterion but IS eligible for the second
- (`>= 0.05 & < 0.1 & wholehalfimp`).
-6. **Boundary: teen age `>= 16` / `>= 17`** — inclusive.
- Exactly 16-year-old females and 17-year-old males are
- eligible for multi-CF rescue.
-7. **Edge case:** If `include.carryforward = TRUE`, the
- entire step is skipped, but `sde_identical_rows` is
- still initialized and the SDE-Identical
- restoration still runs (it's outside the
- `if` block). This is correct — SDE-Identicals were
- removed before Step 6 regardless.
-8. **`valid()` call:** Uses `include.temporary.extraneous
- = TRUE`, which is correct — temp SDEs should participate
- in CF detection (they might be CFs themselves).
-9. **Parameter scope:** All 3 parameters handled.
- wholehalfimp has HC-specific logic.
-10. **Factor levels:** All 4 rescue codes exist in
- `exclude.levels`. `Exclude-C-CF` also exists.
-11. **Sort order:** `setorder(cf_subset, subjid, param,
- agedays, id)` ensures deterministic CF
- detection order.
+### Checklist findings (2026-04-17 walk)
+
+1. **Sort determinism.** All sorts include `internal_id` as
+ the final tiebreaker: `setkey(data.df, subjid, param,
+ agedays, internal_id)` at the top of `cleanchild()`,
+ `cf_subset[order(subjid, param, agedays, internal_id)]`
+ inside the CF block, and
+ `data.df[order(subjid, param, agedays, internal_id)]`
+ after the SDE-Identical rbind.
+2. **Birth tiebreaking.** Step 6 does not perform
+ age-dependent tiebreaking. The birth vs non-birth rule
+ lives in Early Step 13 and Step 5.
+3. **Z-score correctness.** Detection uses `v.orig` (raw
+ measurement, exact equality). The originator z-score
+ and `absdiff` use `sd.orig_uncorr` (pre-GA-correction),
+ which is the correct reference-based raw z-score.
+4. **Dead code.** None found. Pre-2026-04-14 artifacts
+ (`cf_string_length`, `Rescued-Imperial`,
+ `Rescued-Adol{,-Imperial}`, commented-out dplyr/`map_lgl`
+ blocks) are all removed. The previously-dead
+ `cf_threshold` store on `data.df` was removed in this
+ walk (F17). The `run_cf_detection` optimization that
+ conditionally skipped the Step 6 body when `cf_rescue =
+ "all"` and `cf_detail = FALSE` was removed (F19);
+ detection and rescue now always run, producing consistent
+ `cf_rescued` labels regardless of `cf_detail`.
+5. **Exclusion code names.** `Exclude-C-CF` appears in
+ `exclude.levels.peds`. `Rescued` and `Rescued-All` are
+ the only values written to `cf_rescued`.
+6. **Column names.** `data.df`, `v.orig`, `sd.orig_uncorr`,
+ `tbc.sd`, `exclude` all match current conventions.
+7. **Configurable parameter defaults.** `cf_rescue =
+ "standard"` and `cf_detail = FALSE` match the defaults
+ documented in `gc-github-latest/CLAUDE.md`.
+8. **Step linkage.** Prior: Step 5 (Temporary SDEs); next:
+ Step 7 (BIV).
+9. **Grepl vs. exact matching.** Step 6 uses exact
+ equality throughout (`exclude == "Include"`, `exclude
+ == "Exclude-C-CF"`, etc.); no `grepl()` on exclusion
+ codes.
+10. **Inline comment accuracy.** Comments reviewed in this
+ walk; no stale references remain after F17 (removed
+ the stale "Store thresholds on data.df for cf_detail
+ output" comment alongside its dead assignment).
+11. **Stale content.** Removed the dead `cf_threshold`
+ store and updated this section to reflect the
+ 2026-04-14 lookup-based rescue design.
+12. **Threshold reconciliation.** `.cf_rescue_lookup()`
+ matrices match `cf-rescue-thresholds.md`; HEADCM reuses
+ HEIGHTCM as a known placeholder (flagged above).
+13. **`valid()` flags.** Phase 1 uses
+ `.child_valid(data.df, include.temporary.extraneous =
+ TRUE)` — correct. Temp SDEs are legitimate CF
+ candidates themselves.
+14. **DOP logic.** Step 6 does not use the designated
+ other parameter.
 
 ---
 

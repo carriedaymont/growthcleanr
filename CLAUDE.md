@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-github-latest (growthcleanr)
 
-**Last updated:** 2026-04-16 (added `debug` parameter to gate `ewma1_it1.*` columns; small dead-code cleanup: Step 17 inner if branch, adult `keeper_id`, `"temp extraneous"` filter; Step 15 Birth WT codes use `.child_exc()`)
+**Last updated:** 2026-04-17 (Session 4a CF walkthrough: removed run_cf_detection optimization; cf_rescue="all" now rescues every detected CF including shared-SPA ones, with Step 13 resolving multi-Include SPAs; HEADCM threshold placeholder moved to Known Issues; pre-session cleanup migrated D5/D6/D9+D10 to Known Issues → Open (wrapper) and fixed D4/D16 in child_clean.R)
 
 ## Overview
 
@@ -206,7 +206,10 @@ in the code comments but not reflected in the exclusion code.
 **Parameter:** `cf_rescue = c("standard", "none", "all")`
 - `"standard"` (default): age/interval/param-specific lookup thresholds
 - `"none"`: no rescue (all CFs excluded)
-- `"all"`: all CFs rescued (no CF exclusions)
+- `"all"`: every detected CF rescued, including CFs on an SPA that
+  also has another Include. Step 13 final-SDE resolution handles any
+  resulting multi-Include SPAs. Use when the caller wants to treat
+  CFs as plausible and let downstream SDE logic pick among candidates.
 
 **cf_rescued column values:**
 
@@ -407,7 +410,7 @@ Default: `"looser"`
 | `error.load.threshold` | 0.5 | Step 21 | Error ratio above this excludes all |
 | `sd.recenter` | NA | Recentering | Default uses built-in rcfile; pass a data.table for custom recentering |
 | `include.carryforward` | FALSE | Step 6 | **Deprecated** — use `cf_rescue` instead. If TRUE, skip CF detection entirely |
-| `cf_rescue` | `"standard"` | Step 6 | CF rescue mode: `"standard"` (age/interval/param-specific lookup), `"none"` (all CFs excluded), `"all"` (all CFs rescued) |
+| `cf_rescue` | `"standard"` | Step 6 | CF rescue mode: `"standard"` (age/interval/param-specific lookup), `"none"` (all CFs excluded), `"all"` (every detected CF rescued; Step 13 resolves any multi-Include SPAs) |
 | `cf_detail` | FALSE | Step 6 | If TRUE, add `cf_status` and `cf_deltaZ` columns to output |
 | `debug` | FALSE | Step 11, output | If TRUE, emit 6 `ewma1_it1.*` columns capturing EWMA values from the first iteration of Step 11 (EWMA1 Extreme), useful for diagnosing why a row was flagged. Off by default to keep standard output lean. |
 | `ewma_window` | 15 | EWMA steps | Max observations on each side for EWMA |
@@ -684,6 +687,16 @@ Requires installed package — see Known Issues. Run in background from Claude C
 - [ ] **LENGTHCM → HEIGHTCM:** No measurement adjustment for
   the ~0.5–0.7 cm supine/standing difference. Known
   limitation; future update planned.
+- [ ] **HEADCM CF rescue thresholds are HEIGHTCM-derived
+  (placeholder).** `.cf_rescue_lookup()` reuses the HEIGHTCM
+  `other` and `imperial` matrices for HEADCM, with an inline
+  `# placeholder: use HT thresholds` comment. The 100K
+  synthetic tracker population used to derive the current
+  thresholds (see `__Pipeline/CF-exploration/cf-threshold-schemes.md`)
+  did not include HC. HC-specific thresholds would require a
+  dedicated derivation study on a synthetic HC population.
+  Decision deferred; HT thresholds are a reasonable starting
+  point given similar reference-standard structure.
 - **`parallel = TRUE` requires installed package.** Will fail
   with `load_all()` only — workers need `system.file()` access
   to extdata. Install with `devtools::install_local(".")` first.
@@ -726,6 +739,40 @@ degrade on large/unusual datasets. No blocking issues found.
   ~lines 291-292, 559): O(n²) pattern — `exc_ids <- c(exc_ids, new_id)`.
   Negligible for typical subject sizes but could slow down
   on subjects with thousands of measurements.
+
+### Open (wrapper)
+
+Deferred from walkthrough sessions 1–3 (2026-04-16):
+
+- [ ] **`cleangrowth()` `@return` roxygen incomplete.** Roxygen
+  lists only part of the returned data.table's columns. The
+  actual return also includes `internal_id, subjid, agedays,
+  sex, line, bin_exclude, tri_exclude`, conditional columns
+  (`cf_status`/`cf_deltaZ` under `cf_detail=TRUE`, `ewma1_it1.*`
+  under `debug=TRUE`), and internal working columns (`v`,
+  `v_adult`, `measurement`, `age_years`, `newbatch`, `sd.corr`,
+  `sd.orig_uncorr`, `z.orig`, `uncorr`, `potcorr`). Before
+  updating the roxygen, decide which internal columns should
+  be dropped from output vs. kept as part of the public
+  contract, then align `@return` to the final schema.
+- [ ] **Partial-run output row ordering.** `cleangrowth()` in
+  partial-run mode rbinds changed-subject output to cached
+  output and sorts by `internal_id`. Because `internal_id` is
+  reassigned 1..K over only the changed-subject input and
+  collides with 1..N in `cached_results`, the resulting
+  whole-dataset row order is deterministic but semantically
+  meaningless. Per-row data is correct. Acceptable as-is;
+  if revisited, sort by user `id` (contract-guaranteed unique)
+  or renumber `internal_id` after rbind.
+- [ ] **Velocity reference tables not in `gc_preload_refs()`.**
+  `tanner_ht_vel` is loaded once per `cleangrowth()` call;
+  WHO velocity tables (`who_ht_vel_for_age`,
+  `who_hc_vel_for_age`) are loaded once per batch inside
+  `cleanchild()`. Both are tiny (< 1 kB each gzipped) and the
+  `fread()` calls are fast, so correctness is unaffected.
+  Extension: add the three tables to `gc_preload_refs()` and
+  plumb optional parameters through `cleangrowth()` /
+  `cleanchild()`; keep existing `fread()` fallbacks.
 
 ### Open (adult)
 

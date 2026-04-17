@@ -37,10 +37,14 @@ run_child_subset <- function(n_subjects, ...) {
 # (Test 1 and Test 2 removed — legacy algorithm removed in v3.0.0)
 
 # ---------------------------------------------------------------------------
-# Test 3: include.carryforward controls whether CFs are kept or excluded
+# Test 3: include.carryforward controls CF rescue behavior (deprecated alias
+# for cf_rescue).
 #
-# include.carryforward = TRUE means "keep CFs in output" (don't exclude them)
-# include.carryforward = FALSE (default) means CFs are excluded
+# include.carryforward = TRUE  → cf_rescue = "all"
+#   Every detected CF is rescued (no Exclude-C-CF in output). Step 13
+#   final-SDE resolution handles any resulting multi-Include SPAs.
+# include.carryforward = FALSE → cf_rescue = "standard" (default)
+#   Excludes CFs unless the lookup threshold rescues them.
 # ---------------------------------------------------------------------------
 test_that("include.carryforward = TRUE keeps CFs, FALSE excludes them", {
 

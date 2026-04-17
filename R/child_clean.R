@@ -1035,18 +1035,24 @@ cleangrowth <- function(subjid,
     # define field names needed by helper functions
     ewma.fields <- c('ewma.all', 'ewma.before', 'ewma.after')
 
-    # 3.  SD-score recentering: Because the basis of the method is comparing SD-scores over time, we need to account for the fact that
-    #     the mean SD-score for the population changes with age.
-    # a.	Determine the median cdc*sd for each parameter by year of age (with sexes combined): median*sd.
-    # b.	The median*sd should be considered to apply to midyear-age, defined as the age in days with the same value as the integer
-    #     portion of (365.25*year + 365.25/2).
-    # c.	Linearly interpolate median*sd for each parameter between each midyear-age, naming the interpolated values rc*sd.
-    # d.	For ages below the first midyear-age, let rc*sd equal the median*sd for the earliest year.
-    #     For ages above the last midyear_age, let rc*sd equal the median*sd for the last year.
-    # e.	Subtract rcsd_* from SDorig to create the recentered SD-score.  This recentered SD-score, labeled tbc*sd
-    #     (stands for "to be cleaned") will be used for most of the rest of the analyses.
-    # f.	In future steps I will sometimes refer to measprev and measnext which refer to the previous or next wt or ht measurement
-    #     for which exc_*==0 for the subject and parameter, when the data are sorted by subject, parameter, and agedays. SDprev and SDnext refer to the tbc*sd of the previous or next measurement.
+    # SD-score recentering
+    #
+    # The code below reads a precomputed recentering file
+    # (rcfile-2023-08-15_format.csv.gz) and subtracts its per-
+    # (param, sex, agedays) median SD-score from sd.orig to produce
+    # tbc.sd (and from sd.corr to produce ctbc.sd). Recentering is
+    # needed because the population mean SD-score changes with age.
+    #
+    # The rcfile itself was built once using the procedure implemented
+    # in sd_median() (see that function for the current-day code):
+    #   a. Determine the median sd.orig for each param by year of age
+    #      (sexes combined).
+    #   b. Treat each year's median as applying to midyear-age (day
+    #      floor(365.25 * year + 365.25 / 2)).
+    #   c. Linearly interpolate between midyear medians by day of age;
+    #      clamp to the earliest/latest year-median outside the covered
+    #      range.
+    # Users can override with a custom sd.recenter data.table if desired.
 
     if (!quietly)
       message(sprintf("[%s] Re-centering data...", Sys.time()))
@@ -1992,31 +1998,35 @@ get_dop <- function(param_name){
 }
 
 # temporary extraneous ----
-#' Function for temporary extraneous (step 5):
-#' 5.  Temporary extraneous: I use extraneous to refer to more than more than one recorded value for a parameter on the same day,
-#'     and we need to select which one to include in our analysis. The overall strategy will be to select a measurement using a simple
-#'     strategy that will be used temporarily, and select permanently in a later step after we have a somewhat cleaner dataset that
-#'     can help us identify the best extraneous.
-#' a.  For subjects/parameters with extraneous: Determine median_tbc*sd for both parameters: the median tbc*sd for each subject
-#'     and parameter including only non-extraneous values with exc_*==0. The median of the same parameter as the extraneous will
-#'     be referred to as median_tbc*sd, the median of the other parameter will be referred to as median_tbcOsd.
-#' b.	For each subject/parameter with extraneous and at least one value for the subject/parameter on a day with no extraneous,
-#'     select the value closest to the median_tbc*sd for temporary inclusion, and assign all other extraneous exc_*=2.
-#'  i.	For each subject/parameter with extraneous and no values for the subject/parameter on a day with no extraneous, select the
-#'     value closest to the median_tbcOsd for temporary inclusion, and assign all other extraneous exc_*=2.
-#'     If median_tbcOsd is missing because there are no values for the other parameter, randomly choose one extraneous value for
-#'     each subject/parameter/age to keep as exc_*=0 and replace exc_*=2 for all other extraneous for that subject/parameter/age.
+#' Identify temporary SDE (same-day extraneous) "losers" for Step 5 and
+#' Step 13.
+#'
+#' For each (subjid, param, agedays) group with more than one valid
+#' measurement, selects one value to keep temporarily and flags the
+#' remainder for exclusion. Selection uses the recentered z-score
+#' (tbc.sd) and two per-subject reference points:
+#'   median.spz  - median of tbc.sd for the same (subjid, param),
+#'                 taken over valid rows (all non-excluded
+#'                 measurements).
+#'   median.dopz - median of tbc.sd for the subject's designated other
+#'                 parameter (DOP). In Step 13, earlier temp SDEs are
+#'                 optionally excluded from this median via the
+#'                 exclude_from_dop_ids argument; in Step 5 no temp
+#'                 SDEs exist yet.
+#'
+#' For each SDE group, the kept row is the one whose tbc.sd is closest
+#' to median.spz, provided the subject has at least one non-SDE day.
+#' Otherwise the row closest to median.dopz is kept. If no DOP data
+#' exists for the subject, one row is chosen at random.
+#'
+#' Returns a logical vector in the caller's original row order; the
+#' caller sets flagged rows to 'Exclude-C-Temp-Same-Day'.
 #'
 #' @keywords internal
 #' @noRd
-# Identifies which rows in a same-day duplicate group should be marked as the
-# temporary-SDE "losers" (i.e., not the value to keep). Returns a logical
-# vector in the caller's original row order; the caller is responsible for
-# setting those rows to 'Exclude-C-Temp-Same-Day'.
-#
-# Note: Identical values are removed earlier (Early Step 13 SDE-Identicals),
-# so by the time identify_temp_sde() runs, all same-day values in a given
-# (subjid, param, agedays) group are dissimilar.
+# Identical same-day values are removed earlier (Early Step 13
+# SDE-Identicals), so by the time identify_temp_sde() runs, all same-day
+# values in a given (subjid, param, agedays) group are dissimilar.
 
 identify_temp_sde <- function(df, exclude_from_dop_ids = NULL) {
   # exclude_from_dop_ids: in Step 13, temp SDEs should be excluded from the
@@ -2557,282 +2567,278 @@ cleanchild <- function(data.df,
   # Initialize sde_identical_rows before CF block so it exists when referenced later
   sde_identical_rows <- data.df[0]  # Empty data.table with same structure
 
-  # Run CF detection unless cf_rescue = "all" and cf_detail is off (no need to detect)
-  run_cf_detection <- !(cf_rescue == "all" && !cf_detail)
+  if (!quietly)
+    message(sprintf(
+    "[%s] Exclude measurements carried forward...",
+      Sys.time()
+  ))
 
-  if (run_cf_detection) {
-    if (!quietly)
-      message(sprintf(
-      "[%s] Exclude measurements carried forward...",
-        Sys.time()
-    ))
+  # Only run CF detection on valid values with >1 measurement per subject-param
+  sp_multi <- data.df[, .(is_multi = .N > 1), by = .(subjid, param)]
+  not_single <- sp_multi[data.df, on = .(subjid, param), is_multi]
+  valid_set <- .child_valid(data.df, include.temporary.extraneous = TRUE) &
+    not_single
+  data.sub <- data.df[valid_set,]
 
-    # Only run CF detection on valid values with >1 measurement per subject-param
-    sp_multi <- data.df[, .(is_multi = .N > 1), by = .(subjid, param)]
-    not_single <- sp_multi[data.df, on = .(subjid, param), is_multi]
-    valid_set <- .child_valid(data.df, include.temporary.extraneous = TRUE) &
-      not_single
-    data.sub <- data.df[valid_set,]
+  # Pre-filter to subject-params with potential CFs
+  # CF requires duplicate values - if all values unique, skip CF processing entirely
+  # This excludes SDE-Identicals from consideration (already handled in early Step 13)
+  data.sub[, sp_key := paste0(subjid, "_", param)]
+  sp_has_dups <- data.sub[, .(has_dup_vals = uniqueN(v.orig) < .N), by = sp_key]
+  sp_with_potential_cf <- sp_has_dups[has_dup_vals == TRUE, sp_key]
+  n_total_sp <- uniqueN(data.sub$sp_key)
+  n_with_cf <- length(sp_with_potential_cf)
+  if (!quietly)
+    message(sprintf("  CF pre-filter: %d/%d subject-params have potential CFs (%.1f%%)",
+                n_with_cf, n_total_sp, 100*n_with_cf/n_total_sp))
 
-    # Pre-filter to subject-params with potential CFs
-    # CF requires duplicate values - if all values unique, skip CF processing entirely
-    # This excludes SDE-Identicals from consideration (already handled in early Step 13)
-    data.sub[, sp_key := paste0(subjid, "_", param)]
-    sp_has_dups <- data.sub[, .(has_dup_vals = uniqueN(v.orig) < .N), by = sp_key]
-    sp_with_potential_cf <- sp_has_dups[has_dup_vals == TRUE, sp_key]
-    n_total_sp <- uniqueN(data.sub$sp_key)
-    n_with_cf <- length(sp_with_potential_cf)
-    if (!quietly)
-      message(sprintf("  CF pre-filter: %d/%d subject-params have potential CFs (%.1f%%)",
-                  n_with_cf, n_total_sp, 100*n_with_cf/n_total_sp))
+  # Initialize cf=FALSE for all, only process those with potential CFs
+  data.sub[, cf := FALSE]
 
-    # Initialize cf=FALSE for all, only process those with potential CFs
-    data.sub[, cf := FALSE]
+  # Only process subject-params with duplicate values
+  if (length(sp_with_potential_cf) > 0) {
+    cf_subset <- data.sub[sp_key %in% sp_with_potential_cf]
+    # Add id for consistent SDE order
+    cf_subset <- cf_subset[order(subjid, param, agedays, internal_id)]
 
-    # Only process subject-params with duplicate values
-    if (length(sp_with_potential_cf) > 0) {
-      cf_subset <- data.sub[sp_key %in% sp_with_potential_cf]
-      # Add id for consistent SDE order
-      cf_subset <- cf_subset[order(subjid, param, agedays, internal_id)]
+    # CF detection: compare each value to the prior ageday's single value.
+    # Only compare if the prior ageday has exactly ONE value — if there are
+    # multiple values (SDEs) on the prior day, skip the CF comparison.
 
-      # CF detection: compare each value to the prior ageday's single value.
-      # Only compare if the prior ageday has exactly ONE value — if there are
-      # multiple values (SDEs) on the prior day, skip the CF comparison.
+    # Step 1: Count values per (subjid, param, ageday)
+    day_counts <- cf_subset[, .(n_on_day = .N), by = .(subjid, param, agedays)]
 
-      # Step 1: Count values per (subjid, param, ageday)
-      day_counts <- cf_subset[, .(n_on_day = .N), by = .(subjid, param, agedays)]
+    # Step 2: Get unique agedays per subject-param, then find prior ageday for each
+    unique_days <- unique(cf_subset[, .(subjid, param, agedays)])
+    setorder(unique_days, subjid, param, agedays)
+    unique_days[, prior_ageday := shift(agedays, type = "lag"), by = .(subjid, param)]
 
-      # Step 2: Get unique agedays per subject-param, then find prior ageday for each
-      unique_days <- unique(cf_subset[, .(subjid, param, agedays)])
-      setorder(unique_days, subjid, param, agedays)
-      unique_days[, prior_ageday := shift(agedays, type = "lag"), by = .(subjid, param)]
+    # Step 3: Get the value from each unique (subjid, param, ageday) where count == 1
+    # For days with >1 value, we set prior_val to NA so CF check fails
+    single_val_days <- cf_subset[, .(
+      single_val = if (.N == 1) v.orig[1] else NA_real_
+    ), by = .(subjid, param, agedays)]
 
-      # Step 3: Get the value from each unique (subjid, param, ageday) where count == 1
-      # For days with >1 value, we set prior_val to NA so CF check fails
-      single_val_days <- cf_subset[, .(
-        single_val = if (.N == 1) v.orig[1] else NA_real_
-      ), by = .(subjid, param, agedays)]
+    # Step 4: Merge prior_ageday into cf_subset
+    cf_subset[unique_days, prior_ageday := i.prior_ageday, on = .(subjid, param, agedays)]
 
-      # Step 4: Merge prior_ageday into cf_subset
-      cf_subset[unique_days, prior_ageday := i.prior_ageday, on = .(subjid, param, agedays)]
+    # Step 5: Look up the single value from prior ageday
+    cf_subset[single_val_days, prior_single_val := i.single_val,
+             on = .(subjid, param, prior_ageday = agedays)]
 
-      # Step 5: Look up the single value from prior ageday
-      cf_subset[single_val_days, prior_single_val := i.single_val,
-               on = .(subjid, param, prior_ageday = agedays)]
+    # Step 6: CF = TRUE if prior day had exactly 1 value AND current matches it.
+    # Uses exact equality (no numeric tolerance).
+    cf_subset[, cf := !is.na(prior_single_val) & v.orig == prior_single_val]
 
-      # Step 6: CF = TRUE if prior day had exactly 1 value AND current matches it.
-      # Uses exact equality (no numeric tolerance).
-      cf_subset[, cf := !is.na(prior_single_val) & v.orig == prior_single_val]
-
-      # Merge cf results back to data.sub by index
-      data.sub[cf_subset, cf := i.cf, on = "index"]
-    }
-    # End of pre-filter if block - subject-params without potential CFs already have cf=FALSE
-
-    # Cleanup temp columns
-    data.sub[, sp_key := NULL]
-
-    # Merge CF flags back to data.df
-    cf_idx <- data.sub$index[data.sub$cf]
-    data.df[index %in% cf_idx, exclude := .child_exc(param, "CF")]
-
-    # Check if CFs exist before rescue processing.
-    # This optimization skips rescue logic if no CFs are present.
-    any_cf <- any(data.df$exclude == "Exclude-C-CF")
-    if (!quietly)
-      message(sprintf("  CF rescue pre-filter: CFs exist = %s", any_cf))
-
-    # Only process CF rescue if CFs exist
-    if (any_cf) {
-
-    # Redo temporary SDEs after CF identification: temp SDEs should be
-    # re-evaluated now that CFs are excluded.
-    any_sde <- any(data.df$exclude == "Exclude-C-Temp-Same-Day")
-
-    if (any_sde) {
-      # Temporarily convert Temp SDEs back to Include for re-evaluation.
-      data.df[exclude == "Exclude-C-Temp-Same-Day", exclude := "Include"]
-
-      # Re-run temp SDE logic (now CFs are excluded, so SDE evaluation will differ)
-      data.df$exclude[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-C-Temp-Same-Day'
-    }
-
-    # Determine if measurements are in whole or half imperial units (row-level flag)
-    # WEIGHTKG: whole pounds; HEIGHTCM/HEADCM: whole or half inches
-    # Tolerance: 0.01 of the imperial unit
-    data.df[, wholehalfimp := FALSE]
-    data.df[param == "WEIGHTKG",
-            wholehalfimp := abs((v.orig * 2.20462262) %% 1) < 0.01]
-    data.df[param == "HEIGHTCM",
-            wholehalfimp := abs((v.orig / 2.54) %% 0.5) < 0.01]
-    data.df[param == "HEADCM",
-            wholehalfimp := abs((v.orig / 2.54) %% 0.5) < 0.01]
-
-    # SDE-Identicals break multiple parts of the CF logic (rle, originator
-    # detection, cs assignment) so temporarily remove them, do CF calculations,
-    # then add them back after CF rescue below.
-    sde_identical_rows <- data.df[exclude == "Exclude-C-Identical"]
-    data.df <- data.df[!exclude == "Exclude-C-Identical"]
-
-    # CFs on days that also have at least one Include are NOT eligible for
-    # rescue and are excluded from string detection. ageday_has_include only
-    # checks for Includes (temp SDEs do not block CF rescue eligibility).
-    data.df[, ageday_has_include := any(as.character(exclude) == "Include"),
-            by = c("subjid", "param", "agedays")]
-
-    # POSITIONAL STRING DETECTION
-    # Originators are Includes where the NEXT value is a CF. Strings propagate
-    # forward (originator, then consecutive CFs) until interrupted by a non-CF.
-    # The ageday_has_include check restricts CF rescue eligibility only; it does
-    # not disqualify originators.
-
-    # Initialize variables
-    data.df[, cf_binary := exclude == "Exclude-C-CF"]
-
-    # Process by subject-param to maintain ordering
-    data.df[, ':=' (
-      nextcf = shift(cf_binary, type = "lead", fill = FALSE),
-      priorcf = shift(cf_binary, type = "lag", fill = FALSE),
-      originator = FALSE,
-      cf_string_num = NA_integer_,
-      originator_z = NA_real_
-    ), by = c("subjid", "param")]
-
-    # Identify originators: Include where next value is a CF
-    # Any Include can be an originator - ageday_has_include only restricts CF rescue eligibility
-    data.df[exclude == "Include" & nextcf == TRUE, originator := TRUE]
-
-    # Assign sequential string numbers to originators (per subject-param)
-    data.df[, originator_seq := cumsum(originator), by = c("subjid", "param")]
-    data.df[originator == TRUE, cf_string_num := originator_seq]
-
-    # Store originator z-scores (uncorrected, pre-GA-correction).
-    data.df[originator == TRUE, originator_z := sd.orig_uncorr]
-
-    # Get max number of CFs to determine loop iterations
-    max_cf_count <- data.df[cf_binary == TRUE, .N, by = c("subjid", "param")]
-    max_iterations <- if (nrow(max_cf_count) > 0) max(max_cf_count$N) else 0
-
-    # Propagate string numbers and originator z-scores forward to consecutive CFs
-    # Only propagate to CFs that are eligible (not on days with includes)
-    if (max_iterations > 0) {
-      for (i in 1:max_iterations) {
-        data.df[, ':=' (
-          cf_string_num = ifelse(
-            cf_binary == TRUE &
-            (ageday_has_include == FALSE | is.na(ageday_has_include)) &
-            is.na(cf_string_num),
-            shift(cf_string_num, type = "lag"),
-            cf_string_num
-          ),
-          originator_z = ifelse(
-            cf_binary == TRUE &
-            (ageday_has_include == FALSE | is.na(ageday_has_include)) &
-            is.na(originator_z),
-            shift(originator_z, type = "lag"),
-            originator_z
-          )
-        ), by = c("subjid", "param")]
-      }
-    }
-
-    # Create seq_win variable (position in string: 0 for originator, 1/2/3... for CFs)
-    data.df[, seq_win := NA_integer_]
-    data.df[originator == TRUE, seq_win := 0]
-    data.df[!is.na(cf_string_num) & cf_binary == TRUE,
-            seq_win := seq_len(.N),
-            by = c("subjid", "param", "cf_string_num")]
-
-    # Create cs variable for compatibility with rescue code logic
-    data.df[, cs := cf_string_num]
-
-    # Calculate absdiff (absolute z-score difference from originator)
-    data.df[!is.na(seq_win), absdiff := abs(sd.orig_uncorr - originator_z)]
-
-    # Clean up temporary variables
-    data.df[, c("cf_binary", "nextcf", "priorcf",
-                "originator", "originator_seq", "cf_string_num", "originator_z") := NULL]
-
-    # CF rescue: use age/interval/param-specific lookup thresholds
-    # CFs with ageday_has_include are already excluded from cs/seq_win assignment
-    # (they stay excluded regardless of rescue mode)
-
-    # Compute interval_days for each CF: agedays - prior_ageday
-    # We need the originator's ageday for each CF string
-    # Reconstruct: originator is seq_win == 0, CFs are seq_win > 0
-    # For each CF, the originator's ageday is the ageday of the row with seq_win == 0 in the same cs group
-    data.df[, orig_ageday := NA_integer_]
-    data.df[seq_win == 0, orig_ageday := agedays]
-    # Propagate originator ageday forward within each string (same approach as originator_z)
-    if (max_iterations > 0) {
-      for (i in 1:max_iterations) {
-        data.df[, orig_ageday := ifelse(
-          !is.na(cs) & seq_win > 0 & is.na(orig_ageday),
-          shift(orig_ageday, type = "lag"),
-          orig_ageday
-        ), by = c("subjid", "param")]
-      }
-    }
-
-    # For CFs, interval = agedays - originator agedays
-    # (This is the interval from the originator, which is the measurement being compared to)
-    data.df[!is.na(seq_win) & seq_win > 0, cf_interval := agedays - orig_ageday]
-
-    if (cf_rescue == "none") {
-      # No rescue: all CFs stay excluded
-      if (!quietly) message("  CF rescue mode: none (all CFs excluded)")
-
-    } else if (cf_rescue == "all") {
-      # Rescue everything: all CFs re-included
-      cf_mask <- !is.na(data.df$seq_win) & data.df$seq_win > 0 &
-                 (data.df$ageday_has_include == FALSE | is.na(data.df$ageday_has_include))
-      if (any(cf_mask)) {
-        data.df[cf_mask, cf_rescued := "Rescued-All"]
-        data.df[cf_mask, exclude := "Include"]
-        if (!quietly)
-          message(sprintf("  CF rescue mode: all (%d measurements re-included)", sum(cf_mask)))
-      }
-
-    } else {
-      # Standard rescue: use lookup table thresholds
-      cf_lookup <- .cf_rescue_lookup()
-
-      # Get thresholds for all CF rows
-      cf_rows <- !is.na(data.df$seq_win) & data.df$seq_win > 0 &
-                 (data.df$ageday_has_include == FALSE | is.na(data.df$ageday_has_include))
-
-      if (any(cf_rows)) {
-        cf_dt <- data.df[cf_rows, .(index, agedays, cf_interval, param, wholehalfimp, absdiff)]
-        cf_dt[, cf_threshold := .cf_get_thresholds(
-          agedays = agedays,
-          interval_days = cf_interval,
-          param = as.character(param),
-          wholehalfimp = wholehalfimp,
-          lookup = cf_lookup
-        )]
-
-        # Rescue if absdiff < threshold (threshold > 0)
-        # NR cells have threshold = 0: no rescue (absdiff >= 0 is always true)
-        # NA threshold (impossible cell): treat as NR (no rescue)
-        cf_dt[, rescued := !is.na(cf_threshold) & cf_threshold > 0 & absdiff < cf_threshold]
-
-        # Apply rescues back to data.df
-        rescued_idx <- cf_dt[rescued == TRUE, index]
-        if (length(rescued_idx) > 0) {
-          data.df[index %in% rescued_idx, cf_rescued := "Rescued"]
-          data.df[index %in% rescued_idx, exclude := "Include"]
-          if (!quietly)
-            message(sprintf("  CF rescue: %d measurements re-included (lookup thresholds)",
-                        length(rescued_idx)))
-        }
-
-        # Store thresholds on data.df for cf_detail output
-        data.df[cf_dt, cf_threshold := i.cf_threshold, on = "index"]
-      }
-    }
-
-    } # End if (any_cf)
+    # Merge cf results back to data.sub by index
+    data.sub[cf_subset, cf := i.cf, on = "index"]
   }
+  # End of pre-filter if block - subject-params without potential CFs already have cf=FALSE
+
+  # Cleanup temp columns
+  data.sub[, sp_key := NULL]
+
+  # Merge CF flags back to data.df
+  cf_idx <- data.sub$index[data.sub$cf]
+  data.df[index %in% cf_idx, exclude := .child_exc(param, "CF")]
+
+  # Check if CFs exist before rescue processing.
+  # This optimization skips rescue logic if no CFs are present.
+  any_cf <- any(data.df$exclude == "Exclude-C-CF")
+  if (!quietly)
+    message(sprintf("  CF rescue pre-filter: CFs exist = %s", any_cf))
+
+  # Only process CF rescue if CFs exist
+  if (any_cf) {
+
+  # Redo temporary SDEs after CF identification: temp SDEs should be
+  # re-evaluated now that CFs are excluded.
+  any_sde <- any(data.df$exclude == "Exclude-C-Temp-Same-Day")
+
+  if (any_sde) {
+    # Temporarily convert Temp SDEs back to Include for re-evaluation.
+    data.df[exclude == "Exclude-C-Temp-Same-Day", exclude := "Include"]
+
+    # Re-run temp SDE logic (now CFs are excluded, so SDE evaluation will differ)
+    data.df$exclude[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-C-Temp-Same-Day'
+  }
+
+  # Determine if measurements are in whole or half imperial units (row-level flag)
+  # WEIGHTKG: whole pounds; HEIGHTCM/HEADCM: whole or half inches
+  # Tolerance: 0.01 of the imperial unit
+  data.df[, wholehalfimp := FALSE]
+  data.df[param == "WEIGHTKG",
+          wholehalfimp := abs((v.orig * 2.20462262) %% 1) < 0.01]
+  data.df[param == "HEIGHTCM",
+          wholehalfimp := abs((v.orig / 2.54) %% 0.5) < 0.01]
+  data.df[param == "HEADCM",
+          wholehalfimp := abs((v.orig / 2.54) %% 0.5) < 0.01]
+
+  # SDE-Identicals break multiple parts of the CF logic (rle, originator
+  # detection, cs assignment) so temporarily remove them, do CF calculations,
+  # then add them back after CF rescue below.
+  sde_identical_rows <- data.df[exclude == "Exclude-C-Identical"]
+  data.df <- data.df[!exclude == "Exclude-C-Identical"]
+
+  # CFs on days that also have at least one Include are NOT eligible for
+  # rescue and are excluded from string detection. ageday_has_include only
+  # checks for Includes (temp SDEs do not block CF rescue eligibility).
+  data.df[, ageday_has_include := any(as.character(exclude) == "Include"),
+          by = c("subjid", "param", "agedays")]
+
+  # POSITIONAL STRING DETECTION
+  # Originators are Includes where the NEXT value is a CF. Strings propagate
+  # forward (originator, then consecutive CFs) until interrupted by a non-CF.
+  # The ageday_has_include check restricts CF rescue eligibility only; it does
+  # not disqualify originators.
+
+  # Initialize variables
+  data.df[, cf_binary := exclude == "Exclude-C-CF"]
+
+  # Process by subject-param to maintain ordering
+  data.df[, ':=' (
+    nextcf = shift(cf_binary, type = "lead", fill = FALSE),
+    priorcf = shift(cf_binary, type = "lag", fill = FALSE),
+    originator = FALSE,
+    cf_string_num = NA_integer_,
+    originator_z = NA_real_
+  ), by = c("subjid", "param")]
+
+  # Identify originators: Include where next value is a CF
+  # Any Include can be an originator - ageday_has_include only restricts CF rescue eligibility
+  data.df[exclude == "Include" & nextcf == TRUE, originator := TRUE]
+
+  # Assign sequential string numbers to originators (per subject-param)
+  data.df[, originator_seq := cumsum(originator), by = c("subjid", "param")]
+  data.df[originator == TRUE, cf_string_num := originator_seq]
+
+  # Store originator z-scores (uncorrected, pre-GA-correction).
+  data.df[originator == TRUE, originator_z := sd.orig_uncorr]
+
+  # Get max number of CFs to determine loop iterations
+  max_cf_count <- data.df[cf_binary == TRUE, .N, by = c("subjid", "param")]
+  max_iterations <- if (nrow(max_cf_count) > 0) max(max_cf_count$N) else 0
+
+  # Propagate string numbers and originator z-scores forward to consecutive CFs
+  # Only propagate to CFs that are eligible (not on days with includes)
+  if (max_iterations > 0) {
+    for (i in 1:max_iterations) {
+      data.df[, ':=' (
+        cf_string_num = ifelse(
+          cf_binary == TRUE &
+          (ageday_has_include == FALSE | is.na(ageday_has_include)) &
+          is.na(cf_string_num),
+          shift(cf_string_num, type = "lag"),
+          cf_string_num
+        ),
+        originator_z = ifelse(
+          cf_binary == TRUE &
+          (ageday_has_include == FALSE | is.na(ageday_has_include)) &
+          is.na(originator_z),
+          shift(originator_z, type = "lag"),
+          originator_z
+        )
+      ), by = c("subjid", "param")]
+    }
+  }
+
+  # Create seq_win variable (position in string: 0 for originator, 1/2/3... for CFs)
+  data.df[, seq_win := NA_integer_]
+  data.df[originator == TRUE, seq_win := 0]
+  data.df[!is.na(cf_string_num) & cf_binary == TRUE,
+          seq_win := seq_len(.N),
+          by = c("subjid", "param", "cf_string_num")]
+
+  # Create cs variable for compatibility with rescue code logic
+  data.df[, cs := cf_string_num]
+
+  # Calculate absdiff (absolute z-score difference from originator)
+  data.df[!is.na(seq_win), absdiff := abs(sd.orig_uncorr - originator_z)]
+
+  # Clean up temporary variables
+  data.df[, c("cf_binary", "nextcf", "priorcf",
+              "originator", "originator_seq", "cf_string_num", "originator_z") := NULL]
+
+  # CF rescue: use age/interval/param-specific lookup thresholds
+  # CFs with ageday_has_include are already excluded from cs/seq_win assignment
+  # (they stay excluded regardless of rescue mode)
+
+  # Compute interval_days for each CF: agedays - prior_ageday
+  # We need the originator's ageday for each CF string
+  # Reconstruct: originator is seq_win == 0, CFs are seq_win > 0
+  # For each CF, the originator's ageday is the ageday of the row with seq_win == 0 in the same cs group
+  data.df[, orig_ageday := NA_integer_]
+  data.df[seq_win == 0, orig_ageday := agedays]
+  # Propagate originator ageday forward within each string (same approach as originator_z)
+  if (max_iterations > 0) {
+    for (i in 1:max_iterations) {
+      data.df[, orig_ageday := ifelse(
+        !is.na(cs) & seq_win > 0 & is.na(orig_ageday),
+        shift(orig_ageday, type = "lag"),
+        orig_ageday
+      ), by = c("subjid", "param")]
+    }
+  }
+
+  # For CFs, interval = agedays - originator agedays
+  # (This is the interval from the originator, which is the measurement being compared to)
+  data.df[!is.na(seq_win) & seq_win > 0, cf_interval := agedays - orig_ageday]
+
+  if (cf_rescue == "none") {
+    # No rescue: all CFs stay excluded
+    if (!quietly) message("  CF rescue mode: none (all CFs excluded)")
+
+  } else if (cf_rescue == "all") {
+    # Rescue every detected CF, including CFs on a SPA that also has a
+    # non-CF Include. This is the "ignore CFs" / legacy-compatible mode:
+    # a CF that is consistent with the trajectory should not be
+    # preferentially excluded just because another value landed on the
+    # same day. Step 13 final SDE resolution handles any resulting
+    # multi-Include SPAs on downstream.
+    cf_mask <- data.df$exclude == "Exclude-C-CF"
+    if (any(cf_mask)) {
+      data.df[cf_mask, cf_rescued := "Rescued-All"]
+      data.df[cf_mask, exclude := "Include"]
+      if (!quietly)
+        message(sprintf("  CF rescue mode: all (%d measurements re-included)", sum(cf_mask)))
+    }
+
+  } else {
+    # Standard rescue: use lookup table thresholds
+    cf_lookup <- .cf_rescue_lookup()
+
+    # Get thresholds for all CF rows
+    cf_rows <- !is.na(data.df$seq_win) & data.df$seq_win > 0 &
+               (data.df$ageday_has_include == FALSE | is.na(data.df$ageday_has_include))
+
+    if (any(cf_rows)) {
+      cf_dt <- data.df[cf_rows, .(index, agedays, cf_interval, param, wholehalfimp, absdiff)]
+      cf_dt[, cf_threshold := .cf_get_thresholds(
+        agedays = agedays,
+        interval_days = cf_interval,
+        param = as.character(param),
+        wholehalfimp = wholehalfimp,
+        lookup = cf_lookup
+      )]
+
+      # Rescue if absdiff < threshold (threshold > 0)
+      # NR cells have threshold = 0: no rescue (absdiff >= 0 is always true)
+      # NA threshold (impossible cell): treat as NR (no rescue)
+      cf_dt[, rescued := !is.na(cf_threshold) & cf_threshold > 0 & absdiff < cf_threshold]
+
+      # Apply rescues back to data.df
+      rescued_idx <- cf_dt[rescued == TRUE, index]
+      if (length(rescued_idx) > 0) {
+        data.df[index %in% rescued_idx, cf_rescued := "Rescued"]
+        data.df[index %in% rescued_idx, exclude := "Include"]
+        if (!quietly)
+          message(sprintf("  CF rescue: %d measurements re-included (lookup thresholds)",
+                      length(rescued_idx)))
+      }
+    }
+  }
+
+  } # End if (any_cf)
 
   # Add SDE-Identical rows back after CF rescue
   if (nrow(sde_identical_rows) > 0) {
@@ -2868,7 +2874,7 @@ cleanchild <- function(data.df,
   # wholehalfimp: only used in CF exclusion logic (Step 6)
   cols_to_drop_6 <- intersect(
     c("v.orig", "wholehalfimp", "seq_win", "cs", "absdiff", "ageday_has_include",
-      "orig_ageday", "cf_interval", "cf_threshold"),
+      "orig_ageday", "cf_interval"),
     names(data.df)
   )
   if (length(cols_to_drop_6) > 0L) data.df[, (cols_to_drop_6) := NULL]

@@ -61,7 +61,9 @@ run_gc <- function(d, ...) {
 # age/interval/param/rounding cell. Three modes:
 #   cf_rescue = "standard" (default) — age/interval/param lookup thresholds
 #   cf_rescue = "none"     — no rescue (all CFs excluded)
-#   cf_rescue = "all"      — all CFs rescued (no CF exclusions)
+#   cf_rescue = "all"      — every detected CF rescued (including CFs on a
+#                            SPA with another Include; Step 13 resolves the
+#                            resulting multi-Include SPAs)
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
@@ -124,10 +126,15 @@ test_that("CF rescue: all mode rescues all CFs", {
 
   res <- run_gc(.d200, cf_rescue = "all")
 
-  # No CF exclusion codes should remain
+  # No CF exclusion codes should remain — every detected CF is rescued.
   n_cf <- sum(grepl("-CF$", res$exclude))
   expect_equal(n_cf, 0,
                info = "cf_rescue='all' should leave no CF exclusions")
+
+  # Rescued rows should have the Rescued-All label.
+  n_rescued_all <- sum(res$cf_rescued == "Rescued-All")
+  expect_gt(n_rescued_all, 0,
+            label = "Rescued-All count in cf_rescue='all'")
 })
 
 
