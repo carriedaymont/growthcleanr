@@ -242,7 +242,7 @@ cleanadult <- function(df,
     # resolution happens later in Step 9H.
     if (nrow(h_subj_df) > 0) {
       h_subj_df <- temp_sde(h_subj_df)
-      h_extraneous[h_subj_df$internal_id[h_subj_df$extraneous]] <- TRUE
+      h_extraneous[as.character(h_subj_df$internal_id[h_subj_df$extraneous])] <- TRUE
     }
 
     # =========================================================================
@@ -319,7 +319,7 @@ cleanadult <- function(df,
     if (nrow(w_subj_df) > 0) {
       w_subj_df <- temp_sde(w_subj_df, ptype = "weight")
       w_subj_df <- redo_identify_rv(w_subj_df)
-      w_extraneous[w_subj_df$internal_id[w_subj_df$extraneous]] <- TRUE
+      w_extraneous[as.character(w_subj_df$internal_id[w_subj_df$extraneous])] <- TRUE
     }
 
     # --- 4W: Scale Max (Weight Cap) ---
