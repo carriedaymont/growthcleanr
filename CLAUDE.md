@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-github-latest (growthcleanr)
 
-**Last updated:** 2026-04-17 (Session 6 Step 11 EWMA1 walkthrough: removed dead `debug` parameter and `ewma1_it1.*` capture block — the block never populated any columns because EWMA fields lived inside a per-group closure that only returned `exclude`, confirmed empirically on stress data. Rewrote Step 11 code header block from changelog-style to current-state rationale; replaced Stata-notation `exc_*==0`/`exc_*==2` comments; removed "Fixed cdewma sign" historical comment; `lowest id` → `lowest internal_id` in worst-row comment. Added explicit 11a/11b/11c sub-sections (pre-filter / iteration loop / end-of-step temp SDE refresh) in code and narrative. Step 11 narrative rewritten for current-state only; Code-location cell now names file and functions; stale Checklist items 1–3 dropped and renumbered; added "Configurable parameters in scope for Step 11" subsection. Session 4b Step 7 BIV walkthrough: replaced dead `sd.extreme`/`z.extreme` parameters with 8 per-cell `biv.z.*` parameters; rewrote Step 7 narrative for "current state only"; fixed Stata-style 7d comment and inaccurate "overwrites non-temp codes" note; documented that full child permissiveness framework is deferred until after v3.0.0 and that `Child-growthcleanr-permissiveness-specs.md` is to be ignored during walkthroughs/reconciliation. Session 4a: removed run_cf_detection optimization; cf_rescue="all" now rescues every detected CF including shared-SPA ones, with Step 13 resolving multi-Include SPAs; HEADCM threshold placeholder moved to Known Issues; pre-session cleanup migrated D5/D6/D9+D10 to Known Issues → Open (wrapper) and fixed D4/D16 in child_clean.R)
+**Last updated:** 2026-04-17 (Step naming convention: all step references prefixed with "Child" or "Adult", and headers use name-first format like "EWMA1: Extreme EWMA (Child Step 11)" — applied across both algorithm narratives and both CLAUDE.mds. Session 6 Child Step 11 EWMA1 walkthrough: removed dead `debug` parameter and `ewma1_it1.*` capture block — the block never populated any columns because EWMA fields lived inside a per-group closure that only returned `exclude`, confirmed empirically on stress data. Rewrote Child Step 11 code header block from changelog-style to current-state rationale; replaced Stata-notation `exc_*==0`/`exc_*==2` comments; removed "Fixed cdewma sign" historical comment; `lowest id` → `lowest internal_id` in worst-row comment. Added explicit 11a/11b/11c sub-sections (pre-filter / iteration loop / end-of-step temp SDE refresh) in code and narrative. Child Step 11 narrative rewritten for current-state only; Code-location cell now names file and functions; stale Checklist items 1–3 dropped and renumbered; added "Configurable parameters in scope for Child Step 11" subsection. Session 4b Child Step 7 BIV walkthrough: replaced dead `sd.extreme`/`z.extreme` parameters with 8 per-cell `biv.z.*` parameters; rewrote Child Step 7 narrative for "current state only"; fixed Stata-style 7d comment and inaccurate "overwrites non-temp codes" note; documented that full child permissiveness framework is deferred until after v3.0.0 and that `Child-growthcleanr-permissiveness-specs.md` is to be ignored during walkthroughs/reconciliation. Session 4a: removed run_cf_detection optimization; cf_rescue="all" now rescues every detected CF including shared-SPA ones, with Child Step 13 resolving multi-Include SPAs; HEADCM threshold placeholder moved to Known Issues; pre-session cleanup migrated D5/D6/D9+D10 to Known Issues → Open (wrapper) and fixed D4/D16 in child_clean.R)
 
 ## Overview
 
@@ -75,7 +75,7 @@ This CLAUDE.md covers both the child and adult algorithms.
   no measurement adjustment — known limitation)
 - Age cutpoint split (pediatric vs. adult)
 - Z-score calculation (CSD method, WHO/CDC blending)
-- GA correction (Step 2b) for potcorr subjects
+- GA correction (Child Step 2b) for potcorr subjects
 - Recentering → tbc.sd and ctbc.sd
 - Missing value identification
 - Batching and dispatch to `cleanchild()`
@@ -172,7 +172,7 @@ the data (the `param` column). The `.child_exc()` helper
 function (line ~142 of `child_clean.R`) generates these codes:
 `.child_exc(reason)` → `Exclude-C-{reason}`.
 
-| Code | Step | Param | Description |
+| Code | Child Step | Param | Description |
 |------|------|-------|-------------|
 | `Include` | — | All | Value passes all checks |
 | `Exclude-Missing` | Init | All | NA, NaN, agedays < 0; also HC ≥ 5y |
@@ -215,7 +215,7 @@ in the code comments but not reflected in the exclusion code.
 - `"standard"` (default): age/interval/param-specific lookup thresholds
 - `"none"`: no rescue (all CFs excluded)
 - `"all"`: every detected CF rescued, including CFs on an SPA that
-  also has another Include. Step 13 final-SDE resolution handles any
+  also has another Include. Child Step 13 final-SDE resolution handles any
   resulting multi-Include SPAs. Use when the caller wants to treat
   CFs as plausible and let downstream SDE logic pick among candidates.
 
@@ -242,13 +242,13 @@ in `__Pipeline/CF-exploration/cf-threshold-schemes.md`.
 ## Complete List of Steps (child algorithm)
 
 Step numbers are not consecutive — they align with the Stata
-implementation. Steps 3, 4, 8, 10, 12, 14, 18, 20 either
+implementation. Child Steps 3, 4, 8, 10, 12, 14, 18, 20 either
 do not exist or are handled within other steps.
 
-| Step | Name | Brief description |
+| Child Step | Name | Brief description |
 |------|------|-------------------|
 | (preprocessing) | Z-score calculation | WHO/CDC CSD z-scores, blending, rounding |
-| (preprocessing) | Step 2b: GA correction | Fenton-based correction for potcorr subjects |
+| (preprocessing) | GA correction (Child Step 2b) | Fenton-based correction for potcorr subjects |
 | (preprocessing) | Recentering | Subtract population medians → tbc.sd/ctbc.sd |
 | Early 13 | SDE-Identicals | Remove same-day identical values before CF detection |
 | 5 | Temporary SDE | Temporarily flag same-day duplicates |
@@ -304,9 +304,9 @@ is used for all internal sorting and named vector indexing
 11Wa 2D Ord WT → 11Wa2 2D Non-Ord WT → 11Wb Moderate EWMA →
 13 Distinct 1D → 14 Error Load
 
-**There is no Step 12W.**
+**There is no Adult Step 12W.**
 
-| Step | Name | Brief description |
+| Adult Step | Name | Brief description |
 |------|------|-------------------|
 | 1H/1W | BIV | Biologically implausible value exclusion (HT, WT, BMI) |
 | 2W | RV markers | Mark repeated values for linked mode |
@@ -328,7 +328,7 @@ is used for all internal sorting and named vector indexing
 
 #### Non-SDE Codes
 
-| Code | Step | Description |
+| Code | Adult Step | Description |
 |------|------|-------------|
 | `Include` | — | Not excluded |
 | `Exclude-A-BIV` | 1H/1W | Biologically implausible value (height or weight) |
@@ -363,7 +363,7 @@ rename. Trajectory codes no longer include the loop iteration.
 
 #### SDE Codes
 
-| Code | Steps | Description |
+| Code | Adult Steps | Description |
 |------|-------|-------------|
 | `Exclude-A-Identical` | 9H/10W | Same-day identical values (keep one) |
 | `Exclude-A-Extraneous` | 9H/10W | Same-day non-identical value (SDE loser) |
@@ -412,20 +412,20 @@ Default: `"looser"`
 
 | Parameter | Default | Used in | Description |
 |-----------|---------|---------|-------------|
-| `biv.z.wt.low.young` | -25 | Step 7 | Lower unrecentered CSD z cutoff for WEIGHTKG at `ageyears < 1` |
-| `biv.z.wt.low.old` | -15 | Step 7 | Lower unrecentered CSD z cutoff for WEIGHTKG at `ageyears >= 1` |
-| `biv.z.wt.high` | 22 | Step 7 | Upper unrecentered CSD z cutoff for WEIGHTKG (all ages) |
-| `biv.z.ht.low.young` | -25 | Step 7 | Lower unrecentered CSD z cutoff for HEIGHTCM at `ageyears < 1` |
-| `biv.z.ht.low.old` | -15 | Step 7 | Lower unrecentered CSD z cutoff for HEIGHTCM at `ageyears >= 1` |
-| `biv.z.ht.high` | 8 | Step 7 | Upper unrecentered CSD z cutoff for HEIGHTCM (all ages) |
-| `biv.z.hc.low` | -15 | Step 7 | Lower unrecentered CSD z cutoff for HEADCM (all ages) |
-| `biv.z.hc.high` | 15 | Step 7 | Upper unrecentered CSD z cutoff for HEADCM (all ages) |
-| `error.load.mincount` | 2 | Step 21 | Min exclusions before evaluating error load |
-| `error.load.threshold` | 0.5 | Step 21 | Error ratio above this excludes all |
+| `biv.z.wt.low.young` | -25 | Child Step 7 | Lower unrecentered CSD z cutoff for WEIGHTKG at `ageyears < 1` |
+| `biv.z.wt.low.old` | -15 | Child Step 7 | Lower unrecentered CSD z cutoff for WEIGHTKG at `ageyears >= 1` |
+| `biv.z.wt.high` | 22 | Child Step 7 | Upper unrecentered CSD z cutoff for WEIGHTKG (all ages) |
+| `biv.z.ht.low.young` | -25 | Child Step 7 | Lower unrecentered CSD z cutoff for HEIGHTCM at `ageyears < 1` |
+| `biv.z.ht.low.old` | -15 | Child Step 7 | Lower unrecentered CSD z cutoff for HEIGHTCM at `ageyears >= 1` |
+| `biv.z.ht.high` | 8 | Child Step 7 | Upper unrecentered CSD z cutoff for HEIGHTCM (all ages) |
+| `biv.z.hc.low` | -15 | Child Step 7 | Lower unrecentered CSD z cutoff for HEADCM (all ages) |
+| `biv.z.hc.high` | 15 | Child Step 7 | Upper unrecentered CSD z cutoff for HEADCM (all ages) |
+| `error.load.mincount` | 2 | Child Step 21 | Min exclusions before evaluating error load |
+| `error.load.threshold` | 0.5 | Child Step 21 | Error ratio above this excludes all |
 | `sd.recenter` | NA | Recentering | Default uses built-in rcfile; pass a data.table for custom recentering |
-| `include.carryforward` | FALSE | Step 6 | **Deprecated** — use `cf_rescue` instead. If TRUE, skip CF detection entirely |
-| `cf_rescue` | `"standard"` | Step 6 | CF rescue mode: `"standard"` (age/interval/param-specific lookup), `"none"` (all CFs excluded), `"all"` (every detected CF rescued; Step 13 resolves any multi-Include SPAs) |
-| `cf_detail` | FALSE | Step 6 | If TRUE, add `cf_status` and `cf_deltaZ` columns to output |
+| `include.carryforward` | FALSE | Child Step 6 | **Deprecated** — use `cf_rescue` instead. If TRUE, skip CF detection entirely |
+| `cf_rescue` | `"standard"` | Child Step 6 | CF rescue mode: `"standard"` (age/interval/param-specific lookup), `"none"` (all CFs excluded), `"all"` (every detected CF rescued; Child Step 13 resolves any multi-Include SPAs) |
+| `cf_detail` | FALSE | Child Step 6 | If TRUE, add `cf_status` and `cf_deltaZ` columns to output |
 | `ewma_window` | 15 | EWMA steps | Max observations on each side for EWMA |
 | `adult_cutpoint` | 20 | Preprocessing | Age (years) dividing pediatric/adult |
 | `quietly` | TRUE | All | Suppress progress messages |
@@ -437,7 +437,7 @@ Default: `"looser"`
 ### gc_preload_refs() and partial runs (cached_results)
 
 Canonical documentation for both features lives in
-`child-gc-narrative-2026-04-13.md` under "Partial runs and
+`wrapper-narrative-2026-04-17.md` under "Partial runs and
 preloaded references" (in the Batching and Dispatch section).
 Quick reference:
 
@@ -529,7 +529,7 @@ the adult algorithm, which always keeps the highest id.
 ### Designated Other Parameter (DOP)
 
 Weight's DOP is height; height's DOP is weight; HC's DOP is
-height. Used in Steps 5, 6, 11, 13, 15, 19 for cross-parameter
+height. Used in Child Steps 5, 6, 11, 13, 15, 19 for cross-parameter
 plausibility checks.
 
 ### data.table reference semantics
@@ -736,13 +736,13 @@ Deferred from walkthrough sessions 1–3 (2026-04-16):
 See git history for full details on each fix.
 
 - **Pre-walkthrough cleanup (2026-04-16):** Resolved deferred
-  walkthrough items: Step 17 dead inner `if (count_exclude >= 1)`
+  walkthrough items: Child Step 17 dead inner `if (count_exclude >= 1)`
   branch collapsed; adult dead `keeper_id` removed (2 locations);
   adult dead `"temp extraneous"` filter removed in `eval_2d_nonord()`;
-  Step 15 Birth WT block now uses `.child_exc(param, "Traj")` for
+  Child Step 15 Birth WT block now uses `.child_exc(param, "Traj")` for
   consistency with surrounding code (was 4 hardcoded literals).
   (The `debug` parameter added in this round was subsequently
-  removed during the Step 11 walkthrough — the capture block
+  removed during the Child Step 11 walkthrough — the capture block
   was dead code that never populated the promised columns.)
 - **Doc/dead-code cleanup (2026-04-16):** Deleted 6 orphaned
   man pages for removed extdata files. Removed dead `nnte`
@@ -804,7 +804,7 @@ A full child permissiveness framework (analogous to the
 adult 4-level system) is **deferred until after v3.0.0 is
 released**. For v3.0.0, child parameters are exposed as
 individual user-settable scalars (e.g., the eight
-`biv.z.*` Step 7 cutoffs added 2026-04-17), not as
+`biv.z.*` Child Step 7 cutoffs added 2026-04-17), not as
 permissiveness presets.
 
 `Child-growthcleanr-permissiveness-specs.md` contains
@@ -976,39 +976,63 @@ Things that have caused bugs before or fail silently:
 
 ---
 
-## Child Narrative Document
+## Algorithm Narrative Documents
 
-The technical narrative for the child algorithm is in
-`child-gc-narrative-2026-03-18.md` (in gc-github-latest).
-It documents what the current R code does, serving as both
-a debugging aid and long-term reference.
+Three companion narratives document the package. All live in
+`gc-github-latest/`.
+
+| Narrative | Scope |
+|---|---|
+| `wrapper-narrative-2026-04-17.md` | `cleangrowth()` public interface, preprocessing (incl. Child Step 2b GA correction), z-score calculation pipeline (CSD, WHO/CDC blending, recentering), batching, dispatch, output reassembly, wrapper-level configurable parameters, canonical Code Review Checklist |
+| `child-gc-narrative-2026-04-13.md` | Child algorithm cleaning steps (Child Steps 5, 6, 7, 9, 11, 13, 15/16, 17, 19, 21, 22), child-specific concepts (DOP, `.child_valid()`, EWMA, CF rescue), child-specific variables, child exclusion codes, brief Z-Score Summary pointing to wrapper |
+| `adult-algorithm-narrative.md` | Adult algorithm cleaning steps (Adult Steps 1, 2W, 3, 4W, 9Wa/9H/9Wb, 10H/10W, 11H/11Wa/11Wa2/11Wb, 13, 14), permissiveness framework, rounding tolerance |
+
+The two algorithm narratives reference the wrapper narrative
+for shared material (input format, z-score mechanics,
+batching, the code review checklist) so the same content does
+not need to be maintained in three places.
 
 ### Status
 
-**Front matter: COMPLETE.** Covers Key Concepts, Architecture,
-Data Requirements, Z-Score Infrastructure, Working/Output
-Dataframe, Variable Glossary, Output Format (with full
-exclusion code tables), Configurable Parameters, and Complete
-List of Steps.
+**Wrapper narrative: extraction pass complete (Pass 1b,
+2026-04-17).** All wrapper-level material has been moved out
+of the child narrative and into a dedicated file. The
+`cleangrowth()` line-by-line walkthrough and output
+reassembly mechanics are deferred to a fill-in pass (Pass 2).
 
-**Step-by-step documentation: COMPLETE for all steps.**
-Steps 5, 6, 7, 9, 11, 13, 15, 16, 17, 19, 21, 22 all
+**Child narrative: COMPLETE for all walked steps.** Child
+Steps 5, 6, 7, 9, 11, 13, 15/16, 17, 19, 21, 22 all
 documented with summary tables, overview, logic details,
 rationale, and code review checklist findings.
 
-**Open questions and issues:** Tracked in the narrative's
-"Open Questions and Issues to Investigate" section. Items
-marked `[x]` are resolved; `[ ]` items are still open.
+**Adult narrative: COMPLETE.** Adult algorithm closed pending
+clinician validation; do not modify without checking with
+Carrie first.
+
+**Open questions and issues:** Tracked inline in each
+narrative's "Open Questions" or "Checklist findings"
+sections. Items marked `[x]` are resolved; `[ ]` items are
+still open.
 
 ### Structure
 
-Each step section includes:
+Each step or phase section includes:
 - Summary table (scope, prior/next step, exclusion codes)
 - Overview
 - Key terms and variable names
 - Logic and implementation
 - Rationale for selected decisions
-- Code review checklist findings (12-point checklist)
+- Code review checklist findings (12-point checklist; the
+  canonical checklist itself lives in the wrapper narrative)
+
+### Step naming convention
+
+All step references are prefixed with "Child" or "Adult".
+Headers use name-first format: `## EWMA1: Extreme EWMA
+(Child Step 11)`, `## Moderate EWMA (Adult Step 11Wb)`.
+Inline references: `Child Step N`, `Adult Step NX`,
+`Child Steps 15/16`. See the 2026-04-17 entry in the
+"Last updated" header for the rationale.
 
 ---
 

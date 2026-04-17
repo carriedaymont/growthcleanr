@@ -1,5 +1,26 @@
 # Adult Growthcleanr Algorithm Narrative
 
+This narrative documents the adult algorithm cleaning steps
+(Adult Steps 1, 2W, 3, 4W, 9Wa/9H/9Wb, 10H/10W,
+11H/11Wa/11Wa2/11Wb, 13, 14).
+
+**Wrapper-level material lives in
+`wrapper-narrative-2026-04-17.md`:** the `cleangrowth()` public
+interface, input format, unit conversion, batching, dispatch,
+output reassembly, the canonical **Code review checklist**, and
+cross-algorithm working-dataframe differences (the adult
+algorithm's copies-into-shrinking-dataframes pattern is
+contrasted there with the child algorithm's single-`data.df`
+pattern).
+
+The adult algorithm does not use z-scores or CSD calculations —
+it works with raw measurements (and BMI computed internally for
+some thresholds). The Z-Score Infrastructure section in the
+wrapper narrative is therefore not load-bearing for the adult
+algorithm but may be useful context for cross-algorithm work.
+
+---
+
 ## Key concepts
 
 ***EWMA:*** Exponentially Weighted Moving Average — a weighted average of a subject's other weight measurements, where measurements closer in time receive exponentially more weight. The exponent is e=−5, making the nearest neighbor almost entirely dominant; this is closer to a near-neighbor comparison than a traditional moving average. Three variants are computed for each observation: `ewma_all` (all other values), `ewma_before` (excluding the immediately preceding value), and `ewma_after` (excluding the immediately following value). The before/after variants are used as confirmation — a value is only excluded when the overall and both directional deviations agree. Edge values (first/last in subject) have only one neighbor, so before/after falls back to `ewma_all`. Window parameter `ewma_window` (default 15) limits how many observations on each side contribute.
@@ -21,19 +42,19 @@ All threshold comparisons in the algorithm apply a **0.12 unit tolerance** (cm f
 The tolerance makes all threshold comparisons slightly more permissive: a value must exceed a limit by more than 0.12 to be excluded. For example, if the BIV minimum height is 50 cm, a recorded value of 49.9 cm is not excluded (it is within 0.12 of the threshold). When comparing two measured values (e.g., height difference in a band check), the tolerance is applied once (0.12), not doubled.
 
 **Where tolerance is applied:**
-- BIV limits (Step 1): value vs fixed min/max thresholds
-- Weight cap EWMA checks (Step 4W): `dewma_all` vs 50 kg; `dewma_before`/`dewma_after` vs 45 kg (0.9 factor applied to 50 kg base); adjacency diffs vs 50 kg
-- Evil twins caps (Step 9Wa): weight difference vs dynamic cap
-- Extreme EWMA (Step 9Wb): dewma vs dynamic threshold
-- Height distinct (Steps 10Ha/10Hb): band checks, gain/loss direction and rescue
-- Weight 2D ordered and non-ordered (Steps 11Wa/11Wa2): weight difference vs wtallow
-- Moderate EWMA (Step 11Wb): dewma vs wtallow (standard and alternate pathways)
-- 1D limits (Step 13): value vs fixed min/max thresholds
+- BIV limits (Adult Step 1): value vs fixed min/max thresholds
+- Weight cap EWMA checks (Adult Step 4W): `dewma_all` vs 50 kg; `dewma_before`/`dewma_after` vs 45 kg (0.9 factor applied to 50 kg base); adjacency diffs vs 50 kg
+- Evil twins caps (Adult Step 9Wa): weight difference vs dynamic cap
+- Extreme EWMA (Adult Step 9Wb): dewma vs dynamic threshold
+- Height distinct (Adult Steps 10Ha/10Hb): band checks, gain/loss direction and rescue
+- Weight 2D ordered and non-ordered (Adult Steps 11Wa/11Wa2): weight difference vs wtallow
+- Moderate EWMA (Adult Step 11Wb): dewma vs wtallow (standard and alternate pathways)
+- 1D limits (Adult Step 13): value vs fixed min/max thresholds
 
 **Where tolerance is NOT applied:**
 - BMI thresholds (derived from ht+wt; 0.12 in either produces <0.1 BMI unit change)
 - Perclimit ratio checks (conversion factors cancel in ratios)
-- Error load ratio (Step 14; count-based, not measurement-based)
+- Error load ratio (Adult Step 14; count-based, not measurement-based)
 - Exact equality checks (RV identification, SDE identical detection — same conversion applied uniformly, so identical inputs produce identical outputs)
 
 ---
@@ -85,11 +106,11 @@ Parameters NOT controlled by permissiveness: `scale_max_lbs` (default Inf), `ewm
 
 ***For the most part, HT and WT are evaluated separately, although there are some shared steps. See separate tables for HT and WT steps below.***
 
-***Step numbering is not sequential. Steps 5–8 and 12W are not present in the algorithm; numbering is preserved for consistency with prior documentation.***
+***Adult Step numbering is not sequential. Adult Steps 5–8 and 12W are not present in the algorithm; numbering is preserved for consistency with prior documentation.***
 
 Height steps (include steps shared by HT and WT):
 
-| Step # | Step title | Brief description |
+| Adult Step # | Adult Step title | Brief description |
 |--------|-----------|-------------------|
 | 1H | BIV | Exclude biologically implausible heights |
 | 3H | Temp SDE | Temporarily flag same-day height duplicates |
@@ -99,7 +120,7 @@ Height steps (include steps shared by HT and WT):
 
 Weight steps (include steps shared by HT and WT):
 
-| Step # | Step title | Brief description |
+| Adult Step # | Adult Step title | Brief description |
 |--------|-----------|-------------------|
 | 1W | BIV | Exclude biologically implausible weights |
 | 2W | Repeated Values | Identify groups of identical weight values; mark first vs. subsequent |
@@ -116,15 +137,15 @@ Weight steps (include steps shared by HT and WT):
 
 ---
 
-## Step 1: Biologically Implausible Values (BIV)
+## BIV: Biologically Implausible Values (Adult Step 1)
 
 ***Exclude values outside absolute biological limits.***
 
 | | |
 |---|---|
 | Scope | Height and Weight (individually), then same-day ht+wt pairs (BMI check) |
-| Prior Step | None (first step) |
-| Next Step | 2W: Repeated Values (Weight); 3H: Temp SDE (Height) |
+| Prior Adult Step | None (first step) |
+| Next Adult Step | 2W: Repeated Values (Weight); 3H: Temp SDE (Height) |
 | Distinct/RVs | N/A — runs before RV identification |
 | Exclusion Code | `Exclude-A-BIV`, `Exclude-A-BIV` |
 | Configurable parameter names | `overall_ht_min`, `overall_ht_max`, `overall_wt_min`, `overall_wt_max`, `overall_bmi_min`, `overall_bmi_max` |
@@ -157,7 +178,7 @@ These thresholds use strict inequalities with 0.12 rounding tolerance (see Round
 2. Exclude any height outside [`overall_ht_min`, `overall_ht_max`] (with 0.12 tolerance)
 3. For each subject, evaluate all weight values against the weight BIV limits
 4. Exclude any weight outside [`overall_wt_min`, `overall_wt_max`] (with 0.12 tolerance)
-5. **BMI BIV check (Step 1B):** Runs only when `overall_bmi_min < single_bmi_min` or `overall_bmi_max > single_bmi_max` — i.e., only when the BIV BMI limits are wider than the Step 13 single-value limits. In practice this means loosest only (overall BMI [5,300] vs single BMI [10,250]). At other levels the two sets of limits are equal, so skipping the check avoids applying thresholds earlier than the algorithm intends.
+5. **BMI BIV check (Adult Step 1B):** Runs only when `overall_bmi_min < single_bmi_min` or `overall_bmi_max > single_bmi_max` — i.e., only when the BIV BMI limits are wider than the Adult Step 13 single-value limits. In practice this means loosest only (overall BMI [5,300] vs single BMI [10,250]). At other levels the two sets of limits are equal, so skipping the check avoids applying thresholds earlier than the algorithm intends.
 6. For each ageday where both a surviving height and a surviving weight exist, pair the first height and first weight (by id order) and compute BMI = weight_kg / (height_cm / 100)²
 7. Exclude that ht and wt pair if BMI < `overall_bmi_min` or BMI > `overall_bmi_max`. No rounding tolerance is added to the BMI comparison: tolerance is already embedded in the measurement-level checks above, and BMI is a derived value
 8. Excluded values are removed from the working dataframes so they do not participate in subsequent steps
@@ -167,19 +188,19 @@ These thresholds use strict inequalities with 0.12 rounding tolerance (see Round
 
 - The weight maximum (500 kg) is in kilograms, not pounds. This is noted explicitly because the algorithm also handles pound-to-kg conversion, and confusion between units is a common source of data error.
 - These limits are intentionally very broad. For example, a height of 50 cm (~20 inches) would be implausible for an adult, but unusually small adults and data that might represent seated heights or other measurement contexts are handled by later, more nuanced steps.
-- BIV values count toward the error load denominator in Step 14 (Too Many Errors). A subject with many BIV values plus a few other exclusions could trigger error load on their remaining included values.
+- BIV values count toward the error load denominator in Adult Step 14 (Too Many Errors). A subject with many BIV values plus a few other exclusions could trigger error load on their remaining included values.
 
 ---
 
-## Step 2W: Repeated Value Markers (Weight only)
+## Repeated Value Markers (Adult Step 2W, weight only)
 
 ***Identify groups of identical weight values and distinguish first occurrence from subsequent repeats.***
 
 | | |
 |---|---|
 | Scope | Weight only |
-| Prior Step | 1W: BIV |
-| Next Step | 3W: Temp SDE |
+| Prior Adult Step | 1W: BIV |
+| Next Adult Step | 3W: Temp SDE |
 | Distinct/RVs | Creates RV markers (this is where RVs are defined) |
 | Exclusion Code | None — this step marks but does not exclude |
 | Configurable parameter names | `repval_handling` (affects later EWMA steps, not this step) |
@@ -188,7 +209,7 @@ These thresholds use strict inequalities with 0.12 rounding tolerance (see Round
 
 This step identifies repeated values (RVs) — weight measurements that appear more than once for a subject. The first occurrence is distinguished from subsequent identical values. RVs are not excluded at this point; instead they are flagged so that later steps (particularly the EWMA steps) can handle them differently depending on the `repval_handling` mode.
 
-Height does not use RV tracking. While height does identify same-day duplicates (Step 3H), it does not distinguish first vs. subsequent occurrences of the same height value across different days.
+Height does not use RV tracking. While height does identify same-day duplicates (Adult Step 3H), it does not distinguish first vs. subsequent occurrences of the same height value across different days.
 
 ***Key terms and variable names:***
 
@@ -230,22 +251,22 @@ Height does not use RV tracking. While height does identify same-day duplicates 
 
 ---
 
-## Step 3: Temp Same-Day Extraneous (SDE)
+## Temp Same-Day Extraneous: SDE (Adult Step 3)
 
 ***Temporarily flag same-day values that deviate most from patient median.***
 
 | | |
 |---|---|
 | Scope | Height (3H) and Weight (3W), evaluated separately |
-| Prior Step | 1H: BIV (Height); 2W: Repeated Values (Weight) |
-| Next Step | 4W: Weight Cap (Weight); 9H: Final SDE Height Resolution (Height) |
+| Prior Adult Step | 1H: BIV (Height); 2W: Repeated Values (Weight) |
+| Next Adult Step | 4W: Weight Cap (Weight); 9H: Final SDE Height Resolution (Height) |
 | Distinct/RVs | WT median uses non-RV values only; HT median uses all values |
 | Exclusion Code | None — values are flagged as `extraneous`, not excluded yet |
 | Configurable parameter names | None |
 
 ***Overview:***
 
-When a subject has multiple measurements on the same day, this step temporarily identifies which value to keep and which to flag as extraneous. For each same-day group, the value closest to the patient's overall median survives; the others are flagged `extraneous = TRUE`. This is a temporary designation — flagged values remain in the working dataframe but are skipped by most subsequent steps. Final SDE resolution (where extraneous values are actually excluded or rescued) happens later (Step 9H for height, Step 10W for weight).
+When a subject has multiple measurements on the same day, this step temporarily identifies which value to keep and which to flag as extraneous. For each same-day group, the value closest to the patient's overall median survives; the others are flagged `extraneous = TRUE`. This is a temporary designation — flagged values remain in the working dataframe but are skipped by most subsequent steps. Final SDE resolution (where extraneous values are actually excluded or rescued) happens later (Adult Step 9H for height, Adult Step 10W for weight).
 
 ***Key terms and variable names:***
 
@@ -273,19 +294,19 @@ None. This step has no configurable parameters.
 
 - The median is calculated from all included values (not just non-same-day values) because the goal is to identify which same-day value best represents the patient's overall pattern.
 - Weight uses non-RV values for the median because repeated values may be carried-forward and could bias the median. Height uses all values because the RV concept does not apply to height.
-- This is a temporary step because the "correct" same-day value may change after later exclusion steps alter the patient's value distribution. Final resolution happens in Steps 9H and 10W.
+- This is a temporary step because the "correct" same-day value may change after later exclusion steps alter the patient's value distribution. Final resolution happens in Adult Steps 9H and 10W.
 
 ---
 
-## Step 4W: Scale Max (Weight Cap)
+## Scale Max: Weight Cap (Adult Step 4W)
 
 ***Exclude weights at a physical scale maximum unless EWMA and adjacency checks confirm the value fits the patient's pattern.***
 
 | | |
 |---|---|
 | Scope | Weight only |
-| Prior Step | 3W: Temp SDE |
-| Next Step | 9Wa: Evil Twins |
+| Prior Adult Step | 3W: Temp SDE |
+| Next Adult Step | 9Wa: Evil Twins |
 | Distinct/RVs | EWMA and adjacency use firstRV (non-RV) values; RVs of excluded cap values are also excluded |
 | Exclusion Codes | `Exclude-A-Scale-Max`, `Exclude-A-Scale-Max-Identical`, `Exclude-A-Scale-Max-RV-Propagated` |
 | Configurable parameter names | `scale_max_lbs` |
@@ -342,15 +363,15 @@ The cap detection range is: `round(scale_max_lbs / 2.2046226, 1) ± 0.1` kg, usi
 
 ---
 
-## Step 9Wa: Evil Twins
+## Evil Twins (Adult Step 9Wa)
 
 ***Exclude one member of adjacent weight pairs with implausibly large differences.***
 
 | | |
 |---|---|
 | Scope | Weight only |
-| Prior Step | 4W: Scale Max |
-| Next Step | 9H: Final SDE Height Resolution; 9Wb: Extreme EWMA |
+| Prior Adult Step | 4W: Scale Max |
+| Next Adult Step | 9H: Final SDE Height Resolution; 9Wb: Extreme EWMA |
 | Distinct/RVs | Both Inc and RV values participate in OOB detection, median, and pairs guard |
 | Exclusion Code | `Exclude-A-Evil-Twins` |
 | Configurable parameter names | `wtallow_formula` (shared with EWMA steps) |
@@ -413,22 +434,22 @@ All thresholds include the standard 0.12 kg rounding tolerance (see Rounding Tol
 
 ---
 
-## Step 9H: Final SDE Height Resolution
+## Final SDE Height Resolution (Adult Step 9H)
 
 ***Resolve same-day height duplicates: exclude identical values, then choose keepers using category-based median selection.***
 
 | | |
 |---|---|
 | Scope | Height only |
-| Prior Step | 3H: Temp SDE (temporary flagging) |
-| Next Step | 10H: Height Distinct Pairs |
+| Prior Adult Step | 3H: Temp SDE (temporary flagging) |
+| Next Adult Step | 10H: Height Distinct Pairs |
 | Distinct/RVs | Height does not use RV tracking |
 | Exclusion Codes | `Exclude-A-Identical`, `Exclude-A-Extraneous` |
 | Configurable parameter names | None |
 
 ***Overview:***
 
-This step does the final resolution of same-day height duplicates that were temporarily flagged in Step 3H. It has two parts:
+This step does the final resolution of same-day height duplicates that were temporarily flagged in Adult Step 3H. It has two parts:
 
 - **Part A (Identical):** When all same-day values are identical, exclude all but one (keep lowest id). If removing identical values eliminates all duplicates on a day, that day is no longer treated as SDE.
 - **Part B (Non-identical):** For remaining days with multiple different values, categorize the subject and choose which value to keep based on category-specific median comparisons.
@@ -450,7 +471,7 @@ None. This step has no configurable parameters.
 ***Logic and implementation:***
 
 **Part A — Identical values:**
-1. All values (including those temporarily marked extraneous by Step 3H) remain in `h_subj_df`; extraneous flags identify which days have duplicates
+1. All values (including those temporarily marked extraneous by Adult Step 3H) remain in `h_subj_df`; extraneous flags identify which days have duplicates
 2. On each day with extraneous values, identify measurements that appear more than once (exact match on meas_m)
 3. Keep the first occurrence (lowest id); exclude the rest with `Exclude-A-Identical`
 4. Re-run `temp_sde()` to update extraneous flags on remaining values
@@ -475,19 +496,19 @@ None. This step has no configurable parameters.
 
 - **Tiebreaker — lowest id for identical, highest id for non-identical:** For identical values there is no meaningful difference, so keep the first-entered. For non-identical values, the later measurement may represent a more careful re-measurement.
 - **Three categories:** The choice of reference median depends on how much non-SDE data exists. With many non-SDE days (Category 2), the non-SDE median is the best reference. With few non-SDE days (Category 3), the median-of-medians balances across days. With only one day (Category 1), only the day-median is available.
-- **No averaging:** The keeper retains its original value. Mean height calculation is a separate step that happens later (Step 11H).
+- **No averaging:** The keeper retains its original value. Mean height calculation is a separate step that happens later (Adult Step 11H).
 
 ---
 
-## Step 9Wb: Extreme EWMA
+## Extreme EWMA (Adult Step 9Wb)
 
 ***Exclude weight outliers whose EWMA deviation exceeds interval-specific caps.***
 
 | | |
 |---|---|
 | Scope | Weight only |
-| Prior Step | 9Wa: Evil Twins |
-| Next Step | 10W: Final SDE Weight Resolution |
+| Prior Adult Step | 9Wa: Evil Twins |
+| Next Adult Step | 10W: Final SDE Weight Resolution |
 | Distinct/RVs | Independent: all values participate. Linked: firstRV pass (non-RV only), then propagate, then allRV pass. |
 | Exclusion Codes | `Exclude-A-Traj-Extreme` (independent), `Exclude-A-Traj-Extreme-firstRV` (linked), `Exclude-A-Traj-Extreme-allRV` (linked) |
 | Configurable parameter names | `wtallow_formula`, `repval_handling` |
@@ -505,7 +526,7 @@ A value is excluded when its EWMA deviation exceeds an interval-specific ET cap 
 - **dewma_before / dewma_after:** EWMA deviation excluding the immediately prior / next measurement. Used for the 90% confirmation rule.
 - **min_gap_months:** Minimum gap (in months) to either chronological neighbor. Determines which tier (≤6m or >6m) applies.
 - **Upper weight (UW):** `max(wt, ewma)` for each observation. Used for UW-based ET cap scaling.
-- `remove_ewma_wt()` — support function implementing the iterative exclusion logic (shared with Moderate EWMA, Step 11Wb). Signature: `remove_ewma_wt(subj_df, wtallow_formula, ...)`
+- `remove_ewma_wt()` — support function implementing the iterative exclusion logic (shared with Moderate EWMA, Adult Step 11Wb). Signature: `remove_ewma_wt(subj_df, wtallow_formula, ...)`
 - `compute_et_limit()` — computes the ET cap per observation: `compute_et_limit(min_gap_months, formula, uw)`. See `wtallow-formulas.md` for full specification.
 - `adult_ewma_cache_init()` — EWMA computation with position-based window (default 15 on each side)
 
@@ -558,15 +579,15 @@ The threshold is computed dynamically per observation: `compute_et_limit(min_gap
 
 ---
 
-## Step 10H: Height Distinct Values
+## Height Distinct Values (Adult Step 10H)
 
 ***Evaluate subjects with 2 or 3+ distinct height values: exclude pairs outside the height band (with loss/gain and frequency rescue), or values outside the best height window.***
 
 | | |
 |---|---|
 | Scope | Height only |
-| Prior Step | 9H: Final SDE Height Resolution |
-| Next Step | 10W: Final SDE Weight Resolution |
+| Prior Adult Step | 9H: Final SDE Height Resolution |
+| Next Adult Step | 10W: Final SDE Weight Resolution |
 | Distinct/RVs | Height does not use RV tracking |
 | Exclusion Codes | `Exclude-A-Ord-Pair-All`, `Exclude-A-Ord-Pair`, `Exclude-A-Window-All`, `Exclude-A-Window` |
 | Configurable parameter names | `ht_band`, `allow_ht_loss`, `allow_ht_gain` |
@@ -603,7 +624,7 @@ Subjects with only 1 distinct height skip this step entirely.
 
 ***Logic and implementation:***
 
-**Step 10Ha: 2 Distinct Heights**
+**Adult Step 10Ha: 2 Distinct Heights**
 
 1. Extract the two distinct heights (ht_1, ht_2) in age order (both in cm)
 2. **Band check:** `abs(ht_1 - ht_2) > (ht_band * 2.54 + 0.12)` — if FALSE, values are within band; skip (all remain included)
@@ -624,7 +645,7 @@ Subjects with only 1 distinct height skip this step entirely.
    - `Exclude-A-Ord-Pair` if frequency rescue saved some values
    - `Exclude-A-Ord-Pair-All` if no frequency rescue (all excluded)
 
-**Step 10Hb: 3+ Distinct Heights**
+**Adult Step 10Hb: 3+ Distinct Heights**
 
 ***Part 1 — Window (w2) evaluation:***
 1. Define w2 window for each distinct height: `[ht, ht + ht_band * 2.54 + 0.12]`
@@ -671,22 +692,22 @@ Subjects with only 1 distinct height skip this step entirely.
 
 ---
 
-## Step 11H: Mean Height
+## Mean Height (Adult Step 11H)
 
-***Calculate the mean height for each subject, respecting loss/gain group boundaries from Step 10H.***
+***Calculate the mean height for each subject, respecting loss/gain group boundaries from Adult Step 10H.***
 
 | | |
 |---|---|
 | Scope | Height only |
-| Prior Step | 10H: Height Distinct Values |
-| Next Step | 11Wa: 2D Ordered Weight Pairs |
+| Prior Adult Step | 10H: Height Distinct Values |
+| Next Adult Step | 11Wa: 2D Ordered Weight Pairs |
 | Distinct/RVs | N/A — height does not use RV tracking |
 | Exclusion Codes | None — this step calculates a value, not exclusions |
 | Configurable parameter names | None |
 
 ***Overview:***
 
-This step computes a representative mean height for each subject, used later for BMI calculations. The mean is calculated from `meas_m` (metric measurement values) of remaining included heights. How the mean is computed depends on the outcome of Step 10H:
+This step computes a representative mean height for each subject, used later for BMI calculations. The mean is calculated from `meas_m` (metric measurement values) of remaining included heights. How the mean is computed depends on the outcome of Adult Step 10H:
 
 - **Pair loss or gain (2D):** Each observation retains its individual original measurement as its "mean" (no averaging across the two distinct values, since they represent different physical states)
 - **3D with validated loss groups:** Mean within each loss group (observations in the same group share one mean)
@@ -697,14 +718,14 @@ This step computes a representative mean height for each subject, used later for
 
 - `mean_ht` — output column: the calculated mean height for each observation
 - `meas_m` — the metric measurement value (used for mean calculation)
-- `loss_groups` / `gain_groups` — group assignments from Step 10H
-- `pairhtloss` / `pairhtgain` — flags from Step 10Ha indicating pair rescue type
+- `loss_groups` / `gain_groups` — group assignments from Adult Step 10H
+- `pairhtloss` / `pairhtgain` — flags from Adult Step 10Ha indicating pair rescue type
 
 ***Logic and implementation:***
 
 1. Initialize `meanht` as NA for all height observations
 2. If no included heights remain, leave as NA
-3. Otherwise, compute mean height based on Step 10H outcome:
+3. Otherwise, compute mean height based on Adult Step 10H outcome:
    - **pairhtloss or pairhtgain:** Use each observation's `meas_m` directly (no averaging)
    - **Loss groups validated:** For each group in `glist_loss`, compute `mean(meas_m)` for observations in that group; all observations in the group receive the same mean
    - **Gain groups validated:** Same logic using `glist_gain`
@@ -713,28 +734,28 @@ This step computes a representative mean height for each subject, used later for
 
 ***Rationale for selected decisions:***
 
-- **Uses `meas_m` (metric measurement):** Since SDE resolution retains a keeper's original value without averaging (Step 9H), `meas_m` equals the raw recorded measurement for all surviving heights. The mean is based on these raw values, not any intermediate calculation.
+- **Uses `meas_m` (metric measurement):** Since SDE resolution retains a keeper's original value without averaging (Adult Step 9H), `meas_m` equals the raw recorded measurement for all surviving heights. The mean is based on these raw values, not any intermediate calculation.
 - **Pair loss/gain keeps individual values:** When a subject has two distinct heights representing different physical states (e.g., height loss from aging), averaging them would produce a value that doesn't represent either state. Each observation keeps its own measurement.
 - **Group-aware averaging:** Loss/gain groups represent different time periods with different true heights. Averaging within groups but not across them preserves the temporal signal.
 
 ---
 
-## Step 10W: Final SDE Weight Resolution
+## Final SDE Weight Resolution (Adult Step 10W)
 
 ***Resolve same-day weight duplicates: exclude identical values, then choose keepers using category-based median selection.***
 
 | | |
 |---|---|
 | Scope | Weight only |
-| Prior Step | 9Wb: Extreme EWMA |
-| Next Step | 11H: Mean Height; 11Wa: Distinct Ordered Pairs (Weight) |
+| Prior Adult Step | 9Wb: Extreme EWMA |
+| Next Adult Step | 11H: Mean Height; 11Wa: Distinct Ordered Pairs (Weight) |
 | Distinct/RVs | Non-SDE median uses firstRV (non-RV) values only; re-identifies RVs after exclusions |
 | Exclusion Codes | `Exclude-A-Identical`, `Exclude-A-Extraneous` |
 | Configurable parameter names | None |
 
 ***Overview:***
 
-Same logic as Step 9H (Final SDE Height Resolution), applied to weight. Resolves same-day weight duplicates that were temporarily flagged in Step 3W. Two parts:
+Same logic as Adult Step 9H (Final SDE Height Resolution), applied to weight. Resolves same-day weight duplicates that were temporarily flagged in Adult Step 3W. Two parts:
 
 - **Part A (Identical):** Exclude all but one when same-day values are identical (keep lowest id).
 - **Part B (Non-identical):** Categorize subject and choose keeper using category-specific median comparisons.
@@ -743,7 +764,7 @@ The keeper retains its original measurement value — no averaging is performed.
 
 ***Key terms and variable names:***
 
-Same as Step 9H, with one weight-specific difference:
+Same as Adult Step 9H, with one weight-specific difference:
 - **nonsdemed (weight):** Uses firstRV (non-RV) values on non-SDE days only, unlike height which uses all values. This prevents carried-forward RV values from biasing the reference median.
 
 ***Configurable parameter defaults and options:***
@@ -752,29 +773,29 @@ None.
 
 ***Logic and implementation:***
 
-Identical to Step 9H with these weight-specific differences:
+Identical to Adult Step 9H with these weight-specific differences:
 1. After identical removal, `temp_sde()` is re-run with `ptype = "weight"` (non-RV median) and `redo_identify_rv()` updates RV flags
 2. Non-SDE median (`nonsdemed`) is calculated from non-RV values on non-SDE days only
 3. After all SDE exclusions, RVs are re-identified via `identify_rv()`
 
-See Step 9H for full details on categories, sorting, and tiebreakers.
+See Adult Step 9H for full details on categories, sorting, and tiebreakers.
 
 ***Rationale for selected decisions:***
 
 - Using firstRV (non-RV) values for the non-SDE median prevents carried-forward values from dominating the reference. Height does not need this because repeated identical heights are expected (adults don't grow).
-- All other rationale is the same as Step 9H.
+- All other rationale is the same as Adult Step 9H.
 
 ---
 
-## Step 11Wa: 2D Ordered Weight Pairs
+## 2D Ordered Weight Pairs (Adult Step 11Wa)
 
 ***Exclude subjects with exactly 2 distinct weight values in time order when the weight difference exceeds the allowed amount or the weight ratio is too extreme.***
 
 | | |
 |---|---|
 | Scope | Weight only |
-| Prior Step | 10W: Final SDE Weight Resolution |
-| Next Step | 11Wa2: 2D Non-Ordered Weight Pairs |
+| Prior Adult Step | 10W: Final SDE Weight Resolution |
+| Next Adult Step | 11Wa2: 2D Non-Ordered Weight Pairs |
 | Distinct/RVs | Routing uses firstRV (non-RV) numdistinct and ordering; allRV override for non-ordered detection; evaluation uses firstRV values |
 | Exclusion Codes | `Exclude-A-2D-Ordered` |
 | Configurable parameter names | `wtallow_formula` |
@@ -783,7 +804,7 @@ See Step 9H for full details on categories, sorting, and tiebreakers.
 
 This step handles subjects whose remaining included weights have exactly 2 distinct values that are time-ordered (all instances of value 1 occur before all instances of value 2). It applies two independent tests: (1) whether the absolute weight difference exceeds a time-dependent allowance (`wtallow`), and (2) whether the ratio of the smaller weight to the larger weight falls below a threshold (`perclimit`). If either test fails, all weight observations for the subject are excluded.
 
-This step also performs the routing that determines whether subjects go to 2D ordered (this step), 2D non-ordered (Step 11Wa2), or 3+D/EWMA (Step 11Wb). Subjects with 1 distinct value go to Step 13 (Distinct Single).
+This step also performs the routing that determines whether subjects go to 2D ordered (this step), 2D non-ordered (Adult Step 11Wa2), or 3+D/EWMA (Adult Step 11Wb). Subjects with 1 distinct value go to Adult Step 13 (Distinct Single).
 
 ***Key terms and variable names:***
 
@@ -817,7 +838,7 @@ This step also performs the routing that determines whether subjects go to 2D or
     - UW > 120: NOT scaled up (same as base formula)
     - UW < 120: caps scale as `(base_cap − 20) × (UW/120) + 20`; ceiling of UW × 2/3
 
-  - **`"allofus15"`** — Step function for short intervals, linear ramp for long intervals. Default for tightest.
+  - **`"allofus15"`** — Adult Step function for short intervals, linear ramp for long intervals. Default for tightest.
     - 0–2 days: 5 kg; 3–7 days: 10 kg; 8 days–<6 months: 15 kg
     - 6–12 months: linear from 15 kg to allofus15-cap-12m
     - >12 months: flat at allofus15-cap-12m
@@ -834,12 +855,12 @@ See `wtallow-formulas.md` for the complete specification of all formulas, UW adj
 1. Filter to firstRV (non-RV) included weight observations (`w_nonrv`)
 2. Count distinct values among firstRV observations
 3. If firstRV has exactly 2 distinct values, check ordering: `max(ages of value 1) < min(ages of value 2)` (strict less-than)
-4. **allRV override:** If allRV (all included values, including RVs) also has exactly 2 distinct values but they are NOT time-ordered, override the firstRV result — route to 2D non-ordered (Step 11Wa2) instead
+4. **allRV override:** If allRV (all included values, including RVs) also has exactly 2 distinct values but they are NOT time-ordered, override the firstRV result — route to 2D non-ordered (Adult Step 11Wa2) instead
 5. Routing outcome:
-   - 1 distinct value → Step 13 (Distinct Single)
+   - 1 distinct value → Adult Step 13 (Distinct Single)
    - 2 distinct, ordered → this step (11Wa)
-   - 2 distinct, not ordered → Step 11Wa2
-   - 3+ distinct → Step 11Wb (Moderate EWMA)
+   - 2 distinct, not ordered → Adult Step 11Wa2
+   - 3+ distinct → Adult Step 11Wb (Moderate EWMA)
 
 **Evaluation (if 2D ordered):**
 
@@ -861,22 +882,22 @@ See `wtallow-formulas.md` for the complete specification of all formulas, UW adj
 
 ---
 
-## Step 11Wa2: 2D Non-Ordered Weight Pairs
+## 2D Non-Ordered Weight Pairs (Adult Step 11Wa2)
 
 ***Exclude subjects with exactly 2 distinct weight values that are interleaved in time, using a four-rule decision tree based on wtallow, prior exclusions, and value dominance.***
 
 | | |
 |---|---|
 | Scope | Weight only |
-| Prior Step | 11Wa: 2D Ordered Weight Pairs |
-| Next Step | 11Wb: Moderate EWMA |
+| Prior Adult Step | 11Wa: 2D Ordered Weight Pairs |
+| Next Adult Step | 11Wb: Moderate EWMA |
 | Distinct/RVs | Uses allRV (all included values) for both detection and evaluation |
 | Exclusion Codes | `Exclude-A-2D-Non-Ordered` |
 | Configurable parameter names | `wtallow_formula` |
 
 ***Overview:***
 
-This step handles subjects whose remaining included weights have exactly 2 distinct values that are NOT time-ordered — meaning the values are interleaved (e.g., 70, 110, 70, 110). Unlike 2D ordered pairs (Step 11Wa), the values cannot be separated into "before" and "after" groups, so a different evaluation strategy is used.
+This step handles subjects whose remaining included weights have exactly 2 distinct values that are NOT time-ordered — meaning the values are interleaved (e.g., 70, 110, 70, 110). Unlike 2D ordered pairs (Adult Step 11Wa), the values cannot be separated into "before" and "after" groups, so a different evaluation strategy is used.
 
 The step applies a four-rule decision tree: (1) if all adjacent different-value pairs are within wtallow, keep everything; (2) if any pair exceeds wtallow and the subject has prior non-SDE exclusions, exclude all; (3) if one value is dominant (>65% of observations), exclude only the minority; (4) if neither value dominates, exclude all.
 
@@ -889,7 +910,7 @@ The step applies a four-rule decision tree: (1) if all adjacent different-value 
 
 ***Configurable parameter defaults and options:***
 
-Same as Step 11Wa — uses `compute_wtallow()` with `wtallow_formula`. UW for each adjacent pair is the larger of the two weights in the pair (`uw_pair`).
+Same as Adult Step 11Wa — uses `compute_wtallow()` with `wtallow_formula`. UW for each adjacent pair is the larger of the two weights in the pair (`uw_pair`).
 
 ***Logic and implementation:***
 
@@ -918,22 +939,22 @@ Checks the full subject weight history (`w_subj_keep`), not just currently inclu
 
 ---
 
-## Step 11Wb: Moderate EWMA
+## Moderate EWMA (Adult Step 11Wb)
 
 ***Exclude weight outliers using a 7-step EWMA flow with trajectory rescue, alternate pathway, percentage criterion, and error load detection.***
 
 | | |
 |---|---|
 | Scope | Weight only |
-| Prior Step | 11Wa2: 2D Non-Ordered Weight Pairs |
-| Next Step | 13: Distinct Single (1D) |
+| Prior Adult Step | 11Wa2: 2D Non-Ordered Weight Pairs |
+| Next Adult Step | 13: Distinct Single (1D) |
 | Distinct/RVs | Independent: single pass, RVs as full participants. Linked: firstRV pass (non-RV only) with RV propagation, then allRV pass. |
 | Exclusion Codes | `Exclude-A-Traj-Moderate`, `Exclude-A-Traj-Moderate-allRV`, `Exclude-A-Traj-Moderate-Error-Load`, `Exclude-A-Traj-Moderate-Error-Load-RV` |
 | Configurable parameter names | `wtallow_formula`, `ewma_window`, `repval_handling`, `mod_ewma_f`, `perclimit_low`, `perclimit_mid`, `perclimit_high` |
 
 ***Overview:***
 
-This step handles subjects with 3+ distinct weight values. It uses EWMA deviation to identify outliers, but with a more nuanced 7-step flow compared to Extreme EWMA (Step 9Wb). The key differences from Extreme EWMA are:
+This step handles subjects with 3+ distinct weight values. It uses EWMA deviation to identify outliers, but with a more nuanced 7-step flow compared to Extreme EWMA (Adult Step 9Wb). The key differences from Extreme EWMA are:
 
 - Uses **wtallow** (time-interval-dependent) as the threshold instead of fixed caps
 - Includes **trajectory rescue** — values that follow the interpolation/extrapolation of surrounding measurements are protected from exclusion
@@ -950,10 +971,10 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
 - **wtallow (wta)** — time-interval-dependent weight allowance, computed from `compute_wtallow(months, formula, uw)` using the minimum of the before and after age gaps. UW = `max(wt, ewma)` for the observation.
 - **wta_base** — wtallow at UW=120 (no UW adjustment), used as the denominator in prioritization scoring. This ensures scoring is not distorted by UW-dependent wtallow.
 - **minagediff** — minimum of before and after age gaps (years), used to determine wtallow
-- **perclimit** — observation-level ratio threshold via `compute_perc_limit(meas, permissiveness)`. Weight-dependent and permissiveness-dependent (see permissiveness table). Note: observation-level here, unlike Step 11Wa which uses subject-level max.
-- **exc_stand** — standard pathway candidates (Step 1)
-- **exc_pair** — alternate pathway candidates (Step 3)
-- **exc_wt_i** — accumulated exclusion candidates across Steps 2, 4, 5
+- **perclimit** — observation-level ratio threshold via `compute_perc_limit(meas, permissiveness)`. Weight-dependent and permissiveness-dependent (see permissiveness table). Note: observation-level here, unlike Adult Step 11Wa which uses subject-level max.
+- **exc_stand** — standard pathway candidates (Adult Step 1)
+- **exc_pair** — alternate pathway candidates (Adult Step 3)
+- **exc_wt_i** — accumulated exclusion candidates across Adult Steps 2, 4, 5
 - **error_load** — observations in 4+ consecutive exc_wt_i runs
 - **ewma_window** — number of observations on each side used for EWMA computation (default 15, so up to 30 total neighbors)
 - **trajectory rescue** — three methods (interpolation, prior extrapolation, next extrapolation) that can protect a value from standard-pathway exclusion
@@ -962,7 +983,7 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
 
 | Parameter | Default | Unit | Notes |
 |-----------|---------|------|-------|
-| `wtallow_formula` | `"piecewise"` | — | Formula for wtallow (see Step 11Wa and wtallow-formulas.md) |
+| `wtallow_formula` | `"piecewise"` | — | Formula for wtallow (see Adult Step 11Wa and wtallow-formulas.md) |
 | `mod_ewma_f` | 0.75 | — | Directional factor: loosest/looser = 0.75; tighter/tightest = 0.60 |
 | `perclimit_low` | 0.5 | — | % criterion for wt ≤45 kg (loosest/looser); 0.7 (tighter/tightest) |
 | `perclimit_mid` | 0.4 | — | % criterion for 45<wt≤80 kg (all levels) |
@@ -985,7 +1006,7 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
 
 **7-step exclusion flow (each round):**
 
-**Step 1 — Standard pathway + trajectory rescue:**
+**Adult Step 1 — Standard pathway + trajectory rescue:**
 - Standard criteria: `|dewma_all| > wtallow + 0.12` AND both directional dewma exceed `0.75 × wtallow + 0.12` in the same direction
 - Trajectory rescue checks three methods (all use ±5 kg error margin):
   1. **Interpolation:** Value falls between p1 and n1 (± 5 kg). Uses non-strict inequalities (≥, ≤).
@@ -994,9 +1015,9 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
 - A value is rescued if ANY of the three methods succeeds. Must fail ALL three to remain a candidate.
 - `exc_stand = standard_criteria AND fails_all_trajectory`
 
-**Step 2 — Standard run detection + pair/trio prioritization:**
+**Adult Step 2 — Standard run detection + pair/trio prioritization:**
 - Detect consecutive runs of `exc_stand` within each subject
-- **4+ consecutive** → error load (all excluded immediately in Step 7)
+- **4+ consecutive** → error load (all excluded immediately in Adult Step 7)
 - **Isolated (run length 1)** → directly becomes exc_wt_i
 - **Pairs/trios (run length 2-3)** → score each member and pick the highest:
   - First of run: `|dewma_aft / wtallow_aft_unrel|` (wtallow computed as if before-neighbor were removed)
@@ -1004,30 +1025,30 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
   - Middle of trio: `|dewma_bef/wtallow_bef_unrel + dewma_aft/wtallow_aft_unrel|`
   - Highest score → exc_wt_i
 
-**Step 3 — Alternate pathway:**
+**Adult Step 3 — Alternate pathway:**
 - Catches values adjacent to unreliable neighbors (≤14 days AND >wtallow apart)
 - If prior is unreliable: only check aft dewma (`|dewma_all| > wtallow + 0.12` AND `|dewma_aft| > 0.75×wtallow + 0.12`, same direction)
 - If next is unreliable: only check bef dewma (same logic)
 - Must not already be exc_wt_i
 - Result: `exc_pair`
 
-**Step 4 — Alternate run detection + pair/trio prioritization:**
-- Same run detection as Step 2, applied to exc_pair candidates
+**Adult Step 4 — Alternate run detection + pair/trio prioritization:**
+- Same run detection as Adult Step 2, applied to exc_pair candidates
 - Isolated → directly exc_wt_i
 - Pairs/trios → scored with same approach, accounting for committed neighbors (exc_wt_i from prior steps that are adjacent to the pair/trio)
 - Effective position adjusts when a committed neighbor is adjacent (first becomes middle, etc.)
 
-**Step 5 — Percentage criterion:**
+**Adult Step 5 — Percentage criterion:**
 - Independent of EWMA deviation direction
 - `wt/ewma_all < perclimit AND wt/ewma_bef < perclimit AND wt/ewma_aft < perclimit`
 - Must not already be exc_wt_i
 - Uses observation-level perclimit via `compute_perc_limit(meas, permissiveness)`
 
-**Step 6 — Consecutive check (all pathways combined):**
-- After Steps 2, 4, 5 accumulate exc_wt_i candidates, re-check for 4+ consecutive
+**Adult Step 6 — Consecutive check (all pathways combined):**
+- After Adult Steps 2, 4, 5 accumulate exc_wt_i candidates, re-check for 4+ consecutive
 - Newly identified 4+ runs → error load
 
-**Step 7 — Final prioritization:**
+**Adult Step 7 — Final prioritization:**
 - **Error load values:** All excluded immediately with code `"...-Error-Load round N"`
 - **Non-error-load candidates:** Score each and exclude only the single highest-scoring:
   - Edge (first/last in subject): `pmax(0, |dewma_all| - wta) / wta_base` where `wta` is UW-adjusted wtallow and `wta_base` is wtallow at UW=120 (no adjustment)
@@ -1055,22 +1076,22 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
 - **Trajectory rescue:** Values that follow the linear trend of surrounding measurements are likely real, even if their EWMA deviation is large (e.g., a genuine rapid weight change). Rescue prevents false positives. Must fail all three methods to ensure the value genuinely doesn't fit any trajectory.
 - **Alternate pathway:** When a neighbor is ≤14 days away and >wtallow apart, that neighbor is unreliable and distorts the directional dewma on that side. The alternate pathway drops the unreliable side's confirmation requirement.
 - **Graduated multiplier for interior scoring:** Interior values have both before and after context, while edge values have only one direction. The graduated multiplier bridges these: when both directions independently confirm (min_ratio ≥ 1), the score is full; when only one direction is bad, the score is discounted (0.6× floor), preventing interior values from being unfairly ranked against edge values.
-- **Observation-level perclimit (not subject-level):** Unlike Step 11Wa where the max perclimit across observations is used, here each observation uses its own weight and the current permissiveness level to determine its threshold via `compute_perc_limit()`. At loosest/looser, observations >80 kg have perclimit=0 (disabled).
+- **Observation-level perclimit (not subject-level):** Unlike Adult Step 11Wa where the max perclimit across observations is used, here each observation uses its own weight and the current permissiveness level to determine its threshold via `compute_perc_limit()`. At loosest/looser, observations >80 kg have perclimit=0 (disabled).
 - **Error load escalation in linked mode:** If a patient has both repeated values (RVs) and 4+ consecutive flagged values, the data quality is too poor to trust any remaining values.
 - **EWMA window (default 15):** Limits each EWMA to the 15 nearest observations on each side. For subjects with many observations, distant measurements (which contribute negligibly due to the e=-5 exponent) are excluded from the computation, improving both efficiency and preventing numerical noise from very distant observations.
 - **Max rounds (default 100):** Allows the algorithm to handle subjects with many observations without being artificially limited. In practice, convergence typically occurs within a few rounds.
 
 ---
 
-## Step 13: Single Distinct Value (1D) Evaluation
+## Single Distinct Value: 1D Evaluation (Adult Step 13)
 
 ***Exclude height or weight values when a subject has only one distinct value for that parameter, using BMI-dependent or no-BMI limits.***
 
 | | |
 |---|---|
 | Scope | Height and Weight |
-| Prior Step | 11Wb: Moderate EWMA |
-| Next Step | 14: Error Load |
+| Prior Adult Step | 11Wb: Moderate EWMA |
+| Next Adult Step | 14: Error Load |
 | Distinct/RVs | Weight uses firstRV for numdistinct. Remaining RVs are treated as Include. |
 | Exclusion Codes | `Exclude-A-Single`, `Exclude-A-Single` |
 | Configurable parameter names | `single_ht_min_bmi`, `single_ht_max_bmi`, `single_wt_min_bmi`, `single_wt_max_bmi`, `single_ht_min_nobmi`, `single_ht_max_nobmi`, `single_wt_min_nobmi`, `single_wt_max_nobmi`, `single_bmi_min`, `single_bmi_max` |
@@ -1134,15 +1155,15 @@ The step runs as a two-pass loop over each subject (both passes use the same log
 
 ---
 
-## Step 14: Error Load
+## Error Load (Adult Step 14)
 
 ***Exclude all remaining included values for a parameter when the proportion of errors is too high, indicating widespread data quality issues.***
 
 | | |
 |---|---|
 | Scope | Height and Weight (evaluated separately) |
-| Prior Step | 13: Single Distinct (1D) |
-| Next Step | None (final step) |
+| Prior Adult Step | 13: Single Distinct (1D) |
+| Next Adult Step | None (final step) |
 | Distinct/RVs | Weight uses firstRV exclusion codes for error counting |
 | Exclusion Codes | `Exclude-A-Too-Many-Errors`, `Exclude-A-Too-Many-Errors` |
 | Configurable parameter names | `error_load_threshold` |
