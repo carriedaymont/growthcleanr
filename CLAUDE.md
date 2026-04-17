@@ -421,102 +421,35 @@ Default: `"looser"`
 | `changed_subjids` | NULL | Partial run | Optional vector of subject IDs to re-run. If NULL and `cached_results` provided, changed subjects are auto-detected |
 | `batch_size` | 2000 | Batching | Number of subjects per processing batch |
 
-### gc_preload_refs()
+### gc_preload_refs() and partial runs (cached_results)
 
-Exported function that pre-loads both `read_anthro()` closures once
-and returns them as a named list. Avoids ~0.6 sec of disk reads per
-`cleangrowth()` call (replaces 2 `read_anthro()` calls).
-Benchmarked on 200 subjects: standard 4.46 sec → preloaded 3.40 sec
-(1.06 sec saved/call, ~15 hours over 50K reps). Load time: 0.46 sec (once).
+Canonical documentation for both features lives in
+`child-gc-narrative-2026-04-13.md` under "Partial runs and
+preloaded references" (in the Batching and Dispatch section).
+Quick reference:
 
-Combined with `changed_subjids` partial run (50K reps, 200 subjects):
+- `gc_preload_refs()` returns a list of CDC/WHO reference
+  closures (`list(mtz_cdc_prelim, mtz_who_prelim)`) that can be
+  passed to `cleangrowth()` via `ref_tables = refs` to skip
+  per-call disk reads (~0.9 sec/call saved).
+- `cached_results` + optional `changed_subjids` let you
+  re-process only subjects whose input rows changed vs. a prior
+  run. Auto-detect mode (omit `changed_subjids`) compares
+  subjid/param/agedays/sex/measurement against the cache.
+
+Observed speedups (200 subjects, 50 000 calls):
 
 | % subjects changed | Time/rep | vs standard | 50K saving |
 |---|---|---|---|
-| 100% (full run, refs only) | 3.40 sec | 1.3× | 15 hrs |
-| 50% changed | 1.93 sec | 2.3× | 35 hrs |
-| 25% changed | 1.16 sec | 3.8× | 46 hrs |
-| 10% changed | 0.58 sec | 7.7× | 54 hrs |
-| 5% changed | 0.40 sec | 11.1× | 56 hrs |
+| 100% (full run, refs only) | 3.40 s | 1.3× | 15 hrs |
+| 50% changed | 1.93 s | 2.3× | 35 hrs |
+| 25% changed | 1.16 s | 3.8× | 46 hrs |
+| 10% changed | 0.58 s | 7.7× | 54 hrs |
+| 5% changed | 0.40 s | 11.1× | 56 hrs |
 
-~0.2–0.3 sec fixed overhead per partial call (batching setup + merge).
-
-```r
-refs <- gc_preload_refs()
-result <- cleangrowth(..., ref_tables = refs)
-```
-
-Returns: `list(mtz_cdc_prelim, mtz_who_prelim)`.
-
-### Partial run (cached_results)
-
-When running GC repeatedly on data that differs for only a subset of
-subjects (e.g., baseline vs. error-injected data, or updated data
-extracts), pass `cached_results` from a prior full run. Only subjects
-with changed data are re-processed; unchanged subjects receive their
-cached results. Subjects are independent in all GC operations
-(by-group on subjid/param, fixed reference-based recentering), so
-this is safe.
-
-**Two modes:**
-
-1. **Auto-detect** (recommended): Pass `cached_results` only.
-   `cleangrowth()` compares the incoming input data against the
-   cached results to automatically identify subjects with any
-   row-level differences (added/removed/modified measurements).
-   Only those subjects are re-processed.
-
-2. **Explicit**: Pass both `cached_results` and `changed_subjids`.
-   Only subjects in `changed_subjids` are re-processed. No
-   auto-detection is performed.
-
-```r
-# First run (full baseline)
-refs <- gc_preload_refs()
-res_baseline <- cleangrowth(..., ref_tables = refs)
-
-# Auto-detect mode: pass modified data + cached baseline
-# GC figures out which subjects differ
-res_error <- cleangrowth(
-  subjid = d_err$subjid, param = d_err$param,
-  agedays = d_err$agedays, sex = d_err$sex,
-  measurement = d_err$measurement, id = d_err$id,
-  ref_tables = refs,
-  cached_results = res_baseline)
-
-# Explicit mode: caller provides the list of changed subjects
-res_error <- cleangrowth(...,
-  ref_tables = refs,
-  cached_results = res_baseline,
-  changed_subjids = c(3, 7, 12))
-```
-
-**Auto-detection details:**
-- Compares input subjid, param, agedays, sex, and measurement
-  (with the same 0→NaN transformation GC applies internally)
-- Detects added subjects (in input but not cache), removed
-  subjects (in cache but not input), and modified subjects
-  (any row-level difference in the comparison columns)
-- Removed subjects simply won't appear in output (they're not
-  in the input data)
-- With `quietly = FALSE`, prints a summary:
-  `Auto-detected N changed subjects (X added, Y modified, Z removed, W unchanged)`
-
-**Performance (50 subjects, 3 modified):**
-- Full run: ~1.05 sec
-- Auto-detect partial: ~1.0 sec (comparison overhead dominates
-  at small scale; savings increase with larger datasets and
-  fewer changed subjects)
-- Explicit partial: ~0.29 sec (no comparison overhead)
-- No changes detected: ~0.11 sec (returns cache immediately)
-
-Notes:
-- If `changed_subjids` contains subject IDs not present in the
-  input data, they are silently ignored
-- Output row order matches input order (sorted by `internal_id`)
-- Designed for two use cases: (1) error-injection pipeline
-  workflows where most subjects are unmodified, and (2) Eric's
-  secure-environment workflow with updated data extracts
+Designed for two workflows: (1) error-injection pipelines where
+most subjects are unchanged per rep, and (2) secure-environment
+runs where only a subset of subjects has new data.
 
 ### Configurable Parameters (adult, via cleangrowth)
 

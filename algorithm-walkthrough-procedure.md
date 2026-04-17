@@ -225,6 +225,15 @@ For each step, systematically check all items that apply. Items are marked
    `ewma_window`, `cf_rescue`, `batch_size`). No permissiveness levels for
    3.0.0.
 
+   **[both] Parameters table row audit per session** — Each session must
+   audit the rows of the narrative's Configurable Parameters table that
+   correspond to the step(s) in scope. Cross-check against the current
+   `cleangrowth()` / `cleanadult()` signature and defaults; remove rows for
+   parameters that no longer exist (e.g., `recover.unit.error`,
+   `use_legacy_algorithm`, `ewma.exp` were removed during 2026-04 cleanup).
+   Table-wide cleanup should accumulate across sessions rather than be
+   deferred to a separate pass.
+
 7. **[both] Step linkage** — "Prior Step" and "Next Step" in each narrative
    summary table must match actual algorithm flow. Renumbered or reordered
    steps leave stale step references. Child step numbers are non-consecutive

@@ -44,7 +44,7 @@ growthcleanr narrative review. Each algorithm step has:
  be vectorized
 5. **Edge cases:** 0, 1, or 2 valid rows; empty groups;
  all-NA values — does code handle gracefully or crash?
-6. **`valid()` call correctness:** Which `include.*` flags
+6. **`.child_valid()` call correctness:** Which `include.*` flags
  are passed? Consistent with step's purpose?
 7. **`by`-group correctness:** `by = subjid` vs
  `by = .(subjid, param)` etc. — wrong grouping silently
@@ -83,7 +83,7 @@ Before the step-by-step walkthrough, this document covers:
 
 ***Data retention:*** Although we refer to values as being excluded, growthcleanr does not exclude any values from the dataset returned to users. It adds a column to user' input recommending inclusion or exclusion. It does exclude values from further consideration in cleaning. For example, a value of 690kg will be excluded early in the algorithm and is ignored thereafter. As shorthand, we refer to this as excluding a value. 
 
-***Three growth parameters:*** The child algorithm cleans weight (WEIGHTKG), height/length (HEIGHTCM/LENGTHCM), and head circumference (HEADCM). LENGTHCM is relabeled to HEIGHTCM — only the `param` value changes; the measurement value is **not** altered. No adjustment is made for the ~0.5–0.7 cm difference between supine length and standing height. After relabeling, z-scores are calculated identically to HEIGHTCM. Code comments and 725–727 acknowledge this as a known limitation to be addressed in a future update. HEADCM is only cleaned through age 3 years (marked "Exclude-Not-Cleaned" for agedays > 3 × 365.25); z-score data for HC is available only through age 5 years (marked "Exclude-Missing" for agedays ≥ 5 × 365.25).
+***Three growth parameters:*** The child algorithm cleans weight (WEIGHTKG), height/length (HEIGHTCM/LENGTHCM), and head circumference (HEADCM). LENGTHCM is relabeled to HEIGHTCM — only the `param` value changes; the measurement value is **not** altered. No adjustment is made for the ~0.5–0.7 cm difference between supine length and standing height. After relabeling, z-scores are calculated identically to HEIGHTCM. This is a known limitation to be addressed in a future update. HEADCM is only cleaned through age 3 years (marked "Exclude-Not-Cleaned" for agedays > 3 × 365.25); z-score data for HC is available only through age 5 years (marked "Exclude-Missing" for agedays ≥ 5 × 365.25).
 
 ***CSD z-scores, not measurements:*** The child algorithm bases most decisions on z-scores, which standardize measurements by age and sex. The algorithm uses the Conditional Standard Deviation (CSD) method for calculating z-scores (also referred to as SD-scores), not the standard LMS method. [ADD CDC REFERENCE] The LMS accounts for significant skewness in the distribution of weights, which is often useful, but in cleaning it reduces the ability of z-scores to distinguish large absolute differences in weight for heavier children, reducing cleaning accuracy. Several variations of z-scores (SD-scores) are used. These are described further below and are listed in the "### Z-score variants" section below. The two primary variations are sd.orig (the unaltered SD score) and tbc.sd. tbc.sd is calculated by subtracting a recentering value (described further below) from sd.orig.
 
@@ -99,7 +99,7 @@ extreme problems first and getting more refined later. Same-day extraneous value
 
 ***Iterations within steps:*** Several steps (Evil Twins, EWMA1, EWMA2) are iterative. If more than one value is a candidate for exclusion, they select the most extreme candidate and then re-evaluate for further exclusions. This continues until no candidates remain or too few values are left to evaluate. This is a central part of the algorithm and reduces the likelihood of erroneous values leading to exclusion of true values.
 
-***Temporary vs. permanent exclusions:*** Same-day extraneous (SDE) values are multiple values for the same parameter on the same day. growthcleanr selects the most plausible SDE for inclusion in the final dataset. are first flagged temporarily (Step 5) and later
+***Temporary vs. permanent exclusions:*** Same-day extraneous (SDE) values are multiple values for the same parameter on the same day. growthcleanr selects the most plausible SDE for inclusion in the final dataset. SDEs are first flagged temporarily (Step 5) and later
 resolved permanently (Step 13). Carried-forward values may be
 "rescued" and returned to Include status based on z-score
 similarity criteria. These temporary mechanisms allow the
@@ -139,37 +139,42 @@ nearest neighbor, spreading influence across a wider time
 range — appropriate for pediatric data where growth trajectories
 change more rapidly.
 
-***The `valid()` function:*** A critical gatekeeper that
+***The `.child_valid()` function:*** A critical gatekeeper that
 determines which rows participate in each step. It returns a
 logical vector indicating which rows are currently "valid"
 (eligible for processing). Its `include.*` flags control
 whether temporarily excluded categories (temp SDEs, permanent
 SDEs, carried-forward values) are included:
 
-- `valid(df)` — only rows with `exclude` that does not start
+- `.child_valid(df)` — only rows with `exclude` that does not start
  with "Exclude"
-- `valid(df, include.temporary.extraneous = TRUE)` — also
+- `.child_valid(df, include.temporary.extraneous = TRUE)` — also
  includes "Exclude-C-Temp-Same-Day"
-- `valid(df, include.extraneous = TRUE)` — also includes
+- `.child_valid(df, include.extraneous = TRUE)` — also includes
  "Exclude-C-Extraneous"
-- `valid(df, include.carryforward = TRUE)` — also includes
+- `.child_valid(df, include.carryforward = TRUE)` — also includes
  "Exclude-C-CF"
 
-The valid function works by checking the text of the exclude
-column rather than using factor ordering. It uses `grepl("^Exclude", ...)`
-to identify excluded rows, then checks for specific patterns to
-re-include temporarily excluded categories. Non-Exclude codes like
-"Include", "Unit-Error-High", "Unit-Error-Low", "Swapped-Measurements"
-pass through.
+`.child_valid()` works by checking the text of the `exclude`
+column rather than using factor ordering. It uses
+`grepl("^Exclude", ...)` to identify excluded rows, then
+checks for specific codes to conditionally re-include the
+temporary categories (`"Exclude-C-Temp-Same-Day"`,
+`"Exclude-C-Extraneous"`, `"Exclude-C-CF"`). `"Include"` is the
+only non-Exclude value the algorithm produces, so it passes
+through unconditionally.
 
-***Age-dependent id tiebreaking:*** When resolving same-day
-duplicates, the child algorithm uses an age-dependent rule:
-at birth (agedays == 0), keep the lowest id (earliest
-measurement, before postnatal fluid shifts and interventions);
-at all other ages, keep the highest id (later measurement,
-which may represent a more careful re-measurement). This
-differs from the adult algorithm, which always keeps the
-highest id.
+***Age-dependent internal_id tiebreaking:*** When resolving
+same-day duplicates, the child algorithm uses an age-dependent
+rule based on `internal_id` (the sequential integer assigned in
+id-sorted order at session start): at birth (agedays == 0),
+keep the lowest `internal_id` (earliest measurement, before
+postnatal fluid shifts and interventions); at all other ages,
+keep the highest `internal_id` (later measurement, which may
+represent a more careful re-measurement). This differs from the
+adult algorithm, which always keeps the highest `internal_id`.
+The user's original `id` column is never used as a tiebreaker;
+it is preserved untouched into output.
 
 ---
 
@@ -193,10 +198,8 @@ Handles all data setup before the main cleaning loop:
 6. Gestational age correction (Step 2b) for potcorr subjects
 7. SD-score recentering to create tbc.sd and ctbc.sd
 8. Missing value identification
-9. Batching and dispatch to `cleanchild()`
- (see "Batching and Dispatch" section below for details,
- including a known bug where the outer wrapper is
- currently defeated)
+9. Batching and dispatch to `cleanchild()` (see "Batching and
+ Dispatch" section below)
 10. Adult data dispatch to `cleanadult()`
 11. Result merging and output assembly
 
@@ -222,7 +225,7 @@ steps:
 Support functions are defined in `child_clean.R` (after
 `cleanchild`) and `utils.R`:
 
-- `valid()` — row eligibility filter
+- `.child_valid()` — row eligibility filter
 - `identify_temp_sde()` — temp SDE resolution
 - `calc_otl_evil_twins()` — evil twins OTL calculation
 - `calc_and_recenter_z_scores()` — z-score recalculation
@@ -282,90 +285,110 @@ batch's subjects, and `rbindlist()` combines across batches.
 The code contains two layered batching systems with different
 purposes:
 
-**System 1 — Outer wrapper (Chris's addition, for memory
-management):**
-- In `child_clean.R`
-- Creates batches of up to 2,000 subjects using
- `dplyr::mutate(batch = (row_number() - 1) %/% 2000 + 1)`
-- Iterates with a `for` loop; each iteration filters
- `data.all.ages` to the current batch's `subjid` values
-- Collects results in `results_list`, then combines with
- `rbindlist()` at the end
+**System 1 — Outer wrapper (for memory management):**
+- In `child_clean.R`, inside `cleangrowth()`.
+- Creates batches of up to `batch_size` subjects
+ (default 2000; configurable via the `batch_size` parameter):
+ `patients[, batch := (seq_len(.N) - 1L) %/% batch_size + 1L]`.
+- Iterates the batches with a `for` loop. Each iteration
+ filters the input to the current batch's `subjid` values
+ (both the pediatric `data.all` and the adult `data.adult`
+ are limited to those subjects), runs preprocessing and the
+ child/adult algorithms on just that batch, and pushes the
+ per-batch result onto `results_list`.
+- After the loop, `rbindlist(results_list)` combines
+ per-batch results and the merge against `data.batch`
+ restores user input columns.
 
 **System 2 — Inner batching (for parallelism):**
-- In `child_clean.R`
-- Assigns random batch numbers to subjects in the
- already-filtered `data.all` using
- `sample(num.batches, ...)`
+- Also in `child_clean.R`, inside each outer-batch
+ iteration.
+- Assigns round-robin batch numbers to subjects in the
+ already-filtered `data.all`:
+ `(seq_along(subjid.unique) - 1L) %% num.batches + 1L`.
 - When `parallel = FALSE`, `num.batches = 1`, making this a
  no-op: all subjects in the outer batch go to a single
- `cleanchild()` call
+ `cleanchild()` call.
 - When `parallel = TRUE`, dispatches via
- `ddply(..., .parallel = TRUE)` to process batches in
- parallel across CPU cores
+ `ddply(..., .parallel = TRUE)` to process inner batches in
+ parallel across CPU cores.
 
 The inner batching subdivides whatever data the outer wrapper
 provides into parallel work units. With `parallel = FALSE`,
 it has no effect. The adult algorithm has its own inner
-parallel batching system, structured
-identically.
+parallel batching system, structured identically.
 
-### Outer wrapper bug (FIXED)
+### Parallel processing
 
-The outer batching wrapper previously had a bug where
-`data.all` and `data.adult` were overwritten with ALL
-subjects (not just the current batch's subjects), defeating
-the memory management purpose of the wrapper. Fixed by:
+`parallel = TRUE` runs the inner batches concurrently. It
+requires the growthcleanr package to be installed (not just
+`devtools::load_all()`-ed) because the worker processes need
+`system.file()` access to the `inst/extdata/` reference
+tables. Results are bit-identical to sequential processing
+(verified on the 77,721-row `syngrowth` dataset). Typical
+observed speedups on 2,697 subjects: ~114 s sequential, ~65 s
+at `num.batches = 2` (1.7×), ~30 s at `num.batches = 4`
+(3.9×).
 
-1. Batch filter now correctly limits `data.all` and
- `data.adult` to the current batch's subjects
-2. A batch-level reference (`data.batch`) is used for
- result assembly instead of `data.all.ages`
+Batch-invariant setup (the `exclude.levels` factor and the
+Tanner / WHO velocity reference files) is performed once
+outside the outer loop so the cost is not repeated per batch.
 
-Additionally, several batch-invariant operations have been
-moved before the loop:
-- `exclude.levels` definition
-- Tanner/WHO velocity reference file reads
+### Partial runs and preloaded references
 
-These were not bugs, but caused redundant I/O and
-computation per batch.
+Two `cleangrowth()` parameters support workflows that call
+the function many times on overlapping data (simulation
+loops, error-injection pipelines, secure-environment
+workflows with updated data extracts). Both are optional and
+independent; either or both can be used.
 
-### Batch size
+**`ref_tables` + `gc_preload_refs()`.** `gc_preload_refs()`
+reads the CDC and WHO growth-chart reference files once and
+returns a named list of closures (`mtz_cdc_prelim` and
+`mtz_who_prelim`). Passing that list as the `ref_tables`
+argument to subsequent `cleangrowth()` calls skips the
+per-call `read_anthro()` disk reads (≈0.9 seconds per call).
+The return value is a session-lifetime object; rebuild only
+if the reference files themselves change.
 
-The current batch size of 2,000 subjects is hard-coded.
-Chris tested several sizes to find a good default. This
-should be parameterized (e.g., a `batch_size` argument to
-`cleangrowth()` with default 2000) for two reasons:
+```r
+refs <- gc_preload_refs()
+res  <- cleangrowth(..., ref_tables = refs)
+```
 
-- Efficiency improvements since the original testing may
- shift the optimal batch size
-- In HPC environments with large memory, much larger batches
- (or no batching) may be preferable for datasets with
- millions of subjects, avoiding per-batch overhead
+**`cached_results` (+ optional `changed_subjids`).** When
+rerunning `cleangrowth()` on input that differs from a prior
+run for only a subset of subjects, pass the prior result as
+`cached_results`. Only subjects whose input rows differ are
+re-processed; unchanged subjects are copied from the cache.
+Subjects are independent in all cleaning operations
+(by-subject grouping, fixed-reference recentering), so
+partial runs produce the same output a full run would for
+the subjects that changed, and bit-identical output for the
+ones that didn't.
 
-### Parallel processing — known limitation
+Two modes:
 
-The inner parallel batching system (`parallel = TRUE`) is
-currently disabled because it produces incorrect results on
-macOS. The root cause has not been fully investigated but is
-most likely the well-known incompatibility between
-`data.table`'s internal threading and R's forked parallel
-processes (`doParallel`/`foreach` with `type = "FORK"`).
-macOS has additional restrictions on `fork()` with
-multithreaded processes that can silently corrupt shared
-state.
+- **Auto-detect** (preferred — `cached_results` provided,
+ `changed_subjids = NULL`): `cleangrowth()` compares the
+ incoming `subjid`, `param`, `agedays`, `sex`, and
+ `measurement` against the cache (with the same `0 → NaN`
+ transformation applied internally) and re-processes any
+ subjects with added, removed, or modified rows.
+- **Explicit** (`cached_results` + `changed_subjids`
+ provided): only the listed subjects are re-processed; the
+ comparison step is skipped.
 
-Potential fixes to investigate:
-- Use `type = "PSOCK"` socket clusters instead of forked
- processes
-- Replace `ddply`/`foreach` with `data.table`'s own
- `setDTthreads()` parallelism
-- Use `future`/`furrr` framework with `plan(multisession)`
+With `quietly = FALSE`, the wrapper prints a one-line
+summary: `Auto-detected N changed subjects (X added, Y
+modified, Z removed, W unchanged)`. Output row order matches
+input order (sorted by the session-assigned `internal_id`).
 
-This is a future priority — parallel processing would
-significantly reduce runtime on large datasets, particularly
-on macOS where the outer batching wrapper's sequential
-processing is the only option.
+Observed runtimes (200 subjects, 50 000 calls, 5 % of
+subjects changed per call): ≈0.40 s/call vs ≈3.4 s/call for
+a full run with preloaded refs — roughly an 11× speedup and
+~56 hours saved over the simulation. See
+`gc-github-latest/CLAUDE.md` for the full benchmark table.
 
 ---
 
@@ -568,13 +591,7 @@ as the main z-score calculation (2–5 year window).
 | > 5 years | HT, WT | CDC only |
 | any age | HEADCM | WHO only |
 
-This now matches the main z-score blending formula.
-
-***BUG FIXED (2026-03-20):*** The CDC-only cutoff was
-previously `>= 4 years`, which conflated the WHO/CDC
-blending window (2–5 years) with the corrected/uncorrected
-smoothing window (2–4 years). Fixed to `> 5` to match the
-main z-score calculation.
+This matches the main z-score blending formula.
 
 ### Recentering
 
@@ -587,11 +604,13 @@ tbc.sd = sd.orig - sd.median
 ctbc.sd = sd.corr - sd.median
 ```
 
-The child algorithm always uses a fixed reference file
-(`rcfile-2023-08-15_format.csv.gz`) for recentering medians,
-regardless of dataset size. The legacy algorithm uses NHANES
-medians for small datasets (< 5000 observations) or
-derives medians from the input for larger datasets.
+Recentering uses a precomputed reference file
+(`inst/extdata/rcfile-2023-08-15_format.csv.gz`) whose
+medians were built once via the procedure implemented in
+`sd_median()` (year-of-age medians treated as midyear-age,
+linearly interpolated by day of age, clamped outside the
+covered range). Callers can override by passing a
+`sd.recenter` data.table to `cleangrowth()`.
 
 The recentering median file is indexed by param, sex, and
 agedays. It is merged into the data by a rolling join on
@@ -610,18 +629,18 @@ value was excluded.
 
 Internally, most steps operate on the full `data.df`
 data.table but filter to currently valid rows using the
-`valid()` function. When the narrative says a value is
+`.child_valid()` function. When the narrative says a value is
 "excluded," this means:
 
 1. The value's `exclude` column is set to the appropriate
  exclusion code
-2. Subsequent calls to `valid()` will exclude this row
+2. Subsequent calls to `.child_valid()` will exclude this row
  from processing
 3. The value remains in `data.df` with its exclusion code
 
 There is also a softer mechanism: the **temporary SDE**
 flag. Values marked `"Exclude-C-Temp-Same-Day"`
-are excluded by default `valid()` calls but can be included
+are excluded by default `.child_valid()` calls but can be included
 by passing `include.temporary.extraneous = TRUE`. This
 allows steps to optionally include or exclude temp SDEs.
 Permanent SDE resolution (Step 13) replaces temp SDE codes
@@ -632,7 +651,7 @@ with final codes.
 The adult algorithm copies rows into separate working
 dataframes (`h_subj_df`, `w_subj_df`) that shrink as values
 are excluded. The child algorithm keeps all rows in a single
-`data.df` and uses the `exclude` column plus `valid()` to
+`data.df` and uses the `exclude` column plus `.child_valid()` to
 control which rows participate. Rows are never physically
 removed from `data.df` during processing (except for a
 temporary removal of SDE-Identicals during CF string
@@ -647,14 +666,15 @@ detection, which are re-added after).
 | Variable | Type | Created | Description |
 |----------|------|---------|-------------|
 | `line` | integer | Preprocessing | Original row number; used to restore output order |
-| `id` | numeric/char | Input or generated | User-provided unique row id; tiebreaker for sorting |
-| `index` | integer | cleanchild | Sequential row number after sorting; internal key |
-| `subjid` | factor | Input | Subject identifier |
-| `param` | character | Input | `"WEIGHTKG"`, `"HEIGHTCM"`, or `"HEADCM"` (after conversion) |
-| `agedays` | integer | Input | Age in days |
-| `sex` | integer | Input | 0 = male, 1 = female |
-| `v` | numeric | Preprocessing | Working measurement value (metric; 0 → NaN) |
-| `v.orig` | numeric | Step 5 | Copy of `v` before transformations |
+| `id` | any (required) | Input | User-provided row identifier. Required (errors if `NULL`). Preserved untouched into output; not used as a sort key or tiebreaker by the algorithm. |
+| `internal_id` | integer | `cleangrowth()` | Sequential integer `1:N` assigned in id-sorted order at session start. Used throughout as the final sort-tiebreaker and for named-vector indexing where applicable (age-dependent tiebreaking keeps the lowest `internal_id` at `agedays == 0`, the highest at `agedays > 0`). |
+| `index` | integer | `cleanchild` | Sequential `1:.N` within each outer-batch dataframe, reassigned at the top of `cleanchild()` so merges and subset operations within the batch have contiguous keys. |
+| `subjid` | any | Input | Subject identifier (any type; preserved as-is into output). |
+| `param` | character | Input (post-conversion) | `"WEIGHTKG"`, `"HEIGHTCM"`, or `"HEADCM"` after imperial→metric relabeling. |
+| `agedays` | integer | Input | Age in days at the measurement. |
+| `sex` | integer | Input | 0 = male, 1 = female. |
+| `v` | numeric | Preprocessing | Working measurement value (metric; 0 → NaN). |
+| `v.orig` | numeric | Step 5 | Copy of `v` captured at the start of Step 5, used in Step 6 CF detection. |
 
 ### Z-score variables
 
@@ -754,9 +774,6 @@ uncorr, sd.orig_uncorr) when the child algorithm was used.
 | `Include` | — | All | Value passes all checks |
 | `Exclude-Missing` | Init | All | Measurement is NA, NaN, or agedays < 0; also HC ≥ 5y |
 | `Exclude-Not-Cleaned` | Init | HEADCM | HC with agedays > 3 × 365.25 |
-| `Unit-Error-High` | 3 | HT, WT | Unit error detected (value too high); corrected in-place |
-| `Unit-Error-Low` | 3 | HT, WT | Unit error detected (value too low); corrected in-place |
-| `Swapped-Measurements` | 4 | HT, WT | Height and weight appear swapped; corrected in-place |
 | `Exclude-C-Temp-Same-Day` | 5 | All | Temp SDE (may persist if not resolved by Step 13) |
 | `Exclude-C-CF` | 6 | All | Value identical to prior-day value (not rescued) |
 | `Exclude-C-BIV` | 7 | All | Outside absolute or standardized biological limits |
@@ -771,10 +788,12 @@ uncorr, sd.orig_uncorr) when the child algorithm was used.
 | `Exclude-C-Too-Many-Errors` | 21 | All | Error ratio exceeds threshold |
 
 Note: Exclusion codes are not parameter-specific — the param
-is in the data row (e.g., `Exclude-C-CF` applies to WT, HT, and HC).
-The `exclude.levels` list also includes legacy codes from the
-original pediatric algorithm for backward compatibility with
-datasets cleaned by older versions.
+is in the data row (e.g., `Exclude-C-CF` applies to WT, HT, and
+HC). The `exclude.levels` factor defined in `cleangrowth()`
+enumerates exactly the codes listed here, plus the adult
+codes; values outside this list would silently become `NA` when
+assigned to the `exclude` factor, so new codes must be added
+to `exclude.levels` before use.
 
 ### CF rescue reason codes (cf_rescued column)
 
@@ -792,20 +811,39 @@ Rescued CFs have their `exclude` column set back to
 
 ## Configurable Parameters
 
+The table is audited incrementally by walk-through session.
+Rows for parameters used in steps that have not yet been
+walked are shown with their current defaults but without a
+detailed description; those rows will be filled in and
+verified against the code when each step is walked.
+
 | Parameter | Default | Used in | Description |
 |-----------|---------|---------|-------------|
-| `recover.unit.error` | FALSE | Step 3 | Attempt to identify and correct unit errors |
-| `sd.extreme` | 25 | Step 7 | SD-score cutoff for extreme exclusion |
-| `z.extreme` | 25 | Step 7 | Z-score cutoff for extreme exclusion |
-| `error.load.mincount` | 2 | Step 21 | Min exclusions before evaluating error load |
-| `error.load.threshold` | 0.5 | Step 21 | Error ratio above this excludes all |
-| `sd.recenter` | NA | Recentering | Recentering method (child always uses fixed file) |
-| `include.carryforward` | FALSE | Step 6 | If TRUE, skip CF detection entirely |
-| `ewma.exp` | -1.5 | EWMA steps | Exponent for EWMA weighting |
-| `ewma_window` | 15 | EWMA steps | Max observations on each side for EWMA |
-| `adult_cutpoint` | 20 | Preprocessing | Age (years) dividing pediatric/adult |
-| `use_legacy_algorithm` | FALSE | Dispatch | If TRUE, use legacy pediatric algorithm |
-| `quietly` | TRUE | All | Suppress progress messages |
+| `id` | NULL | Preprocessing | Required row identifier preserved into output. Can be any type (numeric, character, UUID). If `NULL`, `cleangrowth()` errors. |
+| `adult_cutpoint` | 20 | Preprocessing | Age (years) dividing the pediatric and adult paths. Subjects with measurements spanning the cutpoint have their pediatric and adult rows cleaned by separate algorithms. |
+| `sd.recenter` | NA | Preprocessing (recentering) | If left `NA`, the built-in rcfile is used (`inst/extdata/rcfile-2023-08-15_format.csv.gz`). Pass a data.table to override with custom recentering medians. |
+| `ref.data.path` | `""` | Preprocessing | Directory override for reference files (CDC/WHO z-score tables, rcfile, velocity tables, Fenton data). Default empty string means use the installed package's `inst/extdata/`. |
+| `batch_size` | 2000 | Batching (outer wrapper) | Number of subjects per outer-wrapper batch. Subjects are never split across batches. |
+| `parallel` | FALSE | Batching (inner) | If `TRUE`, inner batches dispatch via `ddply(..., .parallel = TRUE)` for concurrent processing. Requires the package to be installed (not just `load_all()`-ed). |
+| `num.batches` | NA | Batching (inner) | Number of inner (parallel) batches. Auto-set when `parallel = TRUE`; ignored when `parallel = FALSE` (acts as 1). |
+| `log.path` | NA | Batching (inner) | If non-NA and `parallel = TRUE`, each worker sinks messages to `{log.path}/cleangrowth-{date}-batch-{n}.log`. |
+| `ref_tables` | NULL | Performance | Pre-loaded reference closures from `gc_preload_refs()`. Skips repeated disk reads across many `cleangrowth()` calls; see "Partial runs and preloaded references" below. |
+| `cached_results` | NULL | Performance | Prior `cleangrowth()` output. Unchanged subjects are copied from cache; changed subjects are re-processed. Either auto-detected or listed explicitly via `changed_subjids`. See "Partial runs and preloaded references" below. |
+| `changed_subjids` | NULL | Performance | Optional explicit list of subject IDs to re-process when using `cached_results`. If `NULL`, changed subjects are auto-detected by comparing input to cache. |
+| `debug` | FALSE | Diagnostics | If `TRUE`, emits 6 `ewma1_it1.*` columns capturing first-iteration Step 11 EWMA values. Off by default to keep standard output lean. |
+| `tri_exclude` | FALSE | Output | If `TRUE`, adds a `tri_exclude` column with a three-level summary (Include / Exclude / N/A). Convenience for downstream filtering. |
+| `quietly` | TRUE | All | Suppress progress messages. When `FALSE`, the wrapper prints batch and step progress via `message()`. |
+| `include.carryforward` | FALSE | Step 6 | **Deprecated** — mapped to `cf_rescue = "all"` with a warning. Use `cf_rescue` directly. |
+| `cf_rescue` | `"standard"` | Step 6 | See Step 6. |
+| `cf_detail` | FALSE | Step 6 | See Step 6. |
+| `weight_cap` | (missing) | Adult | **Deprecated** — mapped to `adult_scale_max_lbs` with a warning. |
+| `adult_permissiveness` | `"looser"` | Adult | Not walked yet; see `adult-algorithm-narrative.md`. |
+| `adult_scale_max_lbs` | `Inf` | Adult | Not walked yet. |
+| `sd.extreme` | 25 | Step 7 | Not walked yet. |
+| `z.extreme` | 25 | Step 7 | Not walked yet. |
+| `ewma_window` | 15 | EWMA steps | Not walked yet. |
+| `error.load.mincount` | 2 | Step 21 | Not walked yet. |
+| `error.load.threshold` | 0.5 | Step 21 | Not walked yet. |
 
 ---
 
@@ -836,44 +874,178 @@ or are handled within other steps in the child algorithm.
 
 ---
 
-## Open Questions and Issues to Investigate
+## Step 2b: Gestational Age Correction (preprocessing)
 
-- [x] **BUG FIXED: Z-score blending in
- `calc_and_recenter_z_scores()`:** CDC-only cutoff was
- `>= 4 years`; fixed to `> 5` to match main z-score
- blending. See "Age blending — calc_and_recenter_z_scores()"
- section above.
-- [x] **HC age limits:** "Exclude-Not-Cleaned" is applied at
- `agedays > 3 × 365.25`, but "Exclude-Missing" is
- applied at `agedays >= 5 × 365.25`.
- **Resolved:** "Exclude-Not-Cleaned" at > 3y fires first during
- initialization, so HC > 3y is never cleaned. The
- >= 5y Missing assignment is functionally redundant for
- HC but catches the z-score reference gap (WHO HC
- reference data only available through age 5). Not a bug;
- consider adding a comment in code for clarity.
-- [x] **BUG FIXED: Batching wrapper defeats its own purpose.**
- Fixed by removing the overwrite and creating a batch-level
- reference for result assembly.
-- [x] **Debug output fixed:** Step 5 `stop()` on duplicate
- Include values converted to `warning()`. Also fixed in
- Step 13 (two locations).
-- [ ] **Exclusion code rename and cleanup:** All exclusion
- code names will be renamed at the end of development.
- The exclude.levels list also includes many legacy codes
- from the original pediatric algorithm that the child
- algorithm does not produce — clean up at the same time.
-- [x] **Parallel processing fixed (2026-04-04).** Three
- bugs resolved (see CLAUDE.md). Requires installed package
- via `devtools::install_local()`.
-- [ ] **Batch size should be parameterized.** Currently
- hard-coded at 2,000 subjects. Add a `batch_size` argument
- to `cleangrowth()`. See "Batching and Dispatch — Batch
- size" section.
-- [x] **Batch-invariant operations moved outside the loop
- (2026-04-13).** `exclude.levels` definition and Tanner/WHO
- velocity reference reads moved before the loop.
- `read_anthro()` calls already optimized via `ref_tables`.
+| | |
+|---|---|
+| **Scope** | Subjects whose first weight suggests prematurity (potcorr subjects) |
+| **Operates on** | All rows of potcorr subjects |
+| **Prior step** | Z-score calculation (WHO/CDC) |
+| **Next step** | Recentering |
+| **Output columns** | `sd.corr`, `uncorr`, `potcorr` (merged back onto all rows) |
+| **Exclusion code** | None — computes corrected z-scores only |
+| **Code location** | `cleangrowth()` in `child_clean.R` ~lines 737–1005 |
+| **Controlled by** | No user parameters; uses built-in Fenton 2025 reference |
+
+### Overview
+
+Very preterm subjects whose anthropometric references should
+be preterm growth standards are identified as "potentially
+correctable" (`potcorr`) and have their z-scores recomputed
+against the Fenton 2025 reference using postmenstrual age. If
+the correction happens to worsen the early trajectory
+(corrected first-to-fourth-weight deviations sum larger than
+uncorrected), the correction is reverted for that subject
+(`uncorr := 1`, `sd.corr := sd.orig`). All three columns
+(`sd.corr`, `uncorr`, `potcorr`) are written back to
+`data.all` for every row; downstream steps read them through
+`final_tbc` and related recentered fields.
+
+### Phase 1: potcorr identification
+
+Subjects are flagged by a two-level rule.
+
+- **Sort.** Sort by `(subjid, param, agedays, id_sort)` where
+ `id_sort = internal_id` at `agedays == 0` and `-internal_id`
+ otherwise. At birth this keeps the earliest-recorded row as
+ the "first" weight; at later ages it keeps the most recent
+ internal_id — the age-dependent tiebreaker used throughout
+ the algorithm.
+- **`potcorr_wt`** (row-level): a weight row is
+ `potcorr_wt = TRUE` iff (a) it is the first weight row for
+ that subject under the sort above (`seq_len(.N) == 1L` with
+ `by = subjid`), (b) `sd.orig < -2`, and (c) age is less than
+ 10 months. NA-safe: `sd.orig` is `NA` for `Exclude-Missing`
+ rows so they never flag.
+- **`potcorr`** (subject-level): `any(potcorr_wt, na.rm = TRUE)`
+ per subject. Propagated to all rows of that subject.
+
+### Phase 2: fast path when no potcorr
+
+`has_potcorr <- any(data.all$potcorr, na.rm = TRUE)`. If
+FALSE, Step 2b short-circuits: `sd.corr := sd.orig`,
+`uncorr := 0`. Fenton reference files are not read. This
+typical-case fast path matters because potcorr subjects are
+usually < 1 % of a dataset.
+
+### Phase 3: Fenton correction (potcorr subjects only)
+
+All work happens on a copy `pc <- data.all[subjid %in% pc_ids]`.
+
+1. **Integer weight.** `intwt := trunc(v * 100) * 10` (grams
+ rounded to 10 g); values in `[250, 500)` are floored to 500
+ to hit the Fenton table's minimum.
+2. **Fenton merge #1 — weight → GA.** Merge `pc` with
+ `fent_foraga` (from
+ `inst/extdata/fent_foraga.csv.gz`) on `(sex, intwt)` to get
+ `fengadays` (Fenton gestational age in days for that
+ weight).
+3. **Propagate.** Use the qualifying first-weight row's
+ `fengadays` for every row of the subject
+ (`fengadays_subj := min(fengadays[potcorr_wt], ...)`, by
+ subjid).
+4. **Ages.** `pmagedays := agedays + fengadays` (postmenstrual
+ age); `cagedays := pmagedays - 280` (corrected age). Both
+ computed only when `fengadays < 259` (term cutoff).
+5. **Fenton merge #2 — GA → M/S.** Map gc param names
+ (`WEIGHTKG`/`HEIGHTCM`/`HEADCM`) to Fenton param names
+ (`weight`/`length`/`headcirc`), then merge with
+ `fenton2025_ms_lookup_smoothed.csv` on `(sex, fengadays,
+ param)` to pull `M`, `S_upper`, `S_lower`.
+6. **Fenton CSD z-score.** `v_fenton` is `v * 1000` for weight
+ and `v` otherwise. `unmod_zscore := (v_fenton − M) /
+ (S_upper * M)` if `v_fenton >= M`, else `/ (S_lower * M)`.
+ This uses the same CSD method as WHO/CDC elsewhere in the
+ algorithm.
+7. **Correction failure.** If Fenton merge failed (no M),
+ reset `potcorr_wt` to FALSE for that row and recompute the
+ subject-level `potcorr`. A subject whose weight is outside
+ Fenton's range silently falls out of the correction.
+8. **Initial `sd.corr`.** Rows with `unmod_zscore` non-NA get
+ `sd.corr := unmod_zscore`. Rows still `NA` fall back to
+ `sd.orig`.
+9. **Corrected WHO/CDC z-scores.** Compute `sd.c_who` and
+ `sd.c_cdc` via the in-memory `measurement.to.z_who` /
+ `measurement.to.z` closures at `cagedays`. For HEIGHTCM
+ between ages 2 and 2+ at Fenton-corrected-age-≤2, apply the
+ supine/standing offsets (+0.8 cm for WHO, +0.7 cm for CDC)
+ before the z-score call.
+10. **`sd.c` (corrected blend).** HEADCM uses WHO at all ages.
+ Other params: WHO for `ageyears_2b ≤ 2`, smoothed
+ WHO→CDC blend for `2 < ageyears_2b < 5`, CDC for
+ `ageyears_2b ≥ 5`.
+11. **Fenton takes precedence under 2.** For `ageyears_2b ≤ 2`
+ with Fenton available, `sd.c := unmod_zscore`.
+12. **Final `sd.corr`.** Age-dependent:
+ - `ageyears_2b ≤ 2` with potcorr: `sd.c`
+ - `2 < ageyears_2b ≤ 4`: smoothed blend
+ `(sd.orig * (4 − ageyears_2b) + sd.c * (ageyears_2b − 2)) / 2`
+ - otherwise: `sd.orig`
+
+### Phase 4: uncorr check (revert when correction worsens trajectory)
+
+Only weight rows of potcorr subjects participate. A
+temporary `tmp` copy is built:
+
+- SDE-Identicals are filtered via the age-dependent
+ `keep_id` rule (match Early Step 13 behavior).
+- `seq_win := sequence(.N)` per subject; keep rows with
+ `seq_win ≤ 4 AND ageyears_2b < 2`.
+- Drop subjects that have only one value or no non-NA
+ z-scores.
+- Compute `sd.corr_abssumdiff := |sum(sd.corr[1] − sd.corr)|`
+ and `sd.orig_abssumdiff := |sum(sd.orig[1] − sd.orig)|`
+ per subject.
+- A subject's correction is reverted if
+ `sd.corr_abssumdiff > sd.orig_abssumdiff` (and the first
+ weight exists): in `pc`, `sd.corr := sd.orig`,
+ `uncorr := 1`.
+
+### Phase 5: merge results back
+
+`data.all[, sd.corr := sd.orig]` and `uncorr := 0L` baseline,
+then merge the pc results back by `id`:
+
+```r
+data.all[pc_result, on = "id", `:=`(
+  sd.corr = i.sd.corr,
+  uncorr = i.uncorr,
+  potcorr = i.potcorr
+)]
+```
+
+Temporary columns (`agemonths`, `ageyears_2b`, `potcorr_wt`,
+etc.) are dropped before the data flows into recentering.
+
+### Checklist findings (2026-04-17 walk)
+
+1. **Sort determinism.** Age-dependent sort key
+ (`id_sort`) is assigned explicitly before potcorr_wt is
+ marked.
+2. **Fenton reference files.** Loaded only under
+ `has_potcorr`; `fent_foraga.csv.gz` and
+ `fenton2025_ms_lookup_smoothed.csv` both in
+ `inst/extdata/`.
+3. **Fast-path correctness.** When no subjects flag, the
+ fast path writes `sd.corr := sd.orig` and `uncorr := 0L`
+ — every row still has a non-missing `sd.corr` for
+ downstream use.
+4. **NA safety.** The `potcorr_wt` predicate uses
+ `!is.na(sd.orig) & sd.orig < -2`, so `Exclude-Missing`
+ rows (where `sd.orig` is `NA`) cannot flag.
+5. **Fenton merge failure.** Correctly resets `potcorr_wt`
+ to FALSE and recomputes subject-level `potcorr` so the
+ subject is excluded from downstream Fenton logic without
+ silently using partial results.
+6. **Correction revert rule.** The abssumdiff comparison is
+ computed only over weight rows with `ageyears_2b < 2` and
+ `seq_win ≤ 4`. The check is first-weight-only
+ (`is_first`), which matches its purpose (the correction
+ is driven by the first qualifying weight).
+7. **HEIGHTCM supine/standing offsets** (+0.8 WHO, +0.7
+ CDC) are applied only when `agedays > 730 & cagedays ≤
+ 730` — the band where chronological age is post-2y but
+ corrected age is still under 2y.
 
 ---
 
@@ -883,7 +1055,7 @@ or are handled within other steps in the child algorithm.
 |---|---|
 | **Scope** | All parameters |
 | **Exclusion codes** | `Exclude-C-Identical`, `Exclude-C-Extraneous` |
-| **Code location** | See code |
+| **Code location** | Early Step 13 is inline at the top of `cleanchild()` in `child_clean.R` (~lines 2518–2537). Main Step 13 is later in `cleanchild()` and reuses `identify_temp_sde()` (`child_clean.R` ~lines 2021+). |
 
 ### Overview
 
@@ -1007,33 +1179,23 @@ are dropped.
 
 ### Checklist findings
 
-1. **Debug `stop()` blocks converted to `warning()`:**
- Two duplicate-Include checks (pre and post temp SDE
- marking) were hard stops with CSV file writing. Converted
- to warnings matching the Step 5 pattern.
-2. **Removed debug save points:** Commented-out saveRDS
- blocks for Step 13 input and output.
-3. **Removed unnecessary `_rounded` aliases:**
- `absdiff_median_rounded` and `absdiff_dop_rounded` were
- exact copies. Replaced references with originals.
-4. **DOP mapping consistent:** HC → HT in all three DOP
+1. **DOP mapping consistent:** HC → HT in all three DOP
  median calculations.
-5. **Boundaries:** SDE-All-Extreme `> 2` (one-day) and
+2. **Boundaries:** SDE-All-Extreme `> 2` (one-day) and
  `> 1` (EWMA-based) — both strict. Age-dependent id
- tiebreaker uses `internal_id` (not `id`) in Step 13.
-6. **`valid()` calls:** Temp SDEs included when building
- `data.sde` subset. EWMA computed on Include-only
- (excludes temp SDEs). DOP medians exclude temp SDEs
- via `!was_temp_sde`.
-7. **Merge safety:** Only Include/Temp-SDE rows overwritten
- on merge back — permanent exclusions preserved.
-8. **Parameter scope:** All 3 params handled. DOP has
- param-specific mapping.
-9. **Factor levels:** All 5 SDE exclusion codes exist in
+ tiebreaker uses `internal_id` (not the user's `id`) in
+ Step 13.
+3. **`.child_valid()` calls:** Temp SDEs included when
+ building the `data.sde` subset. EWMA computed on
+ Include-only rows (excludes temp SDEs). DOP medians
+ exclude temp SDEs via `!was_temp_sde`.
+4. **Merge safety:** Only Include and Temp-SDE rows are
+ overwritten on merge-back — permanent exclusions from
+ earlier steps are preserved.
+5. **Parameter scope:** All three params are handled. DOP
+ has a param-specific mapping (see get_dop()).
+6. **Factor levels:** All 5 SDE exclusion codes exist in
  `exclude.levels`.
-10. **Comment cleanup:** Cryptic stray comment "h. no need
- to calculate for R." was removed from the code during
- the 2026-04-16d walkthrough.
 
 ---
 
@@ -1042,11 +1204,11 @@ are dropped.
 | | |
 |---|---|
 | **Scope** | All parameters |
-| **Operates on** | Valid rows (via `valid()`, includes temp SDEs) |
+| **Operates on** | Valid rows (via `.child_valid()`, includes temp SDEs) |
 | **Prior step** | Early Step 13 (SDE-Identicals) |
 | **Next step** | Step 6 (Carried Forwards) |
 | **Exclusion code** | `Exclude-C-Temp-Same-Day` |
-| **Code location** | See code |
+| **Code location** | Inline in `cleanchild()` at `child_clean.R` ~lines 2540–2556; dispatches to `identify_temp_sde()` (`child_clean.R` ~lines 2021+) without the Step-13 `exclude_from_dop_ids` argument. |
 
 ### Overview
 
@@ -1113,9 +1275,9 @@ Within each `(subjid, param, agedays)` group, sort by:
 1. `absdmedian.spz` ascending (closest to SP median first)
 2. `absdmedian.dopz` ascending (closest to DOP median as
  tiebreaker)
-3. Age-dependent id tiebreaker:
- - At birth (`agedays == 0`): `id` ascending (keep lowest)
- - At other ages: `id` descending (keep highest)
+3. Age-dependent `internal_id` tiebreaker:
+ - At birth (`agedays == 0`): `internal_id` ascending (keep lowest)
+ - At other ages: `internal_id` descending (keep highest)
 
 The first value after sorting is kept; all others are marked
 `extraneous = TRUE`.
@@ -1419,7 +1581,7 @@ comment in the helper).
 12. **Threshold reconciliation.** `.cf_rescue_lookup()`
  matrices match `cf-rescue-thresholds.md`; HEADCM reuses
  HEIGHTCM as a known placeholder (flagged above).
-13. **`valid()` flags.** Phase 1 uses
+13. **`.child_valid()` flags.** Phase 1 uses
  `.child_valid(data.df, include.temporary.extraneous =
  TRUE)` — correct. Temp SDEs are legitimate CF
  candidates themselves.
@@ -1544,7 +1706,7 @@ changes which SDE value is most plausible.
  `ageyears >= 1` for Standardized-BIV use strict `<`
  and `>=`. A child at exactly 365.25 days (1.0 years)
  gets the `>= 1` thresholds.
-6. **`valid()` call:** Correctly includes temp SDEs.
+6. **`.child_valid()` call:** Correctly includes temp SDEs.
  `valid_set` is computed once and not refreshed between
  Absolute and Standardized BIV, but the `!= abs_biv`
  guard prevents double-exclusion.
@@ -1670,7 +1832,7 @@ back to `data.df` in bulk.
  Not a bug, just slightly wasteful.
 4. **Boundaries:** OTL threshold is strict `> 5`. Tiebreaker
  uses lowest `id` (not age-dependent like SDE steps).
-5. **`valid()` call:** Correctly excludes temp SDEs
+5. **`.child_valid()` call:** Correctly excludes temp SDEs
  (`include.temporary.extraneous = FALSE`). Evil Twins
  operates on the "clean" view without SDE candidates.
 6. **Sort order:** Explicit sort before
@@ -1834,7 +1996,7 @@ result.
 4. **Boundaries — all strict:** `> 3.5`, `> 3`, `< -3.5`,
  `< -3` for dewma; `> 3.5` / `< -3.5` for `tbc.sd`
  and `c.dewma.all`.
-5. **`valid()` call:** Correctly excludes temp SDEs.
+5. **`.child_valid()` call:** Correctly excludes temp SDEs.
  Only Include values participate in EWMA calculation
  and exclusion candidates.
 6. **ctbc optimization:** Skips ctbc EWMA computation
@@ -2035,7 +2197,7 @@ updates. DOP snapshot refreshed each iteration.
 2. **Boundaries verified:** All dewma thresholds are
  strict `>` / `<`. Gap thresholds use strict `<` vs
  `>=` consistently.
-3. **`valid()` calls:** Step 15 excludes temp SDEs AND
+3. **`.child_valid()` calls:** Step 15 excludes temp SDEs AND
  birth HT/HC. Step 16 excludes temp SDEs, includes
  only birth HT/HC subjects.
 4. **p_plus/p_minus values:** WT uses multiplicative
@@ -2219,7 +2381,7 @@ For **exactly 2 measurements:**
 5. **Boundaries:** `diff < mindiff` and `diff > maxdiff`
  — strict inequalities. WHO interval boundaries use
  `>=` / `<` consistently.
-6. **`valid()` call:** Excludes temp SDEs, excludes weight.
+6. **`.child_valid()` call:** Excludes temp SDEs, excludes weight.
 7. **Sort order:** Explicit `order(agedays, id)` inside
  each while-loop iteration.
 8. **Parameter scope:** HT and HC only. HC has separate
@@ -2288,7 +2450,7 @@ For 1 remaining measurement:
 
 1. **Boundaries:** Pair: `> 4` / `> 2.5` strict; gap
  `>= 365.25` inclusive. Single: `> 3` / `> 5` strict.
-2. **`valid()` call:** Excludes temp SDEs. Counts only
+2. **`.child_valid()` call:** Excludes temp SDEs. Counts only
  Include rows for singles/pairs determination.
 3. **DOP snapshot:** Correct — prevents cross-parameter
  interference.
