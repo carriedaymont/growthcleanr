@@ -24,7 +24,6 @@ cleangrowth(
   include.carryforward = FALSE,
   cf_rescue = "standard",
   cf_detail = FALSE,
-  debug = FALSE,
   ref.data.path = "",
   log.path = NA,
   parallel = FALSE,
@@ -130,11 +129,6 @@ columns in the output. \code{cf_status} is one of: NA (not a CF candidate),
 "CF-NR" (CF, does not meet rescue criteria), or "CF-Resc" (CF, meets rescue
 criteria). \code{cf_deltaZ} is the absolute z-score difference used for rescue
 evaluation. Defaults to FALSE.}
-
-\item{debug}{Logical. If TRUE, include diagnostic columns in the output for
-algorithm debugging. Currently emits six \code{ewma1_it1.*} columns capturing
-EWMA values from the first iteration of Step 11 (EWMA1 Extreme), useful for
-investigating why a particular row was flagged. Defaults to FALSE.}
 
 \item{ref.data.path}{Path to reference data. If not supplied, the year 2000
 Centers for Disease Control (CDC) reference data will be used.}

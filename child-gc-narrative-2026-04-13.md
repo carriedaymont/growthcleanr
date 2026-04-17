@@ -830,7 +830,6 @@ verified against the code when each step is walked.
 | `ref_tables` | NULL | Performance | Pre-loaded reference closures from `gc_preload_refs()`. Skips repeated disk reads across many `cleangrowth()` calls; see "Partial runs and preloaded references" below. |
 | `cached_results` | NULL | Performance | Prior `cleangrowth()` output. Unchanged subjects are copied from cache; changed subjects are re-processed. Either auto-detected or listed explicitly via `changed_subjids`. See "Partial runs and preloaded references" below. |
 | `changed_subjids` | NULL | Performance | Optional explicit list of subject IDs to re-process when using `cached_results`. If `NULL`, changed subjects are auto-detected by comparing input to cache. |
-| `debug` | FALSE | Diagnostics | If `TRUE`, emits 6 `ewma1_it1.*` columns capturing first-iteration Step 11 EWMA values. Off by default to keep standard output lean. |
 | `tri_exclude` | FALSE | Output | If `TRUE`, adds a `tri_exclude` column with a three-level summary (Include / Exclude / N/A). Convenience for downstream filtering. |
 | `quietly` | TRUE | All | Suppress progress messages. When `FALSE`, the wrapper prints batch and step progress via `message()`. |
 | `include.carryforward` | FALSE | Step 6 | **Deprecated** — mapped to `cf_rescue = "all"` with a warning. Use `cf_rescue` directly. |
@@ -1943,66 +1942,95 @@ None. The OTL threshold (`> 5` on both `tbc.sd` and
 | **Prior step** | Step 9 (Evil Twins) |
 | **Next step** | Step 13 (Final SDE Resolution) |
 | **Exclusion code** | `Exclude-C-Traj-Extreme` |
-| **Code location** | See code |
+| **Code location** | Inline in `cleanchild()` in `child_clean.R`; support function `ewma()` defined earlier in `child_clean.R` |
 
 ### Overview
 
-EWMA1 identifies extreme outliers using Exponentially
-Weighted Moving Averages. For each measurement, the EWMA
-predicts what the value "should" be based on the subject's
-other measurements for the same parameter. Values that
-deviate extremely from their EWMA prediction are excluded.
+EWMA1 flags extreme outliers using Exponentially Weighted
+Moving Averages. For each measurement, the EWMA predicts
+what the value "should" be based on the subject's other
+measurements for the same parameter. Values that deviate
+extremely from their EWMA prediction are flagged
+`Exclude-C-Traj-Extreme`.
 
 The step is **iterative at two levels**:
-1. Per subject-param: exclude at most ONE worst value
+1. Per subject-param: flag at most ONE worst value per pass.
 2. Globally: repeat across all subject-params until no
- new exclusions occur
+   new exclusions occur.
 
 This prevents one extreme value from distorting the EWMA
-of nearby values, causing a cascade of false exclusions.
+of nearby values and causing a cascade of false exclusions.
 
-### Pre-filtering
+The step has three blocks:
+
+- **11a. Pre-filter / setup** — count and extreme filters
+  narrow the set of subject-params, and the subjects that
+  currently carry temp SDEs are captured for later targeted
+  recalculation.
+- **11b. Iteration loop** — global while loop; each pass
+  processes one subject-param at a time via a per-group
+  closure, flags at most one worst value, and runs a
+  targeted temp-SDE recalc.
+- **11c. End-of-step temp SDE refresh** — global reset +
+  rerun of `identify_temp_sde()` before Step 13.
+
+### 11a. Pre-filter / setup
 
 Two pre-filters narrow the work:
-1. **Count filter:** Subject-params with <= 2 Include
- values are skipped (EWMA needs 3+ points)
-2. **Extreme filter:** Subject-params where no Include
- value has `|tbc.sd| > 3.5` are skipped (impossible to
- meet exclusion criteria)
 
-### EWMA calculation
+1. **Count filter:** Subject-params with `<= 2` Include
+   values are skipped (EWMA needs 3+ points).
+2. **Extreme filter:** Subject-params where no Include
+   value has `|tbc.sd| > 3.5` are skipped — if the most
+   extreme z-score does not exceed 3.5, no value can meet
+   the `tbc.sd > 3.5` criterion.
+
+In addition, the subjects that currently carry
+`Exclude-C-Temp-Same-Day` are captured up front as
+`subj_with_sde`; the iteration loop only recalculates
+temp SDEs for subjects that are in this set AND produce
+a new EWMA1 exclusion in a given pass.
+
+### 11b. Iteration loop
+
+Each pass processes one subject-param at a time via a
+per-group closure operating on a copy of the group's
+rows (`copy(.SD)`). The closure performs four computations
+and at most one exclusion.
+
+#### EWMA computation
 
 For each subject-param group with `> 2` Include values:
 
-1. **Exponent calculation**: Age-gap-
- dependent exponent using linear interpolation:
- - Gap <= 1 year: exponent = -1.5
- - Gap >= 3 years: exponent = -3.5
- - Between: linear interpolation
- (`-1.5 - (ageyears - 1)`)
- - `ageyears` is based on the maximum of the gap
- before and after each measurement
+1. **Exponent calculation** — age-gap-dependent exponent
+   using linear interpolation:
+   - Gap <= 1 year: exponent = -1.5
+   - Gap >= 3 years: exponent = -3.5
+   - Between: linear interpolation
+     (`-1.5 - (ageyears - 1)`)
+   - `ageyears` is based on the maximum of the gap
+     before and after each measurement.
 
-2. **EWMA computation**: Calls
- `ewma()` function with windowed matrix operations.
- Three variants computed:
- - `ewma.all`: excluding only the current observation
- - `ewma.before`: excluding current + prior
- - `ewma.after`: excluding current + next
- - Same three computed for `ctbc.sd` (corrected),
- prefixed with `c.`. If `ctbc.sd == tbc.sd` for all
- rows (vast majority — non-potcorr subjects), the
- ctbc columns are copied rather than recomputed.
+2. **EWMA computation** — calls `ewma()` with windowed
+   matrix operations. Three variants are computed:
+   - `ewma.all`: excluding only the current observation
+   - `ewma.before`: excluding current + prior
+   - `ewma.after`: excluding current + next
+   - The same three are computed for `ctbc.sd`
+     (corrected), prefixed with `c.`. If `ctbc.sd == tbc.sd`
+     for all rows (vast majority — non-potcorr subjects),
+     the ctbc columns are copied rather than recomputed.
 
 3. **Deviation (dewma)**:
- - `dewma.all = tbc.sd - ewma.all`
- - `dewma.before = tbc.sd - ewma.before`
- - `dewma.after = tbc.sd - ewma.after`
- - `c.dewma.all = ctbc.sd - c.ewma.all`
+   - `dewma.all = tbc.sd - ewma.all`
+   - `dewma.before = tbc.sd - ewma.before`
+   - `dewma.after = tbc.sd - ewma.after`
+   - `c.dewma.all = ctbc.sd - c.ewma.all`
 
-### Exclusion criteria
+#### Exclusion criteria
 
-A value is a potential exclusion if ALL of:
+A value is a potential exclusion (`pot_excl = TRUE`) if
+ALL of:
 
 **Positive outlier:**
 - `dewma.all > 3.5`
@@ -2018,81 +2046,91 @@ A value is a potential exclusion if ALL of:
 - `tbc.sd < -3.5`
 - `c.dewma.all < -3.5` OR `ctbc.sd` is NA
 
-The `c.dewma.all` check uses `ctbc.sd` (not `c.dewma.all`)
-for the NA test. When `ctbc.sd` is NA (non-potcorr subjects
-or missing corrected z-score), the corrected dewma check
-passes automatically. When `ctbc.sd` is available,
-`c.dewma.all = ctbc.sd - c.ewma.all` must also exceed the
-threshold.
-
-**Pre-filter:** Before per-group processing, subject-params
-with `max(|tbc.sd|) <= 3.5` are skipped entirely (if the
-most extreme z-score doesn't exceed 3.5, no value can meet
-the `tbc.sd > 3.5` criterion).
+The NA-escape uses `ctbc.sd` (not `c.dewma.all`) for the
+NA test. When `ctbc.sd` is NA (non-potcorr subjects or
+missing corrected z-score), the corrected-dewma check
+passes automatically; when `ctbc.sd` is available,
+`c.dewma.all = ctbc.sd - c.ewma.all` must also exceed
+the threshold.
 
 **Additional constraints:**
-- First and last Include values are never excluded
-- At most ONE value excluded per subject-param per
- iteration
+- First and last Include values are never excluded.
+- At most ONE value is flagged per subject-param per
+  iteration.
 
-### Worst-value selection
+#### Worst-value selection
 
-When multiple values meet criteria, the worst is selected
-by: `order(pot_excl, abs(tbc.sd + dewma.all), -id,
-decreasing = TRUE)`. The sort key
-`abs(tbc.sd + dewma.all)` combines the z-score magnitude
-with its deviation — values that are both extreme and far
-from EWMA prediction score highest. Lowest `id` breaks
-ties.
+When more than one value meets criteria, the worst is
+selected by
+`order(pot_excl, abs(tbc.sd + dewma.all), -internal_id, decreasing = TRUE)[1]`.
+The sort key `abs(tbc.sd + dewma.all)` combines the
+z-score magnitude with its deviation — values that are
+both extreme and far from EWMA prediction score highest.
+Lowest `internal_id` breaks ties.
 
-### Global iteration loop
+#### Iteration bookkeeping
 
 After each per-group pass:
-1. Identify subject-params with NEW exclusions (comparing
- before/after)
-2. Recalculate temp SDEs only for subjects that had both
- new exclusions AND existing SDEs (targeted, not global)
-3. Next iteration processes only subject-params with new
- exclusions
-4. Loop terminates when no new exclusions occur
 
-After the loop, a final global temp SDE recalculation runs.
+1. Subject-params with a NEW exclusion this pass are
+   identified (comparing `had_ewma1_before` flags against
+   the post-pass state).
+2. Temp SDEs are recalculated ONLY for subjects that are
+   both in `subj_with_sde` (had a temp SDE going into
+   Step 11) AND produced a new exclusion this pass — the
+   closure resets those subjects' temp SDEs to Include
+   and reruns `identify_temp_sde()` on that subset.
+3. The next iteration's `sp_to_process` is the set of
+   subject-params with new exclusions from this pass.
+4. The loop terminates when no subject-param produces a
+   new exclusion.
 
-### Debug columns preserved
+### 11c. End-of-step temp SDE refresh
 
-Iteration 1 EWMA values are saved to permanent columns
-(e.g., `ewma1_it1.ewma_all`, `ewma1_it1.dewma_all`) for
-diagnostic output. These persist through to the final
-result.
+After the loop, all `Exclude-C-Temp-Same-Day` rows are
+reset to Include and `identify_temp_sde()` is run globally
+across the full dataset. This final pass catches any
+residual drift left by the per-iteration targeted recalc,
+which only handles subjects that started with temp SDEs.
+It does NOT use `exclude_from_dop_ids` — that DOP-median
+biasing is specific to Step 13.
+
+### Configurable parameters in scope for Step 11
+
+| Parameter | Default | Role |
+|---|---|---|
+| `ewma_window` | 15 | Maximum number of Include observations on each side that contribute to the EWMA weighting. Passed into `ewma()`. |
+
+Step 11 thresholds (`> 3.5`, `> 3`, `< -3.5`, `< -3`) are
+not user-configurable.
 
 ### Checklist findings
 
-1. **Removed `nnte` from `.SDcols`:** `nnte` was passed
- into the closure but never used (filter was removed).
- Fixed.
-2. **Removed stale comments:** "Removed nnte filter" (3
- instances), "Round to 3 decimals" (no rounding done).
-3. **Removed debug exit block:** Commented-out
- `saveRDS`/`return` after Step 11.
-4. **Boundaries — all strict:** `> 3.5`, `> 3`, `< -3.5`,
- `< -3` for dewma; `> 3.5` / `< -3.5` for `tbc.sd`
- and `c.dewma.all`.
-5. **`.child_valid()` call:** Correctly excludes temp SDEs.
- Only Include values participate in EWMA calculation
- and exclusion candidates.
-6. **ctbc optimization:** Skips ctbc EWMA computation
- when `ctbc.sd == tbc.sd` (copies instead). This is
- correct for non-potcorr subjects.
-7. **Parameter scope:** All 3 params handled uniformly.
-8. **Factor levels:** `Exclude-C-Traj-Extreme` exists in
- `exclude.levels`.
-9. **Efficiency:** Good — two levels of pre-filtering
- (count + extreme), targeted SDE recalc, and
- subject-params drop out of the loop as they stop
- producing exclusions.
-10. **`ewma_window` parameter:** Passed through to
- `ewma()` — controls max observations on each side
- (default 15).
+1. **Boundaries — all strict:** `> 3.5`, `> 3`, `< -3.5`,
+   `< -3` for dewma; `> 3.5` / `< -3.5` for `tbc.sd`
+   and `c.dewma.all`.
+2. **`.child_valid()` call:** Correctly excludes temp SDEs
+   via `include.temporary.extraneous = FALSE`. Only
+   Include values participate in EWMA calculation and as
+   exclusion candidates.
+3. **ctbc optimization:** Skips ctbc EWMA computation
+   when `ctbc.sd == tbc.sd` (copies `ewma.*` to `c.ewma.*`
+   instead). Correct for non-potcorr subjects, which are
+   the vast majority.
+4. **Parameter scope:** All 3 params (WEIGHTKG, HEIGHTCM,
+   HEADCM) handled uniformly.
+5. **Factor levels:** `Exclude-C-Traj-Extreme` exists in
+   `exclude.levels`.
+6. **Efficiency:** Good — two levels of pre-filtering
+   (count + extreme), targeted SDE recalc, and
+   subject-params drop out of the loop as they stop
+   producing exclusions.
+7. **`ewma_window` parameter:** Passed through to
+   `ewma()` — controls max Include observations on each
+   side (default 15).
+8. **Boundaries — tiebreaker:** `internal_id` is the
+   final tiebreaker in the worst-value `order()` call
+   (lowest `internal_id` wins).
 
 ---
 
@@ -2615,8 +2653,6 @@ Assembles the return value from `cleanchild()`:
  `cf_rescued`
  - Z-scores (if present): `sd.orig_who`, `sd.orig_cdc`,
  `sd.orig`, `tbc.sd`, `ctbc.sd`
- - EWMA1 iteration 1 diagnostics (if present):
- `ewma1_it1.*`
  - `final_tbc`
 
 The caller (`cleangrowth()`) merges this with the original

@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-github-latest (growthcleanr)
 
-**Last updated:** 2026-04-17 (Session 4b Step 7 BIV walkthrough: replaced dead `sd.extreme`/`z.extreme` parameters with 8 per-cell `biv.z.*` parameters; rewrote Step 7 narrative for "current state only"; fixed Stata-style 7d comment and inaccurate "overwrites non-temp codes" note; documented that full child permissiveness framework is deferred until after v3.0.0 and that `Child-growthcleanr-permissiveness-specs.md` is to be ignored during walkthroughs/reconciliation. Session 4a: removed run_cf_detection optimization; cf_rescue="all" now rescues every detected CF including shared-SPA ones, with Step 13 resolving multi-Include SPAs; HEADCM threshold placeholder moved to Known Issues; pre-session cleanup migrated D5/D6/D9+D10 to Known Issues → Open (wrapper) and fixed D4/D16 in child_clean.R)
+**Last updated:** 2026-04-17 (Session 6 Step 11 EWMA1 walkthrough: removed dead `debug` parameter and `ewma1_it1.*` capture block — the block never populated any columns because EWMA fields lived inside a per-group closure that only returned `exclude`, confirmed empirically on stress data. Rewrote Step 11 code header block from changelog-style to current-state rationale; replaced Stata-notation `exc_*==0`/`exc_*==2` comments; removed "Fixed cdewma sign" historical comment; `lowest id` → `lowest internal_id` in worst-row comment. Added explicit 11a/11b/11c sub-sections (pre-filter / iteration loop / end-of-step temp SDE refresh) in code and narrative. Step 11 narrative rewritten for current-state only; Code-location cell now names file and functions; stale Checklist items 1–3 dropped and renumbered; added "Configurable parameters in scope for Step 11" subsection. Session 4b Step 7 BIV walkthrough: replaced dead `sd.extreme`/`z.extreme` parameters with 8 per-cell `biv.z.*` parameters; rewrote Step 7 narrative for "current state only"; fixed Stata-style 7d comment and inaccurate "overwrites non-temp codes" note; documented that full child permissiveness framework is deferred until after v3.0.0 and that `Child-growthcleanr-permissiveness-specs.md` is to be ignored during walkthroughs/reconciliation. Session 4a: removed run_cf_detection optimization; cf_rescue="all" now rescues every detected CF including shared-SPA ones, with Step 13 resolving multi-Include SPAs; HEADCM threshold placeholder moved to Known Issues; pre-session cleanup migrated D5/D6/D9+D10 to Known Issues → Open (wrapper) and fixed D4/D16 in child_clean.R)
 
 ## Overview
 
@@ -23,6 +23,14 @@ is `__Pipeline/gc-github-latest/`. Stale copies exist in
 `/Users/Shared/` — do NOT use them. Never edit files outside
 `__Pipeline/` without Carrie's explicit written permission in
 chat.
+
+**Standing permission** (2026-04-17): While working in
+`__Pipeline/gc-github-latest/`, it is OK to edit
+`__Pipeline/CLAUDE.md` without asking — typically to sync its
+"Last updated" / milestone summary with work that happened in
+`gc-github-latest/`. Edits to other files outside
+`gc-github-latest/` still require explicit per-change
+permission.
 
 ---
 
@@ -418,7 +426,6 @@ Default: `"looser"`
 | `include.carryforward` | FALSE | Step 6 | **Deprecated** — use `cf_rescue` instead. If TRUE, skip CF detection entirely |
 | `cf_rescue` | `"standard"` | Step 6 | CF rescue mode: `"standard"` (age/interval/param-specific lookup), `"none"` (all CFs excluded), `"all"` (every detected CF rescued; Step 13 resolves any multi-Include SPAs) |
 | `cf_detail` | FALSE | Step 6 | If TRUE, add `cf_status` and `cf_deltaZ` columns to output |
-| `debug` | FALSE | Step 11, output | If TRUE, emit 6 `ewma1_it1.*` columns capturing EWMA values from the first iteration of Step 11 (EWMA1 Extreme), useful for diagnosing why a row was flagged. Off by default to keep standard output lean. |
 | `ewma_window` | 15 | EWMA steps | Max observations on each side for EWMA |
 | `adult_cutpoint` | 20 | Preprocessing | Age (years) dividing pediatric/adult |
 | `quietly` | TRUE | All | Suppress progress messages |
@@ -687,13 +694,13 @@ Deferred from walkthrough sessions 1–3 (2026-04-16):
   lists only part of the returned data.table's columns. The
   actual return also includes `internal_id, subjid, agedays,
   sex, line, bin_exclude, tri_exclude`, conditional columns
-  (`cf_status`/`cf_deltaZ` under `cf_detail=TRUE`, `ewma1_it1.*`
-  under `debug=TRUE`), and internal working columns (`v`,
-  `v_adult`, `measurement`, `age_years`, `newbatch`, `sd.corr`,
-  `sd.orig_uncorr`, `z.orig`, `uncorr`, `potcorr`). Before
-  updating the roxygen, decide which internal columns should
-  be dropped from output vs. kept as part of the public
-  contract, then align `@return` to the final schema.
+  (`cf_status`/`cf_deltaZ` under `cf_detail=TRUE`), and
+  internal working columns (`v`, `v_adult`, `measurement`,
+  `age_years`, `newbatch`, `sd.corr`, `sd.orig_uncorr`, `z.orig`,
+  `uncorr`, `potcorr`). Before updating the roxygen, decide
+  which internal columns should be dropped from output vs.
+  kept as part of the public contract, then align `@return`
+  to the final schema.
 - [ ] **Partial-run output row ordering.** `cleangrowth()` in
   partial-run mode rbinds changed-subject output to cached
   output and sorts by `internal_id`. Because `internal_id` is
@@ -728,15 +735,15 @@ Deferred from walkthrough sessions 1–3 (2026-04-16):
 
 See git history for full details on each fix.
 
-- **Pre-walkthrough cleanup (2026-04-16):** Added `debug = FALSE`
-  parameter to `cleangrowth()` and `cleanchild()`; gates 6
-  `ewma1_it1.*` columns (created in Step 11 only when `debug=TRUE`,
-  emitted in output only when `debug=TRUE`). Resolved deferred
+- **Pre-walkthrough cleanup (2026-04-16):** Resolved deferred
   walkthrough items: Step 17 dead inner `if (count_exclude >= 1)`
   branch collapsed; adult dead `keeper_id` removed (2 locations);
   adult dead `"temp extraneous"` filter removed in `eval_2d_nonord()`;
   Step 15 Birth WT block now uses `.child_exc(param, "Traj")` for
   consistency with surrounding code (was 4 hardcoded literals).
+  (The `debug` parameter added in this round was subsequently
+  removed during the Step 11 walkthrough — the capture block
+  was dead code that never populated the promised columns.)
 - **Doc/dead-code cleanup (2026-04-16):** Deleted 6 orphaned
   man pages for removed extdata files. Removed dead `nnte`
   column assignment and unused NULL declarations (`sum_val`,

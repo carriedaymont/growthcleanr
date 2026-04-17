@@ -216,10 +216,6 @@
 #'   "CF-NR" (CF, does not meet rescue criteria), or "CF-Resc" (CF, meets rescue
 #'   criteria). \code{cf_deltaZ} is the absolute z-score difference used for rescue
 #'   evaluation. Defaults to FALSE.
-#' @param debug Logical. If TRUE, include diagnostic columns in the output for
-#'   algorithm debugging. Currently emits six \code{ewma1_it1.*} columns capturing
-#'   EWMA values from the first iteration of Step 11 (EWMA1 Extreme), useful for
-#'   investigating why a particular row was flagged. Defaults to FALSE.
 #' @param ref.data.path Path to reference data. If not supplied, the year 2000
 #' Centers for Disease Control (CDC) reference data will be used.
 #' @param log.path Path to log file output when running in parallel (non-quiet mode). Default is NA. A new
@@ -338,7 +334,6 @@ cleangrowth <- function(subjid,
                         include.carryforward = FALSE,
                         cf_rescue = "standard",
                         cf_detail = FALSE,
-                        debug = FALSE,
                         ref.data.path = "",
                         log.path = NA,
                         parallel = FALSE,
@@ -1161,7 +1156,6 @@ cleangrowth <- function(subjid,
         ewma.fields = ewma.fields,
         cf_rescue = cf_rescue,
         cf_detail = cf_detail,
-        debug = debug,
         biv.z.wt.low.young = biv.z.wt.low.young,
         biv.z.wt.low.old = biv.z.wt.low.old,
         biv.z.wt.high = biv.z.wt.high,
@@ -1197,7 +1191,6 @@ cleangrowth <- function(subjid,
         ewma.fields = ewma.fields,
         cf_rescue = cf_rescue,
         cf_detail = cf_detail,
-        debug = debug,
         biv.z.wt.low.young = biv.z.wt.low.young,
         biv.z.wt.low.old = biv.z.wt.low.old,
         biv.z.wt.high = biv.z.wt.high,
@@ -2468,7 +2461,6 @@ cleanchild <- function(data.df,
                                ewma.fields,
                                cf_rescue = "standard",
                                cf_detail = FALSE,
-                               debug = FALSE,
                                biv.z.wt.low.young,
                                biv.z.wt.low.old,
                                biv.z.wt.high,
@@ -3147,28 +3139,25 @@ cleanchild <- function(data.df,
   data.df[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-C-Temp-Same-Day']
 
   # Step 11: Extreme EWMA ----
-  # Restructured to use global iterations for efficiency
-  # Key changes:
-  #   1. Global while loop instead of per-subject-param while loops
-  #   2. Only Include values participate in EWMA (temp SDEs do NOT get EWMA calculated)
-  #   3. After each iteration, only re-process subject-params that had new exclusions
-  #   4. Temp SDE recalculation only for subjects with new exclusions
-  # This provides major speedup when most subjects are clean after early iterations.
-
-  # 11.  Exclude extreme errors with EWMA
-  # a.  Erroneous measurements can distort the EWMA for measurements around them. Therefore, if the EWMA
-  #     method identifies more than one value for a subject and parameter that meets criteria for exclusion,
-  #     we will only exclude the value that deviates the most from expected in any given step. Then we will
-  #     repeat the entire process until no measurements are identified that meet criteria for exclusion.
-  # b.  Perform a EWMA calculation
-  #   i.  Only use values where exc_*==0 to determine the EWMAs and for exclusion candidates.
-  #       Temp SDEs (exc_*==2) do NOT participate in EWMA calculation or exclusion in this step.
+  # Flag extreme outliers using an exponentially weighted moving average
+  # (EWMA). For each measurement, the EWMA predicts what the value should
+  # be based on the subject's other measurements for the same parameter;
+  # values that deviate extremely from the prediction are flagged
+  # Exclude-C-Traj-Extreme. Only Include rows participate in the EWMA and
+  # as exclusion candidates — temp SDEs do not participate. Because an
+  # erroneous measurement can distort the EWMA of its neighbours, at most
+  # one value is flagged per subject-param per pass; the global while
+  # loop then re-processes any subject-param that produced a new exclusion
+  # until no further exclusions occur.
 
   if (!quietly)
     message(sprintf("[%s] Exclude extreme measurements based on EWMA...", Sys.time()))
 
-  # Pre-identify subject-params that need processing:
-  # Count INCLUDE values only (not temp SDEs) - need >2 for EWMA processing
+  # 11a. Pre-filter / setup -----------------------------------------------
+  # Two filters narrow the work; a third captures subjects with existing
+  # temp SDEs for later targeted recalculation.
+
+  # Count filter: EWMA needs at least 3 Include values per subject-param.
   data.df[, sp_key := paste0(subjid, "_", param)]
   include_mask <- .child_valid(data.df, include.temporary.extraneous = FALSE)
   include_counts <- data.df[include_mask, .(n_include = .N), by = sp_key]
@@ -3185,9 +3174,16 @@ cleanchild <- function(data.df,
     message(sprintf("  EWMA1 pre-filter: %d/%d groups have |tbc.sd| > 3.5",
                 length(sp_to_process), nrow(extreme_sp)))
 
-  # Track subjects with SDEs for targeted temp SDE recalculation
+  # Track subjects with SDEs for targeted temp SDE recalculation.
   subj_with_sde <- unique(data.df[exclude == "Exclude-C-Temp-Same-Day", subjid])
 
+  # 11b. Iteration loop ---------------------------------------------------
+  # Each pass processes one subject-param at a time via a per-group
+  # closure operating on a copy of the group's rows. At most one value is
+  # flagged per subject-param per iteration. After each pass, temp SDEs
+  # are recalculated only for subjects that had a new exclusion and
+  # already carried temp SDEs. The loop terminates when no subject-param
+  # produces a new exclusion.
   iteration <- 0
   while (length(sp_to_process) > 0) {
     iteration <- iteration + 1
@@ -3237,10 +3233,10 @@ cleanchild <- function(data.df,
                   c.dewma.all = ctbc.sd - c.ewma.all
                 )]
 
-                # Identify potential exclusions - Include values only
+                # Identify potential exclusions - Include values only.
+                # c.dewma.all is tested in the same direction as dewma.all
+                # (> 3.5 for positive outliers, < -3.5 for negative).
                 df[, pot_excl := FALSE]
-                # Fixed cdewma sign for negative outliers
-                # Was: c.dewma.all > 3.5 for negative case (wrong - should be < -3.5)
                 df[include_set, pot_excl :=
                      (dewma.all > 3.5 & dewma.before > 3 & dewma.after > 3 & tbc.sd > 3.5 &
                         ((!is.na(ctbc.sd) & c.dewma.all > 3.5) | is.na(ctbc.sd))
@@ -3261,7 +3257,7 @@ cleanchild <- function(data.df,
                 if (num.exclude == 1) {
                   df[pot_excl == TRUE, exclude := .child_exc(param, "Traj-Extreme")]
                 } else if (num.exclude > 1) {
-                  # Select worst: highest abs(tbc.sd + dewma.all), lowest id as tiebreaker
+                  # Select worst: highest abs(tbc.sd + dewma.all), lowest internal_id as tiebreaker
                   worst.row <- with(df, order(pot_excl, abs(tbc.sd + dewma.all), -internal_id, decreasing = TRUE))[1]
                   df[worst.row, exclude := .child_exc(param, "Traj-Extreme")]
                 }
@@ -3271,20 +3267,6 @@ cleanchild <- function(data.df,
             })(copy(.SD)),
             by = .(subjid, param),
             .SDcols = c('index', 'id', 'internal_id', 'param', 'sex', 'agedays', 'tbc.sd', 'ctbc.sd', 'exclude')]
-
-    # Capture EWMA1 iteration 1 values for debugging (gated behind `debug`).
-    # Adds 6 columns to output for diagnosing why a row was flagged in Step 11.
-    if (debug && iteration == 1) {
-      # Copy EWMA values from first iteration to permanent columns
-      # Naming: ewma1_it1.ewma_all, ewma1_it1.ewma_before, ewma1_it1.dewma_all, etc.
-      ewma1_cols <- c("ewma.all", "ewma.before", "ewma.after", "dewma.all", "dewma.before", "dewma.after")
-      for (col in ewma1_cols) {
-        new_col <- paste0("ewma1_it1.", gsub("\\.", "_", col))
-        if (col %in% names(data.df)) {
-          data.df[, (new_col) := get(col)]
-        }
-      }
-    }
 
     # Find subject-params with NEW exclusions this iteration
     data.df[sp_key %in% sp_to_process, has_new_excl :=
@@ -3313,11 +3295,15 @@ cleanchild <- function(data.df,
     data.df[, c("had_ewma1_before", "has_new_excl") := NULL]
   }
 
-  # Cleanup
   data.df[, sp_key := NULL]
 
-  # Final temp SDE recalculation (end of Step 11, before Step 13)
-  # Note: Does NOT use exclude_from_dop_ids - that's only for Step 13
+  # 11c. End-of-step temp SDE refresh -------------------------------------
+  # Reset all Exclude-C-Temp-Same-Day rows to Include, then rerun
+  # identify_temp_sde() across the full dataset. Rationale: the per-
+  # iteration targeted recalc only covers subjects that had both an
+  # existing temp SDE and a new EWMA1 exclusion in that pass; this final
+  # pass catches any residual drift before Step 13. Does NOT use
+  # exclude_from_dop_ids — that biasing is specific to Step 13.
   data.df[exclude == 'Exclude-C-Temp-Same-Day', exclude := 'Include']
   data.df[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-C-Temp-Same-Day']
 
@@ -4838,17 +4824,6 @@ cleanchild <- function(data.df,
   for (col in zscore_cols) {
     if (col %in% names(data.df)) {
       return_cols <- c(return_cols, col)
-    }
-  }
-
-  # Add EWMA1 iteration 1 debug columns when debug=TRUE
-  # (created in Step 11 only when debug=TRUE; pattern: ewma1_it1.ewma_*, ewma1_it1.dewma_*)
-  if (debug) {
-    ewma1_it1_cols <- grep("^ewma1_it1\\.", names(data.df), value = TRUE)
-    for (col in ewma1_it1_cols) {
-      if (!(col %in% return_cols)) {
-        return_cols <- c(return_cols, col)
-      }
     }
   }
 

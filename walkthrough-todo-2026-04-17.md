@@ -765,3 +765,232 @@ After reinstalling the package:
 
 Adult suites and regression harness not re-run (no adult
 code touched).
+
+---
+
+## Session 6 — Step 11 (EWMA1 Extreme)
+
+Scope: `child_clean.R` Step 11 block (main logic, per-group
+closure, global iteration loop, end-of-step temp SDE refresh)
+and the surrounding `debug` parameter plumbing; narrative
+`child-gc-narrative-2026-04-13.md` Step 11 section plus the
+parameters table and output-columns list; `gc-github-latest/
+CLAUDE.md` and `NEWS.md`; `__Pipeline/CLAUDE.md` header.
+
+### Pre-session baseline tests
+
+After Session 5, re-ran the child test suites against the
+installed package:
+
+- test-cleangrowth.R: 65 PASS, 0 warnings
+- test-child-regression.R: 48 PASS, 0 warnings
+- test-child-edge-cases.R: 28 PASS, 0 warnings
+- test-child-algorithms.R: 41 PASS (2 baseline codetools warnings)
+- test-child-parameters.R: 13 PASS (1 expected deprecation warning)
+
+Adult suites not re-run; no adult code touched in this session.
+
+### Fix-now items
+
+### F34. `debug` parameter + `ewma1_it1.*` capture block removed — FIXED
+- **Background.** Commit `bc86770` (Pre-walkthrough cleanup,
+  2026-04-16) added `debug = FALSE` to `cleangrowth()` and
+  `cleanchild()` to gate a pre-existing capture block in
+  Step 11 (originally unconditional — flagged as
+  walkthrough-todo-2026-04-15 item 32 / 2026-04-16b). The
+  documented behaviour: when `debug = TRUE`, emit six
+  `ewma1_it1.*` columns (`ewma_all`, `ewma_before`,
+  `ewma_after`, `dewma_all`, `dewma_before`, `dewma_after`)
+  from the first EWMA1 iteration to aid diagnosis.
+- **Issue.** The capture block (pre-edit `child_clean.R`
+  lines 3275–3287) and the final-output column filter
+  (pre-edit lines 4844–4853) are both dead code. The EWMA
+  columns live on a local `df = copy(.SD)` inside the Step 11
+  per-group closure; only `df$exclude` is returned to
+  `data.df`. The block's gate `col %in% names(data.df)` is
+  therefore always FALSE, and `get(col)` would resolve to the
+  NULL declaration at `child_clean.R` line 2494 even if the
+  gate ever passed. Verified empirically: running
+  `cleangrowth(..., debug = TRUE)` on a 200-subject stress-
+  data sample (29 real `Exclude-C-Traj-Extreme` results)
+  produced no `ewma1_it1.*` columns in the output.
+- **Design decision (this session).** Remove the `debug`
+  parameter outright rather than fix the capture block.
+  Rationale: the feature was freshly added, never verified
+  to work, has no current consumer, and the walkthrough is
+  focused on current-state correctness. A systematic
+  diagnostic mechanism can be reintroduced later if needed
+  (e.g., return-list restructuring from the per-group
+  closure, or a separate diagnostic entry point).
+- **Files changed:**
+  - `R/child_clean.R` — removed `debug = FALSE` from the
+    `cleangrowth()` signature and the corresponding
+    `@param debug` Roxygen block; removed from both Roxygen
+    pass-throughs (sequential `cleanchild()` call and
+    `ddply(..., cleanchild, ...)` call); removed `debug = FALSE`
+    from the `cleanchild()` signature; removed the Step 11
+    capture block (`if (debug && iteration == 1) { ... }`) and
+    the final-output `ewma1_it1.*` column filter in
+    `cleanchild()`.
+  - `child-gc-narrative-2026-04-13.md` — removed the
+    parameters-table row for `debug`; removed the
+    `ewma1_it1.*` diagnostics bullet from the Step 22 output
+    section; removed the Step 11 "Debug columns preserved"
+    subsection (folded into the overall Step 11 rewrite
+    below).
+  - `gc-github-latest/CLAUDE.md` — removed `debug` row from
+    the Configurable Parameters (child) table; removed
+    `ewma1_it1.*` reference from the `cleangrowth()` `@return`
+    Known-Issues entry; rewrote the 2026-04-16 Pre-walkthrough
+    cleanup entry to note that the `debug` parameter added
+    in that round was subsequently removed here.
+  - `NEWS.md` — removed the 3.0.0 "Added" bullet for the
+    `debug` parameter.
+  - `__Pipeline/CLAUDE.md` — refreshed "Last updated" header
+    to note the debug-parameter removal (edited with
+    standing permission — see gc CLAUDE.md header block).
+  - `man/cleangrowth.Rd` — regenerated via
+    `devtools::document()` after the Roxygen edits.
+- **Verification.** After reinstall, all 5 child test suites
+  pass: 65 / 48 / 28 / 41 / 13.
+
+### F35. Step 11 header block rewritten for current-state — FIXED
+- **Background.** Pre-edit `child_clean.R` lines 3141–3148
+  contained a "Restructured to use global iterations for
+  efficiency / Key changes: 1. …" changelog block describing
+  what changed relative to an earlier implementation. Pre-edit
+  lines 3150–3157 contained Stata-derived enumeration
+  (`# 11. / a. / b. / i.`) with `exc_*==0` / `exc_*==2`
+  notation. Same patterns as Session 5 F30 (Step 9 "Session
+  16" changelog) and Session 4b F26 (Stata notation).
+- **Fix.** Replaced both blocks with a single current-state
+  description at the top of Step 11: what the step does,
+  which rows participate, why per-pass single-exclusion + a
+  global while loop, and a pointer to the 11a/11b/11c
+  sub-sections introduced in F37.
+
+### F36. Historical "Fixed cdewma sign" comment and `lowest id` wording — FIXED
+- **File/lines:** pre-edit `child_clean.R` lines 3234–3235
+  ("# Fixed cdewma sign for negative outliers / # Was:
+  c.dewma.all > 3.5 for negative case (wrong - should be
+  < -3.5)") and pre-edit line 3256 ("# Select worst: highest
+  abs(tbc.sd + dewma.all), lowest id as tiebreaker").
+- **Fix.** The "Fixed / Was:" block was replaced with a
+  current-state two-line note describing what the guard does
+  (`c.dewma.all` is tested in the same direction as
+  `dewma.all`). The "lowest id" wording was corrected to
+  "lowest internal_id" to match the `-internal_id` expression
+  actually used in the `order()` call — same F32 correction
+  pattern as Step 9.
+
+### F37. Explicit 11a / 11b / 11c sub-sections added — FIXED
+- **Background.** Step 11 previously had no labelled
+  sub-sections; its natural structure (pre-filter +
+  while-loop + end-of-step temp SDE refresh) was visible in
+  the code only via spacing and comment cues. Session 5 F31
+  established an `Xa` / `Xb` / `Xc` / `Xd` convention for
+  Step 9; Carrie asked for that to extend to Step 11.
+- **Fix.** Added three labelled sections in `child_clean.R`:
+  - `11a. Pre-filter / setup` — count filter, extreme
+    filter, and `subj_with_sde` capture.
+  - `11b. Iteration loop` — global while loop (the per-group
+    closure + per-pass temp-SDE recalc live inside).
+  - `11c. End-of-step temp SDE refresh` — global reset and
+    rerun of `identify_temp_sde()` before Step 13. The
+    existing comment already noted the `exclude_from_dop_ids`
+    distinction vs. Step 13; kept that wording.
+  Narrative Step 11 section rewritten to mirror these
+  labels, with the EWMA computation / exclusion criteria /
+  worst-value selection / iteration bookkeeping as
+  sub-sections under 11b.
+
+### F38. Step 11 narrative rewritten for current-state only — FIXED
+- **Background.** Pre-edit `child-gc-narrative-2026-04-13.md`
+  Step 11 section (lines ~1937–2095):
+  - `Code location` cell said "See code" — same placeholder
+    F28/F33 replaced with a function+file reference in
+    earlier sessions.
+  - Worst-value-selection paragraph said "Lowest `id` breaks
+    ties" (code uses `-internal_id`). F32 pattern.
+  - "Debug columns preserved" subsection described a feature
+    that doesn't work (retired here with F34).
+  - Checklist items 1–3 described already-completed
+    cleanup actions ("Removed `nnte` from `.SDcols`",
+    "Removed stale comments", "Removed debug exit block") —
+    same F28 pattern. Verified against current code: `nnte`
+    does not appear in the Step 11 block or any `.SDcols`
+    list in `cleanchild()`; "Round to 3 decimals" is not
+    present; `saveRDS` only appears in the `child_clean.R`
+    file-header documentation comment, not in Step 11.
+  - No "Configurable parameters in scope for Step 11"
+    subsection existed — same gap F23 / F28 added for
+    Steps 7 and 9.
+- **Fix.** Full rewrite of the Step 11 narrative:
+  - `Code location` → "Inline in `cleanchild()` in
+    `child_clean.R`; support function `ewma()` defined
+    earlier in `child_clean.R`".
+  - Added an Overview paragraph that also enumerates the
+    11a / 11b / 11c sub-sections.
+  - Reorganised content under the 11a / 11b / 11c labels;
+    EWMA computation / exclusion criteria / worst-value
+    selection / iteration bookkeeping as sub-sections under
+    11b.
+  - Worst-value selection paragraph updated to "Lowest
+    `internal_id` breaks ties."
+  - Removed the "Debug columns preserved" subsection.
+  - Dropped stale Checklist items 1–3 and renumbered the
+    remaining items 1–8.
+  - Added "Configurable parameters in scope for Step 11"
+    subsection listing `ewma_window` (default 15) with a
+    note that the threshold constants are not
+    user-configurable.
+
+### Session 6 deferreds (not addressed)
+
+### D26. Step 11 targeted test coverage gaps — DEFERRED
+- **Scope.** `test-child-stress.R` line 134 asserts
+  `catcount("Exclude-C-Traj-Extreme") == 58` as an
+  aggregate regression count on the stress dataset;
+  `test-child-regression.R` has no Step 11-specific
+  assertions. No targeted unit tests exist for:
+  - Count-filter branch (subject-param with exactly 2
+    Include rows must not be processed)
+  - Extreme-filter branch (subject-param with max
+    `|tbc.sd| <= 3.5` must not be processed)
+  - Positive- vs. negative-outlier branches at the exclusion
+    gate
+  - `ctbc.sd == tbc.sd` fast path vs. ctbc recompute path
+  - `ctbc.sd` NA-escape on the `c.dewma.all` check
+  - First/last Include protection (worst candidate at an
+    endpoint must not be flagged)
+  - Worst-row tiebreaker (multi-candidate → sort by
+    `abs(tbc.sd + dewma.all)` → `internal_id` final
+    tiebreaker)
+  - Global iteration loop (constructed case where
+    iteration 1 exclusion opens a new candidate that fires
+    in iteration 2)
+  - Targeted per-iteration temp-SDE recalc (subject with
+    both an existing temp SDE and a new EWMA1 exclusion)
+- **Why deferred.** Coverage gaps; medium effort; no
+  current accuracy issue (regression counts unchanged on
+  stress data). Same D24 / D25 precedent.
+- **Where fixed later.** Dedicated test-coverage session
+  for walked steps.
+
+---
+
+## Session 6 — post-fix test results
+
+After reinstalling the package and regenerating
+`man/cleangrowth.Rd` via `devtools::document()`:
+
+- test-cleangrowth.R: 65 PASS, 0 warnings
+- test-child-regression.R: 48 PASS, 0 warnings
+- test-child-edge-cases.R: 28 PASS, 0 warnings
+- test-child-algorithms.R: 41 PASS (2 codetools warnings,
+  baseline, unchanged)
+- test-child-parameters.R: 13 PASS (1 expected deprecation
+  warning, baseline, unchanged)
+
+Adult suites and regression harness not re-run (no adult
+code touched).

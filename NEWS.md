@@ -8,7 +8,6 @@
 - Adult algorithm: dynamic while loop for evil twins exclusion (previously fixed 3 rounds).
 - `cf_rescue` parameter (default `"standard"`) replaces `include.carryforward` (deprecated). Supports age/interval/param/rounding-specific rescue thresholds via lookup, plus `"none"` and `"all"` modes.
 - `cf_detail` parameter — adds `cf_status` and `cf_deltaZ` columns to output for CF rescue diagnostics.
-- `debug` parameter (default `FALSE`) — gates emission of `ewma1_it1.*` diagnostic columns from Step 11.
 - `gc_preload_refs()` and `cached_results` / `changed_subjids` parameters for partial re-runs and reference-table caching.
 - `batch_size` parameter (default 2000) — number of subjects per outer batch.
 - Comprehensive test suite: 198 adult unit tests; 1508 adult regression tests at all 4 permissiveness levels; child regression and edge case tests.
