@@ -542,3 +542,226 @@ After reinstalling the package and regenerating
 
 Adult suites and regression harness not re-run (no adult
 code touched).
+
+---
+
+## Session 5 — Step 9 (Evil Twins)
+
+Scope: `child_clean.R` ~lines 3035–3147 (main logic including
+9d temp-SDE rerun) and ~lines 2242–2271 (`calc_otl_evil_twins`
+support function); narrative `child-gc-narrative-2026-04-13.md`
+~lines 1775–1899.
+
+### Pre-session baseline tests
+
+After Session 4b, re-ran the child test suites against the
+installed package:
+
+- test-cleangrowth.R: 65 PASS, 0 warnings
+- test-child-regression.R: 48 PASS, 0 warnings
+- test-child-edge-cases.R: 28 PASS, 0 warnings
+- test-child-algorithms.R: 41 PASS (2 baseline codetools warnings)
+- test-child-parameters.R: 13 PASS (1 expected deprecation warning)
+
+Adult suites not re-run; no adult code touched in this
+session.
+
+### Fix-now items
+
+### F28. Step 9 narrative rewritten for "current state only" — FIXED
+- **Background.** `child-gc-narrative-2026-04-13.md` Step 9
+  section (pre-edit lines ~1775–1899) had two problems: (1)
+  two Checklist findings described already-removed code —
+  item 1 flagged `_rounded` aliases in `calc_otl_evil_twins`
+  that grep confirms do not exist in the current function
+  body (lines 2260–2263 use bare `tbc_next_diff` /
+  `tbc_prev_diff` / `ctbc_next_diff` / `ctbc_prev_diff`);
+  item 2 flagged a "non NNTE values" comment that is not
+  present anywhere in `child_clean.R`. (2) The narrative
+  still referenced `id` as the sort tiebreaker in the
+  Setup pseudocode (line 1830) and the Checklist Boundaries
+  entry (line 1881), but the code has used `internal_id` for
+  sort tiebreaking since the 2026-04-12 internal_id rename.
+  In addition, the Code-location cell was the same
+  `"See code"` placeholder pattern Session 4b F23 replaced
+  with concrete line ranges, and the Overview ("This step is
+  now added…") framed the step as a change from a prior
+  implementation rather than a current-state description.
+- **Fix.** Rewrote the entire Step 9 section:
+  - Code-location cell now reads "`child_clean.R`
+    ~lines 3035–3142 (main logic, including 9d temp-SDE
+    rerun); support function `calc_otl_evil_twins()` at
+    ~lines 2242–2271".
+  - Overview rewritten in current-state prose: describes
+    why Evil Twins is needed (adjacent extremes distort
+    each other's EWMA so EWMA-based exclusions alone can
+    miss them) without the "original pediatric algorithm"
+    framing.
+  - 9a–9d subsections made explicit: 9a (global early-exit
+    check via one `calc_otl_evil_twins()` call), 9b
+    (per-group while-loop), 9c (bulk apply exclusions), 9d
+    (cleanup + temp-SDE rerun). Removed the old "9D" inner
+    label from the narrative's while-loop description and
+    rephrased as numbered steps a–f within 9b.
+  - Setup pseudocode updated to
+    `order(subjid, param, agedays, internal_id)`.
+  - Tiebreaker documented as "Lowest `internal_id`"
+    (replaces "Lowest `id`") in both 9b step c and the
+    Checklist Boundaries entry.
+  - Added a "Configurable parameters in scope for Step 9"
+    subsection noting there are none (the `> 5` OTL
+    threshold is hardcoded in `calc_otl_evil_twins()`).
+  - Checklist renumbered 1–8 consecutively after removing
+    stale items 1 and 2; no other Checklist content
+    removed.
+
+### F29. Stale "param-specific code" inline comment removed — FIXED
+- **File/lines:** `R/child_clean.R` pre-edit line 3043 —
+  `# Evil Twins exclusion — param-specific code applied at
+  final assignment`.
+- **Issue.** Since the 2026-04-14 exclusion-code rename,
+  child codes are not param-specific. `.child_exc()` (line
+  137) accepts a `param_val` argument but ignores it and
+  returns `paste0("Exclude-C-", suffix)`. The `param`
+  argument passed at line 3137's bulk assignment
+  `.child_exc(param, "Evil-Twins")` is carried for call-site
+  consistency with ~40 other call sites, but the value is
+  discarded. The comment misleadingly implied otherwise.
+- **Fix.** Removed the comment as part of the broader
+  rewrite of the Step 9 header block in F30 below; no
+  replacement needed since the header block now describes
+  the current step contents rather than the individual
+  assignment mechanics.
+
+### F30. "Session 16" changelog note rewritten as current-state rationale — FIXED
+- **File/lines:** `R/child_clean.R` pre-edit lines 3036–3041
+  — the Step 9 header comment block. Block contained (a)
+  a past-tense description framing Evil Twins as a fix for
+  a weakness in the "original pediatric growthcleanr
+  algorithm" that "is now added", and (b) a "Optimization
+  (Session 16): Restructured from single-closure operating
+  on ALL valid rows to by-(subjid, param) group processing"
+  changelog entry.
+- **Issue.** Per walkthrough procedure item 10 (Stale
+  content — references to prior versions), session-numbered
+  changelog entries and "this step is now added" prose
+  should not live in the implementation file. The rationale
+  each conveyed is still useful — Evil Twins' reason-to-
+  exist and why per-group processing is used — but needs
+  to be expressed in current-state prose.
+- **Fix.** Replaced the block with two current-state
+  paragraphs: one describing what Evil Twins does and why
+  (adjacent extremes distort each other's EWMA so
+  EWMA-based exclusions alone can miss them; Step 9 runs
+  before EWMA processing to catch them) and one describing
+  the per-group processing strategy and its rationale
+  (groups are small and independent; local-copy processing
+  avoids repeatedly copying the full valid dataset per
+  while-loop iteration; same pattern in Steps 11, 15, 17).
+  Also updated the preceding sort-key comment block
+  (pre-edit lines 3045–3051) to reference `internal_id` in
+  its rationale prose; the actual `order()` call already
+  used `internal_id`.
+
+### F31. 9A/B/C/D/F step-letter labels unified to lowercase 9a/9b/9c/9d — FIXED
+- **File/lines:** `R/child_clean.R` pre-edit line 3062
+  (`# 9A/B/C`), line 3081 (no label; added `9b.`), line
+  3098 (`# 9D:`), line 3142 (`# 9F.  redo temp
+  extraneous`).
+- **Issue.** Uppercase labels inherited from the Stata
+  implementation; the gap at `9E` made the sequence
+  self-inconsistent. Narrative now uses contiguous
+  `9a / 9b / 9c / 9d`.
+- **Fix.** Re-labeled as: `9a.` global early-exit check
+  (line 3062), `9b.` per-group loop (added on line 3081),
+  `9c.` median and distance-from-median inside the while
+  loop (line 3098, was `9D`), `9d.` temp-SDE re-evaluation
+  (line 3142, was `9F`). `9d`'s comment also gained an
+  explicit rationale paragraph mirroring the Step 7 F26
+  pattern.
+
+### F32. `Lowest id` comment in worst-OTL tiebreaker updated — FIXED
+- **File/lines:** `R/child_clean.R` pre-edit line 3106 —
+  the tiebreaker hierarchy comment listed "3. Lowest id
+  (deterministic)".
+- **Issue.** The actual `order()` expression on pre-edit
+  line 3109 uses `otl_rows$internal_id` (has since the
+  2026-04-12 internal_id rename); comment was stale.
+- **Fix.** Updated to "3. Lowest internal_id
+  (deterministic)". Comment and code now agree.
+
+### F33. All code line-number references removed from narrative — FIXED
+- **Background.** Carrie flagged that line-number
+  references in `child-gc-narrative-2026-04-13.md` drift
+  every time code is edited; most had already been purged
+  in earlier passes, but the Code-location cells in step
+  summary tables still used ranges like `~lines 2565–2880`.
+  Session 4b F23 had just added one such range for Step 7,
+  and Session 5 F28 added another for Step 9 — both
+  premised on the F23-era convention that has since been
+  reconsidered.
+- **Issue.** A grep for line-range patterns found six
+  occurrences, all in Code-location table cells:
+  - Step 2b (GA correction)
+  - Early Step 13 (SDE-Identicals)
+  - Step 5 (Temporary SDE)
+  - Step 6 (Carried Forwards)
+  - Step 7 (BIV)
+  - Step 9 (Evil Twins)
+- **Fix.** Rewrote all six cells to reference the
+  containing function and file only (e.g., "Inline in
+  `cleanchild()` in `child_clean.R`; support function
+  `calc_otl_evil_twins()` defined earlier in
+  `child_clean.R`"). No line numbers. Historical line
+  references in session logs (this file and earlier
+  walkthrough-todo files) are left intact — those are
+  archival records of what the code looked like at the
+  time of each session, not living narrative.
+- **Convention going forward.** Narrative Code-location
+  cells name the file and function(s); no line numbers.
+
+### Session 5 deferreds (not addressed)
+
+### D25. Step 9 targeted test coverage gaps — DEFERRED
+- **Scope.** `test-child-algorithms.R` Section 2 (Tests
+  5–8) exercises Evil Twins detection through realistic
+  unit-error injection (HT×2.54). No targeted unit tests
+  for the specific code paths:
+  - OTL threshold boundary (diff exactly 5.0 → NOT OTL)
+  - Cross-`(subjid, param)` adjacency guard (a HT row
+    immediately followed by a WT row in the sorted table
+    must not be compared as adjacent)
+  - Tiebreaker hierarchy (constructed case where two OTL
+    rows tie on `med_diff`, and then on `|tbc.sd|`, to
+    exercise the `internal_id` final tiebreaker)
+  - `sp_count_9 <= 2` pre-filter (subject-param with 2
+    total rows, both OTL — must not be flagged)
+  - `calc_otl_evil_twins()` edge case for `nrow(df) < 2`
+    returning all `otl = FALSE`
+  - 9d temp-SDE re-evaluation after an Evil Twins
+    exclusion removes the prior SPA "keeper"
+- **Why deferred.** Coverage gaps; medium effort; no
+  current accuracy issue. Regression tests already
+  confirm the behavior under defaults, and the existing
+  Evil Twins/OTL tests exercise realistic end-to-end
+  scenarios. Same rationale as Session 4b D24 (Step 7
+  coverage gaps).
+- **Where fixed later.** Dedicated test-coverage session
+  for walked steps.
+
+---
+
+## Session 5 — post-fix test results
+
+After reinstalling the package:
+
+- test-cleangrowth.R: 65 PASS, 0 warnings
+- test-child-regression.R: 48 PASS, 0 warnings
+- test-child-edge-cases.R: 28 PASS, 0 warnings
+- test-child-algorithms.R: 41 PASS (2 codetools warnings,
+  baseline, unchanged)
+- test-child-parameters.R: 13 PASS (1 expected deprecation
+  warning, baseline, unchanged)
+
+Adult suites and regression harness not re-run (no adult
+code touched).

@@ -3033,22 +3033,24 @@ cleanchild <- function(data.df,
   data.df[, ageyears := NULL]
 
   # Step 9: Evil Twins ----
-  # Evil Twins: An important weakness in the original pediatric growthcleanr algorithm was that it often failed to identify two or more implausible measurements that occurred next to each other, even if they were extremely deviant from a child's other measurements. This step is now added to identify these multiple extreme values, although it also identifies some single values.
+  # Evil Twins identifies pairs (or longer runs) of consecutive measurements
+  # that are both extreme relative to the subject's trajectory. Such pairs
+  # distort each other's EWMA enough that neither looks out of line on a
+  # neighbor-weighted basis, so EWMA-based exclusions alone can miss them.
+  # This step runs before EWMA processing to catch them.
   #
-  # Optimization (Session 16): Restructured from single-closure operating on ALL valid rows
-  # to by-(subjid, param) group processing. Previous approach copied the entire valid dataset
-  # on every while-loop iteration — O(n*k) to O(n^2). New approach processes each group
-  # independently (typically 3-30 rows), matching the pattern used in Steps 11/15/17.
+  # Per-(subjid, param) group processing: groups are small and independent
+  # (typically 3-30 rows), so processing each group in a local copy avoids
+  # repeatedly copying the full valid dataset on every while-loop iteration.
+  # Same pattern is used in Steps 11, 15, and 17.
 
-  # Evil Twins exclusion — param-specific code applied at final assignment
-
-  # MUST reorder BEFORE computing valid_set
-  # The valid_set boolean vector is computed based on row positions.
-  # If we reorder AFTER computing valid_set, the boolean indices no longer match
-  # the correct rows, causing temp SDEs to be included and non-temp-SDEs excluded.
-  # Must include agedays and id for consistent order
-  # Without agedays, calc_otl_evil_twins compares non-adjacent-in-time values
-  # Without id, SDE rows (same ageday) have undefined order, causing parallel inconsistency
+  # MUST reorder BEFORE computing valid_set.
+  # valid_set is a boolean vector aligned to row positions; reordering
+  # after would misalign it, causing temp SDEs to be included and
+  # non-temp-SDEs to be excluded.
+  # Sort key must include agedays (so calc_otl_evil_twins compares
+  # temporally adjacent rows) and internal_id (so same-ageday rows have a
+  # deterministic order across sequential and parallel runs).
   data.df <- data.df[order(subjid, param, agedays, internal_id),]
 
   # Evil Twins requires 3+ measurements per subject-param
@@ -3057,8 +3059,8 @@ cleanchild <- function(data.df,
   valid_set <- .child_valid(data.df, include.temporary.extraneous = FALSE) &
     not_single_pairs
 
-  # 9A/B/C
-  # first, find out if any possible evil twins exist at all (cheap vectorized check)
+  # 9a. Global early-exit check: find out if any possible evil twins exist
+  # at all (cheap vectorized check) before entering per-group loop.
   start_df <- calc_otl_evil_twins(data.df[valid_set,])
 
   if (any(start_df$otl, na.rm = TRUE)) {
@@ -3075,7 +3077,7 @@ cleanchild <- function(data.df,
       message(sprintf("  Evil twins pre-filter: %d subject-params have OTL values",
                   nrow(sp_with_otl)))
 
-    # Process each subject-param group independently via for loop
+    # 9b. Process each subject-param group independently via for loop
     # (Avoids data.table by+:= closure mechanics; groups are small, typically 3-30 rows)
     et_excl_lines <- integer(0)
     for (sp_i in seq_len(nrow(sp_with_otl))) {
@@ -3093,7 +3095,7 @@ cleanchild <- function(data.df,
       df <- calc_otl_evil_twins(df)
 
       while (any(df$otl, na.rm = TRUE)) {
-        # 9D: median and distance from median (for included values only)
+        # 9c. median and distance from median (for Include rows only)
         incl_tbc <- df$tbc.sd[df$exclude == "Include"]
         sd_med <- median(incl_tbc, na.rm = TRUE)
         df[exclude == "Include", med_diff := abs(tbc.sd - sd_med)]
@@ -3101,7 +3103,7 @@ cleanchild <- function(data.df,
         # Find worst OTL value using tiebreaker hierarchy:
         #   1. Furthest from median (highest med_diff)
         #   2. Most extreme overall (highest abs(tbc.sd))
-        #   3. Lowest id (deterministic)
+        #   3. Lowest internal_id (deterministic)
         otl_rows <- df[otl == TRUE]
         if (nrow(otl_rows) == 0L) break
         ord <- order(-otl_rows$med_diff, -abs(otl_rows$tbc.sd), otl_rows$internal_id)
@@ -3137,7 +3139,10 @@ cleanchild <- function(data.df,
   }
   data.df[, sp_count_9 := NULL]
 
-  # 9F.  redo temp extraneous
+  # 9d. Re-evaluate temp SDEs after Evil Twins exclusions: reset all
+  # Exclude-C-Temp-Same-Day rows to Include, then rerun identify_temp_sde().
+  # Rationale: an Evil Twins exclusion may have removed the prior temp-SDE
+  # "keeper" on an SPA, so another value in that SPA should now be flagged.
   data.df[exclude == 'Exclude-C-Temp-Same-Day', exclude := 'Include']
   data.df[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-C-Temp-Same-Day']
 

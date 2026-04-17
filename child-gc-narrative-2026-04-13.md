@@ -890,7 +890,7 @@ or are handled within other steps in the child algorithm.
 | **Next step** | Recentering |
 | **Output columns** | `sd.corr`, `uncorr`, `potcorr` (merged back onto all rows) |
 | **Exclusion code** | None — computes corrected z-scores only |
-| **Code location** | `cleangrowth()` in `child_clean.R` ~lines 737–1005 |
+| **Code location** | `cleangrowth()` in `child_clean.R` (preprocessing block, before dispatch to `cleanchild()`) |
 | **Controlled by** | No user parameters; uses built-in Fenton 2025 reference |
 
 ### Overview
@@ -1061,7 +1061,7 @@ etc.) are dropped before the data flows into recentering.
 |---|---|
 | **Scope** | All parameters |
 | **Exclusion codes** | `Exclude-C-Identical`, `Exclude-C-Extraneous` |
-| **Code location** | Early Step 13 is inline at the top of `cleanchild()` in `child_clean.R` (~lines 2518–2537). Main Step 13 is later in `cleanchild()` and reuses `identify_temp_sde()` (`child_clean.R` ~lines 2021+). |
+| **Code location** | Early Step 13 is inline at the top of `cleanchild()` in `child_clean.R`. Main Step 13 is later in `cleanchild()` and reuses `identify_temp_sde()` (defined in `child_clean.R`). |
 
 ### Overview
 
@@ -1214,7 +1214,7 @@ are dropped.
 | **Prior step** | Early Step 13 (SDE-Identicals) |
 | **Next step** | Step 6 (Carried Forwards) |
 | **Exclusion code** | `Exclude-C-Temp-Same-Day` |
-| **Code location** | Inline in `cleanchild()` at `child_clean.R` ~lines 2540–2556; dispatches to `identify_temp_sde()` (`child_clean.R` ~lines 2021+) without the Step-13 `exclude_from_dop_ids` argument. |
+| **Code location** | Inline in `cleanchild()` in `child_clean.R`; dispatches to `identify_temp_sde()` (defined in `child_clean.R`) without the Step-13 `exclude_from_dop_ids` argument. |
 
 ### Overview
 
@@ -1339,7 +1339,7 @@ the check has never fired in testing.
 | **Next step** | Step 7 (BIV) |
 | **Exclusion code** | `Exclude-C-CF` |
 | **Rescue codes** | `Rescued`, `Rescued-All` (in `cf_rescued` column) |
-| **Code location** | `child_clean.R` ~lines 2565–2880 (CF logic), support helpers `.cf_rescue_lookup()` and `.cf_get_thresholds()` at ~lines 2297–2400 |
+| **Code location** | CF logic inline in `cleanchild()` in `child_clean.R`; support helpers `.cf_rescue_lookup()` and `.cf_get_thresholds()` defined earlier in `child_clean.R` |
 | **Controlled by** | `cf_rescue` parameter (`"standard"` default / `"none"` / `"all"`); `cf_detail` parameter for optional diagnostic output columns |
 
 ### Overview
@@ -1605,7 +1605,7 @@ comment in the helper).
 | **Prior step** | Step 6 (Carried Forwards) |
 | **Next step** | Step 9 (Evil Twins) |
 | **Exclusion codes** | `Exclude-C-BIV` |
-| **Code location** | `R/child_clean.R` lines ~2882–2976 |
+| **Code location** | Inline in `cleanchild()` in `R/child_clean.R` |
 
 ### Overview
 
@@ -1781,22 +1781,24 @@ are not user-configurable.
 | **Prior step** | Step 7 (BIV) |
 | **Next step** | Step 11 (EWMA1 — Extreme EWMA) |
 | **Exclusion code** | `Exclude-C-Evil-Twins` |
-| **Code location** | See code |
+| **Code location** | Inline in `cleanchild()` in `child_clean.R`; support function `calc_otl_evil_twins()` defined earlier in `child_clean.R` |
 
 ### Overview
 
 Evil Twins identifies adjacent measurements that are both
-extreme — cases where two or more consecutive values are
-far from the subject's trajectory. The original pediatric
-algorithm often missed these because each value's EWMA was
-distorted by its extreme neighbor(s). This step catches
-them before EWMA processing.
+extreme — pairs (or longer runs) of consecutive values far
+from the subject's trajectory. When two such values sit
+next to each other, each distorts the other's EWMA enough
+that neither looks out of line on a neighbor-weighted basis,
+so EWMA-based exclusions alone can miss them. Step 9
+catches these values before EWMA processing (Steps 11, 15,
+16).
 
 The step is **iterative**: it finds the single worst OTL
 value, excludes it, recalculates OTL on the remaining
 values, and repeats until no OTL values remain.
 
-### OTL calculation (`calc_otl_evil_twins`, the relevant code section)
+### OTL calculation (`calc_otl_evil_twins`)
 
 A measurement is "over the limit" (OTL) if it differs from
 at least one adjacent measurement (in time order within
@@ -1812,91 +1814,123 @@ OTL = (|tbc_next - tbc_current| > 5 AND
 
 **Key details:**
 - Threshold is **strict `> 5`** — a difference of exactly
- 5.0 is NOT OTL
+ 5.0 is NOT OTL.
 - Both `tbc.sd` AND `ctbc.sd` must exceed 5 for the
  **same** pair (not mixed across neighbors). This dual
- requirement prevents false positives when correction
- moves the z-score close to the boundary.
-- Adjacent means the next/prior row within the same
- `(subjid, param)` in agedays order
-- Cross-subject/param boundaries are handled by padding
- with `Inf` (always exceeds threshold, but `same_sp_next/
- prev` flags prevent false matches)
-- Edge case: < 2 rows returns all `otl = FALSE`
+ requirement prevents false positives when gestational-age
+ correction moves one z-score close to the boundary for
+ potcorr subjects but the other z-score does not.
+- "Adjacent" means the next or prior row within the same
+ `(subjid, param)` in agedays order (relies on the
+ caller's sort).
+- Cross-`(subjid, param)` boundaries are handled by padding
+ the first/last row's neighbor with `Inf` and by
+ `same_sp_next` / `same_sp_prev` flags that block matches
+ across different subject-params.
+- Edge case: if `nrow(df) < 2` the function returns
+ `otl = FALSE` for all rows.
 
 ### Step 9 main logic
 
 **9a. Setup:**
-- Sort by `(subjid, param, agedays, id)` — MUST happen
- before `valid_set` computation (comment explains why)
-- `valid_set`: excludes temp SDEs
- (`include.temporary.extraneous = FALSE`), requires
- `sp_count_9 > 2` (total row count, loose pre-filter)
-- Initial `calc_otl_evil_twins` on all valid rows to check
- if any OTL exists (cheap early exit)
+- Sort `data.df` by `(subjid, param, agedays, internal_id)`
+ — this must happen **before** `valid_set` is computed,
+ because `valid_set` is a boolean vector aligned to row
+ position; reordering after would misalign it.
+- Add `sp_count_9 := .N` by `(subjid, param)`; require
+ `sp_count_9 > 2L` as a loose pre-filter.
+- `valid_set`: `.child_valid(data.df,
+ include.temporary.extraneous = FALSE)` combined with the
+ `sp_count_9 > 2` filter. Temp SDEs do not participate.
+- Run `calc_otl_evil_twins()` once on the initial valid
+ rows as a cheap early exit — if no row is OTL globally,
+ skip the per-group loop entirely.
 
 **9b. Per-group processing:**
-Only subject-params with at least one OTL value are
-processed. For each:
+If any row in the initial pass is OTL, iterate over
+the unique `(subjid, param)` groups that contain at least
+one OTL row. For each group:
 
-1. Extract valid rows for this `(subjid, param)`
-2. Skip if < 2 valid rows
-3. **While loop** — iterate until no OTL remains:
- a. Compute median of `tbc.sd` for Include rows
- b. Compute `med_diff = |tbc.sd - median|` for each
- Include row
- c. Find the worst OTL value by sort priority:
- - Highest `med_diff` (furthest from median)
+1. Extract the valid rows for that `(subjid, param)` as a
+ local `df` copy (group sizes are typically 3–30 rows).
+2. Skip groups with fewer than 2 valid rows.
+3. **While loop** — iterate until no OTL remains in the
+ group:
+ a. Compute the median of `tbc.sd` across Include rows
+ in the group.
+ b. For each Include row, compute `med_diff =
+ |tbc.sd - median|`.
+ c. Select the worst OTL row using this priority
+ (highest to lowest):
+ - Highest `med_diff` (furthest from the group
+ median)
  - Highest `|tbc.sd|` (most extreme overall)
- - Lowest `id` (deterministic tiebreaker)
- d. Exclude that one value (`Exclude-C-Evil-Twins`)
- e. Recalculate OTL on remaining Include values
- f. Break if < 2 Include values remain
+ - Lowest `internal_id` (deterministic tiebreaker)
+ d. Mark that single row `Exclude-C-Evil-Twins` in the
+ local `df`.
+ e. Rebuild a local `incl` from rows still flagged
+ `Include`; if fewer than 2 remain, break.
+ f. Recalculate OTL on `incl` (after removing its
+ existing `otl` column to avoid data.table's
+ column-self-assignment scoping). Reset the group's
+ `otl` to `FALSE`, then map TRUE back only for
+ `incl` rows flagged OTL.
+4. Collect `line` values of all rows marked
+ `Exclude-C-Evil-Twins` in this group.
 
 **9c. Apply exclusions:**
-All exclusions are collected as `line` values and applied
-back to `data.df` in bulk.
+After all groups are processed, the accumulated
+`et_excl_lines` are applied to `data.df` in a single bulk
+update setting `exclude := .child_exc(param, "Evil-Twins")`
+(which produces `"Exclude-C-Evil-Twins"` — `.child_exc()`
+accepts but ignores the `param` argument; codes are not
+param-specific).
 
-**9d. Cleanup and temp SDE rerun:**
-- `sp_count_9` dropped
-- Temp SDEs reset to Include and re-evaluated
+**9d. Cleanup and temp-SDE re-evaluation:**
+- Drop `sp_count_9`.
+- Reset every row currently flagged
+ `Exclude-C-Temp-Same-Day` to `Include`, then rerun
+ `identify_temp_sde()` against the post-Evil-Twins state.
+ Only the temp-SDE identification is rerun, not all of
+ Step 5.
+
+### Configurable parameters in scope for Step 9
+
+None. The OTL threshold (`> 5` on both `tbc.sd` and
+`ctbc.sd`) is hardcoded in `calc_otl_evil_twins()`.
 
 ### Checklist findings
 
-1. **Unnecessary `_rounded` aliases in
- `calc_otl_evil_twins`:** The code creates
- `tbc_next_diff_rounded` etc. as exact copies of the
- unrounded values. The comment says "Handles
- floating-point noise" but no rounding is applied.
- These are unnecessary variables — should use the
- originals directly.
-2. **Stale comment:** the code mentions "non NNTE values."
- NNTE was removed.
-3. **`sp_count_9` counts all rows, not just valid:** This
- is a loose pre-filter. A subject-param with 3 total
- rows (2 excluded + 1 valid) passes the count check
- but is caught by `length(grp_idx) < 2L`.
- Not a bug, just slightly wasteful.
-4. **Boundaries:** OTL threshold is strict `> 5`. Tiebreaker
- uses lowest `id` (not age-dependent like SDE steps).
-5. **`.child_valid()` call:** Correctly excludes temp SDEs
- (`include.temporary.extraneous = FALSE`). Evil Twins
- operates on the "clean" view without SDE candidates.
-6. **Sort order:** Explicit sort before
- `valid_set` computation. Comment explains this is
- critical — sorting after would misalign the boolean
- vector.
-7. **Both `tbc.sd` and `ctbc.sd` used:** The dual
- threshold ensures corrected subjects (potcorr) aren't
- falsely flagged when correction moves one z-score
- close to the neighbor but not the other.
-8. **Parameter scope:** All 3 params handled uniformly.
-9. **Factor levels:** `Exclude-C-Evil-Twins` exists in
+1. **Pre-filter is loose by design:** `sp_count_9` counts
+ all rows in the subject-param, not just valid ones. A
+ group with 3 total rows where 2 are already excluded
+ passes the count check but is caught later by
+ `length(grp_idx) < 2L`. Slightly wasteful; not a bug.
+2. **Boundaries:** OTL threshold is strict `> 5`. Tiebreaker
+ uses lowest `internal_id` (not age-dependent, unlike the
+ birth-aware tiebreaking used by SDE steps).
+3. **`.child_valid()` flags:** `include.temporary.extraneous
+ = FALSE` — Evil Twins operates on the "clean" view
+ without SDE candidates.
+4. **Sort order:** Explicit `order(subjid, param, agedays,
+ internal_id)` before `valid_set` computation. The inline
+ comment explains why the sort must precede `valid_set`:
+ reordering after would misalign the boolean vector
+ against row positions.
+5. **Both `tbc.sd` and `ctbc.sd` used:** The dual threshold
+ prevents false positives for potcorr subjects, where
+ gestational-age correction can move one z-score close
+ to the neighbor but not the other.
+6. **Parameter scope:** All three params (WEIGHTKG,
+ HEIGHTCM, HEADCM) are handled uniformly; Evil Twins is
+ not param-specific.
+7. **Factor levels:** `Exclude-C-Evil-Twins` is present in
  `exclude.levels`.
-10. **Efficiency:** Good — pre-filter checks for any OTL
- globally before entering per-group loop. Only
- subject-params with OTL are processed. The while loop
- typically runs 1–3 iterations per group.
+8. **Efficiency:** Cheap early exit via a single global
+ `calc_otl_evil_twins()` call; only subject-params with
+ OTL rows enter the per-group loop; groups are small and
+ independent. The while loop typically runs 1–3
+ iterations per group.
 
 ---
 
