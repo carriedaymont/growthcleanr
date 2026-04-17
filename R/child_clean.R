@@ -7,8 +7,6 @@
 #   height, head circumference) from electronic health records for children
 #   ages 0-20 years.
 #
-# VERSION: 2026-03-20
-#
 # AUTHOR: Carrie Daymont, Penn State College of Medicine
 #
 #
@@ -27,28 +25,31 @@
 # ALGORITHM STRUCTURE
 ################################################################################
 #
-# The algorithm proceeds through 22 steps:
+# Preprocessing (handled in cleangrowth() before dispatch to cleanchild()):
+#   - Input validation, internal_id assignment, imperial->metric conversion
+#   - Z-score calculation (WHO/CDC blend via CSD method)
+#   - Step 2b: Gestational age correction for potcorr (preterm) subjects
+#   - Recentering -> tbc.sd and ctbc.sd
+#   - Exclude-Missing and Exclude-Not-Cleaned assignment
 #
-#   STEP 0:  Dataset preparation and variable setup
-#   STEP 1:  Missing data and initialization
-#   STEP 2:  Z-score calculation (WHO/CDC) and recentering
-#   STEP 2b: Gestational age correction for premature/small infants
-#   STEP 3:  Unit error recovery (optional)
-#   STEP 4:  Swapped parameters detection
-#   STEP 5:  Temporary same-day extraneous (SDE) resolution
-#   STEP 6:  Carried forward identification
-#   STEP 7:  Absolute biologically implausible values (BIV)
-#   STEP 9:  Evil Twins (adjacent extreme values)
-#   STEP 11: EWMA-based extreme value detection (EWMA1)
-#   STEP 13: Final SDE resolution (one-day and EWMA-based)
-#   STEP 15: Moderate EWMA exclusions (EWMA2)
-#   STEP 17: Height velocity checks
-#   STEP 19: Pairs and singles evaluation
-#   STEP 21: Error load assessment
-#   STEP 22: Output preparation
+# Algorithm steps (within cleanchild()):
+#   Early 13: SDE-Identicals (pre-CF identical-value removal)
+#   STEP 5:   Temporary same-day extraneous (SDE) flagging
+#   STEP 6:   Carried-forward identification + optional rescue
+#   STEP 7:   Biologically implausible values (BIV)
+#   STEP 9:   Evil Twins (adjacent extreme values)
+#   STEP 11:  EWMA1 - extreme EWMA outliers
+#   STEP 13:  Final SDE resolution
+#   STEP 15:  EWMA2 - moderate EWMA outliers
+#   STEP 16:  Birth HT/HC EWMA2 variant
+#   STEP 17:  Height/HC velocity checks
+#   STEP 19:  Pairs and singles evaluation
+#   STEP 21:  Error load assessment
+#   STEP 22:  Output assembly
 #
-# Note: Step numbers are not consecutive due to alignment with parallel
-# Stata algorithm development.
+# Note: Step numbers are not consecutive — they align with the Stata
+# implementation. Steps 1-4, 8, 10, 12, 14, 18, 20 do not exist as
+# top-level steps in the R algorithm.
 #
 # KEY CONCEPTS:
 #   - SDE (Same-Day Extraneous): Multiple measurements of same parameter on
@@ -92,14 +93,16 @@
 ################################################################################
 #
 # This file contains the main cleanchild() function and supporting utilities:
-#   - calc_otl_evil_twins(): Identifies Evil Twins (Step 9)
 #   - temporary_extraneous_infants(): Temporary SDE resolution (Step 5)
-#   - clean_infants_with_sde(): Final SDE resolution (Step 13)
-#   - Various EWMA calculation helpers
-#
-# Additional support functions defined in this file:
-#   - .child_valid(): Identifies included/partially-included rows
-#   - temporary_extraneous_infants(): SDE resolution (used in Step 5)
+#   - calc_otl_evil_twins(): Identifies Evil Twins (Step 9)
+#   - calc_and_recenter_z_scores(): Recomputes z-scores (Steps 11 and 15)
+#   - ewma() / ewma_cache_init() / ewma_cache_update(): EWMA machinery
+#   - .child_valid(): Identifies included/partially-included rows for each step
+#   - .child_exc(): Generates Exclude-C-{Reason} codes
+#   - .cf_rescue_lookup(): Age/interval/param/rounding CF rescue thresholds
+#   - get_dop(): Maps a parameter to its Designated Other Parameter
+#   - read_anthro(): Builds z-score closures from reference tables
+#   - gc_preload_refs(): Pre-loads reference closures for repeated calls
 #
 ################################################################################
 # USAGE NOTES
@@ -346,8 +349,10 @@ cleangrowth <- function(subjid,
 
   # Handle include.carryforward deprecation → cf_rescue
   # include.carryforward = TRUE means "keep CFs" = cf_rescue = "all"
-  # Only warn if user explicitly passed include.carryforward = TRUE
-  if (include.carryforward == TRUE) {
+  # Only warn if user explicitly passed include.carryforward = TRUE.
+  # isTRUE() is NA-safe: if a user passes NA, isTRUE(NA) is FALSE, so the
+  # deprecation branch is skipped and the call proceeds with cf_rescue.
+  if (isTRUE(include.carryforward)) {
     if (cf_rescue != "standard") {
       warning(
         "Both `include.carryforward = TRUE` and `cf_rescue = '", cf_rescue, "'` were set. ",
