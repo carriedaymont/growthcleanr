@@ -719,7 +719,6 @@ cleangrowth <- function(subjid,
       # CDC values in sd.orig_who are never incorrectly used as WHO.
       data.all[, sd.orig_who := measurement.to.z_who(param, agedays, sex, v, TRUE)]
 
-      # Changed smoothing from 2-4y to 2-5y to match Stata
       # smooth z-scores/SD scores between ages 2-5yo using weighted scores
       # older uses cdc, younger uses who
       data.all$ageyears <- data.all$agedays/365.25
@@ -748,12 +747,8 @@ cleangrowth <- function(subjid,
                sd.orig := data.all$sd.orig_cdc[(cdc_val & !smooth_val) | (smooth_val & is.na(data.all$sd.orig_who))]]
 
 
-      # NOTE: SD SCORES IN CODE ARE Z IN INFANT DOCS -- USE sd.orig ONLY
-
       # keep the original, uncorrected, unrecentered zscores
       data.all[,sd.orig_uncorr := sd.orig]
-
-      # NOTE: MAY WANT TO SUBSET HERE
 
       # 2b: corrected z scores ----
 
@@ -1127,11 +1122,9 @@ cleangrowth <- function(subjid,
     # WHO reference for HC only goes up to 5 years
     data.all[param == "HEADCM" & agedays >= 5*365.25, exclude := 'Exclude-Missing']
 
-    # NNTE removed: deterministic pre-filters in CF Step 6 and SDE Step 13
-    # are used instead.
-    # pediatric: cleanbatch (most of steps) ----
+    # pediatric: cleanchild (most of steps) ----
 
-    # NOTE: the rest of cleangrowth's steps are done through cleanbatch().
+    # NOTE: the rest of cleangrowth's steps are done through cleanchild().
 
     # Store off vars for later - CP
     # --- capture key checkpoint columns for later diagnostics ---
@@ -2524,8 +2517,9 @@ cleanchild <- function(data.df,
   # regardless of input row order.
   data.df <- data.table(data.df, key = c('subjid', 'param', 'agedays', 'internal_id'))
   # Recreate index for batch processing
-  # index was created on full dataset before batching (line 1022), so batches have
-  # non-contiguous indices. This breaks merge/subset operations that use index.
+  # index was created on the full dataset in cleangrowth() before batching, so
+  # batches have non-contiguous indices. This breaks merge/subset operations
+  # that use index, so we reassign 1:.N here within the batch.
   data.df[, index := 1:.N]
 
   if (parallel & !is.na(log.path)) {
@@ -2549,11 +2543,11 @@ cleanchild <- function(data.df,
   # NOTE: in each step, we redo temp SDEs
 
   # EARLY STEP 13: SDE-Identicals (before Steps 5/6) ----
-  # Updated to use age-dependent id preference
-  # Same-day identical values should be excluded before CF detection to match Stata
-  # Stata removes identicals early (lines 179-215 in do file) before Steps 5/6
-  # At birth (age 0): Keep LOWEST id (earliest, before fluid/interventions)
-  # At age > 0: Keep HIGHEST id (consistent with other SDE handling)
+  # Same-day identical values are excluded before CF detection so that CF logic
+  # only sees distinct repeated values, not trivial same-day duplicates.
+  # Tiebreaking uses age-dependent id preference:
+  # At birth (age 0): Keep LOWEST internal_id (earliest, before fluid/interventions)
+  # At age > 0: Keep HIGHEST internal_id (consistent with other SDE handling)
 
   if (!quietly)
     message(sprintf(
