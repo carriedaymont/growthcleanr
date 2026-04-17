@@ -35,7 +35,7 @@ growthcleanr narrative review. Each algorithm step has:
  what the code does
 2. **Exact boundaries:** `<` vs `<=`, `>` vs `>=`, and
  exact numeric tolerances (e.g., 0.4 vs 0.41) verified
- against spec/Stata
+ against spec
 3. **Uninitialized or unnecessary variables:** No variables
  used before assignment; no leftover variables from prior
  refactors
@@ -220,7 +220,7 @@ Support functions are defined in `child_clean.R` (after
 `cleanchild`) and `utils.R`:
 
 - `valid()` — row eligibility filter
-- `temporary_extraneous_infants()` — temp SDE resolution
+- `identify_temp_sde()` — temp SDE resolution
 - `calc_otl_evil_twins()` — evil twins OTL calculation
 - `calc_and_recenter_z_scores()` — z-score recalculation
  for CF rescue
@@ -481,8 +481,8 @@ the algorithm detect implausible measurements.
 
 Intermediate z-score rounding has been removed.
 Previously all z-score variables were rounded to 0.001
-using Stata-style rounding (half away from zero) for
-cross-platform validation; this is no longer needed.
+(half away from zero) for cross-platform validation; this
+is no longer needed.
 
 ### Age blending — main z-score (`sd.orig`)
 
@@ -819,8 +819,7 @@ Rescued CFs have their `exclude` column set back to
 | 21 | Error Load | Exclude all if error ratio too high |
 | 22 | Output | Assemble return columns |
 
-Step numbers are not consecutive because they are aligned
-with the parallel Stata implementation. Steps 3 (unit error),
+Step numbers are not consecutive. Steps 3 (unit error),
 4 (swaps), 8, 10, 12, 14, 18, and 20 either do not exist
 or are handled within other steps in the child algorithm.
 
@@ -926,7 +925,7 @@ measurements, then merges results back.
  (`temp_sde_ids_step13`)
 2. Safety checks: warn if Include duplicates exist (these
  would indicate a bug in prior steps)
-3. Re-run `temporary_extraneous_infants()` with
+3. Re-run `identify_temp_sde()` with
  `exclude_from_dop_ids` — in Step 13, temp SDEs are
  excluded from DOP median calculation (unlike Step 5
  where all values contribute)
@@ -1021,8 +1020,9 @@ are dropped.
  param-specific mapping.
 9. **Factor levels:** All 5 SDE exclusion codes exist in
  `exclude.levels`.
-10. **Comment:** "h. no need to calculate for
- R." — cryptic reference to a Stata step. Harmless.
+10. **Comment cleanup:** Cryptic stray comment "h. no need
+ to calculate for R." was removed from the code during
+ the 2026-04-16d walkthrough.
 
 ---
 
@@ -1046,7 +1046,7 @@ for each same-day group and temporarily excludes the others.
 These temporary exclusions are revisited in Step 13 (final
 SDE resolution) after the dataset has been further cleaned.
 
-The function `temporary_extraneous_infants()` is also reused
+The function `identify_temp_sde()` is also reused
 in Step 13 with different parameters (see Step 13).
 
 ### Key terms
@@ -1071,7 +1071,6 @@ valid row exists, all rows in the group are flagged as
 **Step 5b — Compute SP medians:**
 For each `(subjid, param)`, compute `median.spz` = median
 of `tbc.sd` across ALL valid values (not just non-SDE days).
-This matches the Stata implementation.
 
 **Step 5c — Compute DOP medians:**
 For each parameter, look up the SP median of its designated
@@ -1136,7 +1135,7 @@ should be excluded. The caller sets these rows to
 After Step 5, a check verifies that no `(subjid, param,
 agedays)` group has more than one `Include` row. If
 duplicates are found, a warning is issued. This would
-indicate a bug in `temporary_extraneous_infants()` —
+indicate a bug in `identify_temp_sde()` —
 the check has never fired in testing.
 
 ### Also creates
@@ -1213,7 +1212,7 @@ measurements may have changed enough to affect which SDE
 value is most plausible. If any temp SDEs exist:
 1. Reset all `Exclude-C-Temp-Same-Day` back
  to `Include`
-2. Re-run `temporary_extraneous_infants()` (the same
+2. Re-run `identify_temp_sde()` (the same
  function from Step 5) on the updated dataset
 
 This ensures SDE selection accounts for CF removals.
@@ -1438,7 +1437,7 @@ code.
 ### Temp SDE re-evaluation
 
 After BIV exclusions, temp SDEs are reset to Include and
-`temporary_extraneous_infants()` is rerun. This is the same
+`identify_temp_sde()` is rerun. This is the same
 pattern as after CF detection — removing extreme values
 changes which SDE value is most plausible.
 
@@ -2209,8 +2208,7 @@ For 1 remaining measurement:
 1. **Boundaries:** Pair: `> 4` / `> 2.5` strict; gap
  `>= 365.25` inclusive. Single: `> 3` / `> 5` strict.
 2. **`valid()` call:** Excludes temp SDEs. Counts only
- Include rows for singles/pairs determination (matches
- Stata).
+ Include rows for singles/pairs determination.
 3. **DOP snapshot:** Correct — prevents cross-parameter
  interference.
 4. **Both `tbc.sd` and `ctbc.sd` checked** for pairs

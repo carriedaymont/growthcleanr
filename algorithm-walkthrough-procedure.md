@@ -172,7 +172,7 @@ Find the corresponding code in the main algorithm file and any support functions
   `adult_support.R`.
 - **Child:** Everything is in `child_clean.R` — both the main algorithm
   (`cleanchild()`) and all support functions (`.child_valid()`,
-  `temporary_extraneous_infants()`, `calc_otl_evil_twins()`,
+  `identify_temp_sde()`, `calc_otl_evil_twins()`,
   `calc_and_recenter_z_scores()`, `ewma()`, etc.).
 
 ### Step C: Apply the checklist

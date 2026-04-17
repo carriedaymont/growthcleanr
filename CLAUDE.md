@@ -51,7 +51,7 @@ This CLAUDE.md covers both the child and adult algorithms.
 
 | File | What it contains |
 |------|------------------|
-| `R/child_clean.R` | `cleangrowth()` entry point + exports (top of file); `gc_preload_refs()` (pre-loads reference closures for repeated calls); `cleanchild()` main algorithm + support functions (`.child_valid()`, `.child_exc()`, `temporary_extraneous_infants()`, `calc_otl_evil_twins()`, `calc_and_recenter_z_scores()`, `ewma()`, `as_matrix_delta()` (internal), `ewma_cache_init()`/`ewma_cache_update()`, `get_dop()`, `read_anthro()`) |
+| `R/child_clean.R` | `cleangrowth()` entry point + exports (top of file); `gc_preload_refs()` (pre-loads reference closures for repeated calls); `cleanchild()` main algorithm + support functions (`.child_valid()`, `.child_exc()`, `identify_temp_sde()`, `calc_otl_evil_twins()`, `calc_and_recenter_z_scores()`, `ewma()`, `as_matrix_delta()` (internal), `ewma_cache_init()`/`ewma_cache_update()`, `get_dop()`, `read_anthro()`) |
 | `R/utils.R` | Shared utilities (does NOT contain `.child_valid()`) |
 | `R/adult_clean.R` | `cleanadult()` main algorithm — permissiveness framework, 14 steps |
 | `R/adult_support.R` | Adult support functions — permissiveness presets, EWMA, BIV, height groups, evil twins, error load, etc. |

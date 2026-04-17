@@ -47,9 +47,8 @@
 #   STEP 21:  Error load assessment
 #   STEP 22:  Output assembly
 #
-# Note: Step numbers are not consecutive — they align with the Stata
-# implementation. Steps 1-4, 8, 10, 12, 14, 18, 20 do not exist as
-# top-level steps in the R algorithm.
+# Note: Step numbers are not consecutive. Steps 1-4, 8, 10, 12, 14, 18, 20 do
+# not exist as top-level steps in the algorithm.
 #
 # KEY CONCEPTS:
 #   - SDE (Same-Day Extraneous): Multiple measurements of same parameter on
@@ -73,12 +72,6 @@
 #   - Subjects are split into batches for parallel computation
 #   - Each batch processes independently, then results are combined
 #
-# VARIABLE NAMING DIFFERENCES FROM STATA:
-#   - Stata: swtz, shtz, shcz -> R: sd.orig (smoothed original z-score)
-#   - Stata: tbcwtz, tbchtz, tbchcz -> R: tbc.sd (to-be-cleaned SD score)
-#   - Stata: exc_wt, exc_ht, exc_hc -> R: exclude (single character variable)
-#   - Stata: subjid_`p' -> R: param-based subsetting
-#
 # SORT ORDER:
 #   Critical for deterministic results. Primary sort:
 #     data.table::setkey(data.df, subjid, param, agedays, internal_id)
@@ -93,7 +86,7 @@
 ################################################################################
 #
 # This file contains the main cleanchild() function and supporting utilities:
-#   - temporary_extraneous_infants(): Temporary SDE resolution (Step 5)
+#   - identify_temp_sde(): Temporary SDE resolution (Step 5)
 #   - calc_otl_evil_twins(): Identifies Evil Twins (Step 9)
 #   - calc_and_recenter_z_scores(): Recomputes z-scores (Steps 11 and 15)
 #   - ewma() / ewma_cache_init() / ewma_cache_update(): EWMA machinery
@@ -128,16 +121,10 @@
 ################################################################################
 #
 # A substantial amount of effort is made to handle floating point precision
-# and to order by row id. This serves two purposes
-# 1) Ensures consistent handling of a dataset across multiple runs
-# 2) Facilitates debugging of R and Stata by eliminating sources of variation
+# and to order by row id. This ensures consistent handling of a dataset
+# across multiple runs.
 #
 # Row IDENTIFIERS are discussed further above.
-#
-# ROUNDING NOTE:
-#   previously used for all threshold comparisons to match Stata output exactly.
-#   This was removed for performance — the rounding was for cross-implementation
-#   testing, not algorithm correctness. Threshold comparisons now use raw values.
 #
 
 
@@ -336,7 +323,6 @@ cleangrowth <- function(subjid,
                         batch_size = 2000)
                         {
   # ewma_window: number of neighbors on each side for EWMA weighting.
-  # Default 15 is the R design choice; set to 25 to match Stata behavior.
 
   # Handle weight_cap deprecation → adult_scale_max_lbs
   if (!missing(weight_cap)) {
@@ -611,7 +597,7 @@ cleangrowth <- function(subjid,
       # Child algorithm functions
       ".child_valid",
       "ewma", "read_anthro", "as_matrix_delta",
-      "temporary_extraneous_infants",
+      "identify_temp_sde",
       "get_dop", "calc_otl_evil_twins",
       "calc_and_recenter_z_scores",
       ".child_exc", ".cf_rescue_lookup",
@@ -772,7 +758,6 @@ cleangrowth <- function(subjid,
 
       # initialize the column so it's always present
       # Create row-level potcorr_wt flag
-      # Equivalent to Stata line 293: gen potcorr_wt=sn_wt==1 & swtz<-2 & agemonths<10
       data.all[, potcorr := FALSE]
       data.all[, potcorr_wt := FALSE]
 
@@ -791,7 +776,6 @@ cleangrowth <- function(subjid,
       data.all[, id_sort := NULL]
 
       # propagate that flag to all rows for that subject (subject-level)
-      # Equivalent to Stata line 294: bysort subjid: egen potcorr=max(potcorr_wt)
       data.all[, potcorr := any(potcorr_wt, na.rm = TRUE), by = subjid]
 
       # ensure deterministic order
@@ -825,7 +809,6 @@ cleangrowth <- function(subjid,
           all.x = TRUE)
 
         # Propagate fengadays ONLY from potcorr_wt rows
-        # Equivalent to Stata lines 309-310: gen aga_i=fengadays if potcorr_wt==1; bysort subjid: egen aga=min(aga_i)
         # Only use fengadays from the qualifying first weight (potcorr_wt==TRUE), not from any row
         pc[, fengadays_subj := ifelse(any(!is.na(fengadays) & potcorr_wt),
                                              min(fengadays[potcorr_wt], na.rm = TRUE),
@@ -921,14 +904,11 @@ cleangrowth <- function(subjid,
             sd.c_cdc
         )]
 
-        # Prefer Fenton over corrected WHO for ages <=2
-        # Use Fenton when available, fall back to corrected WHO only if Fenton missing
-        pc[, sd.c_temp := sd.c]
+        # Prefer Fenton over corrected WHO for ages <=2. Only overwrite sd.c
+        # when Fenton (unmod_zscore) is available; the := is a no-op otherwise,
+        # which preserves the existing corrected WHO/CDC value as the fallback.
         pc[potcorr == TRUE & ageyears_2b <= 2 & !is.na(unmod_zscore),
                  sd.c := unmod_zscore]
-        pc[potcorr == TRUE & ageyears_2b <= 2 & is.na(sd.c) & !is.na(sd.c_temp),
-                 sd.c := sd.c_temp]
-        pc[, sd.c_temp := NULL]
 
         # Assign final sd.corr in one pass
         # Priority: <2y potcorr -> corrected; 2-4y -> smoothed blend; else -> original
@@ -944,8 +924,7 @@ cleangrowth <- function(subjid,
         examine_only <- pc$param == "WEIGHTKG" & pc$potcorr
         tmp <- copy(pc[examine_only,])
 
-        # Filter SDE-Identicals BEFORE uncorr calculation
-        # Matches Stata's Early Step 13 (lines 172-180) which removes identicals before section 2bK
+        # Filter SDE-Identicals BEFORE uncorr calculation (pre-Step-13 cleanup).
         # At birth (age 0): Keep LOWEST id (earliest, before fluid/interventions)
         # At age > 0: Keep HIGHEST id (consistent with other SDE handling)
 
@@ -977,7 +956,7 @@ cleangrowth <- function(subjid,
         tmp <- tmp[order(subjid, agedays, id_sort),]
         tmp[, id_sort := NULL]
 
-        # Create seq_win (matches Stata's sn_wt creation at line 303, after identicals removed)
+        # Create seq_win (sequence number per subject, after identicals removed)
         tmp[, seq_win := sequence(.N), by = subjid]
         # we're only looking at the first 4 values, and they need to be < 2 years
         tmp <- tmp[seq_win <= 4 & ageyears_2b < 2,]
@@ -986,18 +965,13 @@ cleangrowth <- function(subjid,
         tmp <- tmp[!(is.na(sd.corr) & is.na(sd.orig)),]
         tmp <- tmp[subjid %in% names(which(table(subjid) > 1)),]
 
-        # abssumdiff was actually correct
-        # Stata line 429: abs(dswtz2 + dswtz3 + dswtz4) = abs(sum(diffs))
-        # R original: abs(sum(sd.corr[1] - sd.corr)) = abs(sum(diffs)) - CORRECT!
-        # Previous "fix" changed to sum(abs(diffs)) which was WRONG
-        # create differences, absolute sum them
+        # create differences and take the absolute value of their sum:
+        #   abs(sum(sd.corr[1] - sd.corr)) == abs(sum of diffs from the first value)
         tmp[, sd.corr_abssumdiff := abs(sum(sd.corr[1] - sd.corr)), by = subjid]
         tmp[, sd.orig_abssumdiff := abs(sum(sd.orig[1] - sd.orig)), by = subjid]
         # find subjects where corrected value needs to be replaced
 
-        # Only evaluate uncorr for first weight (potcorr_wt==TRUE)
-        # Equivalent to Stata: gen uncorr_i=abssumdiff_sc>abssumdiff_s & abssumdiff_s!=. & potcorr_wt==1
-        # Filter to first measurement only (equivalent to potcorr_wt==1, earliest agedays per subject)
+        # Only evaluate uncorr for the first weight per subject (earliest agedays)
         tmp[, is_first := seq_win == 1]
 
         sub_replace <- unique(tmp[sd.corr_abssumdiff > sd.orig_abssumdiff &
@@ -1046,10 +1020,8 @@ cleangrowth <- function(subjid,
     data.all[, index := 1:.N]
 
     # Mark missing values for exclusion
-    data.all[, exclude := factor(with(data.all, ifelse(
-      is.na(v) |
-        agedays < 0, 'Exclude-Missing', 'Include'
-    )),
+    data.all[, exclude := factor(
+      ifelse(is.na(v) | agedays < 0, 'Exclude-Missing', 'Include'),
     levels = exclude.levels,
     ordered = TRUE)]
     # also mark certain measurements to not consider
@@ -1147,7 +1119,6 @@ cleangrowth <- function(subjid,
         parallel = parallel,
         measurement.to.z = measurement.to.z,
         ewma.fields = ewma.fields,
-        include.carryforward = include.carryforward,
         cf_rescue = cf_rescue,
         cf_detail = cf_detail,
         debug = debug,
@@ -1178,7 +1149,6 @@ cleangrowth <- function(subjid,
         parallel = parallel,
         measurement.to.z = measurement.to.z,
         ewma.fields = ewma.fields,
-        include.carryforward = include.carryforward,
         cf_rescue = cf_rescue,
         cf_detail = cf_detail,
         debug = debug,
@@ -1675,7 +1645,6 @@ as_matrix_delta <- function(agedays) {
 #' e_df <- ewma(df_stats$agedays, sd, ewma.exp = -1.5)
 ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 15, cache_env = NULL) {
   # window parameter limits EWMA to max window positions on each side.
-  # Default 15 is the R design choice; pass window = 25 to match Stata behavior.
   # Set window = Inf to disable windowing
   # cache_env: optional environment for sharing delta matrix between calls
   #   (e.g., between tbc.sd and ctbc.sd calls that use the same agedays/exponents)
@@ -1697,8 +1666,9 @@ ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 15, cache_
   #   iv.	For each of the three EWMASDs, calculate the dewma_*=SD-EWMASD
   # d.	EWMASDs and ΔEWMASDs will change if a value is excluded or manipulated using one of the methods below, therefore EWMASDs and ΔEWMASDs be recalculated for each
   #     step where they are needed.
-  # e.	For these calculations, use variables that allow for precise storage of numbers (in Stata this is called 'double') because otherwise rounding errors can cause
-  #     problems in a few circumstances
+  # e.	For these calculations, use variables that allow for precise storage of
+  #     numbers (double-precision floats) because otherwise rounding errors can
+  #     cause problems in a few circumstances
 
   n <- length(agedays)
   # initialize response variables
@@ -1722,8 +1692,7 @@ ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 15, cache_
       delta <- sweep(delta + 5, 1, ewma.exp, FUN = "^")
       diag(delta) <- 0  # self-weight is zero (replaces ifelse(delta == 0, ...) approach)
 
-      # Apply windowing: zero out weights beyond window positions
-      # Matches Stata: abs(sn_`ep' - `n') <= `window'
+      # Apply windowing: zero out weights beyond window positions.
       if (!is.null(window) && is.finite(window)) {
         pos_diff <- abs(outer(1:n, 1:n, "-"))  # position difference matrix
         delta[pos_diff > window] <- 0
@@ -1981,7 +1950,7 @@ sd_median <- function(param, sex, agedays, sd.orig) {
   # determine ages (in days) we need to cover from min to max age in years
   agedays.to.cover <- dt[, (floor(min(ageyears) * 365.25):floor(max(ageyears +
                                                                       1) * 365.25))]
-  # group all measurements above age 19 together (copied from CD stata code e-mailed 4/3/15)
+  # group all measurements above age 19 together
   dt[ageyears > 19, ageyears := 19]
   dt.median <- dt[!is.na(sd.orig), list(sex = c(0, 1), sd.median = rep(median(sd.orig), 2)), by =
                     .(param, ageyears)]
@@ -2040,18 +2009,19 @@ get_dop <- function(param_name){
 #'
 #' @keywords internal
 #' @noRd
-# Revised temp SDE logic to match Stata ewmacode-2025-12-11.do
-# Key changes:
-#   1. SP median calculated from ALL included values (not just non-SDE days)
-#   2. DOP median distance used as secondary tiebreaker (always, not just fallback)
-#   3. Sort order: absdmedian_spz -> absdmedian_dopz -> index (spz/dopz ascending, index descending)
-# Note: Identical values are removed earlier (Step 13b SDE-Identicals), so by the time
-# tempsde runs, all same-day values are dissimilar.
+# Identifies which rows in a same-day duplicate group should be marked as the
+# temporary-SDE "losers" (i.e., not the value to keep). Returns a logical
+# vector in the caller's original row order; the caller is responsible for
+# setting those rows to 'Exclude-C-Temp-Same-Day'.
+#
+# Note: Identical values are removed earlier (Early Step 13 SDE-Identicals),
+# so by the time identify_temp_sde() runs, all same-day values in a given
+# (subjid, param, agedays) group are dissimilar.
 
-temporary_extraneous_infants <- function(df, exclude_from_dop_ids = NULL) {
-  # Added exclude_from_dop_ids parameter
-  # In Step 13, temp SDEs should be excluded from DOP median calculation (but included in SP median)
-  # Pass the ids of temp SDEs to exclude them from DOP median only
+identify_temp_sde <- function(df, exclude_from_dop_ids = NULL) {
+  # exclude_from_dop_ids: in Step 13, temp SDEs should be excluded from the
+  # DOP median calculation (but still contribute to the SP median); the caller
+  # passes their ids here. In Step 5 no temp SDEs exist yet, so leave NULL.
 
   # avoid "no visible binding" warnings
   agedays <- absdmedian.spz <- absdmedian.dopz <- extraneous <- NULL
@@ -2067,16 +2037,9 @@ temporary_extraneous_infants <- function(df, exclude_from_dop_ids = NULL) {
   if (is.null(df$param))
     df[, param := NA]
 
-  # Fix keyby reordering bug
-  # The old code computed valid.rows BEFORE keyby, but keyby reorders rows.
-  # Also, the returned boolean vector was in keyby order, not original order.
-  # Fix: Store original order, compute valid.rows AFTER keyby, return in original order
-
-  # Use id not index for deterministic SDE order
-  # index is assigned based on input order after sorting, which is not deterministic for SDEs
-  # id is user-provided and deterministic
-
-  # Store original row positions for mapping result back to original order
+  # Record the caller's original row positions before any reordering, so the
+  # final result can be mapped back. Row ordering is set deterministically
+  # below by explicit order(subjid, param, agedays, internal_id).
   df[, orig_row := .I]
   original_rows <- df$orig_row
 
@@ -2086,8 +2049,7 @@ temporary_extraneous_infants <- function(df, exclude_from_dop_ids = NULL) {
   df <- df[, .(tbc.sd, exclude, id, internal_id, orig_row), by = .(subjid, param, agedays)]
   df <- df[order(subjid, param, agedays, internal_id)]
 
-  # Now compute valid.rows on the keyby-sorted data
-  # Removed nnte filter (nnte calculation removed)
+  # Compute valid.rows on the sorted data.
   valid.rows <- .child_valid(df, include.temporary.extraneous = TRUE)
 
   # initialize fields
@@ -2111,16 +2073,13 @@ temporary_extraneous_infants <- function(df, exclude_from_dop_ids = NULL) {
   )
 
   # ----- STEP 1: Calculate SP medians for each parameter -----
-  # Stata: bysort subjid_`sdep': egen median_spz_`sdep'_i = median(tbc`sdep'z)
-  # Calculate median for each subject-param (all valid values, not just non-SDE days)
+  # Median of tbc.sd for each (subjid, param), over all valid values
+  # (not just non-SDE days).
   df[valid.rows, median.spz := median(tbc.sd, na.rm = TRUE), by = .(subjid, param)]
 
-  # DEBUG 2025-12-18: Check Subject 725 median calculation - REMOVED (medians match)
-
   # ----- STEP 2: Distribute SP medians across all rows for each subject -----
-  # This enables cross-parameter lookup (DOP medians)
-  # Stata uses two-step: first by subjid_p, then max() by subjid to distribute
-  # In R, we create a lookup table and merge
+  # This enables cross-parameter lookup (DOP medians) via a subject-keyed
+  # lookup table, one row per (subjid, param).
 
   # Create lookup table of SP medians by subject
   sp_medians <- df[valid.rows & !is.na(median.spz),
@@ -2144,8 +2103,7 @@ temporary_extraneous_infants <- function(df, exclude_from_dop_ids = NULL) {
       df[param == p, median.dopz := dop_lookup[as.character(subjid)]]
     }
   } else {
-    # Step 13: Calculate DOP median excluding temp SDEs (matches Stata line 1516)
-    # Stata: bysort subjid_`o': egen median_`o'z_i=median(tbc`o'z) if exc_`o'==0
+    # Step 13: Calculate DOP median excluding temp SDEs
     dop_valid_rows <- valid.rows & !(df$id %in% exclude_from_dop_ids)
 
     # Calculate DOP-specific medians excluding temp SDEs
@@ -2189,27 +2147,25 @@ temporary_extraneous_infants <- function(df, exclude_from_dop_ids = NULL) {
      absdmedian.dopz := Inf]
 
   # ----- STEP 5: Select which value to keep -----
-  # Sort by: absdmedian.spz (asc), absdmedian.dopz (asc), index (desc = keep highest)
+  # Sort by: absdmedian.spz (asc), absdmedian.dopz (asc), age-dependent internal_id
   # Keep first after sort, mark others as extraneous
 
   df[valid.rows & extraneous.this.day, extraneous := {
-    # Sort by absdmedian.spz (asc), then absdmedian.dopz (asc), then id tiebreaker
-    # Keep the first after sort, mark others as extraneous
-    # Age-dependent id tiebreaker to match Stata
-    # Stata uses obsid (observation ID) for tiebreaker, not row index
-    # At agedays=0: pick lowest id (sort ascending)
-    # At agedays>0: pick highest id (sort descending via -internal_id)
-    # Use internal_id for sorting, not id (which may be character)
-    tiebreaker <- if(agedays[1] == 0) internal_id else -internal_id
+    # Age-dependent internal_id tiebreaker:
+    #   At agedays == 0: keep lowest internal_id (earliest, before fluid shifts)
+    #   At agedays  > 0: keep highest internal_id (later, more careful measurement)
+    # internal_id is used (not user id) because user id may be character.
+    tiebreaker <- if (agedays[1] == 0) internal_id else -internal_id
     ord <- order(absdmedian.spz,
                  absdmedian.dopz, tiebreaker)
     keep_id <- id[ord[1]]
     id != keep_id
   }, by = .(subjid, param, agedays)]
 
-  # Map result back to original row order
-  # The df is in keyby order, but caller expects result in original order.
-  # Use orig_row instead of index for deterministic ordering
+  # Map result back to caller's original row order.
+  # df was re-ordered during the by-group work above; orig_row preserves
+  # the caller's row positions so the returned logical vector lines up
+  # with the original input.
   extraneous_result <- df$extraneous & valid.rows
 
   # Create a named vector: orig_row -> is_extraneous
@@ -2438,15 +2394,11 @@ calc_and_recenter_z_scores <- function(df, cn, ref.data.path,
 # Main child growthcleanr function (cleanchild)
 
 #' Function to clean data (optionally in batches):
-#' 4.  Dataset split (optional)
-#' a.	In Stata, many of the rest of the steps require you to repeat steps as many times as there are observations for the subject with the highest number of
-#'     observations. Therefore, in order to speed things up I separated the dataset at this point into three groups: short (subjects with <=10 total
-#'     observations), medium (subjects with >10 and <=30 observations) and long (subjects with >30 observations). I performed all the rest of the steps
-#'     separately for each of the 3 datasets and then re-combined them at the end. Note that all observations for a subject stay together. This step is
-#'     definitely not necessary if it will not speed things up in whatever software program you're using.
 #'
-#' NOTE: to use mutliple processes in R we will process patients in batches using the plyr ddply function
-#' set up function to process one patient.  Function to parallelize batches is below.
+#' NOTE: to use multiple processes we process patients in batches using the plyr
+#' ddply function. Subjects are split into batches at the wrapper level; all
+#' observations for a given subject stay together within one batch. This function
+#' processes one batch.
 #'
 #' @keywords internal
 #' @import data.table
@@ -2458,7 +2410,6 @@ cleanchild <- function(data.df,
                                parallel,
                                measurement.to.z,
                                ewma.fields,
-                               include.carryforward,
                                cf_rescue = "standard",
                                cf_detail = FALSE,
                                debug = FALSE,
@@ -2567,7 +2518,7 @@ cleanchild <- function(data.df,
   # Guard against groups with no included rows (empty vector → -Inf/Inf warning)
   data.df[, keep_id := {
     incl_ids <- internal_id[exclude == "Include"]
-    if (length(incl_ids) == 0L) NA_real_
+    if (length(incl_ids) == 0L) NA_integer_
     else if (agedays[1L] == 0L) min(incl_ids)
     else max(incl_ids)
   }, by = .(subjid, param, agedays, v)]
@@ -2588,7 +2539,7 @@ cleanchild <- function(data.df,
       "[%s] Preliminarily identify potential extraneous...",
       Sys.time()
     ))
-  data.df$exclude[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-C-Temp-Same-Day'
+  data.df$exclude[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-C-Temp-Same-Day'
 
   # capture a list of subjects with possible extraneous for efficiency later
   subj.dup <- data.df[exclude == 'Exclude-C-Temp-Same-Day', unique(subjid)]
@@ -2598,7 +2549,7 @@ cleanchild <- function(data.df,
   if (nrow(step5_dupe_check) > 0) {
     warning("Step 5: Found ", nrow(step5_dupe_check),
             " Include duplicates after temp SDE resolution. ",
-            "This may indicate a bug in temporary_extraneous_infants().")
+            "This may indicate a bug in identify_temp_sde().")
   }
 
   # 6:  carried forwards ----
@@ -2644,11 +2595,9 @@ cleanchild <- function(data.df,
       # Add id for consistent SDE order
       cf_subset <- cf_subset[order(subjid, param, agedays, internal_id)]
 
-      # CF logic updated to match Stata
-      # Replaced dplyr/map_lgl with data.table for CF detection
-      # Key logic fix (2025-12-11): Only compare if prior ageday has exactly ONE value
-      #   - If prior ageday has multiple values (SDEs), skip CF comparison
-      # Performance: data.table vectorized ops vs row-by-row map_lgl
+      # CF detection: compare each value to the prior ageday's single value.
+      # Only compare if the prior ageday has exactly ONE value — if there are
+      # multiple values (SDEs) on the prior day, skip the CF comparison.
 
       # Step 1: Count values per (subjid, param, ageday)
       day_counts <- cf_subset[, .(n_on_day = .N), by = .(subjid, param, agedays)]
@@ -2671,8 +2620,8 @@ cleanchild <- function(data.df,
       cf_subset[single_val_days, prior_single_val := i.single_val,
                on = .(subjid, param, prior_ageday = agedays)]
 
-      # Step 6: CF = TRUE if prior day had exactly 1 value AND current matches it
-      # Use exact equality to match Stata (no tolerance)
+      # Step 6: CF = TRUE if prior day had exactly 1 value AND current matches it.
+      # Uses exact equality (no numeric tolerance).
       cf_subset[, cf := !is.na(prior_single_val) & v.orig == prior_single_val]
 
       # Merge cf results back to data.sub by index
@@ -2687,8 +2636,8 @@ cleanchild <- function(data.df,
     cf_idx <- data.sub$index[data.sub$cf]
     data.df[index %in% cf_idx, exclude := .child_exc(param, "CF")]
 
-    # Check if CFs exist before rescue processing
-    # This optimization skips rescue logic if no CFs are present (matches Stata lines 775-780)
+    # Check if CFs exist before rescue processing.
+    # This optimization skips rescue logic if no CFs are present.
     any_cf <- any(data.df$exclude == "Exclude-C-CF")
     if (!quietly)
       message(sprintf("  CF rescue pre-filter: CFs exist = %s", any_cf))
@@ -2696,20 +2645,16 @@ cleanchild <- function(data.df,
     # Only process CF rescue if CFs exist
     if (any_cf) {
 
-    # Redo temporary SDEs after CF identification
-    # Temp SDEs should be re-evaluated now that CFs are excluded
-    # This matches Stata lines 773-780
-
-    # Check if any SDEs exist (matches Stata's anysde_chunk check)
+    # Redo temporary SDEs after CF identification: temp SDEs should be
+    # re-evaluated now that CFs are excluded.
     any_sde <- any(data.df$exclude == "Exclude-C-Temp-Same-Day")
 
     if (any_sde) {
-      # Temporarily convert Temp SDEs to potential includes for re-evaluation
-      # (Stata does this by resetting exc==2 to exc==0 and restoring subjid)
+      # Temporarily convert Temp SDEs back to Include for re-evaluation.
       data.df[exclude == "Exclude-C-Temp-Same-Day", exclude := "Include"]
 
       # Re-run temp SDE logic (now CFs are excluded, so SDE evaluation will differ)
-      data.df$exclude[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-C-Temp-Same-Day'
+      data.df$exclude[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-C-Temp-Same-Day'
     }
 
     # Determine if measurements are in whole or half imperial units (row-level flag)
@@ -2723,35 +2668,23 @@ cleanchild <- function(data.df,
     data.df[param == "HEADCM",
             wholehalfimp := abs((v.orig / 2.54) %% 0.5) < 0.01]
 
-    # Fix: Exclude SDE-Identicals from entire CF string calculation
-    # SDE-Identicals break multiple parts of the CF logic (rle, originator detection, cs assignment)
-    # Temporarily remove them, do CF calculations, then add them back (like Stata's subjidresc approach)
-
-    # Save SDE-Identical rows and remove from data.df temporarily
+    # SDE-Identicals break multiple parts of the CF logic (rle, originator
+    # detection, cs assignment) so temporarily remove them, do CF calculations,
+    # then add them back after CF rescue below.
     sde_identical_rows <- data.df[exclude == "Exclude-C-Identical"]
     data.df <- data.df[!exclude == "Exclude-C-Identical"]
 
-    # Complete rewrite of CF string detection
-    # Previous approach used v.orig sort + position indexing which failed when
-    # multiple CF strings had same measurement value (see Subject 746 bug)
-    # New approach: directly match each CF to its most recent prior Include with same value
-    # Calculate ageday_has_include BEFORE string detection
-    # CFs on days with Includes are not eligible for rescue and should be excluded from
-    # string detection (like Stata's subjidresc approach)
-
-    # First, identify CFs on days with Includes - these are NOT eligible for rescue
-    # ageday_has_include only checks for Includes
-    # Removed Temp SDE check - only Includes should block CF rescue eligibility
-    # This matches Stata line 817: egen ageday_include = max(exc==0)
+    # CFs on days that also have at least one Include are NOT eligible for
+    # rescue and are excluded from string detection. ageday_has_include only
+    # checks for Includes (temp SDEs do not block CF rescue eligibility).
     data.df[, ageday_has_include := any(as.character(exclude) == "Include"),
             by = c("subjid", "param", "agedays")]
 
     # POSITIONAL STRING DETECTION
-    # Changed from value-based to positional approach to match Stata lines 849-883
-    # Originators are Includes where the NEXT value is a CF
-    # Strings propagate forward until interrupted by non-CF
-    # Originators are ANY Include where next is CF
-    # The ageday_has_include check only applies to CFs (for rescue eligibility), not originators
+    # Originators are Includes where the NEXT value is a CF. Strings propagate
+    # forward (originator, then consecutive CFs) until interrupted by a non-CF.
+    # The ageday_has_include check restricts CF rescue eligibility only; it does
+    # not disqualify originators.
 
     # Initialize variables
     data.df[, cf_binary := exclude == "Exclude-C-CF"]
@@ -2773,7 +2706,7 @@ cleanchild <- function(data.df,
     data.df[, originator_seq := cumsum(originator), by = c("subjid", "param")]
     data.df[originator == TRUE, cf_string_num := originator_seq]
 
-    # Store originator z-scores (use sd.orig_uncorr to match Stata's s<param>z)
+    # Store originator z-scores (uncorrected, pre-GA-correction).
     data.df[originator == TRUE, originator_z := sd.orig_uncorr]
 
     # Get max number of CFs to determine loop iterations
@@ -2941,10 +2874,6 @@ cleanchild <- function(data.df,
   if (length(cols_to_drop_6) > 0L) data.df[, (cols_to_drop_6) := NULL]
 
   # Step 7: BIV ----
-  # NOTE: Step numbers aligned with Stata 2025-12-10: BIV is Step 7, Evil Twins is Step 9
-
-  # Wt limits from do-file Oct 10 2022, in dataset, highest plausible weight=29.5kg, 65 lbs
-  # HC Limits based on analysis in do-file from Oct 11 2022: in dataset, lowest plausible 18.5, z=-13, highest plausible 63.5, z=11.2  (at birth, highest=42, z=6)
 
 
   if (!quietly)
@@ -2976,8 +2905,7 @@ cleanchild <- function(data.df,
   data.df[valid_set & param == "WEIGHTKG" & v > 600,
           exclude := "Exclude-C-BIV"]
 
-  # Min/max HT based on analysis in do file from
-  # Also, 18 is z=-6 for 22 0/7 in Fenton and 65 is z=6 for 40 0/7
+  # Min/max HT: 18 is z=-6 for 22 0/7 in Fenton and 65 is z=6 for 40 0/7.
   data.df[valid_set & param == "HEIGHTCM" & v < 18,
           exclude := "Exclude-C-BIV"]
   data.df[valid_set & param == "HEIGHTCM" & v > 244,
@@ -2986,8 +2914,7 @@ cleanchild <- function(data.df,
             agedays == 0,
           exclude := "Exclude-C-BIV"]
 
-  # Min/max HC based on analysis in do file from Oct 11 2022
-  # Also, 13 is z=-6 for 22 0/7 in Fenton and
+  # Min/max HC: 13 is z=-6 for 22 0/7 in Fenton.
   data.df[valid_set & param == "HEADCM" & v < 13,
           exclude := "Exclude-C-BIV"]
   data.df[valid_set & param == "HEADCM" & v > 75,
@@ -3036,7 +2963,7 @@ cleanchild <- function(data.df,
 
   # 7d.  Replace exc_*=0 if exc_*==2 & redo step 5 (temporary extraneous)
   data.df[exclude == 'Exclude-C-Temp-Same-Day', exclude := 'Include']
-  data.df[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-C-Temp-Same-Day']
+  data.df[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-C-Temp-Same-Day']
 
   # Drop column no longer needed after Step 7
   # ageyears: only used for BIV age-threshold checks (Step 7)
@@ -3149,7 +3076,7 @@ cleanchild <- function(data.df,
 
   # 9F.  redo temp extraneous
   data.df[exclude == 'Exclude-C-Temp-Same-Day', exclude := 'Include']
-  data.df[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-C-Temp-Same-Day']
+  data.df[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-C-Temp-Same-Day']
 
   # Step 11: Extreme EWMA ----
   # Restructured to use global iterations for efficiency
@@ -3212,8 +3139,8 @@ cleanchild <- function(data.df,
                 # Initialize EWMA fields
                 df[, (ewma.fields) := as.double(NaN)]
 
-                # Calculate exp_vals based on age gaps (Include values only)
-                # Use linear interpolation for exponent (Stata's linear formula)
+                # Calculate exp_vals based on age gaps (Include values only).
+                # Uses linear interpolation for the exponent.
                 inc_ages <- df$agedays[include_set]
                 diff_before <- c(NA, diff(inc_ages))
                 diff_after <- c(diff(inc_ages), NA)
@@ -3305,7 +3232,7 @@ cleanchild <- function(data.df,
               exclude := 'Include']
       # Recalculate temp SDEs for subset
       sde_subset <- data.df[subjid %in% affected_sde_subj]
-      sde_result <- temporary_extraneous_infants(sde_subset[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])
+      sde_result <- identify_temp_sde(sde_subset[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])
       # Apply results back using index
       sde_indices_to_mark <- sde_subset$index[sde_result]
       data.df[index %in% sde_indices_to_mark, exclude := 'Exclude-C-Temp-Same-Day']
@@ -3324,7 +3251,7 @@ cleanchild <- function(data.df,
   # Final temp SDE recalculation (end of Step 11, before Step 13)
   # Note: Does NOT use exclude_from_dop_ids - that's only for Step 13
   data.df[exclude == 'Exclude-C-Temp-Same-Day', exclude := 'Include']
-  data.df[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-C-Temp-Same-Day']
+  data.df[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-C-Temp-Same-Day']
 
   # 13: SDEs ----
 
@@ -3334,8 +3261,9 @@ cleanchild <- function(data.df,
       Sys.time()
     ))
 
-  # Pass temp SDE ids to exclude from DOP median
-  # This matches Stata Step 13 line 1516: DOP median uses only fully included values (exc==0)
+  # Pass temp SDE ids to exclude from DOP median.
+  # In Step 13 the DOP median uses only fully-included values — temp SDEs are
+  # still under consideration and should not bias the cross-parameter anchor.
   temp_sde_ids_step13 <- data.df[exclude == 'Exclude-C-Temp-Same-Day', id]
 
   # Safety check: no Include duplicates should exist before restoring temp SDEs
@@ -3346,7 +3274,7 @@ cleanchild <- function(data.df,
   }
 
   data.df[exclude == 'Exclude-C-Temp-Same-Day', exclude := 'Include']
-  data.df[temporary_extraneous_infants(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)],
+  data.df[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)],
                                         exclude_from_dop_ids = temp_sde_ids_step13),
           exclude := 'Exclude-C-Temp-Same-Day']
 
@@ -3408,8 +3336,8 @@ cleanchild <- function(data.df,
       if (agedays[1L] == 0L) min(ids) else max(ids)
     }, by = .(subjid, param, agedays, v)]
     data.sde[, dup_count := .N, by = .(subjid, param, agedays, v)]
-    # Fix SDE-Identical bug: was exclude != "Include" (backwards)
-    # Should mark currently-included duplicates as SDE-Identical (matches Stata line 206: exc==0)
+    # Mark currently-Included duplicates as SDE-Identical (only Include rows
+    # are eligible — other exclusion codes are already handled).
     data.sde[dup_count > 1L & internal_id != keep_id_dup & exclude == "Include",
              exclude := .child_exc(param, "Identical")]
     data.sde[, c("keep_id", "keep_id_dup", "dup_count") := NULL]
@@ -3507,10 +3435,9 @@ cleanchild <- function(data.df,
   # Phase B3: SDE-EWMA resolution
   # -------------------------------------------
 
-  # a. Calculate EWMA for fully included vals (exclude temp SDEs)
-  # Stata uses only Include values (not temp SDEs) for EWMA. This ensures:
-  # 1. Only one value per same-day contributes to EWMA (matches Stata behavior)
-  # 2. The diff calculation for exponent is correct (no same-day 0 diffs)
+  # a. Calculate EWMA for fully Included values only (exclude temp SDEs). This
+  # ensures (1) only one value per same-day contributes to EWMA, and (2) the
+  # diff calculation for the exponent is correct (no same-day 0 diffs).
   ewma_df <- data.sde[exclude == "Include" & !(was_temp_sde)]
   setkey(ewma_df, subjid, param, agedays, internal_id)
 
@@ -3547,7 +3474,7 @@ cleanchild <- function(data.df,
   data.sde[is.na(ewma.all) & was_temp_sde, ewma.all := ewma_fill]
   data.sde[, ewma_fill := NULL]
 
-  # Use max(ewma) as reference like Stata
+  # Use max(ewma) as the SPA (subject-parameter-ageday) reference point.
   # suppressWarnings: max/min on empty subsets produce -Inf/Inf with a warning;
   # converted to NA on the next line. Could use explicit length guards instead
   # (see commit 64c186b for the pattern), but these are in by-group expressions
@@ -4119,7 +4046,6 @@ cleanchild <- function(data.df,
   # we only run on valid values, non single values, and non weight
   tmp <- table(paste0(data.df$subjid, "_", data.df$param))
   not_single <- paste0(data.df$subjid, "_", data.df$param) %in% names(tmp)[tmp > 1]
-  # Removed nnte_full filter to match Stata (NNTE appended before Step 17)
   valid_set <- .child_valid(data.df, include.temporary.extraneous = FALSE) &
     not_single &
     data.df$param != "WEIGHTKG" # do not run on weight
@@ -4246,7 +4172,7 @@ cleanchild <- function(data.df,
 
     # ---- HEADCM thresholds ----
     # HC uses WHO velocity tables only (no Tanner); starts at 2-month intervals.
-    # Tolerance: ±1.5 cm (vs ±3 cm for HT). Matches Stata Step 17 HC logic.
+    # Tolerance: ±1.5 cm (vs ±3 cm for HT).
     hc_idx <- pf$param == "HEADCM"
     if (any(hc_idx)) {
       # WHO age group (same floor-month formula as HT)
@@ -4300,8 +4226,8 @@ cleanchild <- function(data.df,
            d_agedays > whoinc.age.hc * 30.4375,
          who_maxdiff_hc := who_maxdiff_hc * d_agedays / (whoinc.age.hc * 30.4375)]
 
-      # Apply HC tolerance: ±1.5 cm (vs ±3 cm for HT)
-      # Matches Stata: applied whenever WHO data exists (not restricted by age)
+      # Apply HC tolerance: ±1.5 cm (vs ±3 cm for HT), whenever WHO data
+      # exists (not restricted by age).
       pf[hc_idx & !is.na(who_mindiff_hc),
          `:=`(who_mindiff_hc = who_mindiff_hc * .5 - 1.5,
               who_maxdiff_hc = who_maxdiff_hc * 2 + 1.5)]
@@ -4310,10 +4236,10 @@ cleanchild <- function(data.df,
       pf[hc_idx & !is.na(d_agedays) & !is.na(who_mindiff_hc), mindiff := who_mindiff_hc]
       pf[hc_idx & !is.na(d_agedays) & !is.na(who_maxdiff_hc), maxdiff := who_maxdiff_hc]
 
-      # Fallback: HC > 24 months or no WHO data → fixed -1.5 (matches Stata default)
+      # Fallback: HC > 24 months or no WHO data → fixed -1.5.
       pf[hc_idx & is.na(mindiff), mindiff := -1.5]
 
-      # Birth adjustments (matches Stata: ±0.5 cm for HC)
+      # Birth adjustments: ±0.5 cm for HC.
       pf[hc_idx & agedays == 0, `:=`(mindiff = mindiff - .5, maxdiff = maxdiff + .5)]
 
       # Clean up temporary HC columns
@@ -4407,9 +4333,7 @@ cleanchild <- function(data.df,
         # b
         df[d_agedays < 365.25, mindiff := .5*min.ht.vel*(d_agedays/365.25)^2-3 ]
         df[d_agedays > 365.25, mindiff := .5*min.ht.vel-3 ]
-        # Fix maxdiff exponents to match Stata
-        # Was: ^1.5 for <365.25, ^0.33 for >365.25 (swapped)
-        # Fixed: ^0.33 for <365.25 (cube root), ^1.5 for >365.25
+        # maxdiff exponents: ^0.33 (cube root) for < 365.25 days, ^1.5 for > 365.25.
         df[d_agedays < 365.25,
            maxdiff := 2*max.ht.vel*(d_agedays/365.25)^0.33 + 5.5 ]
         df[d_agedays > 365.25,
@@ -4462,9 +4386,10 @@ cleanchild <- function(data.df,
         # For gap < 9 months: use WHO (already transformed at lines 4030-4031)
         df[d_agedays < 9*30.4375 & !is.na(who_mindiff_ht), mindiff := who_mindiff_ht]
         df[d_agedays < 9*30.4375 & !is.na(who_maxdiff_ht), maxdiff := who_maxdiff_ht]
-        # Apply transformation for >= 9 month gaps
-        # When gap >= 9 months, Tanner is preferred. But if Tanner not available (min.ht.vel is NA),
-        # use WHO as fallback WITH the transformation (matches Stata lines 2601-2602)
+        # Apply transformation for >= 9 month gaps.
+        # When gap >= 9 months, Tanner is preferred. But if Tanner is not
+        # available (min.ht.vel is NA), use WHO as fallback WITH the
+        # transformation (same scaling as the < 9 month path).
         df[d_agedays >= 9*30.4375 & is.na(min.ht.vel) & !is.na(who_mindiff_ht),
            mindiff := who_mindiff_ht*.5-3]
         df[d_agedays >= 9*30.4375 & is.na(min.ht.vel) & !is.na(who_maxdiff_ht),
@@ -4486,7 +4411,7 @@ cleanchild <- function(data.df,
         # WHO HC velocity columns (whoinc.2.hc, max.whoinc.2.hc, etc.) were pre-merged
         # before the while loop. Here we compute only per-iteration logic (depends on d_agedays).
 
-        # 17J: Interval selection — HC starts at 2-month (no 1-month interval; matches Stata)
+        # 17J: Interval selection — HC starts at 2-month (no 1-month interval).
         df[, whoinc.age.hc := NA_integer_]
         df[!is.na(d_agedays) & d_agedays >= 46  & d_agedays < 76,  whoinc.age.hc := 2L]
         df[!is.na(d_agedays) & d_agedays >= 76  & d_agedays < 107, whoinc.age.hc := 3L]
@@ -4515,18 +4440,17 @@ cleanchild <- function(data.df,
              d_agedays > whoinc.age.hc * 30.4375,
            who_maxdiff_hc := who_maxdiff_hc * d_agedays / (whoinc.age.hc * 30.4375)]
 
-        # 17M: Apply HC tolerance +-1.5 cm whenever WHO data exists (matches Stata)
-        # Stata: replace mindiff = 0.5*who_mindiff - 1.5 if who_mindiff != .
+        # 17M: Apply HC tolerance ±1.5 cm whenever WHO data exists.
         df[!is.na(who_mindiff_hc),
            `:=`(who_mindiff_hc = who_mindiff_hc * .5 - 1.5,
                 who_maxdiff_hc = who_maxdiff_hc * 2 + 1.5)]
 
         df[, mindiff := who_mindiff_hc]
         df[, maxdiff := who_maxdiff_hc]
-        # Fallback: HC > 24 months or no WHO data -> fixed -1.5 (matches Stata)
+        # Fallback: HC > 24 months or no WHO data → fixed -1.5.
         df[is.na(mindiff), mindiff := -1.5]
 
-        # Birth adjustments (+-0.5 cm for HC; matches Stata)
+        # Birth adjustments: ±0.5 cm for HC.
         df[agedays == 0, `:=`(mindiff = mindiff - .5, maxdiff = maxdiff + .5)]
 
         # 17N: Sort and lag thresholds for pairwise violation check
@@ -4671,15 +4595,12 @@ cleanchild <- function(data.df,
   data.df <- data.df[order(subjid, param, agedays, internal_id),]
 
   # Compute valid_set AFTER sort, not before
-  # create the valid set
-  # we only run on valid values and single/pair values
-  # Count only Include rows for singles/pairs determination
-  # Stata line 2769: gen vistot_`p'=_N if exc_`p'==0 - counts only remaining included measurements
-  # Old code counted ALL rows, so subjects with 4 heights (2 excluded + 2 included) were skipped
+  # Create the valid set: only Include rows contribute to the singles/pairs
+  # count (so subjects whose excluded measurements leave them with 1 or 2
+  # remaining Includes still flow into this step).
   include_df <- data.df[exclude == "Include"]
   sp_counts <- include_df[, .(sp_n = .N), by = .(subjid, param)]
   only_single_pairs <- sp_counts[data.df, on = .(subjid, param), fifelse(is.na(sp_n), FALSE, sp_n <= 2L)]
-  # Removed nnte_full filter to match Stata (NNTE included in Step 19)
   valid_set <- .child_valid(data.df, include.temporary.extraneous = FALSE) &
     only_single_pairs
 
@@ -4735,11 +4656,9 @@ cleanchild <- function(data.df,
         ord[1]
       }
 
-      # 19F/G: which exclusion
-      # Use absolute difference to match Stata
-      # Stata line 2778: absd_tbc`p'z=abs(tbc`p'z-tbc`p'z_other)
-      # Stata line 2830: absd_tbc`p'z>2.5 (uses absolute value)
-      # NA-safe: diff_tbc.sd can be NA if z-scores are NA (edge cases)
+      # 19F/G: which exclusion. Use absolute differences for the z-score
+      # threshold comparisons.
+      # NA-safe: diff_tbc.sd can be NA if z-scores are NA (edge cases).
       if (isTRUE(abs(diff_tbc.sd) > 4 &
           (abs(diff_ctbc.sd) > 4 | is.na(diff_ctbc.sd)) &
           diff_agedays >=365.25)){
@@ -4785,10 +4704,9 @@ cleanchild <- function(data.df,
       Sys.time()
     ))
 
-  # Removed nnte_full filter to match Stata (NNTE included in Step 21)
-  # Fix error-load denominator to exclude SDE/CF
-  # Stata formula: tot_exc / (tot_exc + tot_inc) - excludes SDE/CF from denominator
-  # R was using: errors / total - incorrectly included SDE/CF in denominator
+  # Error-load ratio: errors / (errors + includes). SDE codes, CF codes,
+  # Missing, and Not-Cleaned rows are excluded from both the numerator and
+  # the denominator (see non_error_codes below).
   valid_set <- rep(TRUE, nrow(data.df))
 
   # Non-error codes that should be excluded from both numerator AND denominator
@@ -4812,9 +4730,9 @@ cleanchild <- function(data.df,
           },
           by = c("subjid", "param")]
 
-  # Add error.load.mincount check
-  # Stata requires at least 2 errors before applying Error-load
-  # Bug fix (2026-04-12): was hardcoded .4 instead of error.load.threshold parameter
+  # error.load.mincount guards against tripping the step on a subject with
+  # a small number of errors (default: need at least 2 errors before the
+  # ratio is considered).
   data.df[valid_set & err_ratio > error.load.threshold & n_errors >= error.load.mincount & exclude == "Include",
           exclude := .child_exc(param, "Too-Many-Errors")]
 

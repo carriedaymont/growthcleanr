@@ -452,3 +452,344 @@ All tests pass after F5–F11:
 
 Adult regression harness not re-run for this session (no adult
 code touched).
+
+---
+
+## Session 3 — Early Step 13 (SDE-Identicals) + Step 5 (Temporary SDE)
+
+Scope: Early Step 13 identical-value filter, `identify_temp_sde()`
+(formerly `temporary_extraneous_infants()`), the `Exclude-C-Temp-Same-Day`
+transient code, and the post-Step-5 safety check. Also closed several
+deferred items from Sessions 1–2 while in the same territory.
+
+### F12. Stale DEBUG comment in identify_temp_sde — FIXED
+- **File/line:** `child_clean.R` line ~2118 (pre-edit).
+- **Issue:** `# DEBUG 2025-12-18: Check Subject 725 median calculation - REMOVED (medians match)`
+  — leftover debug marker for a check that was already removed. No current meaning.
+- **Fix:** Deleted.
+
+### F13. Stale `index (desc = keep highest)` comment — FIXED
+- **File/line:** `child_clean.R` line ~2192 (pre-edit).
+- **Issue:** "Sort by: absdmedian.spz (asc), absdmedian.dopz (asc),
+  index (desc = keep highest)" referenced the legacy `index` column
+  (replaced by `internal_id`) and also missed the age-dependent rule.
+- **Fix:** Rewrote to "age-dependent internal_id" to match the code.
+
+### F14. Mixed Stata / id / internal_id tiebreaker comment — FIXED
+- **File/lines:** `child_clean.R` lines ~2196–2202 (pre-edit).
+- **Issue:** 7-line comment block mixing descriptive content with
+  "Age-dependent id tiebreaker to match Stata" and "Stata uses obsid
+  (observation ID) for tiebreaker" — historical references, and the
+  "id tiebreaker" phrasing contradicted the code's use of `internal_id`.
+- **Fix:** Collapsed to a 4-line descriptive block (age-dependent
+  internal_id rule; rationale for using internal_id not user id).
+
+### F15. Stale "Use orig_row instead of index" — FIXED
+- **File/line:** `child_clean.R` line ~2215 (pre-edit).
+- **Issue:** "Use orig_row instead of index for deterministic ordering"
+  — refers to the legacy `index` column. Misleading in current code.
+- **Fix:** Rewrote to describe the actual mechanism (caller's row
+  positions are preserved so the logical vector lines up with input).
+
+### F16. "Step 13b" → "Early Step 13" naming — FIXED
+- **File/lines:** `child_clean.R` lines ~2048–2050 (pre-edit).
+- **Issue:** Inline note used "Step 13b" while the rest of the
+  codebase (top-of-file step list at line 36, the `cleanchild()`
+  banner at line ~2545, narrative doc, both CLAUDE.md files) uses
+  "Early Step 13" / "Early 13". Discussed with Carrie — kept "Early
+  Step 13" to maintain consistency with the dominant naming and to
+  avoid collision with main Step 13's internal Phase B1 sub-label.
+- **Fix:** Replaced "Step 13b SDE-Identicals" with "Early Step 13
+  SDE-Identicals" in the temp-SDE function header comment.
+
+### D13. Rename `temporary_extraneous_infants()` → `identify_temp_sde()` — FIXED
+- **Issue:** Legacy Stata-era function name was misleading
+  ("infants" — applies to all pediatric params; only "temporary"
+  in Step 5 but reused in Step 13). Retained without change through
+  the R port.
+- **Fix:** Renamed function at definition (line ~2051) + 8 call
+  sites in `child_clean.R` + 1 reference in `var_for_par` export
+  list. Updated active doc references: `CLAUDE.md` (Key files
+  table), `algorithm-walkthrough-procedure.md` (support-function
+  list), `child-gc-narrative-2026-04-13.md` (6 references).
+  Archived `cp/code/` copies left untouched.
+- **Verification:** All child test suites pass.
+
+### D14. Stata-reference cleanup inside identify_temp_sde() — FIXED
+Closed 6 stale Stata/commit-message blocks inside the function:
+1. Header block "Revised temp SDE logic to match Stata ewmacode-
+   2025-12-11.do" + "Key changes:" bullet list — replaced with a
+   present-tense function-purpose summary.
+2. Opener comments "Added exclude_from_dop_ids parameter" +
+   "In Step 13, temp SDEs should be excluded from DOP median
+   calculation" — folded into a present-tense parameter note.
+3. "Fix keyby reordering bug" + "Use id not index for deterministic
+   SDE order" commit-message blocks — collapsed to one descriptive
+   comment about `orig_row` preserving caller row order.
+4. "Removed nnte filter (nnte calculation removed)" — deleted.
+5. Stata pseudocode `bysort subjid_sdep: egen median_spz_...` —
+   deleted; kept descriptive comment only.
+6. "Stata uses two-step: first by subjid_p, then max() by subjid
+   to distribute / In R, we create a lookup table and merge" —
+   collapsed to R-side description.
+7. "matches Stata line 1516" + accompanying Stata bysort pseudocode
+   at the Step-13 DOP-median branch — Stata pointers removed,
+   descriptive comment kept.
+
+### D15. `NA_real_` → `NA_integer_` in Early 13 `keep_id` — FIXED
+- **File/line:** `child_clean.R` Early Step 13 `keep_id` assignment.
+- **Issue:** The no-Include fallback used `NA_real_` but
+  `internal_id` is integer, so the column was silently coerced to
+  double. No behavioral impact; the later `internal_id != keep_id`
+  filter still evaluates to FALSE (NA), the intended no-op.
+- **Fix:** `NA_integer_`. Type now consistent with `internal_id`.
+
+### Cross-session deferred items closed this session
+
+While in Step 5/Early-13 territory, closed the following deferred
+items from earlier sessions (user approved):
+
+#### D2 (Session 1): Unused `include.carryforward` in cleanchild() — FIXED
+- **File/lines:** `child_clean.R` line ~2448 (signature); lines
+  ~1150, ~1181 (two wrapper dispatch sites).
+- **Issue:** `cleanchild()` declared `include.carryforward` as a
+  positional parameter but never referenced it in the body. The
+  wrapper's deprecation path at line 350 maps it to `cf_rescue`
+  at entry, so `cleanchild()` only needs `cf_rescue`.
+- **Fix:** Removed from `cleanchild()` signature and from both
+  dispatch sites (`cleanchild(...)` single-batch call and
+  `ddply(..., cleanchild, ...)` multi-batch call).
+- **Note:** `.child_valid()`'s `include.carryforward` flag is a
+  different parameter (controls whether CF-excluded rows are
+  treated as valid in each step); left unchanged.
+
+#### D8 (Session 2): Dead `sd.c_temp` block in Step 2b — FIXED
+- **File/lines:** `child_clean.R` lines ~926–931 (pre-edit).
+- **Issue:** Session 2 analysis proved the third statement
+  (`is.na(sd.c) & !is.na(sd.c_temp)` → restore from snapshot) is
+  unreachable in both predicate branches. The snapshot itself is
+  unused — the second statement only overwrites `sd.c` where
+  `unmod_zscore` is non-NA, and `:=` is a no-op elsewhere, which
+  already preserves the pre-existing value.
+- **Fix:** Deleted the 4-line snapshot/restore block. Added a
+  one-line comment explaining the no-op fallback behavior.
+
+#### D11 (Session 2): Redundant `with(data.all, …)` — FIXED
+- **File/line:** `child_clean.R` line ~1046.
+- **Issue:** `data.all[, exclude := factor(with(data.all, ifelse(…)), …)]`
+  wraps column references in a redundant `with()` inside a data.table
+  `[` expression, where columns are already in scope.
+- **Fix:** Dropped `with(data.all, …)`; column references work
+  directly.
+
+---
+
+## Session 3 — findings reviewed and retracted
+
+None this session.
+
+---
+
+## Session 3 — deferred items
+
+### D16. Stale Roxygen prose in identify_temp_sde() — DEFER
+- **File/lines:** `child_clean.R` lines ~2026–2039 (the multi-line
+  Roxygen block above the function).
+- **Observation:** The Roxygen `#'` prose (from Carrie's original
+  Stata-era documentation) uses Stata notation (`exc_*==0`,
+  `median_tbc*sd`) and inline Stata-style variable names. Describes
+  current behavior accurately, but the notation is unfamiliar for
+  R-only readers.
+- **Why deferred:** Requires a deeper rewrite to translate the
+  algorithm description into R-idiomatic notation. Natural to
+  combine with the narrative pass for Step 5 / Step 13.
+- **Exact fix:** Rewrite the Roxygen block in R notation
+  (`tbc.sd`, `exclude`, `median.spz`, `median.dopz`) and
+  present tense. Keep the structural outline (what the function
+  does in the SP-median-then-DOP-median selection procedure).
+
+---
+
+## Session 3 — post-fix test results
+
+All tests pass after F12–F16, D2, D8, D11, D13, D14, D15:
+
+- test-cleangrowth.R: 65 PASS, 0 warnings
+- test-child-regression.R: 48 PASS, 0 warnings
+- test-child-edge-cases.R: 28 PASS, 0 warnings
+- test-child-algorithms.R: 40 PASS (2 codetools warnings,
+  baseline, unchanged)
+- test-child-parameters.R: 13 PASS (1 deprecation warning,
+  baseline, unchanged)
+
+Adult test suites and regression harness not re-run (no adult
+code touched).
+
+---
+
+## Stata-reference cleanup — RESOLVED in Session 3 (bulk pass)
+
+Comprehensive grep (Stata / do-file / bysort / egen / `exc_*` /
+`obsid` / `swtz` / `tbc*z`) across `R/child_clean.R` and the
+child narrative initially turned up ~50 references. Per Carrie
+(2026-04-16): Stata was never released widely and is not
+referenced in any user-facing workflow — so all references were
+deleted (not kept as compatibility hints) rather than triaged
+per-session.
+
+**Adult code (`adult_clean.R`, `adult_support.R`): out of scope.**
+Adult is closed pending clinician validation. Two adult Stata
+references remain (`adult_clean.R:1133`, `adult_support.R:1556`)
+and will be addressed during a future adult-algorithm pass.
+
+**Approach:**
+- Line-number pointers, bysort/egen pseudocode, and "matches
+  Stata" / "Stata uses" historical markers — deleted outright.
+- Stata pseudocode that carried substantive logic — rewritten
+  in plain R prose.
+- `ewma_window = 25 to match Stata behavior` compatibility hint
+  — deleted (no real user need given the Stata code was never
+  broadly released).
+
+**What was touched this pass (~50 sites across ~12 regions):**
+
+Pre-algorithm / file header:
+- L50 "align with the Stata implementation" → "Step numbers
+  are not consecutive" (Stata reference dropped).
+- L77–80 4-line Stata-to-R variable mapping glossary — deleted.
+- L133 "Facilitates debugging of R and Stata" — deleted.
+- L138 "previously used for all threshold comparisons to
+  match Stata output exactly" (rounding historical note) —
+  deleted.
+- L326 `ewma_window` parameter comment "set to 25 to match
+  Stata behavior" — deleted.
+- `ewma()` block (formerly L1658, L1680, L1706): Stata window
+  reference + `in Stata this is called 'double'` parenthetical
+  + Stata pseudocode in windowing comment — all cleaned.
+- `sd_median()` (formerly L1977): "copied from CD stata code
+  e-mailed 4/3/15" — deleted.
+- `cleanchild()` roxygen (formerly L2398–2404): paragraph
+  starting "In Stata, many of the rest of the steps require…"
+  — replaced with a present-tense note about batch processing.
+
+Step 2b GA correction (7 sites):
+- "Equivalent to Stata line 293/294/309-310" pointers —
+  deleted.
+- "Matches Stata's Early Step 13 (lines 172–180)" — reduced
+  to "pre-Step-13 cleanup".
+- "Stata line 429: abs(dswtz2 + dswtz3 + dswtz4)" +
+  "abssumdiff was actually correct" commit-message block —
+  collapsed to a 2-line descriptive comment.
+- "Create seq_win (matches Stata's sn_wt creation at line 303,
+  after identicals removed)" — dropped the Stata reference.
+- "Equivalent to Stata: gen uncorr_i=…" — deleted.
+
+Step 6 CF (11 sites):
+- "CF logic updated to match Stata / Replaced dplyr/map_lgl
+  with data.table / Key logic fix (2025-12-11)" — collapsed to
+  a present-tense description of the CF comparison.
+- "Use exact equality to match Stata (no tolerance)" —
+  rephrased without Stata reference.
+- "matches Stata lines 775-780 / 773-780" — deleted.
+- "matches Stata's anysde_chunk check" — deleted.
+- "(Stata does this by resetting exc==2 to exc==0 and
+  restoring subjid)" — deleted.
+- Two "like Stata's subjidresc approach" references — deleted.
+- "matches Stata line 817: egen ageday_include = max(exc==0)"
+  — deleted.
+- "Changed from value-based to positional approach to match
+  Stata lines 849-883" — deleted; rewritten as a descriptive
+  "POSITIONAL STRING DETECTION" comment.
+- "use sd.orig_uncorr to match Stata's s<param>z" — dropped
+  Stata reference.
+
+Step 7 BIV (5 sites):
+- Step banner: "Step numbers aligned with Stata 2025-12-10:
+  BIV is Step 7, Evil Twins is Step 9" — deleted.
+- "Wt limits from do-file Oct 10 2022" + "HC Limits based on
+  analysis in do-file from Oct 11 2022" — deleted.
+- "Min/max HT based on analysis in do file from" — reduced
+  to the Fenton-based rationale only.
+- "Min/max HC based on analysis in do file from Oct 11 2022"
+  — reduced to the Fenton-based rationale only.
+
+Step 11 EWMA1 (1 site):
+- "Use linear interpolation for exponent (Stata's linear
+  formula)" — dropped Stata reference.
+
+Step 13 main / Phase B3 (2 sites):
+- "matches Stata Step 13 line 1516: DOP median uses only
+  fully included values (exc==0)" — rewritten as a
+  present-tense rationale.
+- "matches Stata line 206: exc==0" — dropped.
+- Phase B3 EWMA comments "Stata uses only Include values…
+  matches Stata behavior" — rewritten without Stata.
+- "Use max(ewma) as reference like Stata" — rephrased.
+
+Step 15 EWMA2 (1 site):
+- "Removed nnte_full filter to match Stata (NNTE appended
+  before Step 17)" — deleted.
+
+Step 17 HT/HC velocity (10 sites):
+- "Matches Stata Step 17 HC logic" (tolerance comment) —
+  dropped.
+- "Matches Stata: applied whenever WHO data exists" — dropped
+  the "Matches Stata:" prefix.
+- "(matches Stata default)" on HC fallback — deleted.
+- "Birth adjustments (matches Stata: ±0.5 cm for HC)" —
+  dropped.
+- "Fix maxdiff exponents to match Stata / Was: … / Fixed: …"
+  commit-message block — replaced with a one-line descriptive
+  comment.
+- "(matches Stata lines 2601-2602)" — dropped.
+- "no 1-month interval; matches Stata" — dropped "matches
+  Stata".
+- "Apply HC tolerance +-1.5 cm whenever WHO data exists
+  (matches Stata) / Stata: replace mindiff = 0.5*who_mindiff
+  - 1.5 if who_mindiff != ." — both lines cleaned.
+- "(matches Stata)" on final HC fallback and birth
+  adjustments — dropped.
+
+Step 19 Pairs/Singles (5 sites):
+- "Stata line 2769: gen vistot_`p'=_N if exc_`p'==0 - counts
+  only remaining included measurements / Old code counted ALL
+  rows, so subjects with 4 heights (2 excluded + 2 included)
+  were skipped" — rewritten as a descriptive comment.
+- "Removed nnte_full filter to match Stata (NNTE included in
+  Step 19)" — deleted.
+- "Use absolute difference to match Stata / Stata line 2778 /
+  Stata line 2830" — rewritten as a one-line descriptive
+  comment.
+
+Step 21 Error load (3 sites):
+- "Removed nnte_full filter to match Stata" — deleted.
+- "Stata formula: tot_exc / (tot_exc + tot_inc) - excludes
+  SDE/CF from denominator / R was using: errors / total —
+  incorrectly included SDE/CF in denominator" — replaced
+  with a present-tense description of the ratio.
+- "Stata requires at least 2 errors before applying
+  Error-load / Bug fix (2026-04-12): was hardcoded .4 …" —
+  replaced with a present-tense comment about
+  `error.load.mincount`.
+
+Narrative (`child-gc-narrative-2026-04-13.md`, 6 sites):
+- "against spec/Stata" → "against spec"
+- "using Stata-style rounding (half away from zero)" →
+  "(half away from zero)"
+- "aligned with the parallel Stata implementation" — deleted
+  leading phrase.
+- "cryptic reference to a Stata step. Harmless." — rewritten
+  to note that the cryptic comment was removed from the code.
+- "This matches the Stata implementation." (Step 5 SP median)
+  — deleted.
+- "(matches Stata)." (Step 19 valid() discussion) — dropped
+  the parenthetical.
+
+**Verification after the bulk pass:**
+- `grep -n 'Stata|stata|do-file|do file|bysort|egen |exc_wt|
+  exc_ht|exc_hc|obsid|swtz|shtz|shcz|tbcwtz|tbchtz|tbchcz'`
+  against `R/child_clean.R` returns zero hits.
+- Same grep against `child-gc-narrative-2026-04-13.md` returns
+  zero hits.
+- Adult code intentionally not touched (Carrie-only pass when
+  adult algorithm reopens).
