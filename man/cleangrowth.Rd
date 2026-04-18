@@ -21,7 +21,6 @@ cleangrowth(
   error.load.mincount = 2,
   error.load.threshold = 0.5,
   sd.recenter = NA,
-  include.carryforward = FALSE,
   cf_rescue = "standard",
   cf_detail = FALSE,
   ref.data.path = "",
@@ -32,7 +31,6 @@ cleangrowth(
   adult_cutpoint = 20,
   adult_permissiveness = "looser",
   adult_scale_max_lbs = Inf,
-  weight_cap,
   ewma_window = 15,
   id = NULL,
   ref_tables = NULL,
@@ -111,10 +109,6 @@ count that must be exceeded before excluding all measurements of either paramete
 built-in reference file (\code{rcfile-2023-08-15_format.csv.gz}). Defaults to
 NA, which uses the built-in file.}
 
-\item{include.carryforward}{Deprecated. Use \code{cf_rescue} instead.
-\code{include.carryforward = TRUE} maps to \code{cf_rescue = "all"}.
-\code{include.carryforward = FALSE} (old default) maps to \code{cf_rescue = "standard"}.}
-
 \item{cf_rescue}{CF rescue mode for the child algorithm. One of:
 \describe{
 \item{"standard"}{(Default) Use age/interval/param-specific lookup thresholds.
@@ -157,8 +151,6 @@ for all adult BIV limits, EWMA caps, height bands, etc. See
 
 \item{adult_scale_max_lbs}{Physical scale upper limit in pounds for adult
 weight data. Weights at or above this value are excluded. Defaults to Inf.}
-
-\item{weight_cap}{Deprecated. Use \code{adult_scale_max_lbs} instead.}
 
 \item{id}{Vector of unique ids for each row in the database.}
 

@@ -994,3 +994,67 @@ After reinstalling the package and regenerating
 
 Adult suites and regression harness not re-run (no adult
 code touched).
+
+---
+
+## Wrapper-level deferreds surfaced during narrative review (post-Session 6)
+
+### D27. Deprecated-parameter translation shims in `cleangrowth()` — FIXED (2026-04-18)
+**Resolution.** Removed `weight_cap` and `include.carryforward` from `cleangrowth()` argument list; deleted both deprecation-translation blocks and the associated warnings. Updated `test-child-parameters.R` Test 3 to use `cf_rescue = "all"` / `cf_rescue = "standard"` directly (baseline deprecation warning dropped from 1 → 0). Removed the `weight_cap` deprecation test from `test-cleangrowth.R`. Regenerated `cleangrowth.Rd`. Phase 1 header in wrapper reference renamed from "Deprecation handling and parameter validation" to "Parameter validation"; `weight_cap` row removed from Configurable Parameters table. Tests post-fix: `test-cleangrowth.R` 63 PASS 0 warnings; `test-child-parameters.R` 13 PASS 0 warnings.
+
+*Original deferred item:*
+- **File/lines:** `child_clean.R`, top of `cleangrowth()` (Phase 1 "Deprecation handling and parameter validation" in the wrapper technical reference).
+- **Issue.** `cleangrowth()` translates two deprecated parameters to their current equivalents: `weight_cap` → `adult_scale_max_lbs` (deprecation warning + value copy) and `include.carryforward = TRUE` → `cf_rescue = "all"` (deprecation warning, with a stronger warning if the caller also sets `cf_rescue` explicitly). `isTRUE()` is used so `NA` slips past the deprecation branch silently. The shims exist for backward compatibility with pre-v3.0.0 callers.
+- **Why defer/address.** v3.0.0 is already a breaking release (output changed from character vector to data.table, multiple parameters removed, exclusion codes renamed). The deprecation shims preserve only a small slice of the pre-v3.0.0 surface while adding entry-block complexity and a test-baseline deprecation warning. Dropping them simplifies Phase 1 and removes a category of parameter-validation branching.
+- **Proposed fix.** Remove both translation blocks from `cleangrowth()`; drop `weight_cap` from the argument list; drop any `include.carryforward = TRUE` handling (leaving `cf_rescue` as the only control). Update tests and roxygen to reference current parameter names only; expect the "1 expected deprecation warning" baseline in `test-child-parameters.R` to drop to 0.
+- **Where fixed later.** Next wrapper-level code pass / v3.0.0 parameter-surface cleanup.
+
+### D28. Phase 11 HC boundary: reference says `>= 3*365.25 → Exclude-Not-Cleaned`, code says `>= 5*365.25 → Exclude-Missing` — FIXED (2026-04-18, option 2)
+**Resolution.** Per Carrie's pick, both the 3y and 5y HC regions now use `Exclude-Not-Cleaned` (consolidated to a single HC exclusion code). Code change: `child_clean.R` line 1132 now reads `data.all[param == "HEADCM" & agedays >= 5*365.25, exclude := 'Exclude-Not-Cleaned']` (was `'Exclude-Missing'`). The pre-recentering `agedays > 3*365.25 → Exclude-Not-Cleaned` assignment at line 1057 is unchanged; the post-recentering check now overrides the generic "NA tbc.sd → Exclude-Missing" rule for the HC-above-5y case, keeping a consistent code across the 3y+ region. Ripple edits: wrapper reference Phase 11 (5*365.25 + rationale paragraph), wrapper reference Key Concepts (HEADCM bullet), wrapper reference Common Pitfalls (HC reference-data bullet), `child-gc-narrative-2026-04-13.md` Key Concepts, `gc-github-latest/CLAUDE.md` Exclusion Codes table and HC summary line. Tests post-fix: `test-cleangrowth.R`, `test-child-regression.R`, `test-child-algorithms.R` all pass (child-algorithms retains 2 baseline codetools warnings, unchanged).
+
+*Original deferred item:*
+- **File/lines:** `child_clean.R` line 1130 (`data.all[param == "HEADCM" & agedays >= 5*365.25, exclude := 'Exclude-Missing']`) vs. the wrapper technical reference Phase 11 post-recentering safety check, which now describes `agedays >= 3 * 365.25` → `Exclude-Not-Cleaned`. Related pre-recentering assignment at line 1057 uses `agedays > 3*365.25` → `Exclude-Not-Cleaned` (listed two bullets earlier in the same Phase 11 section).
+- **Issue.** The wrapper reference and the code disagree on both the age threshold (3y vs 5y) and the exclusion code (`Exclude-Not-Cleaned` vs `Exclude-Missing`) for the post-recentering HC safety check. Carrie's stated preference: "Missing-Not-Cleaned" — intent is that the post-recentering safety check should also use `Exclude-Not-Cleaned` (not `Exclude-Missing`), and possibly at the 3y boundary rather than 5y.
+- **Why defer.** Needs a product decision on (a) the threshold (3y or 5y), (b) the exclusion code (`Not-Cleaned` vs `Missing`), and (c) whether the post-recentering check is redundant with the pre-recentering 3y assignment. Depending on the answers, either the code or the reference needs to change. Text is left as-is in the reference for now; a walkthrough session should reconcile.
+- **Where fixed later.** Child algorithm walkthrough session covering Phase 11 / HC handling; coordinate code change in `child_clean.R` line 1130 with reference text.
+
+### D29. Check whether `parallel = TRUE` emits warnings — INVESTIGATED, DOCUMENTED (2026-04-18, no code change)
+**Resolution.** Confirmed: `parallel = TRUE` emits exactly two `codetools` warnings per `cleangrowth()` call of the form `<anonymous>: ... may be used in an incorrect context: '.fun(piece, ...)'` — one each from the child and adult `ddply()` dispatches. These are false positives: `codetools` flags `plyr::ddply`'s internal use of `...` as potentially misused, but plyr's usage is correct. Documented in wrapper reference Phase 5 ("Known harmless warnings") and cross-linked to the CRAN-prep item on replacing `plyr`. No suppression applied — suppressing would mask future real warnings and create cleanup debt; the warnings go away naturally when `ddply` is replaced with `data.table`/`foreach`. See CLAUDE.md → CRAN Preparation Checklist for the plyr-replacement item.
+
+*Original deferred item:*
+- **Scope.** Carrie noted (during review of wrapper reference Phase 5) that `parallel = TRUE` may emit ~2 harmless warnings; cause unknown. Unverified.
+- **Investigation needed.** Run `cleangrowth(..., parallel = TRUE)` on a small sample, capture any warnings with `withCallingHandlers()`, identify the root cause. Possible sources: `clusterExport()` on unexported helpers, `ddply()` deprecation messages, reference-file loading race conditions in workers.
+- **Resolution options.** (a) If warnings are cosmetic, document them in Phase 5 of the wrapper reference and suppress with `suppressWarnings()` locally. (b) If they point to a real issue (e.g., missing `clusterExport` of a function), fix the root cause.
+- **Where fixed later.** Next parallel-path review, or alongside D27/wrapper-level Phase 1 cleanup.
+
+### D30. Partial-run output row order should use user `id` — FIXED (2026-04-18)
+**Resolution.** Changed `child_clean.R` Phase 15 partial-run rbind reorder from `all_results[order(internal_id)]` to `all_results[order(id)]`. User `id` is contract-guaranteed unique and preserved untouched through both the cached and re-processed paths, producing a stable and semantically-meaningful output row order. Full-run path is unaffected (it already restores by `line`). Wrapper reference Phase 15 updated accordingly; CLAUDE.md Open (wrapper) entry removed. Tests post-fix: `test-child-regression.R` 48 PASS (partial-run tests unaffected).
+
+*Original deferred item:*
+- **File/lines:** `child_clean.R` Phase 15 rbind + reorder step (the `rbind` with `cached_results[!subjid %in% changed_subjids]` followed by `setorder(..., internal_id)`).
+- **Issue.** Already noted in `gc-github-latest/CLAUDE.md → Known Issues → Open (wrapper)`: output is currently ordered by `internal_id`, which is reassigned `1..K` over only the changed-subject input and collides with the cached `1..N`, producing deterministic-but-semantically-meaningless row order. Carrie has confirmed that sorting by user `id` (contract-guaranteed unique and preserved untouched through both paths) is the preferred fix.
+- **Proposed fix.** Replace `setorder(..., internal_id)` with `setorder(..., id)` for the final output-assembly step in partial-run mode. Verify that the full-run path is unaffected (it restores by `line` already, which is still correct there).
+- **Where fixed later.** Next wrapper-level code pass. Related CLAUDE.md entry should be updated to reflect the chosen fix direction.
+
+### D31. Lower Fenton floor from 250 g → 100 g in GA-correction integer-weight step — FIXED (2026-04-18)
+**Resolution.** Changed `child_clean.R` line 833 from `pc[intwt >= 250 & intwt < 500, intwt := 500]` to `pc[intwt >= 100 & intwt < 500, intwt := 500]`. Inline comment updated to explain the rationale. Wrapper reference already described the target state (`[100, 500)`). Tests post-fix: `test-cleangrowth.R` 63 PASS, `test-child-regression.R` 48 PASS, `test-child-algorithms.R` 41 PASS.
+
+*Original deferred item:*
+- **File/lines:** `child_clean.R` line 833: `pc[intwt >= 250 & intwt < 500, intwt := 500]` (inside `cleangrowth()`, Phase 10 / Child Step 2b Fenton integer-weight block).
+- **Issue.** The current floor only rounds `intwt` values in `[250, 500)` up to the Fenton table's minimum of 500. Values below 250 g currently fall out of the Fenton merge silently. In practice most <250 g weights are BIVs and would be excluded anyway, but Carrie has decided to lower the floor to 100 g so that users who configure lower BIV thresholds can still get Fenton-corrected z-scores for those weights. The wrapper technical reference Phase 10 / Phase 3 already describes the target state (`[100, 500)`).
+- **Proposed fix.** Change the condition to `pc[intwt >= 100 & intwt < 500, intwt := 500]`. Add targeted test cases covering a weight in `[100, 250)` to confirm Fenton merge succeeds and produces a sensible `fengadays`/`unmod_zscore`.
+- **Where fixed later.** Next wrapper-level or Child Step 2b code pass; small, localized change.
+
+---
+
+## GA correction (Phase 10 / Child Step 2b) — walkthrough checklist findings (2026-04-17)
+
+Moved from the wrapper technical reference on 2026-04-18. These are walkthrough findings applied to the GA-correction section of `cleangrowth()`.
+
+1. **Sort determinism.** Age-dependent sort key (`id_sort`) is assigned explicitly before `potcorr_wt` is marked.
+2. **Fenton reference files.** Loaded only under `has_potcorr`; `fent_foraga.csv.gz` and `fenton2025_ms_lookup_smoothed.csv` both in `inst/extdata/`.
+3. **Fast-path correctness.** When no subjects flag, the fast path writes `sd.corr := sd.orig` and `uncorr := 0L` — every row still has a non-missing `sd.corr` for downstream use.
+4. **NA safety.** The `potcorr_wt` predicate uses `!is.na(sd.orig) & sd.orig < -2`, so `Exclude-Missing` rows (where `sd.orig` is `NA`) cannot flag.
+5. **Fenton merge failure.** Correctly resets `potcorr_wt` to FALSE and recomputes subject-level `potcorr` so the subject is excluded from downstream Fenton logic without silently using partial results.
+6. **Correction revert rule.** The abssumdiff comparison is computed only over weight rows with `ageyears_2b < 2` and `seq_win ≤ 4`. The check is first-weight-only (`is_first`), which matches its purpose (the correction is driven by the first qualifying weight).
+7. **HEIGHTCM supine/standing offsets** (+0.8 WHO, +0.7 CDC) are applied only when `agedays > 730 & cagedays ≤ 730` — the band where chronological age is post-2y but corrected age is still under 2y.

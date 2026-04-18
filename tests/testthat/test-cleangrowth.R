@@ -483,35 +483,6 @@ test_that("adult integration: adult_scale_max_lbs passes through", {
               info = "136kg should not be scale-max flagged without cap")
 })
 
-test_that("adult integration: weight_cap deprecation warns and works", {
-
-  d <- data.table(
-    id = 1:6,
-    subjid = "dep_test",
-    sex = 0L,
-    param = c("HEIGHTCM", "HEIGHTCM", "HEIGHTCM",
-              "WEIGHTKG", "WEIGHTKG", "WEIGHTKG"),
-    agedays = c(8000L, 8400L, 8800L,
-                8000L, 8400L, 8800L),
-    measurement = c(170.0, 170.0, 170.5,
-                    70.0, 72.0, 136.078)   # 300 lbs
-  )
-
-  # weight_cap should warn about deprecation
-  expect_warning(
-    res <- cleangrowth(
-      subjid = d$subjid, param = d$param, agedays = d$agedays,
-      sex = d$sex, measurement = d$measurement, id = d$id,
-      quietly = TRUE, weight_cap = 300
-    ),
-    regexp = "weight_cap.*deprecated"
-  )
-
-  # But should still work (passed through as adult_scale_max_lbs)
-  expect_equal(as.character(res[id == 6]$exclude), "Exclude-A-Scale-Max",
-               info = "Deprecated weight_cap should still function")
-})
-
 test_that("adult integration: character/UUID ids preserved", {
 
   d <- data.table(

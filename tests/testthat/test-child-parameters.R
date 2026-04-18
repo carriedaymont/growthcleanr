@@ -37,30 +37,29 @@ run_child_subset <- function(n_subjects, ...) {
 # (Test 1 and Test 2 removed — legacy algorithm removed in v3.0.0)
 
 # ---------------------------------------------------------------------------
-# Test 3: include.carryforward controls CF rescue behavior (deprecated alias
-# for cf_rescue).
+# Test 3: cf_rescue controls CF rescue behavior.
 #
-# include.carryforward = TRUE  → cf_rescue = "all"
-#   Every detected CF is rescued (no Exclude-C-CF in output). Step 13
-#   final-SDE resolution handles any resulting multi-Include SPAs.
-# include.carryforward = FALSE → cf_rescue = "standard" (default)
-#   Excludes CFs unless the lookup threshold rescues them.
+# cf_rescue = "all"      → Every detected CF is rescued (no Exclude-C-CF
+#                          in output). Child Step 13 final-SDE resolution
+#                          handles any resulting multi-Include SPAs.
+# cf_rescue = "standard" → Default. Excludes CFs unless the lookup threshold
+#                          rescues them.
 # ---------------------------------------------------------------------------
-test_that("include.carryforward = TRUE keeps CFs, FALSE excludes them", {
+test_that("cf_rescue='all' keeps CFs, cf_rescue='standard' excludes them", {
 
-  out_keep_cf <- run_child_subset(50, include.carryforward = TRUE)
-  out_excl_cf <- run_child_subset(50, include.carryforward = FALSE)
+  out_keep_cf <- run_child_subset(50, cf_rescue = "all")
+  out_excl_cf <- run_child_subset(50, cf_rescue = "standard")
 
   n_cf_kept <- sum(grepl("-CF$|-CF-deltaZ", out_keep_cf$result$exclude))
   n_cf_excl <- sum(grepl("-CF$|-CF-deltaZ", out_excl_cf$result$exclude))
 
-  # include.carryforward = TRUE: CFs are kept as Include, so 0 CF exclusion codes
+  # cf_rescue = "all": CFs are kept as Include, so 0 CF exclusion codes
   expect_equal(n_cf_kept, 0,
-               info = "include.carryforward=TRUE should keep CFs (no CF exclusion codes)")
+               info = "cf_rescue='all' should keep CFs (no CF exclusion codes)")
 
-  # include.carryforward = FALSE (default): CFs should be excluded
+  # cf_rescue = "standard" (default): CFs should be excluded
   expect_gt(n_cf_excl, 0,
-            label = "CF count with include.carryforward = FALSE")
+            label = "CF count with cf_rescue='standard'")
 })
 
 # ---------------------------------------------------------------------------

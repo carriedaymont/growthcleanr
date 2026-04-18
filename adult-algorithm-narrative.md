@@ -1,23 +1,10 @@
 # Adult Growthcleanr Algorithm Narrative
 
-This narrative documents the adult algorithm cleaning steps
-(Adult Steps 1, 2W, 3, 4W, 9Wa/9H/9Wb, 10H/10W,
-11H/11Wa/11Wa2/11Wb, 13, 14).
+This narrative documents the adult algorithm cleaning steps (Adult Steps 1, 2W, 3, 4W, 9Wa/9H/9Wb, 10H/10W, 11H/11Wa/11Wa2/11Wb, 13, 14).
 
-**Wrapper-level material lives in
-`wrapper-narrative-2026-04-17.md`:** the `cleangrowth()` public
-interface, input format, unit conversion, batching, dispatch,
-output reassembly, the canonical **Code review checklist**, and
-cross-algorithm working-dataframe differences (the adult
-algorithm's copies-into-shrinking-dataframes pattern is
-contrasted there with the child algorithm's single-`data.df`
-pattern).
+**Wrapper-level material lives in `wrapper-narrative-2026-04-17.md`:** the `cleangrowth()` public interface, input format, unit conversion, batching, dispatch, output reassembly, the canonical **Code review checklist**, and cross-algorithm working-dataframe differences (the adult algorithm's copies-into-shrinking-dataframes pattern is contrasted there with the child algorithm's single-`data.df` pattern).
 
-The adult algorithm does not use z-scores or CSD calculations —
-it works with raw measurements (and BMI computed internally for
-some thresholds). The Z-Score Infrastructure section in the
-wrapper narrative is therefore not load-bearing for the adult
-algorithm but may be useful context for cross-algorithm work.
+The adult algorithm does not use z-scores or CSD calculations — it works with raw measurements (and BMI computed internally for some thresholds). The Z-Score Infrastructure section in the wrapper narrative is therefore not load-bearing for the adult algorithm but may be useful context for cross-algorithm work.
 
 ---
 
@@ -343,14 +330,7 @@ The cap detection range is: `round(scale_max_lbs / 2.2046226, 1) ± 0.1` kg, usi
 2. Convert `scale_max_lbs` to kg; define detection range as `round(kg, 0.1) ± 0.1`
 3. Identify non-RV values at the cap and count distinct non-RV weights
 4. **If only 1 distinct non-RV weight and it's the cap:** Exclude all of the subject's weights with `Scale-Max-Identical`
-5. **If mixed cap and non-cap, and >1 distinct non-RV weight:**
-   a. Calculate EWMA on non-RV values (exponent = -5), including `ewma_before` (EWMA excluding the immediately preceding observation) and `ewma_after` (EWMA excluding the immediately following observation). At edges, before/after EWMA equals the full EWMA.
-   b. Calculate adjacency diffs (difference from previous and next non-RV values)
-   c. For positive outliers (dewma50p): `dewma_all > 50 + 0.12` AND `dewma_before > 45 + 0.12` AND `dewma_after > 45 + 0.12` AND `dewma_all` is not NA
-   d. For negative outliers (dewma50m): `dewma_all < −(50 + 0.12)` AND `dewma_before < −(45 + 0.12)` AND `dewma_after < −(45 + 0.12)` AND `dewma_all` is not NA
-   e. For positive adjacency (d50p): `d_prev > 50 + 0.12` AND `d_next > 50 + 0.12`. Missing neighbors (first/last in series): treated as +Inf (confirms exclusion).
-   f. For negative adjacency (d50m): `d_prev < −(50 + 0.12)` AND `d_next < −(50 + 0.12)`. Missing neighbors: treated as −Inf (confirms exclusion).
-   g. Exclude cap values where (dewma50p AND d50p) OR (dewma50m AND d50m)
+5. **If mixed cap and non-cap, and >1 distinct non-RV weight:** a. Calculate EWMA on non-RV values (exponent = -5), including `ewma_before` (EWMA excluding the immediately preceding observation) and `ewma_after` (EWMA excluding the immediately following observation). At edges, before/after EWMA equals the full EWMA. b. Calculate adjacency diffs (difference from previous and next non-RV values) c. For positive outliers (dewma50p): `dewma_all > 50 + 0.12` AND `dewma_before > 45 + 0.12` AND `dewma_after > 45 + 0.12` AND `dewma_all` is not NA d. For negative outliers (dewma50m): `dewma_all < −(50 + 0.12)` AND `dewma_before < −(45 + 0.12)` AND `dewma_after < −(45 + 0.12)` AND `dewma_all` is not NA e. For positive adjacency (d50p): `d_prev > 50 + 0.12` AND `d_next > 50 + 0.12`. Missing neighbors (first/last in series): treated as +Inf (confirms exclusion). f. For negative adjacency (d50m): `d_prev < −(50 + 0.12)` AND `d_next < −(50 + 0.12)`. Missing neighbors: treated as −Inf (confirms exclusion). g. Exclude cap values where (dewma50p AND d50p) OR (dewma50m AND d50m)
 6. Propagate exclusion to RVs of excluded cap values
 7. After exclusions: re-run `identify_rv()`, `temp_sde()`, `redo_identify_rv()` on remaining values
 
@@ -408,19 +388,7 @@ All thresholds include the standard 0.12 kg rounding tolerance (see Rounding Tol
 ***Logic and implementation:***
 
 1. **Pre-check:** Skip if <3 non-extraneous values, or if max-min range ≤ minimum possible ET cap + 0.12 (computed via `compute_et_limit(1, formula, uw = min(weights))`, no pair could exceed any interval-specific cap)
-2. **Repeat until no OOB pairs found or <3 values remain:**
-   a. Remove previously excluded values; break if <3 remain
-   b. Sort by age (internal_id tiebreaker)
-   c. Compute adjacent weight differences and age intervals (in months, using 30.4375 days/month)
-   d. Compute dynamic ET cap per pair: `compute_et_limit(interval, formula, uw = uw_pair)` + 0.12 rounding tolerance. `uw_pair` is the larger of the two weights in the pair. ET caps scale with UW (see wtallow-formulas.md).
-   e. Flag OOB pairs: both members of any pair where diff > cap
-   f. If no OOB pairs, break (done)
-   g. Compute subject median from all remaining values (Inc + RV)
-   h. Compute absolute deviation from median for each value
-   i. **Plausibility guardrail:** Set deviation to 99999 for OOB values <38 kg or >180 kg
-   j. **Pairs guard:** Break if <3 values remain
-   k. Among OOB values, sort by: most deviant from median → highest weight → lowest id
-   l. Exclude the top-ranked OOB value
+2. **Repeat until no OOB pairs found or <3 values remain:** a. Remove previously excluded values; break if <3 remain b. Sort by age (internal_id tiebreaker) c. Compute adjacent weight differences and age intervals (in months, using 30.4375 days/month) d. Compute dynamic ET cap per pair: `compute_et_limit(interval, formula, uw = uw_pair)` + 0.12 rounding tolerance. `uw_pair` is the larger of the two weights in the pair. ET caps scale with UW (see wtallow-formulas.md). e. Flag OOB pairs: both members of any pair where diff > cap f. If no OOB pairs, break (done) g. Compute subject median from all remaining values (Inc + RV) h. Compute absolute deviation from median for each value i. **Plausibility guardrail:** Set deviation to 99999 for OOB values <38 kg or >180 kg j. **Pairs guard:** Break if <3 values remain k. Among OOB values, sort by: most deviant from median → highest weight → lowest id l. Exclude the top-ranked OOB value
 3. After all exclusions: re-run `identify_rv()`, `temp_sde()`, `redo_identify_rv()` on remaining values
 
 ***Rationale for selected decisions:***
@@ -549,16 +517,7 @@ The threshold is computed dynamically per observation: `compute_et_limit(min_gap
 
 **Independent mode (single pass):**
 1. Call `remove_ewma_wt()` with all non-extraneous values (including RVs)
-2. Each round:
-   a. Compute minimum neighbor gap in months for each value. Missing gaps (edge values) → Inf (Stata missing-as-infinity convention).
-   b. Compute per-observation threshold: `compute_et_limit(min_gap_months, formula, uw)` where `uw = max(wt, ewma_all)`
-   c. Compute EWMA (exponent e=-5, anchor a=0, window = ewma_window observations on each side)
-   d. **Positive outlier:** dewma_all > threshold + 0.12 AND dewma_before > 0.9×threshold + 0.12 AND dewma_after > 0.9×threshold + 0.12
-   e. **Negative outlier:** dewma_all < -(threshold + 0.12) AND dewma_before < -(0.9×threshold + 0.12) AND dewma_after < -(0.9×threshold + 0.12)
-   f. Missing directional dewma (edge values) → Inf, confirming exclusion
-   g. Among candidates, select the one with largest |dewma_all|, then earliest age, then lowest id
-   h. Exclude with code `"Exclude-A-Traj-Ext"`
-   i. Rebuild EWMA for next round (window boundaries shift after removal)
+2. Each round: a. Compute minimum neighbor gap in months for each value. Missing gaps (edge values) → Inf (Stata missing-as-infinity convention). b. Compute per-observation threshold: `compute_et_limit(min_gap_months, formula, uw)` where `uw = max(wt, ewma_all)` c. Compute EWMA (exponent e=-5, anchor a=0, window = ewma_window observations on each side) d. **Positive outlier:** dewma_all > threshold + 0.12 AND dewma_before > 0.9×threshold + 0.12 AND dewma_after > 0.9×threshold + 0.12 e. **Negative outlier:** dewma_all < -(threshold + 0.12) AND dewma_before < -(0.9×threshold + 0.12) AND dewma_after < -(0.9×threshold + 0.12) f. Missing directional dewma (edge values) → Inf, confirming exclusion g. Among candidates, select the one with largest |dewma_all|, then earliest age, then lowest id h. Exclude with code `"Exclude-A-Traj-Ext"` i. Rebuild EWMA for next round (window boundaries shift after removal)
 3. Iterate until no candidates or <3 values remain (no artificial round limit)
 4. After exclusions: re-identify RVs on remaining values
 
@@ -628,19 +587,15 @@ Subjects with only 1 distinct height skip this step entirely.
 
 1. Extract the two distinct heights (ht_1, ht_2) in age order (both in cm)
 2. **Band check:** `abs(ht_1 - ht_2) > (ht_band * 2.54 + 0.12)` — if FALSE, values are within band; skip (all remain included)
-3. If band exceeded:
-   a. **Gain rescue (pairhtgain):** Only evaluated if `ageyears1 < 25` (young adult). Checks:
+3. If band exceeded: a. **Gain rescue (pairhtgain):** Only evaluated if `ageyears1 < 25` (young adult). Checks:
       - Height increased: `(ht_2 - ht_1) > -0.12` (in cm, with rounding tolerance)
       - Within allowance: `(ht_2 - ht_1) ≤ (htallow + 2) * 2.54 + 0.12` (htallow in inches, converted to cm with tolerance; 2-inch buffer)
       - Temporal ordering: all ht_2 measurements occur after all ht_1 measurements
       - htallow coefficient by age gap: <2yr → 15.5, 2–3yr (inclusive) → 13, >3yr → 12
-      - Age capped at 25 for htallow formula
-   b. **Loss rescue (pairhtloss):** Only evaluated if `allow_ht_loss = TRUE`. Checks:
+      - Age capped at 25 for htallow formula b. **Loss rescue (pairhtloss):** Only evaluated if `allow_ht_loss = TRUE`. Checks:
       - Height decreased: `ht_1 > ht_2 - 0.12` (in cm, with rounding tolerance)
       - Within loss limit: `(ht_1 - ht_2) ≤ 5 * 2.54 + 0.12` for age at ht_2 < 50, or `≤ 7 * 2.54 + 0.12` for age at ht_2 ≥ 50
-      - Temporal ordering: all ht_2 measurements occur after all ht_1 measurements
-   c. If neither rescue applies: mark all values for exclusion
-   d. **Frequency rescue:** If `keepht1` (ht_1 count ≥ ht_2 count × 4/3), rescue ht_1 values. Same for keepht2.
+      - Temporal ordering: all ht_2 measurements occur after all ht_1 measurements c. If neither rescue applies: mark all values for exclusion d. **Frequency rescue:** If `keepht1` (ht_1 count ≥ ht_2 count × 4/3), rescue ht_1 values. Same for keepht2.
 4. **Exclusion code:**
    - `Exclude-A-Ord-Pair` if frequency rescue saved some values
    - `Exclude-A-Ord-Pair-All` if no frequency rescue (all excluded)

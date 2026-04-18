@@ -200,9 +200,6 @@
 #'   \code{agedays}, and \code{sd.median} to use for recentering instead of the
 #'   built-in reference file (\code{rcfile-2023-08-15_format.csv.gz}). Defaults to
 #'   NA, which uses the built-in file.
-#' @param include.carryforward Deprecated. Use \code{cf_rescue} instead.
-#'   \code{include.carryforward = TRUE} maps to \code{cf_rescue = "all"}.
-#'   \code{include.carryforward = FALSE} (old default) maps to \code{cf_rescue = "standard"}.
 #' @param cf_rescue CF rescue mode for the child algorithm. One of:
 #'   \describe{
 #'     \item{"standard"}{(Default) Use age/interval/param-specific lookup thresholds.
@@ -236,7 +233,6 @@
 #'   `adult_clean.R` for sub-parameter details.
 #' @param adult_scale_max_lbs Physical scale upper limit in pounds for adult
 #'   weight data. Weights at or above this value are excluded. Defaults to Inf.
-#' @param weight_cap Deprecated. Use `adult_scale_max_lbs` instead.
 #' @param ref_tables Optional. Pre-loaded reference closures from \code{\link{gc_preload_refs}}.
 #'   When provided, skips all \code{read_anthro()} file reads (~0.93 sec per call on 200
 #'   subjects; ~13 hours saved over 50K calls). Recommended for repeated calls (e.g.,
@@ -331,7 +327,6 @@ cleangrowth <- function(subjid,
                         error.load.mincount = 2,
                         error.load.threshold = 0.5,
                         sd.recenter = NA,
-                        include.carryforward = FALSE,
                         cf_rescue = "standard",
                         cf_detail = FALSE,
                         ref.data.path = "",
@@ -342,7 +337,6 @@ cleangrowth <- function(subjid,
                         adult_cutpoint = 20,
                         adult_permissiveness = "looser",
                         adult_scale_max_lbs = Inf,
-                        weight_cap,
                         ewma_window = 15,
                         id = NULL,
                         ref_tables = NULL,
@@ -352,38 +346,6 @@ cleangrowth <- function(subjid,
                         batch_size = 2000)
                         {
   # ewma_window: number of neighbors on each side for EWMA weighting.
-
-  # Handle weight_cap deprecation → adult_scale_max_lbs
-  if (!missing(weight_cap)) {
-    warning(
-      "The `weight_cap` parameter is deprecated. Use `adult_scale_max_lbs` instead.",
-      call. = FALSE
-    )
-    adult_scale_max_lbs <- weight_cap
-  }
-
-  # Handle include.carryforward deprecation → cf_rescue
-  # include.carryforward = TRUE means "keep CFs" = cf_rescue = "all"
-  # Only warn if user explicitly passed include.carryforward = TRUE.
-  # isTRUE() is NA-safe: if a user passes NA, isTRUE(NA) is FALSE, so the
-  # deprecation branch is skipped and the call proceeds with cf_rescue.
-  if (isTRUE(include.carryforward)) {
-    if (cf_rescue != "standard") {
-      warning(
-        "Both `include.carryforward = TRUE` and `cf_rescue = '", cf_rescue, "'` were set. ",
-        "The deprecated `include.carryforward` takes precedence, setting cf_rescue = 'all'.",
-        call. = FALSE
-      )
-    } else {
-      warning(
-        "The `include.carryforward` parameter is deprecated. ",
-        "Use `cf_rescue` instead. ",
-        "Mapping: include.carryforward = TRUE \u2192 cf_rescue = 'all'.",
-        call. = FALSE
-      )
-    }
-    cf_rescue <- "all"
-  }
 
   # Validate cf_rescue
   cf_rescue <- match.arg(cf_rescue, c("standard", "none", "all"))
@@ -829,8 +791,10 @@ cleangrowth <- function(subjid,
 
         # integer weight is in grams, rounded to the nearest 10
         pc[potcorr == TRUE, intwt := trunc(v*100)*10]
-        # replace to facilitate merging with fenton curves (floor at table minimum of 500g)
-        pc[intwt >= 250 & intwt < 500, intwt := 500]
+        # Floor weights in [100, 500) g up to the Fenton table minimum of 500 g,
+        # so users who configure lower BIV thresholds can still get
+        # Fenton-corrected z-scores for very low weights.
+        pc[intwt >= 100 & intwt < 500, intwt := 500]
 
         # Fenton merge 1: weight -> estimated gestational age
         pc <- merge(
@@ -1125,9 +1089,11 @@ cleangrowth <- function(subjid,
     # safety check: treat observations where tbc.sd cannot be calculated as missing
     data.all[is.na(tbc.sd), exclude := 'Exclude-Missing']
 
-    # Set HC >= 5 years to Exclude-Missing
-    # WHO reference for HC only goes up to 5 years
-    data.all[param == "HEADCM" & agedays >= 5*365.25, exclude := 'Exclude-Missing']
+    # HC >= 5 years: WHO HC reference only goes to 5 years, so no z-score data
+    # exists. Combined with the pre-recentering assignment of
+    # `Exclude-Not-Cleaned` for HC > 3*365.25, this keeps a single consistent
+    # code across both "we don't clean HC >3y" and ">=5y has no reference".
+    data.all[param == "HEADCM" & agedays >= 5*365.25, exclude := 'Exclude-Not-Cleaned']
 
     # pediatric: cleanchild (most of steps) ----
 
@@ -1371,10 +1337,10 @@ cleangrowth <- function(subjid,
   setorder(all_results, line)
 
   # Partial-run mode: merge new results for changed subjects with cached results
-  # for unchanged subjects, then sort by internal_id for a consistent output order.
-  # Note: internal_id is renumbered for the partial subset, so output row order
-  # may differ from a full run. Data values are identical; callers should sort
-  # by their own id column if order matters.
+  # for unchanged subjects, then sort by user id for a stable, semantically-
+  # meaningful output order. (internal_id is renumbered 1..K for the partial
+  # subset and would collide with the cached 1..N; user id is preserved
+  # untouched through both paths and is contract-guaranteed unique.)
   if (do_partial) {
     all_results <- rbind(
       cached_results[!(as.character(cached_results$subjid) %in%
@@ -1382,7 +1348,7 @@ cleangrowth <- function(subjid,
       all_results,
       fill = TRUE
     )
-    all_results <- all_results[order(internal_id)]
+    all_results <- all_results[order(id)]
   }
 
   # Derive bin_exclude and tri_exclude from final exclude codes.

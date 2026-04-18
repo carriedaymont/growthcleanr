@@ -20,6 +20,25 @@ A walk-through serves four goals simultaneously:
 
 ---
 
+## Cross-cutting code-review checklist
+
+Apply this general checklist to each step or phase during a walkthrough. The detailed implementation-specific checks in **Phase 1 → Step C** below are additional step-level items (rounding tolerance, wtallow reconciliation, permissiveness tables, etc.).
+
+1. **Comments and narrative match code.** No stale comments describing removed logic; narrative accurately reflects what the code does.
+2. **Exact boundaries.** `<` vs `<=`, `>` vs `>=`, and exact numeric tolerances (e.g., 0.4 vs 0.41) verified against spec.
+3. **Uninitialized or unnecessary variables.** No variables used before assignment; no leftover variables from prior refactors.
+4. **Efficiency.** Caching opportunities, unnecessary merges, redundant computations, operations that could be vectorized.
+5. **Edge cases.** 0, 1, or 2 valid rows; empty groups; all-NA values — does code handle gracefully or crash?
+6. **`.child_valid()` call correctness** (child algorithm only). Which `include.*` flags are passed? Consistent with step's purpose?
+7. **`by`-group correctness.** `by = subjid` vs `by = .(subjid, param)` etc. — wrong grouping silently produces wrong results.
+8. **Sort order assumptions.** Does code assume a particular sort? Is that guaranteed by a prior `setkey` / `setorder`?
+9. **data.table reference semantics.** `:=` on `data.df` (intended) vs. accidentally modifying a copy or joined table.
+10. **Factor level issues.** Exclusion codes assigned must exist in `exclude.levels`; assigning an unlisted string to a factor silently produces NA.
+11. **Parameter scope.** Does the step handle all 3 params (HT, WT, HC) or only some? Is HC exclusion intentional and documented?
+12. **Interaction with later steps.** Variables stored for downstream use — correctly scoped in `data.df`?
+
+---
+
 ## Pre-Walk-Through Setup
 
 ### 1. Confirm baseline tests pass
