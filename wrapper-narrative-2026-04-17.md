@@ -420,6 +420,17 @@ Recentering uses a precomputed reference file (`inst/extdata/rcfile-2023-08-15_f
 
 The recentering median file is indexed by param, sex, and agedays. It is merged into the data by a rolling join on these keys.
 
+**Required schema for a custom `sd.recenter` data.table.** A user-supplied override must be a data.table with exactly these columns:
+
+| Column | Type | Meaning |
+|---|---|---|
+| `param` | character | `"WEIGHTKG"`, `"HEIGHTCM"`, or `"HEADCM"` |
+| `sex` | integer | 0 (male) or 1 (female) |
+| `agedays` | integer | Age in days; rolling join matches the nearest lower agedays in the table to each row |
+| `sd.median` | numeric | Population median (in CSD z-score units) to subtract from `sd.orig` / `sd.corr` |
+
+`setkey(sd.recenter, param, sex, agedays)` is called on the supplied table before the rolling join; the caller does not need to set the key but the columns must be named exactly as above. Values outside the (param, sex, agedays) range covered by the table receive the clamped endpoint median.
+
 ---
 
 ## Cross-Algorithm Differences

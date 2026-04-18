@@ -300,10 +300,13 @@ Default: `"looser"`
 | perclimit >80 kg | 0 (disabled) | 0 (disabled) | 0.4 | 0.4 |
 | error_load_threshold | 0.41 | 0.41 | 0.29 | 0.29 |
 | mod_ewma_f | 0.75 | 0.75 | 0.60 | 0.60 |
+| max_rounds | 100 | 100 | 100 | 100 |
 | ht_band | 3" | 3" | 2" | 2" |
 | allow_ht_loss | TRUE | FALSE | FALSE | FALSE |
 | allow_ht_gain | TRUE | TRUE | TRUE | FALSE |
 | repval_handling | independent | independent | linked | linked |
+
+For the authoritative cross-algorithm parameter and threshold index (including the role and code location of each preset column — `mod_ewma_f`, `perclimit_*`, `error_load_threshold`, etc.), see [`parameters-reference.md`](parameters-reference.md).
 
 ### Key Differences: Adult vs. Child
 
@@ -336,11 +339,10 @@ Default: `"looser"`
 | `biv.z.hc.high` | 15 | Child Step 7 | Upper unrecentered CSD z cutoff for HEADCM (all ages) |
 | `error.load.mincount` | 2 | Child Step 21 | Min exclusions before evaluating error load |
 | `error.load.threshold` | 0.5 | Child Step 21 | Error ratio above this excludes all |
-| `sd.recenter` | NA | Recentering | Default uses built-in rcfile; pass a data.table for custom recentering |
-| `include.carryforward` | FALSE | Child Step 6 | **Deprecated** — use `cf_rescue` instead. If TRUE, skip CF detection entirely |
+| `sd.recenter` | NA | Recentering | Default uses built-in rcfile; pass a data.table with columns `param`, `sex`, `agedays`, `sd.median` for custom recentering |
 | `cf_rescue` | `"standard"` | Child Step 6 | CF rescue mode: `"standard"` (age/interval/param-specific lookup), `"none"` (all CFs excluded), `"all"` (every detected CF rescued; Child Step 13 resolves any multi-Include SPAs) |
 | `cf_detail` | FALSE | Child Step 6 | If TRUE, add `cf_status` and `cf_deltaZ` columns to output |
-| `ewma_window` | 15 | EWMA steps | Max observations on each side for EWMA |
+| `ewma_window` | 15 | Child Steps 11, 13, 15/16, 17 | Max Include observations on each side for EWMA |
 | `adult_cutpoint` | 20 | Preprocessing | Age (years) dividing pediatric/adult |
 | `quietly` | TRUE | All | Suppress progress messages |
 | `ref_tables` | NULL | All reads | Pre-loaded closures from `gc_preload_refs()`; skips disk reads |
@@ -372,7 +374,7 @@ Designed for two workflows: (1) error-injection pipelines where most subjects ar
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `adult_permissiveness` | `"looser"` | Sets defaults for all adult sub-parameters |
-| `adult_scale_max_lbs` | `Inf` | Physical scale upper limit in lbs (formerly `weight_cap`) |
+| `adult_scale_max_lbs` | `Inf` | Physical scale upper limit in lbs |
 
 All adult sub-parameters (BIV limits, 1D limits, wtallow formula, etc.) can be passed individually to `cleanadult()` to override the preset. See `adult_clean.R` roxygen for the full list. `cleangrowth()` currently exposes only `adult_permissiveness` and `adult_scale_max_lbs`.
 

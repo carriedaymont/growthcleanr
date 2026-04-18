@@ -1045,6 +1045,23 @@ code touched).
 - **Proposed fix.** Change the condition to `pc[intwt >= 100 & intwt < 500, intwt := 500]`. Add targeted test cases covering a weight in `[100, 250)` to confirm Fenton merge succeeds and produces a sensible `fengadays`/`unmod_zscore`.
 - **Where fixed later.** Next wrapper-level or Child Step 2b code pass; small, localized change.
 
+### D32. Rename "narrative" → "reference" everywhere — DEFERRED
+
+- **Scope.** Rename the three algorithm/wrapper documents and all references to them so that the word "reference" is used consistently in filenames, body text, and cross-references; "narrative" should be retired as a term for these documents. The child document has already been renamed (`child-gc-narrative-2026-04-13.md` → `child-algorithm-reference.md`) and its in-body "narrative" references updated on 2026-04-18; the other two files and all cross-references to them still use the old pattern.
+- **Files to rename (proposed names TBD).**
+  - `wrapper-narrative-2026-04-17.md` → e.g., `wrapper-reference.md`
+  - `adult-algorithm-narrative.md` → e.g., `adult-algorithm-reference.md`
+- **Files to update after rename.**
+  - Body of each renamed file: replace in-body uses of "narrative" referring to the document itself with "reference"; update cross-references to the other two renamed files.
+  - [`child-algorithm-reference.md`](child-algorithm-reference.md): 10 remaining `wrapper-narrative-2026-04-17.md` cross-references to update.
+  - [`gc-github-latest/CLAUDE.md`](CLAUDE.md): multiple references to `wrapper-narrative-2026-04-17.md`, `child-gc-narrative-2026-04-13.md`, `adult-algorithm-narrative.md`, and their descriptions (e.g., "Algorithm narrative documents" section, "Narrative status" section, per-section cross-references).
+  - `__Pipeline/CLAUDE.md`: references to `wrapper-narrative-2026-04-17.md`, `child-gc-narrative-2026-04-13.md`, `adult-algorithm-narrative.md` in the "Algorithm narratives" section and elsewhere.
+  - `gc-github-latest/algorithm-walkthrough-procedure.md`: any "narrative" mentions that refer to these documents.
+  - Existing walkthrough-todo files: leave as-is (they are historical logs; renaming would obscure the record of what was called what at the time).
+- **Why defer.** The three files should be renamed together so cross-references can be updated in a single pass. Splitting the rename risks broken links and inconsistent terminology during the interim.
+- **Proposed approach.** Use `git mv` for each rename (preserves history). After all renames, sweep each updated file for (a) cross-references to the renamed files and (b) in-body uses of "narrative" that refer to the document itself (leaving uses that refer to "narrative" as a general term — e.g., "narrative description" — alone).
+- **Where fixed later.** Next walkthrough session focused on documentation reconciliation, or whenever the next file-level rename is being done (e.g., when the wrapper or adult file is next substantively updated).
+
 ---
 
 ## GA correction (Phase 10 / Child Step 2b) — walkthrough checklist findings (2026-04-17)
