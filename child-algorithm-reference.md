@@ -1187,7 +1187,7 @@ All EWMA working columns (`ewma.all`, `ewma.before`, `ewma.after`, `c.ewma.all`,
 | **Prior step** | Child Step 13 (Final SDE Resolution) |
 | **Next step** | Child Step 17 (Height/HC Velocity) |
 | **Exclusion codes** | `Exclude-C-Traj` (all moderate EWMA sub-rules collapsed into one code) |
-| **Code location** | Inline in `cleanchild()` in `child_clean.R`; uses `ewma()`, `ewma_cache_init()`, and `ewma_cache_update()` (also defined in `child_clean.R`); z-score helpers `calc_and_recenter_z_scores()` for p_plus/p_minus conversion |
+| **Code location** | Inline in `cleanchild()` in `child_clean.R`. Uses `calc_and_recenter_z_scores()` for the p_plus / p_minus pre-loop, `ewma_cache_init()` / `ewma_cache_update()` for the incremental EWMA inside the iteration loop, and `get_dop()` for the Step 15 `last-ext` DOP lookup. |
 
 ### Overview
 
@@ -1202,7 +1202,7 @@ Child Step 15 handles all measurements except birth HT/HC. Step 16 handles birth
 - HEIGHTCM: `p_plus = v+1`, `p_minus = v-1`
 - HEADCM: `p_plus = v+1`, `p_minus = v-1`
 
-These are converted to z-scores (`tbc.p_plus`, `tbc.p_minus`) using `calc_and_recenter_z_scores()`. The ±5% rule tests whether the measurement would still be an outlier if perturbed slightly — a robustness check that reduces false positives for values near exclusion boundaries.
+These are converted to z-scores (`tbc.p_plus`, `tbc.p_minus`) using `calc_and_recenter_z_scores()`. The addcrit perturbation check (detailed below) tests whether the measurement would still be an outlier if nudged slightly toward its neighbors — a robustness check that reduces false positives for values near exclusion boundaries.
 
 **first_meas:** Marks the first non-birth Include measurement per subject-param. Used for the "first" exclusion rules. HT/HC exclude birth from Child Step 15 entirely (birth handled in Child Step 16), so for HT/HC `first_meas` is the first non-birth value.
 
@@ -1278,15 +1278,15 @@ Separate step for birth height and HC values, using the same EWMA infrastructure
 | birth-HT-HC | `< 365.25` | `> 3` / `< -3` | `> 3` / `< -3` |
 | birth-HT-HC-ext | `>= 365.25` | `> 4` / `< -4` | `> 4` / `< -4` |
 
-Only processes HT/HC subject-params with a birth measurement (agedays == 0) and 3+ Include values. Structurally identical to Child Step 15 (iterative, cached EWMA, one exclusion per iteration).
+Only processes HT/HC subject-params that themselves have a birth measurement (agedays == 0) with 3+ Include values. A subject with birth HT but no birth HC (or vice versa) has only the birth-carrying param processed here. Structurally identical to Child Step 15 (iterative, cached EWMA, one exclusion per iteration).
 
 ### Worst-value selection
 
-Both steps use `abs(tbc.sd + dewma.all)` as the sort key (same as EWMA1), with lowest `id` as tiebreaker.
+Both steps use `abs(tbc.sd + dewma.all)` as the sort key (same as EWMA1). Ties on the sort key are broken by lowest `internal_id` — the row with the lowest `internal_id` among the tied candidates becomes the exclusion. Ties are rare because `abs(tbc.sd + dewma.all)` is continuous, but `internal_id` makes the selection deterministic.
 
 ### Global iteration
 
-Same pattern as EWMA1: subject-params drop out when they stop producing new exclusions. EWMA caches (`ewma2_caches`, `ewma2b_caches`) persist across iterations for incremental updates. DOP snapshot refreshed each iteration.
+Same pattern as EWMA1: subject-params drop out when they stop producing new exclusions. EWMA caches (`ewma2_caches`, `ewma2b_caches`) persist across iterations for incremental updates. Step 15's DOP snapshot (used by the `last-ext` and `last-ext-high` rules) is refreshed each iteration; Step 16 has no DOP lookup.
 
 ### Rationale
 

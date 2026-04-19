@@ -3667,14 +3667,17 @@ cleanchild <- function(data.df,
   if (!quietly)
     message(sprintf("[%s] Exclude moderate EWMA...", Sys.time()))
 
-  # Order data for processing
-  # Add id for consistent SDE order
+  # Re-sort so the per-group closures below walk rows in
+  # (subjid, param, agedays, internal_id) order; prior/next neighbor
+  # differences and first_meas depend on this sort.
   data.df <- data.df[order(subjid, param, agedays, internal_id),]
 
-  # Pre-identify subject-params that need processing: Include values, >2 values
-  # Include temp SDEs in count so they get p_plus/p_minus calculated
+  # Pre-identify subject-params that need processing: Include values only,
+  # 3+ per subject-param. All temp SDEs were resolved in Main Child Step 13,
+  # so the default `.child_valid()` (temp SDEs excluded) is all that is
+  # needed here; a temp SDE leaking through should be treated as ineligible.
   data.df[, sp_key := paste0(subjid, "_", param)]
-  include_counts <- data.df[.child_valid(data.df, include.temporary.extraneous = TRUE),
+  include_counts <- data.df[.child_valid(data.df),
                             .(n_include = .N), by = sp_key]
   sp_to_process_15 <- include_counts[n_include > 2, sp_key]
 
@@ -3701,18 +3704,16 @@ cleanchild <- function(data.df,
     data.df[zscore_subset, `:=`(tbc.p_plus = i.tbc.p_plus, tbc.p_minus = i.tbc.p_minus), on = "index"]
   }
 
-  # Pre-calculate first_meas indicator
-  # Fix first_meas logic
-  # Handle HT/HC differently from WT
-  # "Non-birth first" means: the first value, when that first value is not at birth
-  # For WEIGHTKG: birth IS included in Step 15, so first_meas only if position 1 has agedays > 0
-  # For HEIGHTCM/HEADCM: birth is EXCLUDED from Step 15, so calculate position among non-birth only
+  # Pre-calculate the first_meas indicator used by Step 15's "first" rules.
+  # Definition is param-specific:
+  #   WEIGHTKG: the first Include row whose agedays > 0 (birth WT has its
+  #     own birth-WT rules, so position 1 at agedays == 0 is not first_meas).
+  #   HEIGHTCM / HEADCM: the first Include row among non-birth rows (birth
+  #     HT/HC is entirely out of scope for Step 15 — Step 16 handles it).
   data.df[, first_meas := FALSE]
-  # WEIGHTKG: first_meas = TRUE only if position 1 AND agedays > 0
   data.df[sp_key %in% sp_to_process_15 & exclude == "Include" & param == "WEIGHTKG",
           first_meas := (seq_len(.N) == 1 & agedays > 0),
           by = .(subjid, param)]
-  # HEIGHTCM/HEADCM: birth excluded from Step 15, so first among non-birth IS the first
   data.df[sp_key %in% sp_to_process_15 & exclude == "Include" & param %in% c("HEIGHTCM", "HEADCM") & agedays > 0,
           first_meas := (seq_len(.N) == 1),
           by = .(subjid, param)]
@@ -3755,20 +3756,19 @@ cleanchild <- function(data.df,
     dop_snap <- data.df[exclude == "Include", .(subjid, param, agedays, tbc.sd)]
     setkey(dop_snap, subjid, param)
 
-    # RECALCULATE filter each iteration - valid() depends on current exclusions
-    # Must recalculate filter inside loop
+    # Recompute step15_filter each iteration — .child_valid() depends on
+    # current exclusions, which change as rows are flagged.
     step15_filter <- data.df$sp_key %in% sp_to_process &
       .child_valid(data.df, include.temporary.extraneous = FALSE) &
       !((data.df$param == "HEIGHTCM" | data.df$param == "HEADCM") & data.df$agedays == 0)
 
-    # Recalculate first_meas each iteration
-    # Handle HT/HC differently from WT (same as initial calc)
+    # Recompute first_meas each iteration (same definitions as the
+    # pre-loop calc): the prior iteration may have excluded what was
+    # previously the first non-birth Include row.
     data.df[sp_key %in% sp_to_process, first_meas := FALSE]
-    # WEIGHTKG: first_meas = TRUE only if position 1 AND agedays > 0
     data.df[sp_key %in% sp_to_process & exclude == "Include" & param == "WEIGHTKG",
             first_meas := (seq_len(.N) == 1 & agedays > 0),
             by = .(subjid, param)]
-    # HEIGHTCM/HEADCM: birth excluded from Step 15, so first among non-birth IS the first
     data.df[sp_key %in% sp_to_process & exclude == "Include" & param %in% c("HEIGHTCM", "HEADCM") & agedays > 0,
             first_meas := (seq_len(.N) == 1),
             by = .(subjid, param)]
@@ -3906,15 +3906,15 @@ cleanchild <- function(data.df,
                      (tbc.sd - tbc_dop < -4 | is.na(tbc_dop)) & addcritlow, pot_excl := .child_exc(param, "Traj")]
               }
 
-              # Exclude the worst candidate (highest abssum)
-              # All pot_excl candidates are eligible - birth HT/HC is already excluded
-              # from Step 15 processing (temporarily excluded before iteration starts)
+              # Exclude the worst candidate (highest abssum). Birth HT/HC
+              # rows are already filtered out of step15_filter upstream, so
+              # they never enter df and cannot be candidates here.
               candidates <- df[pot_excl != ""]
               if (nrow(candidates) > 0) {
                 candidates[, abssum := abs(tbc.sd + dewma.all)]
-                # Use internal_id tie-breaker for deterministic selection
-                # which.max returns first tie, which depends on data order
-                # Use order() with internal_id as tie-breaker for reproducibility
+                # internal_id breaks ties on abssum (rare but possible — abssum
+                # is continuous). order() is deterministic; which.max is not
+                # when rows tie.
                 ord <- order(-candidates$abssum, candidates$internal_id)
                 worst_idx <- candidates$index[ord[1]]
                 df[index == worst_idx, exclude := pot_excl]
@@ -3943,16 +3943,17 @@ cleanchild <- function(data.df,
   if (!quietly)
     message(sprintf("[%s] Exclude moderate EWMA for birth height and head circumference...", Sys.time()))
 
-  # Filter for Step 16: HT/HC only, subjects with birth measurement, >2 values
-  # Get subjects with birth measurements (HT/HC at agedays=0)
-  subj_with_birth <- unique(data.df[param %in% c("HEIGHTCM", "HEADCM") &
-                                     .child_valid(data.df, include.temporary.extraneous = FALSE) &
-                                     agedays == 0, subjid])
+  # Filter for Step 16: only HT/HC subject-params that themselves have a
+  # birth measurement (agedays == 0) with 3+ Include values. A subject can
+  # have birth HT without birth HC (or vice versa); use the per-param
+  # sp_key rather than subjid so the no-birth param is skipped.
+  sp_with_birth <- unique(data.df[param %in% c("HEIGHTCM", "HEADCM") &
+                                    .child_valid(data.df) &
+                                    agedays == 0, sp_key])
 
-  # Initial filter for counting
   step16_filter <- data.df$param %in% c("HEIGHTCM", "HEADCM") &
-    .child_valid(data.df, include.temporary.extraneous = FALSE) &
-    data.df$subjid %in% subj_with_birth
+    .child_valid(data.df) &
+    data.df$sp_key %in% sp_with_birth
   sp_counts_16 <- data.df[step16_filter, .(n = .N), by = sp_key]
   sp_to_process <- sp_counts_16[n > 2, sp_key]
 
@@ -3978,12 +3979,13 @@ cleanchild <- function(data.df,
     if (!quietly)
       message(sprintf("  EWMA2-birth-HT-HC iteration %d: %d subject-params", iteration, length(sp_to_process)))
 
-    # RECALCULATE filter each iteration - valid() depends on current exclusions
-    # Must recalculate filter inside loop
+    # Recompute step16_filter each iteration — .child_valid() depends on
+    # current exclusions, which change as rows are flagged. sp_to_process
+    # is already the surviving per-sp_key set, so we don't need to repeat
+    # the sp_with_birth check here.
     step16_filter <- data.df$sp_key %in% sp_to_process &
       data.df$param %in% c("HEIGHTCM", "HEADCM") &
-      .child_valid(data.df, include.temporary.extraneous = FALSE) &
-      data.df$subjid %in% subj_with_birth
+      .child_valid(data.df)
 
     ewma2_hthc_codes <- "Exclude-C-Traj"
     data.df[sp_key %in% sp_to_process, had_ewma2_before := (exclude %in% ewma2_hthc_codes)]
@@ -4058,7 +4060,7 @@ cleanchild <- function(data.df,
               candidates <- df[pot_excl != ""]
               if (nrow(candidates) > 0) {
                 candidates[, abssum := abs(tbc.sd + dewma.all)]
-                # Use id tie-breaker for deterministic selection
+                # internal_id breaks ties on abssum (same convention as Step 15).
                 ord <- order(-candidates$abssum, candidates$internal_id)
                 worst_idx <- candidates$index[ord[1]]
                 df[index == worst_idx, exclude := pot_excl]
@@ -4080,12 +4082,14 @@ cleanchild <- function(data.df,
   # Cleanup
   data.df[, sp_key := NULL]
 
-  # Drop columns no longer needed after Step 15
-  # p_plus, p_minus, tbc.p_plus, tbc.p_minus: only used in EWMA2 +/-5% rule (Step 15)
-  # first_meas: only used in EWMA2 first-measurement exclusion logic (Step 15)
-  cols_to_drop_15 <- intersect(c("p_plus", "p_minus", "tbc.p_plus", "tbc.p_minus", "first_meas"),
-                                names(data.df))
-  if (length(cols_to_drop_15) > 0L) data.df[, (cols_to_drop_15) := NULL]
+  # Drop columns no longer needed after Steps 15-16.
+  #   p_plus / p_minus / tbc.p_plus / tbc.p_minus: feed the addcrit
+  #     perturbation check used by both Step 15 and Step 16.
+  #   first_meas: only used by Step 15's first-row rules (Step 16 keys
+  #     off agedays == 0 instead).
+  cols_to_drop_15_16 <- intersect(c("p_plus", "p_minus", "tbc.p_plus", "tbc.p_minus", "first_meas"),
+                                   names(data.df))
+  if (length(cols_to_drop_15_16) > 0L) data.df[, (cols_to_drop_15_16) := NULL]
 
   # 17: raw differences ----
 
