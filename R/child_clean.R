@@ -2012,10 +2012,13 @@ get_dop <- function(param_name){
 }
 
 # temporary extraneous ----
-#' Identify temporary SDE (same-day extraneous) "losers" for Step 5 and
-#' Step 13.
+#' Identify temporary SDE (same-day extraneous) "losers" on each
+#' (subjid, param, agedays) group.
 #'
-#' For each (subjid, param, agedays) group with more than one valid
+#' Identical same-day values are removed earlier (Early Step 13
+#' SDE-Identicals), so by the time identify_temp_sde() runs, all
+#' same-day values in a given (subjid, param, agedays) group are
+#' dissimilar. For each such group with more than one valid
 #' measurement, selects one value to keep temporarily and flags the
 #' remainder for exclusion. Selection uses the recentered z-score
 #' (tbc.sd) and two per-subject reference points:
@@ -2023,29 +2026,37 @@ get_dop <- function(param_name){
 #'                 taken over valid rows (all non-excluded
 #'                 measurements).
 #'   median.dopz - median of tbc.sd for the subject's designated other
-#'                 parameter (DOP). In Step 13, earlier temp SDEs are
-#'                 optionally excluded from this median via the
-#'                 exclude_from_dop_ids argument; in Step 5 no temp
-#'                 SDEs exist yet.
+#'                 parameter (DOP).
 #'
 #' For each SDE group, the kept row is the one whose tbc.sd is closest
 #' to median.spz, provided the subject has at least one non-SDE day.
 #' Otherwise the row closest to median.dopz is kept. If no DOP data
 #' exists for the subject, one row is chosen at random.
 #'
-#' Returns a logical vector in the caller's original row order; the
-#' caller sets flagged rows to 'Exclude-C-Temp-Same-Day'.
+#' Called from Steps 5, 6, 7, 9, 11 (mid-loop and end-of-step), and 13
+#' of \code{cleanchild()}. All callers except Step 13 final SDE pass
+#' \code{exclude_from_dop_ids = NULL}; the Step 13 caller passes the
+#' ids of current temp SDEs so those rows do not contribute to the DOP
+#' median anchor used to resolve remaining same-day groups.
+#'
+#' @param df data.table column-subset containing id, internal_id,
+#'   subjid, param, agedays, tbc.sd, and exclude. Not mutated.
+#' @param exclude_from_dop_ids optional vector of \code{id} values to
+#'   remove from the DOP median calculation only (they still contribute
+#'   to the SP median). NULL by default; non-NULL only at Step 13.
+#' @return A logical vector aligned to the caller's input row order.
+#'   TRUE marks rows the caller should flag
+#'   \code{'Exclude-C-Temp-Same-Day'}; FALSE means leave the exclude
+#'   column unchanged.
 #'
 #' @keywords internal
 #' @noRd
-# Identical same-day values are removed earlier (Early Step 13
-# SDE-Identicals), so by the time identify_temp_sde() runs, all same-day
-# values in a given (subjid, param, agedays) group are dissimilar.
 
 identify_temp_sde <- function(df, exclude_from_dop_ids = NULL) {
-  # exclude_from_dop_ids: in Step 13, temp SDEs should be excluded from the
-  # DOP median calculation (but still contribute to the SP median); the caller
-  # passes their ids here. In Step 5 no temp SDEs exist yet, so leave NULL.
+  # exclude_from_dop_ids: when non-NULL, the passed ids are removed from the
+  # DOP median calculation (but still contribute to the SP median). Only the
+  # Step 13 caller passes ids; all earlier callers (Step 5 initial pass and
+  # the recalc callers in Steps 6, 7, 9, and 11) leave it NULL.
 
   # avoid "no visible binding" warnings
   agedays <- absdmedian.spz <- absdmedian.dopz <- extraneous <- NULL
@@ -2055,21 +2066,15 @@ identify_temp_sde <- function(df, exclude_from_dop_ids = NULL) {
   # Make copy before modifying to avoid data.table alloccol error
   df <- copy(df)
 
-  # add subjid and param if needed (may be missing depending on where this is called from)
-  if (is.null(df$subjid))
-    df[, subjid := NA]
-  if (is.null(df$param))
-    df[, param := NA]
-
   # Record the caller's original row positions before any reordering, so the
   # final result can be mapped back. Row ordering is set deterministically
   # below by explicit order(subjid, param, agedays, internal_id).
   df[, orig_row := .I]
-  original_rows <- df$orig_row
 
-  # make a small copy of df with fields we need
-  # Include internal_id for age-dependent tiebreaker
-  # Use by (not keyby) to preserve group order, then sort explicitly
+  # Narrow df to the columns we need, grouped by (subjid, param,
+  # agedays) and then sorted with internal_id as the tiebreaker so
+  # same-day rows have a deterministic order for the winner selection
+  # below.
   df <- df[, .(tbc.sd, exclude, id, internal_id, orig_row), by = .(subjid, param, agedays)]
   df <- df[order(subjid, param, agedays, internal_id)]
 
@@ -2096,30 +2101,27 @@ identify_temp_sde <- function(df, exclude_from_dop_ids = NULL) {
     "HEADCM" = "HEIGHTCM"
   )
 
-  # ----- STEP 1: Calculate SP medians for each parameter -----
-  # Median of tbc.sd for each (subjid, param), over all valid values
-  # (not just non-SDE days).
+  # Assign each valid row its SP median: median of tbc.sd within
+  # (subjid, param), computed over all valid rows (not just SDE days).
   df[valid.rows, median.spz := median(tbc.sd, na.rm = TRUE), by = .(subjid, param)]
 
-  # ----- STEP 2: Distribute SP medians across all rows for each subject -----
-  # This enables cross-parameter lookup (DOP medians) via a subject-keyed
-  # lookup table, one row per (subjid, param).
-
-  # Create lookup table of SP medians by subject
+  # Compact (subjid, param) -> median.spz lookup table. Used below to
+  # anchor each row's DOP median to the median of its other parameter.
   sp_medians <- df[valid.rows & !is.na(median.spz),
                    .(median.spz = median.spz[1]),
                    by = .(subjid, param)]
 
-  # ----- STEP 3: Calculate DOP medians -----
-  # DOP median logic differs between Step 5 and Step 13
-  # Step 5: Use ALL measurements (no temp SDEs exist yet)
-  # Step 13: Exclude temp SDEs from DOP median (passed via exclude_from_dop_ids)
-
-  # For each parameter, look up the median of its designated other parameter
+  # Assign each row its DOP median. When exclude_from_dop_ids is NULL
+  # (all callers except Step 13) the DOP median is just the SP median
+  # of the other parameter. When non-NULL (Step 13), recompute medians
+  # for each param excluding the passed ids first, so the Step 13 final
+  # SDE resolution is not biased by rows that are themselves under
+  # consideration as temp SDEs.
   df[, median.dopz := as.double(NA)]
 
   if (is.null(exclude_from_dop_ids)) {
-    # Step 5: Use sp_medians calculated from all values
+    # Default path (all callers except Step 13): reuse sp_medians
+    # directly as each parameter's DOP median lookup.
     for (p in c("WEIGHTKG", "HEIGHTCM", "HEADCM")) {
       dop <- dop_map[p]
       dop_medians <- sp_medians[param == dop, .(subjid, dop_median = median.spz)]
@@ -2127,7 +2129,8 @@ identify_temp_sde <- function(df, exclude_from_dop_ids = NULL) {
       df[param == p, median.dopz := dop_lookup[as.character(subjid)]]
     }
   } else {
-    # Step 13: Calculate DOP median excluding temp SDEs
+    # Step 13 path: recompute per-(subjid, param) medians excluding the
+    # passed ids, then use those as the DOP median lookup.
     dop_valid_rows <- valid.rows & !(df$id %in% exclude_from_dop_ids)
 
     # Calculate DOP-specific medians excluding temp SDEs
@@ -2150,8 +2153,9 @@ identify_temp_sde <- function(df, exclude_from_dop_ids = NULL) {
     df[, median.dopz.calc := NULL]
   }
 
-  # ----- STEP 4: Calculate absolute distances from medians -----
-  # Only for SDE days
+  # For rows on an SDE day, compute the absolute distance of tbc.sd
+  # from the two median anchors. These distances drive the selection
+  # below.
   df[valid.rows & extraneous.this.day, `:=`(
     absdmedian.spz = abs(tbc.sd - median.spz),
     absdmedian.dopz = abs(tbc.sd - median.dopz)
@@ -2170,10 +2174,10 @@ identify_temp_sde <- function(df, exclude_from_dop_ids = NULL) {
   df[valid.rows & extraneous.this.day & is.na(absdmedian.dopz),
      absdmedian.dopz := Inf]
 
-  # ----- STEP 5: Select which value to keep -----
-  # Sort by: absdmedian.spz (asc), absdmedian.dopz (asc), age-dependent internal_id
-  # Keep first after sort, mark others as extraneous
-
+  # Within each SDE group, pick the winner by sorting on absdmedian.spz
+  # (asc), then absdmedian.dopz (asc), then age-dependent internal_id.
+  # The first row after sorting is the keeper; all others are marked
+  # extraneous.
   df[valid.rows & extraneous.this.day, extraneous := {
     # Age-dependent internal_id tiebreaker:
     #   At agedays == 0: keep lowest internal_id (earliest, before fluid shifts)
@@ -2186,17 +2190,15 @@ identify_temp_sde <- function(df, exclude_from_dop_ids = NULL) {
     id != keep_id
   }, by = .(subjid, param, agedays)]
 
-  # Map result back to caller's original row order.
-  # df was re-ordered during the by-group work above; orig_row preserves
-  # the caller's row positions so the returned logical vector lines up
-  # with the original input.
-  extraneous_result <- df$extraneous & valid.rows
-
-  # Create a named vector: orig_row -> is_extraneous
-  extraneous_lookup <- setNames(extraneous_result, df$orig_row)
-
-  # Return in original order by looking up each original row position
-  return(as.logical(extraneous_lookup[as.character(original_rows)]))
+  # Map result back to the caller's original row order. df was
+  # re-ordered by the by-group work above; orig_row preserves each
+  # row's caller-side position. df$extraneous is only ever set TRUE by
+  # the guarded `extraneous := ...` assignment above, which restricts
+  # to valid rows on SDE days, so we can use it directly without
+  # re-masking on valid.rows.
+  result <- logical(nrow(df))
+  result[df$orig_row] <- df$extraneous
+  return(result)
 }
 
 # evil twins ----
@@ -2568,7 +2570,7 @@ cleanchild <- function(data.df,
       "[%s] Preliminarily identify potential extraneous...",
       Sys.time()
     ))
-  data.df$exclude[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-C-Temp-Same-Day'
+  data.df[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-C-Temp-Same-Day']
 
   # capture a list of subjects with possible extraneous for efficiency later
   subj.dup <- data.df[exclude == 'Exclude-C-Temp-Same-Day', unique(subjid)]
@@ -2679,7 +2681,7 @@ cleanchild <- function(data.df,
     data.df[exclude == "Exclude-C-Temp-Same-Day", exclude := "Include"]
 
     # Re-run temp SDE logic (now CFs are excluded, so SDE evaluation will differ)
-    data.df$exclude[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])] <- 'Exclude-C-Temp-Same-Day'
+    data.df[identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)]), exclude := 'Exclude-C-Temp-Same-Day']
   }
 
   # Determine if measurements are in whole or half imperial units (row-level flag)

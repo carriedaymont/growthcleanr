@@ -1230,3 +1230,120 @@ After reinstalling the package and regenerating man pages with `roxygen2::roxyge
 - test-child-parameters.R: 13 PASS
 
 All child counts identical to baseline. No regressions. Adult tests not re-run by request — edits do not touch `adult_clean.R` or `adult_support.R`.
+
+---
+
+## Session 8 — `identify_temp_sde()` support-function pass (2026-04-18)
+
+Dedicated walkthrough of the shared temp-SDE resolution support function in `R/child_clean.R`: `identify_temp_sde()` (~lines 2045–2200 pre-edit; ~lines 2055–2200 post-edit). Comment-only plus small dead-code cleanup; no behavioral changes.
+
+### Pre-session baseline tests
+
+- test-cleangrowth.R: 63 PASS
+- test-child-regression.R: 48 PASS
+- test-child-edge-cases.R: 28 PASS
+- test-child-algorithms.R: 41 PASS (2 pre-existing codetools warnings)
+- test-child-parameters.R: 13 PASS
+- Adult tests not run (see Scope correction).
+
+### Scope correction
+
+- The original prompt suggested `identify_temp_sde()` might be called from both child and adult algorithms. Inventory confirmed: called only from `cleanchild()` (7 call sites). The adult algorithm has its own separate `temp_sde()` function in `R/adult_support.R:449` with a different signature and semantics; it is not a shared support function.
+- Net effect: this pass is child-scoped by code. Adult tests were not re-run — `adult_clean.R` and `adult_support.R` were not touched.
+- Call-site inventory:
+
+| Line (pre-edit) | Step | `exclude_from_dop_ids` |
+|---|---|---|
+| 2571 | Step 5 (initial pass) | NULL |
+| 2682 | Step 6 (recalc after CF identification) | NULL |
+| 2996 | Step 7d (recalc after BIV) | NULL |
+| 3114 | Step 9d (recalc after Evil Twins) | NULL |
+| 3260 | Step 11 mid-loop (subset recalc for affected subjects) | NULL |
+| 3283 | Step 11c end-of-step (full-dataset recalc) | NULL |
+| 3306–3307 | Step 13 (final SDE) | `temp_sde_ids_step13` |
+
+Only the Step 13 caller passes a non-NULL `exclude_from_dop_ids`.
+
+### Fix-now items
+
+### F50. Title + `Step 5 and Step 13` roxygen simplification rewritten — FIXED
+- **File/lines:** `R/child_clean.R` ~lines 2015–2034 (pre-edit).
+- **Issue.** Roxygen title said the function was for "Step 5 and Step 13." In practice the function is called from 7 sites across Steps 5, 6, 7, 9, 11 (mid- and end-of-step), and 13. Only Step 13 passes non-NULL `exclude_from_dop_ids`. The description paragraph on `median.dopz` repeated the same "Step 5 / Step 13" simplification.
+- **Fix.** Title rewritten as `Identify temporary SDE (same-day extraneous) "losers" on each (subjid, param, agedays) group.` The `median.dopz` description paragraph no longer carries the step-specific framing. Added an explicit "Called from Steps 5, 6, 7, 9, 11 (mid-loop and end-of-step), and 13 of \\code{cleanchild()}" paragraph that names all callers and notes the NULL-vs-non-NULL contract.
+
+### F51. Inline `Step 5 vs Step 13` comments updated — FIXED
+- **File/lines:** `R/child_clean.R` ~lines 2046–2048 (parameter-contract comment inside function body) and ~lines 2113–2117 (block header above the DOP-median branch) pre-edit, plus the two `# Step 5:` / `# Step 13:` comments inside the `if` / `else` branches themselves.
+- **Issue.** Same oversimplification — these comments described the parameter contract as "Step 5 vs Step 13" rather than the actual contract "NULL vs non-NULL", and the inline `# Step 5:` / `# Step 13:` labels at the top of each branch framed the paths as if only those two callers existed.
+- **Fix.** Parameter-contract comment rewritten to list all non-NULL callers explicitly: "Only the Step 13 caller passes ids; all earlier callers (Step 5 initial pass and the recalc callers in Steps 6, 7, 9, and 11) leave it NULL." The block header above the DOP-median branch now describes "When `exclude_from_dop_ids` is NULL (all callers except Step 13) …" and "When non-NULL (Step 13) …". The two branch-label comments were changed to "Default path (all callers except Step 13)" and "Step 13 path".
+
+### F52. Orphan invariant comment between `@noRd` and function def moved into roxygen — FIXED
+- **File/lines:** `R/child_clean.R` ~lines 2041–2043 (pre-edit).
+- **Issue.** A 3-line `#` comment block sat between the closing roxygen `@noRd` tag and the `identify_temp_sde <- function(...)` definition, describing an important invariant ("Identical same-day values are removed earlier (Early Step 13 SDE-Identicals), so by the time identify_temp_sde() runs, all same-day values in a given (subjid, param, agedays) group are dissimilar."). This is an important precondition but lived in an awkward transitional spot.
+- **Fix.** Moved the invariant into the roxygen description as the opening paragraph of `@details` (immediately after the title), where it reads as the natural precondition for the selection rule described right below it. The orphan `#` block was deleted.
+
+### F53. `# ----- STEP 1/2/3/4/5 -----` section headers rewritten as current-state prose — FIXED
+- **File/lines:** `R/child_clean.R` ~lines 2099, 2104, 2113, 2153, 2173 (pre-edit).
+- **Issue.** Five Stata-era numbered section headers (`# ----- STEP 1: Calculate SP medians ... -----` style) inside the function body. Same overall style concern as Session 7b F43. Additionally, STEP 2's description ("Distribute SP medians across all rows for each subject") was inaccurate — the distribution happens in STEP 1 via data.table `:=`; STEP 2 actually creates a compact `(subjid, param) -> median.spz` lookup table used later by STEP 3 for cross-parameter anchoring.
+- **Fix.** Replaced each of the five numbered headers with a short current-state prose comment:
+  - STEP 1 → "Assign each valid row its SP median: median of tbc.sd within (subjid, param), computed over all valid rows (not just SDE days)."
+  - STEP 2 → "Compact (subjid, param) -> median.spz lookup table. Used below to anchor each row's DOP median to the median of its other parameter." (accuracy fix)
+  - STEP 3 → folded with F51; now describes the NULL vs non-NULL branch structure as the decision point.
+  - STEP 4 → "For rows on an SDE day, compute the absolute distance of tbc.sd from the two median anchors. These distances drive the selection below."
+  - STEP 5 → "Within each SDE group, pick the winner by sorting on absdmedian.spz (asc), then absdmedian.dopz (asc), then age-dependent internal_id. The first row after sorting is the keeper; all others are marked extraneous."
+
+### F54. Stale "Use by (not keyby)" comment replaced (trim-only; code unchanged) — FIXED
+- **File/lines:** `R/child_clean.R` ~lines 2070–2072 (pre-edit).
+- **Issue.** Three-line comment block read `# make a small copy of df with fields we need / # Include internal_id for age-dependent tiebreaker / # Use by (not keyby) to preserve group order, then sort explicitly`. The last line in particular reads as a design-note-to-self contrasting with an earlier alternative rather than describing what the code does. The `by = .(subjid, param, agedays)` on the next line is effectively a no-op grouping (same row count, grouped arrangement) and the real sort is done by the `order(...)` on the line after that — so the "Use by" hint was misleading.
+- **Fix.** Replaced with a single current-state block: "Narrow df to the columns we need, grouped by (subjid, param, agedays) and then sorted with internal_id as the tiebreaker so same-day rows have a deterministic order for the winner selection below." Code (the `by = ...` column-subset on line 2073 and explicit `order(...)` on 2074) left unchanged per user instruction.
+
+### F55. Added formal `@param` and `@return` tags — FIXED
+- **File/lines:** `R/child_clean.R` roxygen for `identify_temp_sde()`.
+- **Issue.** The description mentioned the return value and parameter semantics in prose but there were no formal `@param` or `@return` tags. Same precedent as Session 7b F44 for `ewma()`: adding the tags is useful even though the function is `@noRd`, because the source-level roxygen is still the contract for readers.
+- **Fix.** Added three tags:
+  - `@param df` — "data.table column-subset containing id, internal_id, subjid, param, agedays, tbc.sd, and exclude. Not mutated."
+  - `@param exclude_from_dop_ids` — "optional vector of \\code{id} values to remove from the DOP median calculation only (they still contribute to the SP median). NULL by default; non-NULL only at Step 13."
+  - `@return` — "A logical vector aligned to the caller's input row order. TRUE marks rows the caller should flag \\code{'Exclude-C-Temp-Same-Day'}; FALSE means leave the exclude column unchanged."
+
+### Deferred items also resolved (per user request)
+
+### D-a. Dead defensive code removed — FIXED
+- **File/lines:** `R/child_clean.R` ~lines 2058–2062 (pre-edit).
+- **Issue.** `if (is.null(df$subjid)) df[, subjid := NA]` / `if (is.null(df$param)) df[, param := NA]` defensive blocks. All 7 callers pass both columns, so these branches never fire.
+- **Fix.** Removed both `if` blocks (5 lines) and the leading "may be missing depending on where this is called from" comment.
+
+### D-b + D-c. Return block simplified — FIXED
+- **File/lines:** `R/child_clean.R` ~lines 2189–2199 (pre-edit) plus the earlier unused `original_rows <- df$orig_row` at ~line 2068 (pre-edit).
+- **Issue (D-b).** `extraneous_result <- df$extraneous & valid.rows` had a redundant `& valid.rows` — `df$extraneous` is only ever set TRUE by the guarded `extraneous := ...` assignment above (which restricts to `valid.rows & extraneous.this.day`), so masking again on `valid.rows` was unnecessary.
+- **Issue (D-c).** The return used a string-keyed named-vector lookup (`setNames(..., df$orig_row)` + `as.character(original_rows)`) to permute the result back into the caller's row order, with `as.character()` on integer values. Correct but inefficient and indirect.
+- **Fix.** Rewrote the final block as:
+  ```r
+  result <- logical(nrow(df))
+  result[df$orig_row] <- df$extraneous
+  return(result)
+  ```
+  Also removed the unused `original_rows <- df$orig_row` assignment higher up (no longer referenced). Comment rewritten to describe what the mapping does and to note that `df$extraneous` can be used without re-masking because the guarded assignment above already restricts to valid rows on SDE days.
+
+### D-d. Call-site style unified to data.table idiom (limited scope) — FIXED
+- **File/lines:** `R/child_clean.R` lines 2571 (Step 5 initial) and 2682 (Step 6 recalc), pre-edit.
+- **Issue.** Two call sites used base-R vector indexing: `data.df$exclude[identify_temp_sde(...)] <- 'Exclude-C-Temp-Same-Day'`. Four other call sites (lines 2996, 3114, 3283, 3306–3307) used the data.table `:=` idiom: `data.df[identify_temp_sde(...), exclude := 'Exclude-C-Temp-Same-Day']`. Both produce the same result, but the mixed style was a readability issue.
+- **Fix.** Converted the two base-R-style sites (2571 and 2682) to the `:=` idiom to match the others. The Step 11 mid-loop call at line 3260 uses a different separate-variable pattern (`sde_result <- identify_temp_sde(...)` followed by an index-based apply) and was intentionally left unchanged — that pattern serves a different purpose (subsetted input, index-join apply to `data.df`) and is not a base-R vs data.table style mismatch.
+
+### Session 8 deferreds
+
+None. All items flagged during the pass (F50–F55, D-a, D-b, D-c, D-d) were approved and resolved.
+
+Items intentionally not in scope and not opened as new deferreds:
+- `dop_map` is defined inside `identify_temp_sde()` (lines ~2098 post-edit) and also inside `get_dop()` (lines ~2002–2012 post-edit). Two different shapes — `get_dop()` returns a scalar for scalar input; the in-function `dop_map` is a named character vector used for `dop_map[p]` lookups. Not worth collapsing.
+- The `by = .(subjid, param, agedays)` column-subset on line 2078 (post-edit) is redundant in effect (the real sort is done by the explicit `order(...)` on the next line) but the pattern is harmless and preserving it avoids a code change during a comment-only pass. Left as-is per F54 trim-only scope.
+
+### Session 8 — post-fix test results
+
+After reinstalling the package and regenerating man pages with `roxygen2::roxygenise()`:
+
+- test-cleangrowth.R: 63 PASS, 0 warnings
+- test-child-regression.R: 48 PASS, 0 warnings
+- test-child-edge-cases.R: 28 PASS, 0 warnings
+- test-child-algorithms.R: 41 PASS (2 baseline codetools warnings, unchanged)
+- test-child-parameters.R: 13 PASS
+
+All child counts identical to baseline. No regressions. Adult tests not re-run — adult algorithm has its own separate `temp_sde()` in `adult_support.R`; `identify_temp_sde()` is child-only.
