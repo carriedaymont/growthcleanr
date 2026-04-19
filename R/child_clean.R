@@ -86,7 +86,8 @@
 ################################################################################
 #
 # This file contains the main cleanchild() function and supporting utilities:
-#   - identify_temp_sde(): Temporary SDE resolution (Step 5)
+#   - identify_temp_sde(): Temporary SDE resolution — winner selection on each
+#       (subjid, param, agedays) group (Child Steps 5, 6, 7, 9, 11, 13)
 #   - calc_otl_evil_twins(): Identifies Evil Twins (Step 9)
 #   - calc_and_recenter_z_scores(): Recomputes recentered z-scores for the
 #       p_plus / p_minus perturbation columns (Child Step 15/16 pre-loop)
@@ -3409,7 +3410,8 @@ cleanchild <- function(data.df,
     if (!quietly) message("  No SDEs to process, skipping SDE step")
     data.sde <- data.df[0, ]  # Empty data.table with same structure
   } else {
-    # Filter to subjects with potential SDEs before dplyr chain
+    # Filter to subjects with at least one same-day group before the per-row
+    # data.table work below.
     data.df_sde_subset <- data.df[subjid %in% subj_with_sde_days]
 
     # Mark groups that have a temp SDE
@@ -3447,7 +3449,8 @@ cleanchild <- function(data.df,
              exclude := .child_exc(param, "Identical")]
     data.sde[, c("keep_id", "keep_id_dup", "dup_count") := NULL]
 
-    # Include id for deterministic SDE order
+    # Re-key so downstream per-row work uses internal_id as the within-SPA
+    # tiebreaker.
     setkey(data.sde, subjid, param, agedays, internal_id)
 
 
@@ -3551,7 +3554,9 @@ cleanchild <- function(data.df,
             .(c(NA, diff(agedays)), c(diff(agedays), NA)),
           by = .(subjid, param)]
 
-  # Take the larger gap (the "Ba" value) and convert to years
+  # Take the larger of the before/after gaps and convert to years; this drives
+  # the per-row EWMA exponent below (smaller gap -> less-negative exponent ->
+  # heavier weight on closer neighbors).
   ewma_df[, maxdiff := pmax(abs(diff_before), abs(diff_after), na.rm = TRUE)]
   ewma_df[, ageyears := maxdiff / 365.25]
 

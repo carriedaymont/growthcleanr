@@ -532,14 +532,12 @@ After Child Steps 5–11 have removed BIVs, Evil Twins, extreme EWMA outliers, a
 3. Re-run `identify_temp_sde()` with `exclude_from_dop_ids` — in Child Step 13, temp SDEs are excluded from DOP median calculation (unlike Child Step 5 where all values contribute)
 4. Pre-filter to subjects with same-day measurements
 
-**Phase B1: SDE-Identicals**
+**Phase B1: SDE-Identicals (defensive)**
 
-Runs again on `data.sde` to catch identicals that emerged after Child Steps 5–11 removed intervening values. Two checks:
+A second SDE-Identicals pass runs on `data.sde` (Include + TempSDE rows). In the current implementation it is a no-op safety net: Early Child Step 13 already resolves all same-day same-value pairs on Include rows, `v` is never modified by any later step, and every temp-SDE rerun (Child Step 5 initial pass; Steps 6/7/9/11 post-step reruns; the Step 13 pre-phase rerun at `child_clean.R:3381–3384`) preserves the one-Include-per-SPA invariant. `cf_rescue = "all"` restored values sit on different days than their CF originators, so they also cannot reintroduce same-day same-value pairs. The block is kept as a safety net against future invariant-breaking changes. Two checks, both age-dependent (birth: lowest `internal_id`; otherwise highest):
 
-1. **Whole-day identical**: All values on a day are the same → keep one, exclude rest
-2. **Partial identical**: Duplicate values mixed with different values → mark duplicates of each value, keeping one per value group
-
-Both use the age-dependent id rule. Only Include rows are candidates (`exclude == "Include"` guard).
+1. **Whole-day identical**: All rows in the (subjid, param, agedays) group have the same `v` → keep one, others → `Exclude-C-Identical`. No `exclude == "Include"` guard — the check would demote a TempSDE loser to Identical if this block ever fired.
+2. **Partial identical**: Within a (subjid, param, agedays, v) group with more than one row, non-keepers → `Exclude-C-Identical`. Guarded on `exclude == "Include"`.
 
 **Phase B2: One-Day SDE + SDE-All-Extreme**
 
@@ -582,11 +580,19 @@ None. The SDE-All-Extreme thresholds (`> 2` one-day and `> 1` EWMA-based) are ha
 
 ### Variables created and dropped
 
-Internal variables are created on the `data.sde` subset only (`median.spz`, `median.dopz`, `absdmedian.spz`, `absdmedian.dopz`, `was_temp_sde`, `one_day_sde_flag`, `ewma.all`, `spa_ewma`, `absdewma`, `min_absdewma`, `absdiff_dop_for_sort`) and are not merged back to `data.df`. No persistent columns are added to `data.df`.
+All Main Child Step 13 working variables live on the `data.sde` subset (or on `ewma_df`, which is merged back into `data.sde`). They are not carried back to `data.df` at merge time: the Phase B4 block (`child_clean.R:3651–3652`) drops every column not in `keep_cols_sde` (captured before Phase B construction at `child_clean.R:3392`).
+
+- **Phase B1 (defensive identicals):** `keep_id`, `keep_id_dup`, `dup_count` — all dropped at the end of Phase B1 (`child_clean.R:3448`).
+- **Phase B2 (one-day):** `was_temp_sde`, `n_days_with_data`, `has_sde_day`, `one_day_sde_flag`, `median_tbc`, `absdiff_rel_to_median`, `min_absdiff_rel_to_median`, `HT_dop_med`, `WT_dop_med`, `HC_dop_med`, `absdiff_dop_med`, `absdiff_dop_for_sort`, `tiebreaker_oneday`, `keep_id_oneday`.
+- **Phase B3 (EWMA):** `ewma_df` scratch columns (`diff_before`, `diff_after`, `maxdiff`, `ageyears`, `exp_val`, `ewma.all`, `ewma.before`, `ewma.after`), then on `data.sde` after the merge: `ewma.all`, `ewma.before`, `ewma.after`, `spa_ewma`, `absdewma`, `n_available`, `min_absdewma`, `tiebreaker_ewma`, `keep_id_ewma`. (`ewma_fill` is created and dropped inline at `child_clean.R:3580`.)
+
+Inside the separately-called `identify_temp_sde()` (invoked from Phase A at `child_clean.R:3382`), the scratch columns `median.spz`, `median.dopz`, `absdmedian.spz`, `absdmedian.dopz`, `extraneous.this.day`, `extraneous`, and `orig_row` live on a copy of the input and are discarded when the helper returns — they never reach `data.sde` or `data.df`.
+
+No persistent columns are added to `data.df` by Step 13.
 
 ### Checklist findings
 
-1. **DOP mapping consistent:** HC → HT in all three DOP median calculations.
+1. **DOP mapping consistent:** All three Phase B2 DOP median branches (`HT_dop_med`, `WT_dop_med`, `HC_dop_med`) follow the canonical mapping — WT↔HT is symmetric, HC→HT is asymmetric (HC uses HT as its anchor; HT does not use HC).
 2. **Boundaries:** SDE-All-Extreme `> 2` (one-day) and `> 1` (EWMA-based) — both strict. Age-dependent id tiebreaker uses `internal_id` (not the user's `id`) in Child Step 13.
 3. **`.child_valid()` calls:** Temp SDEs included when building the `data.sde` subset. EWMA computed on Include-only rows (excludes temp SDEs). DOP medians exclude temp SDEs via `!was_temp_sde`.
 4. **Merge safety:** Only Include and Temp-SDE rows are overwritten on merge-back — permanent exclusions from earlier steps are preserved.
