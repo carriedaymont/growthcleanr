@@ -45,3 +45,14 @@ AJ## numbering does not advance. The non-intentional diffs surfaced during the d
 The big intentional change — CF rescue scheme redesign (lookup-table + `cf_rescue` + `cf_rescued` + `cf_detail`; rescued CFs → `Include` rather than different exclusion codes) — is documented in the procedure's "Known intentional changes" list and in `cf-rescue-thresholds.md`, so logged briefly and not analyzed further here.
 
 **Session 3 status:** Session closed with 0 findings and no code change. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Next session candidate: **Session 4 — Step 7 (BIV) + Step 9 (Evil Twins)**.
+
+---
+
+## Session 4 — 2026-04-22 — Step 7 (BIV) + Step 9 (Evil Twins)
+
+Walkthrough note: [walkthrough-todo-2026-04-22.md](walkthrough-todo-2026-04-22.md) — see "R-vs-R comparison — Session 4" section.
+
+- [AJ10] Step 7: Absolute BIV weight age boundary — reference uses `agedays == 0` / `agedays != 0` for the 0.2 kg / 1 kg floor; current uses `agedays <= 365` / `agedays > 365` (extends 0.2 kg floor to entire first year, fixing exclusion of legitimate preterm weights 0.7–1.0 kg) — Intentional (other) — closed (confirmed via CLAUDE.md history 2026-03-16; no change needed) — `Infants_Main.R:3073–3075` vs `child_clean.R:3007–3010`. Pitfall: **Boundary changes**.
+- [AJ11] Step 9: `any(start_df$otl, na.rm = TRUE)` vs reference `any(start_df$oob)` — current adds `na.rm = TRUE` preventing `if (NA)` error when `otl` contains NAs and no TRUE values — Bug fix — closed (current already correct, no change needed) — `Infants_Main.R:3187` vs `child_clean.R:3123`. Pitfall: **NA / empty-set handling**.
+
+**Session 4 status:** 2 findings (AJ10 — Intentional (other); AJ11 — Bug fix). Both closed with no code change needed. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Next session candidate: **Session 5 — Child Step 11 (EWMA1)**.

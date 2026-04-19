@@ -175,3 +175,115 @@ After reinstalling the package and running the full child test suite:
 - test-child-parameters.R: 13 PASS
 
 All child counts identical to baseline. No regressions, as expected — all fixes are dead-variable removal, comment rewrites, roxygen rewording, or narrative cleanup (no behavior changes). Adult tests not re-run — no adult files touched in this session.
+
+---
+
+# R-vs-R comparison — Session 4 — 2026-04-22
+
+Scope: Child Step 7 (BIV) + Child Step 9 (Evil Twins). Per `R-child-AprJanComparison-procedure.md`. Pure R-vs-R diff of reference `Infants_Main.R` against current `child_clean.R`.
+
+---
+
+## Pre-session baseline tests
+
+Baseline from today's Step 21 walkthrough session (same process instance):
+
+- test-cleangrowth.R: 63 PASS
+- test-child-regression.R: 48 PASS
+- test-child-edge-cases.R: 28 PASS
+- test-child-algorithms.R: 41 PASS (2 baseline codetools warnings)
+- test-child-parameters.R: 13 PASS
+
+---
+
+## Scope
+
+| Sub-area | Reference lines | Current lines | What |
+|---|---|---|---|
+| Step 7 absolute BIV | `Infants_Main.R:3049–3111` | `child_clean.R:2991–3039` | Absolute weight / HT / HC limits |
+| Step 7 standardized BIV | `Infants_Main.R:3113–3158` | `child_clean.R:3041–3090` | Z-cutoffs + temp-SDE rerun + ageyears drop |
+| `calc_oob_evil_twins` / `calc_otl_evil_twins` | `Infants_Main.R:2387–2429` | `child_clean.R:2254–2288` | OTL detection helper |
+| Step 9 main | `Infants_Main.R:3160–3255` | `child_clean.R:3092–3204` | Evil Twins loop, exclusion, temp-SDE rerun |
+
+---
+
+## Known intentional changes encountered (logged briefly, not analyzed)
+
+- **BIV exclusion codes unified:** `Exclude-Absolute-BIV` + `Exclude-Standardized-BIV` → `Exclude-C-BIV`; guard changed from `exclude != abs_biv` to `!grepl("^Exclude-C-BIV$", exclude)` as a side effect. Known code rename.
+- **`biv.z.*` parametrization:** Eight per-cell parameters replace hardcoded `-25`/`-15`/`22`/`8`/`-15`/`15` z-thresholds. Listed in procedure's "Known intentional changes."
+- **`oob` → `otl`, `calc_oob_evil_twins` → `calc_otl_evil_twins`:** Known OOB → OTL rename.
+- **`id` → `internal_id` tiebreaker:** Known intentional throughout.
+- **`valid()` → `.child_valid()`:** Known intentional rename.
+- **`cat()` → `message()`:** Known intentional.
+- **`Exclude-Evil-Twins` → `Exclude-C-Evil-Twins`:** Known code rename.
+- **Rounding-tolerance removal in `calc_otl_evil_twins`:** Reference had `janitor::round_half_up(janitor::round_half_up(..., 3), 2)` before the `> 5` comparison; current omits this. Per procedure: do NOT flag.
+
+---
+
+## Findings
+
+### AJ10 — Step 7: absolute BIV weight age boundary — Intentional (other) — closed
+
+**Reference (`Infants_Main.R:3073–3075`):**
+```r
+data.df[valid_set & param == "WEIGHTKG" & v < 0.2 & agedays == 0,  exclude := exc_nam]
+data.df[valid_set & param == "WEIGHTKG" & v < 1 & agedays != 0,    exclude := exc_nam]
+```
+
+**Current (`child_clean.R:3007–3010`):**
+```r
+data.df[valid_set & param == "WEIGHTKG" & v < 0.2 & agedays <= 365, exclude := "Exclude-C-BIV"]
+data.df[valid_set & param == "WEIGHTKG" & v < 1   & agedays > 365,  exclude := "Exclude-C-BIV"]
+```
+
+Reference applies the strict 0.2 kg floor only at birth (agedays == 0), with the 1 kg floor for all other days. Current extends the 0.2 kg floor to the entire first year (agedays ≤ 365), with the 1 kg floor only after the first year.
+
+Intentional bug fix documented in `__Pipeline/CLAUDE.md` (2026-03-16 GC archetype testing): "BIV threshold bug found and fixed: Absolute BIV weight limit was excluding legitimate preterm weights (0.7–1.0 kg). Changed to <0.2 kg for first year, <1 kg after that." Not listed in the procedure's "Known intentional changes" but confirmed intentional via CLAUDE.md history. **Pitfall: Boundary changes.**
+
+No code change needed. Closed.
+
+---
+
+### AJ11 — Step 9: `any(start_df$otl, na.rm = TRUE)` vs `any(start_df$oob)` — Bug fix — closed
+
+**Reference (`Infants_Main.R:3187`):**
+```r
+if (any(start_df$oob)) {
+```
+
+**Current (`child_clean.R:3123`):**
+```r
+if (any(start_df$otl, na.rm = TRUE)) {
+```
+
+Current adds `na.rm = TRUE`. Without it, if `otl` contains NAs (which occurs when `tbc.sd` or `ctbc.sd` is NA for any row in the valid set) and no TRUE values are present, `any(...)` returns NA; `if (NA)` errors with "missing value where TRUE/FALSE needed." In normal operation, Include rows at Step 9 should have valid z-scores (BIV excluded implausible z-scores; Missing/Not-Cleaned rows excluded from valid_set), so this edge case is rare, but the fix is correct. **Pitfall: NA / empty-set handling.**
+
+Current already correct; no change needed. Closed.
+
+---
+
+## Items NOT flagged (audit trail)
+
+**Step 7:**
+- `v == 0` explicit tagging (`Infants_Main.R:3154`: `data.df[v == 0, exclude := exc_nam]`) absent from current: Dead code removal. The wrapper converts `measurement == 0` to NaN before dispatch; NaN rows get `Exclude-Missing` at init and are excluded from `valid_set`. No v==0 row can reach Step 7's valid_set. Removal is correct.
+- `ageyears` column explicitly dropped after Step 7 in current (`child_clean.R:3090`: `data.df[, ageyears := NULL]`): Cleanup. Grep confirms `ageyears` in `data.df` is only created and used in Step 7 in both reference and current; later occurrences of `ageyears` are all local variables inside function scopes, not the `data.df` column. Reference leaves the column on `data.df` without dropping it (minor leak); current tidies it. No logic impact.
+- Stale `# Removed nnte filter (nnte calculation removed)` comment in reference Step 7 (`Infants_Main.R:3066`): Already removed in current as part of cleanup.
+
+**Step 9:**
+- `paste0/table` → `.N by-group` for `not_single_pairs` (`Infants_Main.R:3177–3178` vs `child_clean.R:3114–3115`): Equivalent behavior. The paste-based table approach has the same theoretical underscore-concat collision risk as AJ4 in Session 1 — impossible in practice given fixed `WEIGHTKG/HEIGHTCM/HEADCM` param vocabulary (same audit-trail note as Sessions 1 and 3). Not re-flagged.
+- Single data.table closure (reference) → per-group for-loop (current): Equivalent results. Evil Twins processing is fully independent per (subjid, param) group: OTL detection uses `same_sp_next` / `same_sp_prev` guards so cross-group comparisons never occur; the median tiebreaker is per-group; one exclusion per iteration within each group converges to the same final exclusion set regardless of whether groups are processed in parallel (reference's `by = .(subjid, param)` within the closure) or sequentially (current's for-loop). Result sets are identical.
+- `sum_oob` / `any_oob` intermediate variables (reference) → direct `any(df$otl, na.rm = TRUE)` loop condition (current): Equivalent termination condition; `sum_oob >= 1` ↔ `any(otl == TRUE)` per group.
+- `data.df[, sp_count_9 := NULL]` cleanup at end of Step 9 (`child_clean.R:3197`): New cleanup in current (reference leaves the column). Not a logic issue.
+- Stale `# Removed nnte filter` and the old `# we only running carried forwards on valid values, non NNTE values` comment in reference Step 9 (`Infants_Main.R:3175–3176`): Already removed in current.
+
+---
+
+## Open questions
+
+None.
+
+---
+
+## Session 4 status
+
+2 findings (AJ10 — Intentional (other); AJ11 — Bug fix). Both closed with no code change needed. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Next session candidate: **Session 5 — Child Step 11 (EWMA1, complex closure and EWMA caching).**
