@@ -11,7 +11,11 @@ ewma(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 15, cache_env = NULL)
 
 \item{z}{Input vector of numeric z-score data.}
 
-\item{ewma.exp}{Exponent to use for weighting.}
+\item{ewma.exp}{Exponent used for age-gap weighting. May be a single
+scalar (recycled across all observations) or a per-observation vector
+matched to \code{agedays} / \code{z}; the algorithm's main internal
+callers pass a per-observation vector that varies the exponent by the
+widest neighbor age gap.}
 
 \item{ewma.adjacent}{Specify whether EWMA values excluding adjacent measurements should be calculated.  Defaults to TRUE.}
 
@@ -22,15 +26,20 @@ Default 15. Set to Inf to disable windowing.}
 Used internally for performance. Defaults to NULL.}
 }
 \value{
-Data frame with 3 variables:
+A named list of numeric vectors, each the same length as
+\code{agedays}.
 \itemize{
-\item The first variable (ewma.all) contains the EWMA at observation time
-excluding only the actual observation for that time point.
-\item The second variable (ewma.before) contains the EWMA for each observation excluding both the actual observation
-and the immediate prior observation.
-\item The third variable (ewma.after) contains the EWMA for each observation excluding both the actual observation
-and the subsequent observation.
+\item \code{ewma.all} — EWMA at each observation's age, excluding only the
+observation itself.
+\item \code{ewma.before} — also excludes the immediate prior observation
+(sorted by \code{agedays}); equals \code{ewma.all} for the first
+observation and when \code{n <= 2}.
+\item \code{ewma.after} — also excludes the immediate subsequent observation;
+equals \code{ewma.all} for the last observation and when \code{n <= 2}.
 }
+
+When \code{ewma.adjacent = FALSE}, only \code{ewma.all} is returned (still
+wrapped in a one-element named list).
 }
 \description{
 \code{ewma} calculates the exponentially weighted moving average (EWMA) for a set of numeric observations over time.

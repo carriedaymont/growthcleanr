@@ -1117,7 +1117,7 @@ After the 2026-04-18 wrapper-reference / D27–D31 work, the installed package w
 
 ### Session 7 deferreds
 
-### D33. Legacy Stata-style `# 6. / a. / b. / c. / i. / ii. / iii.` comment block in `ewma()` — DEFERRED (support-function scope)
+### D33. Legacy Stata-style `# 6. / a. / b. / c. / i. / ii. / iii.` comment block in `ewma()` — FIXED (Session 7b, 2026-04-18)
 - **File/lines:** `child_clean.R` ~lines 1662–1682 — numbered block inside the `ewma()` function body describing the original EWMA formula in pseudo-math notation (`EWMASDi`, `SDj…SDn`, `ΔAgej`, `EWMAZ`, `EWMAZbef`, `EWMAZaft`).
 - **Issue.** Per walkthrough convention (F26/F30/F35), Stata-style enumeration and algorithm-design prose in the implementation file should be rewritten as current-state R-idiom comments. The block predates the R implementation and does not use current variable names (`tbc.sd`, `ctbc.sd`, `ewma.all`/`before`/`after`, `delta`).
 - **Why deferred.** `ewma()` is a shared support function used by Child Steps 11, 13, 15/16, and 17, and also by the adult algorithm indirectly. The block is not inside Step 11's main logic; it's inside the `ewma()` function definition. Rewriting it belongs with a broader `ewma()` / `ewma_cache_init()` / `ewma_cache_update()` support-function pass rather than inside a single-step walkthrough. The technical content is still accurate (the formula described matches what the code computes).
@@ -1135,3 +1135,98 @@ After reinstalling the package:
 - test-child-parameters.R: 13 PASS
 
 All counts identical to baseline. No regressions.
+
+---
+
+## Session 7b — EWMA support-function pass (2026-04-18)
+
+Dedicated walkthrough of the shared EWMA machinery in `R/child_clean.R`:
+`ewma()` (~lines 1657–1744), `ewma_cache_init()` (~1753–1804),
+`ewma_cache_update()` (~1809–1911), and `as_matrix_delta()` (~1607). Closes
+D33. Comment-only changes; no behavioral edits.
+
+### Pre-session baseline tests
+
+- test-cleangrowth.R: 63 PASS
+- test-child-regression.R: 48 PASS
+- test-child-edge-cases.R: 28 PASS
+- test-child-algorithms.R: 41 PASS (2 pre-existing codetools warnings)
+- test-child-parameters.R: 13 PASS
+- test-adult-clean.R: 198 PASS
+- adult regression test_harness.R: 1508/1508 at all 4 permissiveness levels
+
+### Scope correction
+
+- The original prompt described `ewma()` / `ewma_cache_init()` / `ewma_cache_update()` as "called from Child Steps 11, 13, 15/16, and 17 (and any adult counterparts)." On inventory, **only the child algorithm calls these functions.** The adult algorithm has its own parallel implementations `adult_ewma_cache_init()` and `adult_ewma_cache_update()` in `R/adult_support.R` and uses them in `cleanadult()` (and adult support functions). `as_matrix_delta()` is only called by the child `ewma()` and `ewma_cache_init()`.
+- Net effect: this pass is child-scoped by code. Adult tests were still run as a baseline confirmation but are not affected by the edits.
+
+### Fix-now items
+
+### F43. Stata-style `# 6. / a. / b. / c. / i. / ii. / iii.` block in `ewma()` rewritten — FIXED (closes D33)
+- **File/lines:** `R/child_clean.R` ~lines 1662–1682 (pre-edit).
+- **Issue.** Numbered block predating the R implementation, written in pseudo-math notation (`EWMASDi`, `SDj…SDn`, `ΔAgej`, `EWMAZ`, `EWMAZbef`, `EWMAZaft`) and Stata-style enumeration. Did not use current R variable names (`tbc.sd`, `ctbc.sd`, `ewma.all` / `before` / `after`, `delta`).
+- **Fix.** Replaced with a current-state R-idiom prose block at the top of the `ewma()` body that describes:
+  - the weight formula `w_ij = (5 + |agedays_i - agedays_j|) ^ ewma.exp_i` with `w_ii = 0`;
+  - why "+5" and a negative exponent are used;
+  - what each of the three return variants (`ewma.all` / `ewma.before` / `ewma.after`) excludes and the first/last/`n <= 2` conventions;
+  - the per-observation vector form of `ewma.exp` and how `sweep()` applies it row-wise;
+  - the `window` parameter and its disable form (`Inf`);
+  - the role of `cache_env` for paired tbc/ctbc calls.
+
+### F44. `@return` roxygen corrected from "Data frame with 3 variables" to named list — FIXED
+- **File/lines:** `R/child_clean.R` `@return` block in `ewma()` roxygen (lines ~1631–1638 pre-edit).
+- **Issue.** Roxygen described a data frame, but the function explicitly returns a named list (line ~1739 inline comment: "data.table := compatible, avoids data.frame overhead"). The list form is the version current callers depend on (`df[..., (ewma.fields) := ewma(...)]` patterns at child_clean.R lines 3186, 3191, 3482, 4500). The `ewma.adjacent = FALSE` case was also undocumented.
+- **Fix.** Roxygen now describes a named list of numeric vectors, with each variant's contents and the `n <= 2` / first / last conventions, plus the `ewma.adjacent = FALSE` one-element-list case.
+
+### F45. `@param ewma.exp` clarified to scalar-or-vector — FIXED
+- **File/lines:** `R/child_clean.R` `@param ewma.exp` in `ewma()` roxygen.
+- **Issue.** Said only "Exponent to use for weighting." All four internal callers in `cleanchild()` pass a per-observation vector (`exp_vals`), not a scalar; the roxygen example happens to pass a scalar (works because `sweep()` recycles).
+- **Fix.** Roxygen now states scalar or per-observation vector usage and notes that the algorithm's main internal callers pass a per-observation vector that varies by widest neighbor age gap.
+
+### F46. "self-weight is zero (replaces ifelse(delta == 0, …) approach)" parenthetical dropped — FIXED
+- **File/lines:** `R/child_clean.R` line ~1704 (pre-edit).
+- **Issue.** Trailing parenthetical referenced a prior `ifelse` implementation that no longer exists — stale-content style.
+- **Fix.** Comment now reads `# self-weight is zero so obs i is excluded from its own EWMA`.
+
+### F47. "O(n) arithmetic instead of matrix copy + multiply" comments rephrased — FIXED
+- **File/lines:** `R/child_clean.R` lines ~1722–1724 and ~1729–1731 (pre-edit, two paired comment blocks for `pred_weights` / `succ_weights`).
+- **Issue.** Phrased as a comparison to a hypothetical alternative implementation rather than describing what the current code does.
+- **Fix.** Consolidated into one current-state Before/After comment block that says the predecessor/successor contribution is subtracted directly from the cached weighted sum and row sum, and that this avoids rebuilding a separate weight matrix per adjacent-neighbor exclusion. No "instead of …" framing.
+
+### F48. "Bug fix: was only checking 1 position on each side; extended to 2 positions on each side." removed in `ewma_cache_update()` — FIXED
+- **File/lines:** `R/child_clean.R` lines ~1848–1849 (pre-edit).
+- **Issue.** Stale "Bug fix: was X" comment style. The preceding paragraph already explains *why* up to 2 positions on each side need to be checked after removing `pos_j` (the shift in max-gap for `pos_j-1` and `pos_j-2`, and symmetrically on the other side).
+- **Fix.** Two-line "Bug fix" tail removed; rationale paragraph kept.
+
+### F49. Step 15/16 header "Restructured to use global iterations for efficiency / Key changes:" block rewritten — FIXED (bycatch)
+- **File/lines:** `R/child_clean.R` ~lines 3570–3576 (pre-edit).
+- **Issue.** Same stale-changelog style as D33: bullets numbered "1./2./3." describing what the restructure changed, in the implementation file. Step 15/16 scope, but trivially close in style and 5 lines long.
+- **Fix.** Replaced with a single current-state paragraph describing the global-iteration design (per-batch p_plus / p_minus computed once; one shared while loop; only subject-param groups with new exclusions re-processed each iteration; converged groups are not re-walked).
+- **Note.** This is bycatch from the EWMA support-function pass and was approved in conversation. The Steps 15/16 walkthrough should still happen; this just resolves one cosmetic comment block in advance so the convention stays clean.
+
+### `ewma_cache_init()` — no fixes needed
+- Comments are current-state. `skip_ctbc` shortcut, weight matrix build, windowing, and EWMA computation blocks all match what the code does. Leave as-is.
+
+### `as_matrix_delta()` — no fixes needed
+- Single-purpose internal helper (lines ~1605–1611): `Convert vector of ages (days) into pairwise absolute-difference matrix. Used by ewma() for age-gap weighting.` Comment matches behavior; implementation is correct. The construction `abs(matrix(rep(agedays, n), n, byrow = TRUE) - agedays)` could equivalently be written with `outer()` but neither correctness nor performance is affected. Leave as-is. (Note: `as_matrix_delta` was previously exported and is now internal — already done in earlier 2026-04-16 cleanup; man page deletion already documented in CLAUDE.md.)
+
+### Session 7b deferreds
+
+None. The two related items called out in D33 are both resolved this session:
+- D33 itself (F43) — closed in `ewma()`.
+- Step 15/16 header block (F49) — closed as bycatch.
+
+Items intentionally not in scope and not opened as new deferreds:
+- The roxygen `@examples` block for `ewma()` still names its result `e_df`, which reads as "ewma data frame". Now that the return contract is documented as a list, the variable name is mildly misleading but does not break the example. Cosmetic; not worth a separate deferred entry.
+
+### Session 7b — post-fix test results
+
+After reinstalling the package and regenerating man pages with `roxygen2::roxygenise()`:
+
+- test-cleangrowth.R: 63 PASS, 0 warnings
+- test-child-regression.R: 48 PASS, 0 warnings
+- test-child-edge-cases.R: 28 PASS, 0 warnings
+- test-child-algorithms.R: 41 PASS (2 baseline codetools warnings, unchanged)
+- test-child-parameters.R: 13 PASS
+
+All child counts identical to baseline. No regressions. Adult tests not re-run by request — edits do not touch `adult_clean.R` or `adult_support.R`.

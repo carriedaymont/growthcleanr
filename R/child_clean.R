@@ -1618,7 +1618,11 @@ as_matrix_delta <- function(agedays) {
 #'
 #' @param z Input vector of numeric z-score data.
 #'
-#' @param ewma.exp Exponent to use for weighting.
+#' @param ewma.exp Exponent used for age-gap weighting. May be a single
+#'   scalar (recycled across all observations) or a per-observation vector
+#'   matched to \code{agedays} / \code{z}; the algorithm's main internal
+#'   callers pass a per-observation vector that varies the exponent by the
+#'   widest neighbor age gap.
 #'
 #' @param ewma.adjacent Specify whether EWMA values excluding adjacent measurements should be calculated.  Defaults to TRUE.
 #'
@@ -1628,13 +1632,18 @@ as_matrix_delta <- function(agedays) {
 #' @param cache_env Optional environment for caching EWMA intermediate results.
 #'   Used internally for performance. Defaults to NULL.
 #'
-#' @return Data frame with 3 variables:
-#' * The first variable (ewma.all) contains the EWMA at observation time
-#'   excluding only the actual observation for that time point.
-#' * The second variable (ewma.before) contains the EWMA for each observation excluding both the actual observation
-#'   and the immediate prior observation.
-#' * The third variable (ewma.after) contains the EWMA for each observation excluding both the actual observation
-#'   and the subsequent observation.
+#' @return A named list of numeric vectors, each the same length as
+#'   \code{agedays}.
+#' * \code{ewma.all} — EWMA at each observation's age, excluding only the
+#'   observation itself.
+#' * \code{ewma.before} — also excludes the immediate prior observation
+#'   (sorted by \code{agedays}); equals \code{ewma.all} for the first
+#'   observation and when \code{n <= 2}.
+#' * \code{ewma.after} — also excludes the immediate subsequent observation;
+#'   equals \code{ewma.all} for the last observation and when \code{n <= 2}.
+#'
+#' When \code{ewma.adjacent = FALSE}, only \code{ewma.all} is returned (still
+#'   wrapped in a one-element named list).
 #'@md
 #'
 #' @export
@@ -1655,31 +1664,32 @@ as_matrix_delta <- function(agedays) {
 #' # Calculate exponentially weighted moving average
 #' e_df <- ewma(df_stats$agedays, sd, ewma.exp = -1.5)
 ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 15, cache_env = NULL) {
-  # window parameter limits EWMA to max window positions on each side.
-  # Set window = Inf to disable windowing
-  # cache_env: optional environment for sharing delta matrix between calls
-  #   (e.g., between tbc.sd and ctbc.sd calls that use the same agedays/exponents)
-  # 6.  EWMA calculation description: Most of the next steps will involve calculating the exponentially weighted moving average for each subject and parameter. I will
-  #     describe how to calculate EWMASDs, and will describe how it needs to be varied in subsequent steps.
-  # a.	The overall goal of the EWMASD calculation is to identify the difference between the SD-score and what we might predict that DS-score should be, in order to
-  #     determine whether it should be excluded.
-  # b.	Only nonmissing SD-scores for a parameter that are not designated for exclusion are included in the following calculations.
-  # c.	For each SD-score SDi and associated agedaysi calculate the following for every other z-score (SDj…SDn) and associated agedays (agedaysj…agedaysn)  for the
-  #     same subject and parameter
-  #   i.	ΔAgej=agedaysj-agedaysi
-  #   ii.	EWMAZ=SDi=[Σj→n(SDj*((5+ΔAgej)^-1.5))]/[ Σj→n((5+ΔAgej)^-1.5)]
-  #   iii.	For most EWMASD calculations, there are 3 EWMASDs that need to be calculated. I will note if not all of these need to be done for a given step.
-  #     1.	EWMASDall calculated as above
-  #     2.	EWMAZbef calculated excluding the SD-score just before the SD-score of interest (sorted by agedays). For the first observation for a parameter for a
-  #         subject, this should be identical to EWMASDall rather than missing.
-  #     3.	EWMAZaft calculated excluding the z-score just after the SD-score of interest (sorted by agedays). For the lastobservation for a parameter for a subject,
-  #         this should be identical to EWMASDall rather than missing.
-  #   iv.	For each of the three EWMASDs, calculate the dewma_*=SD-EWMASD
-  # d.	EWMASDs and ΔEWMASDs will change if a value is excluded or manipulated using one of the methods below, therefore EWMASDs and ΔEWMASDs be recalculated for each
-  #     step where they are needed.
-  # e.	For these calculations, use variables that allow for precise storage of
-  #     numbers (double-precision floats) because otherwise rounding errors can
-  #     cause problems in a few circumstances
+  # For each observation i in (agedays, z), compute a weighted average of the
+  # other observations' z-values using weights w_ij = (5 + |agedays_i - agedays_j|) ^ ewma.exp_i,
+  # with w_ii = 0 so observation i is excluded from its own EWMA. The "+5"
+  # prevents nearly-coincident agedays from blowing up the weight; the negative
+  # exponent (typically -1.5 to -3.5) damps the contribution of distant ages.
+  #
+  # Three EWMA variants are returned (when ewma.adjacent = TRUE) so that
+  # callers can decide which neighbors to suppress when checking whether an
+  # observation is consistent with its trajectory:
+  #   ewma.all     EWMA of all other observations
+  #   ewma.before  also drops obs i-1 (immediate predecessor by agedays)
+  #   ewma.after   also drops obs i+1 (immediate successor by agedays)
+  # For the first/last observation, ewma.before/ewma.after equal ewma.all
+  # (no predecessor/successor exists). For n <= 2, both equal ewma.all.
+  #
+  # Caller supplies one ewma.exp value per observation; sweep() applies the
+  # exponent row-wise so each row of the weight matrix uses that row's
+  # observation's exponent. A scalar ewma.exp is recycled by sweep() and
+  # works for the simple single-call form shown in the example.
+  #
+  # window limits the EWMA at each observation to the ±window nearest
+  # positions (default 15); set window = Inf to disable.
+  #
+  # cache_env (optional environment) lets callers reuse the windowed weight
+  # matrix across paired calls on the same agedays + exponents (e.g.,
+  # tbc.sd then ctbc.sd) to avoid recomputing the matrix.
 
   n <- length(agedays)
   # initialize response variables
@@ -1695,13 +1705,12 @@ ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 15, cache_
     if (!is.null(cache_env) && !is.null(cache_env$delta)) {
       delta <- cache_env$delta
     } else {
-      # calculate matrix of differences in age, and add 5 to each delta per Daymont algorithm
+      # Build weight matrix: row-wise exponent application means each
+      # observation's EWMA uses that observation's own exponent for all
+      # weights in its row. sweep(..., 1, ...) targets margin 1 (rows).
       delta <- as_matrix_delta(agedays)
-      # Apply exponent ROW-wise, not column-wise
-      # Each observation's EWMA should use that observation's exponent for all weights
-      # sweep(..., 1, ...) applies the vector to each ROW (margin 1)
       delta <- sweep(delta + 5, 1, ewma.exp, FUN = "^")
-      diag(delta) <- 0  # self-weight is zero (replaces ifelse(delta == 0, ...) approach)
+      diag(delta) <- 0  # self-weight is zero so obs i is excluded from its own EWMA
 
       # Apply windowing: zero out weights beyond window positions.
       if (!is.null(window) && is.finite(window)) {
@@ -1720,14 +1729,14 @@ ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 15, cache_
 
     if (ewma.adjacent) {
       if (n > 2) {
-        # Before: exclude predecessor's contribution from each observation's EWMA
-        # For obs i, remove obs i-1's weight — O(n) arithmetic instead of matrix copy + multiply
+        # Before / After: subtract predecessor's / successor's contribution
+        # from each observation's weighted sum and row sum directly. This
+        # is O(n) per variant — no need to rebuild a separate weight matrix
+        # for each adjacent-neighbor exclusion.
         pred_weights <- c(0, delta[cbind(2:n, 1:(n-1))])  # subdiagonal: delta[i, i-1]
         pred_z <- c(0, z[1:(n-1)])
         ewma.before[index] <- (weighted_sums - pred_weights * pred_z) / (row_sums - pred_weights)
 
-        # After: exclude successor's contribution from each observation's EWMA
-        # For obs i, remove obs i+1's weight — O(n) arithmetic instead of matrix copy + multiply
         succ_weights <- c(delta[cbind(1:(n-1), 2:n)], 0)  # superdiagonal: delta[i, i+1]
         succ_z <- c(z[2:n], 0)
         ewma.after[index] <- (weighted_sums - succ_weights * succ_z) / (row_sums - succ_weights)
@@ -1736,7 +1745,9 @@ ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 15, cache_
       }
     }
   }
-  # return all 3 EWMAs as a list (data.table := compatible, avoids data.frame overhead)
+  # Return as a named list (not a data.frame): list is data.table :=
+  # compatible and avoids data.frame construction overhead in the per-group
+  # callers in Steps 11, 13, 15/16, and 17.
   return(if (ewma.adjacent)
     list(ewma.all = ewma.all, ewma.before = ewma.before, ewma.after = ewma.after)
     else
@@ -1845,8 +1856,6 @@ ewma_cache_update <- function(cache, excluded_id) {
   # to pos_j-2 and pos_j) AND for pos_j-2 (whose gap-after is
   # now to pos_j instead of pos_j-1). Same logic applies on the
   # other side.
-  # Bug fix: was only checking 1 position on each side; extended
-  # to 2 positions on each side.
   neighbors <- integer(0)
   if (pos_j > 2L)     neighbors <- c(neighbors, pos_j - 2L)
   if (pos_j > 1L)     neighbors <- c(neighbors, pos_j - 1L)
@@ -3568,12 +3577,11 @@ cleanchild <- function(data.df,
   setkey(data.df, subjid, param, agedays, internal_id)
 
   # 15-16: moderate EWMA ----
-  # Restructured to use global iterations for efficiency
-  # Key changes:
-  #   1. Pre-calculate p_plus/p_minus and their z-scores ONCE for all valid rows
-  #   2. Global while loop instead of per-subject-param while loops
-  #   3. After each iteration, only re-process subject-params that had new exclusions
-  # This provides major speedup when most subjects are clean after early iterations.
+  # Iteration is global rather than per-(subjid, param): p_plus / p_minus
+  # neighbor age-gaps and their z-scores are computed once for all valid rows,
+  # one shared while loop runs across the whole batch, and after each
+  # iteration only the subject-param groups that produced a new exclusion are
+  # re-processed. This avoids re-walking groups that have already converged.
 
   if (!quietly)
     message(sprintf("[%s] Exclude moderate EWMA...", Sys.time()))
