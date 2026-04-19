@@ -51,3 +51,6 @@ output
 .Rprofile
 docs/reference/*.csv
 docs/reference/*.log
+
+# Claude Code local settings
+.claude/

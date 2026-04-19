@@ -317,3 +317,210 @@ After reinstalling the package and running the full child test suite:
 - test-child-parameters.R: 13 PASS
 
 All child counts identical to baseline. No regressions. Adult tests not re-run — no adult files touched in this session.
+
+---
+
+# R-vs-R comparison — Session 1 — 2026-04-19
+
+**Scope:** Preprocessing — z-scores, GA correction (Child Step 2b), recentering.
+
+Per `R-child-AprJanComparison-procedure.md`. Pure R-vs-R comparison; reference (Jan 2026) is `__Pipeline/current-infant-R-growthcleanr/growthcleanr/R/Infants_Main.R` (5011 lines); current (Apr 2026) is `__Pipeline/gc-github-latest/R/child_clean.R` (5027 lines).
+
+This is a **comparison-only** session per procedure — **no code edits made**. All findings batched for Carrie's review and approval before any fix.
+
+## Pre-session baseline tests (re-confirmed for this comparison)
+
+- test-cleangrowth.R: 63 PASS, 0 warnings
+- test-child-regression.R: 48 PASS, 0 warnings
+- test-child-edge-cases.R: 28 PASS, 0 warnings
+- test-child-algorithms.R: 41 PASS, 2 warnings (pre-existing `parallel=TRUE` / `plyr::ddply` codetools — baseline, unchanged)
+- test-child-parameters.R: 13 PASS, 0 warnings
+
+Adult tests not run — no adult files in scope.
+
+## Scope
+
+| Sub-area | Reference lines | Current lines | What |
+|---|---|---|---|
+| Param validation + LENGTHCM relabel | `Infants_Main.R` 389–399, 703 | `child_clean.R` 506–516, 702 | Validates param names; relabels LENGTHCM → HEIGHTCM |
+| Imperial conversion | `Infants_Main.R` 558–561 | `child_clean.R` 669–672 | HEIGHTIN→cm, WEIGHTLBS→kg |
+| Z-score calculation | `Infants_Main.R` 705–761 | `child_clean.R` 705–753 | CDC + WHO closures, blending, sd.orig_uncorr |
+| GA correction Child Step 2b | `Infants_Main.R` 765–1180 | `child_clean.R` 755–1031 | Fenton + corrected WHO/CDC, sd.corr assignment, uncorr revert |
+| Post-Step-2b cleanup, setkey, index, Missing/Not-Cleaned | `Infants_Main.R` 1195–1212 | `child_clean.R` 1029–1046, 1051 | Drop temp cols, re-key, mark Missing & Not-Cleaned |
+| Recentering | `Infants_Main.R` 1217–1330 | `child_clean.R` 1056–1104 | sd_median or supplied recenter file, tbc.sd, ctbc.sd |
+| Post-recentering safety + HC ≥ 5y | `Infants_Main.R` 1387, 1391 | `child_clean.R` 1115, 1121 | Re-mark NA tbc.sd as Missing, HC ≥ 5y handling |
+
+**Function/name renames already documented in procedure** (treated as cosmetic): `id` → `internal_id`, `swap_parameters()` → `get_dop()`, `valid()` → `.child_valid()`, `cleanbatch_infants()` → `cleanchild()`, `temporary_extraneous_infants()` → `identify_temp_sde()`, `calc_oob_evil_twins()` → `calc_otl_evil_twins()`.
+
+## Known intentional changes encountered (logged briefly per procedure, no further analysis)
+
+These match items in the procedure's "Known intentional changes" section. Logged to confirm visited; no action.
+
+- **`prelim_infants` flag wrapper removed.** Reference wraps the entire z-score / Step 2b block in `if (prelim_infants) { ... }`; current runs unconditionally. Tied to legacy parameter removal (CLAUDE.md 2026-04-16).
+- **`cat()` → `message()`** throughout preprocessing, recentering, and progress logging.
+- **`read_anthro()` signature simplified** — removed `prelim_infants = TRUE` argument.
+- **`ref_tables` preload optimization** — current uses `if (!is.null(ref_tables)) ref_tables$mtz_cdc_prelim else read_anthro(...)`; reference reads from disk every call.
+- **`round_stata()` removed at z-score / sd.corr / tbc.sd / ctbc.sd steps.** Per procedure "Don't flag rounding-tolerance removal."
+- **Fenton z-score formula: LMS → CSD method.** Reference uses `((v_fenton/fen_m)^fen_l - 1)/(fen_l * fen_s)` with L/M/S; current uses `(v_fenton − M) / (S_upper * M)` and `(v_fenton − M) / (S_lower * M)` with M/S_upper/S_lower. Tied to Fenton 2025 swap (CLAUDE.md 2026-04-16).
+- **Fenton data file renames + content swap:** `fentlms_foraga.csv.gz` → `fent_foraga.csv.gz`; `fentlms_forz` deleted; switched to `fenton2025_ms_lookup_smoothed.csv` (CSD method).
+- **Reference WHO/CDC merge eliminated** (lines ~907–922 reference) — current uses the `measurement.to.z` / `measurement.to.z_who` closures directly without the `growthfile_who` / `growthfile_cdc_ext_infants` merges. Performance optimization; the closures contain the same reference data. Verified equivalent.
+- **`### CP MOD ###` / `### CP REPLACE BLOCK ###` / `### CP WORK ###` commented-out scratch blocks removed** in current.
+- **`pc <- copy(data.all[subjid %in% pc_ids])` subset refactor** — current works on a `pc` subset (potcorr subjects only) inside the `if (has_potcorr)` fast path; reference works on the entire `data.all`. Performance optimization.
+- **Single `fcase()` for `sd.c` and final `sd.corr` assignment** — current collapses reference's multiple sequential `data.all[...condition..., sd.c := ...]` overrides into one `fcase()` per variable. Verified the resulting branch logic is equivalent except at one boundary (see AJ6 below).
+- **`agedays / 365.25` → cached `ageyears_2b`** column inside Step 2b. Cosmetic.
+- **`id` → `internal_id`** for sort keys, tiebreaks, and `id_sort` formula throughout (multiple sites).
+- **`internal_id` creation timing** — reference assigns `internal_id := seq_len(.N)` BEFORE any sort (line 380), so internal_id reflects input row order; current sets the canonical key first (`setkey(data.all.ages, subjid, param, agedays, id)` at line 496) then assigns `internal_id := seq_len(.N)` (line 497), so internal_id reflects sorted order. Reference never uses internal_id for tiebreaking, so the timing difference is moot for reference; for current, sorted-order internal_id is the documented contract.
+- **`Missing` → `Exclude-Missing`** and **`Not cleaned` → `Exclude-Not-Cleaned`** code renames.
+- **`cf_rescued` column initialization** at line 1051 (current) — new column tied to CF rescue scheme.
+- **Recentering simplified to single path** — current keeps only the precomputed-rcfile path; reference had three paths (rcfile, NHANES, derive). NHANES + derive paths removed per CLAUDE.md 2026-04-16 legacy removal.
+- **`sdmedian.filename` and `sdrecentered.filename` parameters removed** — tied to recentering simplification.
+- **`include.carryforward` → `cf_rescue` / `cf_detail`** parameter swap.
+- **8 `biv.z.*` parameters added** — Step 7 BIV parameters (used downstream in cleanchild).
+- **`weight_cap` → `adult_scale_max_lbs`** rename, `adult_columns_filename` removed, `adult_permissiveness` added.
+- **`ewma_window`, `ref_tables`, `cached_results`, `changed_subjids`, `tri_exclude`, `batch_size` parameters added.**
+- **Outer batching loop restructured** — `### BATCHING ###` block at current line 525 onward is a structural change. Not a preprocessing logic change; not deep-dived in this session.
+- **`nnte` cleanup** — reference's trailing `if (prelim_infants) { data.all[, nnte := FALSE] }` block (lines 1393–1401) removed.
+
+## Findings batched for review
+
+Per procedure, findings are logged with category. **No code changes made.**
+
+### AJ1. "HEIGHIN" typo in param validation (Bug fix)
+
+- **Reference:** `Infants_Main.R:389–399`
+- **Current:** `child_clean.R:506–516`
+- **Issue:** Reference's accepted-param validation list contains `"HEIGHIN"` (missing `T`); user-supplied `"HEIGHTIN"` rows therefore fail the `param %in% c(...)` check and have `v` and `v_adult` set to `NA` before the imperial conversion at line 558 ever runs. The conversion line `data.all[param == "HEIGHTIN", v := v*2.54]` then operates on rows whose `v` is already `NA`, silently producing `NA * 2.54 = NA`. Net effect: HEIGHTIN data in reference is silently rendered Missing.
+- **Current:** uses correct spelling `"HEIGHTIN"`; validation passes; imperial conversion works.
+- **Category:** Bug fix.
+- **Likely test impact:** Test data likely uses HEIGHTCM/WEIGHTKG only, so the bug wouldn't surface in regression. Worth confirming with a targeted check (e.g., add a HEIGHTIN-only smoke test).
+
+### AJ2. NA-safe `!is.na(sd.orig)` guard added to potcorr_wt (Bug fix)
+
+- **Reference:** `Infants_Main.R:801–803`
+  ```r
+  data.all[param == "WEIGHTKG",
+           potcorr_wt := (seq_len(.N) == 1L &
+                          janitor::round_half_up(janitor::round_half_up(sd.orig, 3), 2) < -2 &
+                          agemonths < 10),
+           by = subjid]
+  ```
+- **Current:** `child_clean.R:785–789`
+  ```r
+  data.all[param == "WEIGHTKG",
+           potcorr_wt := (seq_len(.N) == 1L &
+                          !is.na(sd.orig) & sd.orig < -2 &
+                          agemonths < 10),
+           by = subjid]
+  ```
+- **Issue:** Without the `!is.na(sd.orig)` guard, `NA < -2` returns `NA`, which propagates into `potcorr_wt` as `NA`. The downstream `potcorr := any(potcorr_wt, na.rm = TRUE)` (current line 795) and the failed-merge reset `potcorr_wt := FALSE` patches paper over this in many cases, but `seq_len(.N) == 1L` evaluating against a row whose `v` is `NA` (Missing) leaves potcorr_wt as `NA` for that row — could falsely flag a subject as potcorr (if the NA propagates through a misordered subgroup) or fail to flag a potcorr subject whose first WT row was Missing.
+- The double-rounding removal (`janitor::round_half_up(...)` chain) is tied to rounding-tolerance removal and per procedure is not flagged.
+- **Current:** Adds explicit `!is.na(sd.orig)` and rephrases as a current-state comment "NA-safe: sd.orig is NA when measurement is NA (Missing rows)".
+- **Category:** Bug fix.
+
+### AJ3. `intwt` low-weight floor bounds changed (Intentional, but tied to undocumented bound shift)
+
+- **Reference:** `Infants_Main.R:821` — `data.all[intwt >= 250 & intwt <= 560, intwt := 570]`
+- **Current:** `child_clean.R:822` — `pc[intwt >= 100 & intwt < 500, intwt := 500]`
+- **Issue:** The floor target changed from 570 g to 500 g (matching the new Fenton table's minimum entry — INTENTIONAL, tied to the Fenton table swap). But the floor's applicable input range also changed: lower bound `250 → 100`, and the upper bound went from inclusive `<= 560` (above the new floor target) to exclusive `< 500` (at the new floor target).
+  - At weight = 500 g exactly: reference floors to 570 (since 500 ≤ 560); current keeps at 500 (since 500 < 500 is FALSE). Behavior change at the boundary.
+  - At weight in [100, 250) g: reference does not floor (intwt < 250 fails the lower bound); current does floor to 500. Both are below the old reference's 250 lower bound. Per current's comment "users who configure lower BIV thresholds can still get Fenton-corrected z-scores for very low weights" — this is the intent.
+- **Category:** Intentional (other) — tied to Fenton table swap, documented in current's inline comment.
+- **Note:** Behavior at 500 g exactly is the only practical edge case. Verifying that the new Fenton table's 500 g entry is the right anchor (vs. 570 g in old table) is prudent.
+
+### AJ4. `tmp[subjid %in% names(table(subjid) > 1),]` filter no-op (Bug fix — semantically wrong, behavior-equivalent in practice)
+
+- **Reference:** `Infants_Main.R:1122` — `tmp <- tmp[subjid %in% names(table(subjid) > 1),]`
+- **Current:** `child_clean.R:984` — `tmp <- tmp[subjid %in% names(which(table(subjid) > 1)),]`
+- **Issue:** `table(subjid) > 1` returns a named logical vector. `names()` on a logical vector returns ALL names (regardless of TRUE/FALSE). So reference's filter is a no-op (keeps all subjects). Intent was to filter to subjects with > 1 measurement. Current correctly uses `which()` to extract indices first.
+- **Practical impact:** None observable. For single-row subjects, `abs(sum(sd.corr[1] - sd.corr))` collapses to `abs(0)` = 0, so the downstream `sd.corr_abssumdiff > sd.orig_abssumdiff` check (`0 > 0`) is FALSE. Single-row subjects naturally fail the replacement criterion. The buggy filter was redundant defense.
+- **Category:** Bug fix (semantic correctness).
+
+### AJ5. `c(orig_colnames, id)` ambiguous in column-keep filter (Bug fix — cleanup)
+
+- **Reference:** `Infants_Main.R:1179–1180`
+  ```r
+  data.all <- data.all[, colnames(data.all) %in% c(orig_colnames, id),
+                       with = FALSE]
+  ```
+- **Current:** `child_clean.R:1030–1031`
+  ```r
+  data.all <- data.all[, colnames(data.all) %in% c(orig_colnames, "id"),
+                       with = FALSE]
+  ```
+- **Issue:** In reference, `id` is the function parameter (a vector of user-provided id values), NOT the string `"id"`. `c(orig_colnames, id)` therefore concatenates orig_colnames with all id values (coerced to character). The `%in%` check then keeps any column whose name happens to match an id value (an unlikely coincidence). In practice, `orig_colnames` already contains `"id"` (assigned at reference line 769 = `copy(colnames(data.all))` after `data.all.ages[, id := id]`), so the `id` column is preserved either way. Reference's code is benign but confusing.
+- **Category:** Bug fix (cleanup; no observable behavior change).
+
+### AJ6. sd.corr at exactly 4 years (1461 days) for potcorr subjects — FIXED
+
+- **Reference:** `Infants_Main.R:1047–1064` (multi-statement sequential override)
+  ```r
+  # Step 4: smooth blend for 2-4y
+  data.all[(agedays/365.25 >= 2) & (agedays/365.25 <= 4) &
+           !is.na(sd.c) & !is.na(sd.orig),
+           sd.corr := (sd.orig * (4 - agedays/365.25) + sd.c * ((agedays/365.25) - 2)) / 2]
+  # Step 5: <2y potcorr override
+  data.all[agedays/365.25 <= 2 & potcorr == TRUE & !is.na(sd.c),
+           sd.corr := sd.c]
+  # Step 6: >=4y or non-potcorr fallback
+  data.all[agedays/365.25 >= 4 | potcorr == FALSE | is.na(sd.corr),
+           sd.corr := sd.orig]
+  ```
+- **Pre-fix current:** `child_clean.R:933–939` had `ageyears_2b > 2 & ageyears_2b <= 4` on the smooth-blend branch.
+- **Issue:** At exactly `agedays = 1461` (4 years exactly) for a potcorr subject:
+  - **Reference:** Step 4 fires (`<= 4` TRUE). Smooth blend at age=4 evaluates to `(sd.orig * 0 + sd.c * 2) / 2 = sd.c`. Then Step 6 fires (`>= 4` TRUE). Final: `sd.corr = sd.orig`.
+  - **Pre-fix current:** Second fcase branch fires (`> 2 & <= 4` TRUE). Smooth blend evaluates to `sd.c`. Default branch doesn't fire because second branch matched. Final: `sd.corr = sd.c`.
+- **Resolution (Carrie-approved):** At exactly agedays=1461, sd.corr should be sd.orig (matching reference). Tightened the second `fcase()` branch upper-bound from `ageyears_2b <= 4` to `ageyears_2b < 4`, so the smooth-blend window is half-open `[2, 4)` and age=4 falls to the default `sd.orig` branch. Added a clarifying inline comment naming the half-open convention and noting that reference achieved the same result via a separate `>= 4 -> sd.orig` override after the smooth blend.
+- **Post-fix current:** `child_clean.R:933–941` (3-line comment block + 6-line fcase, total 9 lines)
+  ```r
+  pc[, sd.corr := fcase(
+    ageyears_2b <= 2 & potcorr & !is.na(sd.c),
+      sd.c,
+    ageyears_2b > 2 & ageyears_2b < 4 & !is.na(sd.c) & !is.na(sd.orig),
+      (sd.orig * (4 - ageyears_2b) + sd.c * (ageyears_2b - 2)) / 2,
+    default = sd.orig
+  )]
+  ```
+- **Practical scope:** Only affects integer agedays = 1461 for potcorr subjects (a single integer day per such subject). At ages 1460 and 1462 both versions agree (1460 → smooth blend; 1462 → sd.orig).
+- **Category:** Bug fix — boundary now matches reference January-2026 baseline.
+- **Tests:** Reinstalled package and re-ran the full child suite — 63 / 48 / 28 / 41 / 13 pass, identical to baseline (no regressions). The 2 baseline `parallel=TRUE` / `plyr::ddply` codetools warnings on `test-child-algorithms.R` are unchanged. Adult tests not re-run — no adult files touched.
+
+### AJ7. HC ≥ 5 years exclusion code changed: 'Missing' → 'Exclude-Not-Cleaned' (Intentional, but worth visibility)
+
+- **Reference:** `Infants_Main.R:1391` — `data.all[param == "HEADCM" & agedays >= 5*365.25, exclude := 'Missing']`
+- **Current:** `child_clean.R:1121` — `data.all[param == "HEADCM" & agedays >= 5*365.25, exclude := 'Exclude-Not-Cleaned']`
+- **Issue:** Beyond the rename `Missing → Exclude-Missing` and `Not cleaned → Exclude-Not-Cleaned`, this is a semantic recategorization. Reference treated HC ≥ 5y as 'Missing' (no z-score data); current treats as 'Exclude-Not-Cleaned' (out of cleaning scope).
+- The HC > 3*365.25 rule earlier at `child_clean.R:1046` already marks all HC > 3y as `Exclude-Not-Cleaned`. The line 1115 safety check `data.all[is.na(tbc.sd), exclude := 'Exclude-Missing']` then transitions HC ≥ 5y rows to `Exclude-Missing` (because their tbc.sd is NA from the missing WHO HC reference). Line 1121 then re-sets them back to `Exclude-Not-Cleaned`. Per current's comment: "this keeps a single consistent code across both 'we don't clean HC >3y' and '>=5y has no reference'."
+- **Category:** Intentional (other) — code consistency, documented in current's inline comment. Not in procedure's "Known intentional changes" list, so flagged for visibility.
+
+## Items NOT flagged (verified equivalent or out of scope)
+
+For the record, these were checked and found to be either equivalent in behavior or already covered by the procedure's known-intentional-changes list:
+
+- WHO/CDC corrected z-score block: reference computes via merge of `growthfile_who` + `growthfile_cdc_ext_infants` and adds 40+ unused columns; current uses `measurement.to.z` / `measurement.to.z_who` closures directly. Same z-score values; current is faster.
+- `sd.c` assignment via `fcase()` (current 913–923) vs sequential `data.all[...]` overrides (reference 952–994). Logic-equivalent at all boundaries (≤ 2, 2 < x < 5, ≥ 5).
+- `sd.c_temp` save/restore for Fenton override fallback (reference 1003–1014) vs current's "only overwrite when Fenton non-NA" (current 928–929). Logic-equivalent.
+- `keep_id` SDE-Identicals filter for the uncorr-evaluation `tmp` subset: reference uses `id`, current uses `internal_id`. Within a `(subjid, agedays)` group, internal_id ordering matches id ordering (because internal_id was assigned in canonically-sorted order in current). So `min(id)` ↔ `min(internal_id)` and `max(id)` ↔ `max(internal_id)` give the same row. Equivalent.
+- `examine_only` working subset (reference 1076 on `data.all`, current 942 on `pc`): `pc` is restricted to potcorr subjects, so `pc$param == "WEIGHTKG" & pc$potcorr` selects the same rows as `data.all$param == "WEIGHTKG" & data.all$potcorr`.
+- `sub_replace` selection logic (`abs(sum(diff))` calculation, `is_first` filter, threshold `>` comparison): identical between reference and current.
+- LENGTHCM → HEIGHTCM relabeling: identical (single-line `:=` in both).
+- Recentering merge mechanics (`sd.recenter[data.all]`, `sd.median` subtraction): identical.
+
+## Open questions for Carrie — RESOLVED
+
+1. **AJ3 (intwt floor bounds):** Carrie confirmed the change is correct as-is. No documentation update opened in this session.
+2. **AJ7 (HC ≥ 5y code):** Carrie confirmed the recategorization to `Exclude-Not-Cleaned` is correct as-is.
+
+**All findings closed:**
+- **AJ6** — Approved and fixed in this session (smooth-blend window changed to half-open `[2, 4)`).
+- **AJ1, AJ2, AJ4, AJ5** — Carrie confirmed current code is correct; bug fixes already present, no further change needed.
+- **AJ3, AJ7** — Carrie confirmed intentional; no change needed.
+
+## Approval and next steps
+
+Per procedure, no code changes have been made in this session. After Carrie's review:
+
+- Approved fixes will be applied in a separate edit pass with a re-test (full 5-file child suite, expected unchanged 63/48/28/41/13).
+- Any "Unclear" items resolved as "fix" or "no-op" will be applied accordingly.
+- Findings index will be updated with status transitions (`open → approved → fixed → closed`).
+
+Next session candidate per `R-child-AprJanComparison-procedure.md`: **Session 2 — Step 5 (Temp SDE) + Early Step 13 (SDE-Identicals)**.

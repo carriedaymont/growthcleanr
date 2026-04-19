@@ -208,10 +208,19 @@
 #' (all ages). Head-circumference values with
 #' `sd.orig_uncorr > biv.z.hc.high` are flagged as standardized BIV.
 #' Defaults to 15.
-#' @param error.load.mincount minimum count of exclusions on parameter before
-#' considering excluding all measurements. Defaults to 2.
-#' @param error.load.threshold threshold of percentage of excluded measurement count to included measurement
-#' count that must be exceeded before excluding all measurements of either parameter. Defaults to 0.5.
+#' @param error.load.mincount Minimum number of real errors (exclusions other
+#' than \code{Exclude-C-Identical}, \code{Exclude-C-Extraneous},
+#' \code{Exclude-C-CF}, \code{Exclude-Missing}, and \code{Exclude-Not-Cleaned})
+#' required per (subject, param) group before Child Step 21 Error Load is
+#' evaluated for that group. Defaults to 2.
+#' @param error.load.threshold Error ratio threshold for Child Step 21. The
+#' ratio is \code{n_errors / (n_errors + n_includes)} computed per
+#' (subject, param) group, where \code{n_errors} and \code{n_includes}
+#' exclude SDE / CF / Missing / Not-Cleaned rows from both numerator and
+#' denominator. If the ratio strictly exceeds this threshold (and at least
+#' \code{error.load.mincount} real errors are present), all remaining
+#' Include rows for that (subject, param) group are excluded with
+#' \code{Exclude-C-Too-Many-Errors}. Defaults to 0.5.
 #' @param sd.recenter Optional. A data.table with columns \code{param}, \code{sex},
 #'   \code{agedays}, and \code{sd.median} to use for recentering instead of the
 #'   built-in reference file (\code{rcfile-2023-08-15_format.csv.gz}). Defaults to
@@ -919,12 +928,16 @@ cleangrowth <- function(subjid,
         pc[potcorr == TRUE & ageyears_2b <= 2 & !is.na(unmod_zscore),
                  sd.c := unmod_zscore]
 
-        # Assign final sd.corr in one pass
-        # Priority: <2y potcorr -> corrected; 2-4y -> smoothed blend; else -> original
+        # Assign final sd.corr in one pass.
+        # Smooth-blend window is half-open [2, 4): age == 2 still uses
+        # corrected (first branch); age == 4 falls through to default
+        # (uncorrected). Reference January-2026 baseline used the same
+        # half-open window via a separate `>= 4 -> sd.orig` override
+        # after the smooth blend; current collapses both into one fcase.
         pc[, sd.corr := fcase(
           ageyears_2b <= 2 & potcorr & !is.na(sd.c),
             sd.c,
-          ageyears_2b > 2 & ageyears_2b <= 4 & !is.na(sd.c) & !is.na(sd.orig),
+          ageyears_2b > 2 & ageyears_2b < 4 & !is.na(sd.c) & !is.na(sd.orig),
             (sd.orig * (4 - ageyears_2b) + sd.c * (ageyears_2b - 2)) / 2,
           default = sd.orig
         )]
@@ -4099,9 +4112,9 @@ cleanchild <- function(data.df,
       Sys.time()
     ))
 
-  # tanner.ht.vel was already loaded (same file, same setnames/setkey)
-  # in cleangrowth() and is passed as a parameter to this function.
-  # Bug fix: was redundantly re-reading from disk each batch.
+  # tanner.ht.vel is loaded once in cleangrowth() and passed as a parameter;
+  # the local alias tanner.ht.vel.rev is a leftover name kept so the merge
+  # sites below do not need to be renamed.
   tanner.ht.vel.rev <- tanner.ht.vel
 
   # read in the who height data
@@ -4148,20 +4161,23 @@ cleanchild <- function(data.df,
   setnames(who.hc.vel, colnames(who.hc.vel), gsub('_', '.', colnames(who.hc.vel)))
   setkey(who.hc.vel, sex, whoagegrp.ht)
 
-  # order just for ease later
-  # Add id for consistent SDE order
+  # Re-sort so the per-group shifts and merges below walk rows in
+  # (subjid, param, agedays, internal_id) order; diff_prev / diff_next
+  # and the per-row mindiff_prior / maxdiff_prior lags depend on this sort.
   data.df <- data.df[order(subjid, param, agedays, internal_id),]
 
-  # Compute valid_set AFTER sort, not before
-  # valid_set is a logical vector indexed by row position, so it must be computed
-  # on the sorted data, not before sorting (which would cause index misalignment)
-  # create the valid set
-  # we only run on valid values, non single values, and non weight
+  # valid_set is a logical vector indexed by row position, so it must be
+  # computed on the sorted data (otherwise the positions would not align
+  # with data.df after the sort above).
+  # Step 17 runs only on HT / HC, on rows that are non-temp-SDE Include
+  # and belong to a subject-param with at least 2 rows (singles are
+  # handled in Step 19, weight is excluded entirely because weight can
+  # legitimately decrease).
   tmp <- table(paste0(data.df$subjid, "_", data.df$param))
   not_single <- paste0(data.df$subjid, "_", data.df$param) %in% names(tmp)[tmp > 1]
   valid_set <- .child_valid(data.df, include.temporary.extraneous = FALSE) &
     not_single &
-    data.df$param != "WEIGHTKG" # do not run on weight
+    data.df$param != "WEIGHTKG"
 
   # ---- Step 17 Pre-filter: identify groups with raw-diff violations ----
   # Compute violation thresholds in one vectorized pass over all valid rows.
@@ -4187,11 +4203,14 @@ cleanchild <- function(data.df,
     # ---- HEIGHTCM thresholds ----
     ht_idx <- pf$param == "HEIGHTCM"
     if (any(ht_idx)) {
-      # Tanner months (17B)
+      # Tanner months (17B). Keyed on midpoint age of the adjacent-measurement
+      # pair, in 12-month bins starting at 18. NA-out if the resulting bin is
+      # below the lowest Tanner reference entry (30 months) — the same quantity
+      # used for the merge, so the filter and the lookup are consistent.
       pf[ht_idx, tanner.months := 6L + 12L * as.integer(round(
         .5 * (agedays + shift(agedays, n = 1L, type = "lead")) / 365.25)),
         by = .(subjid)]
-      pf[ht_idx & (agedays / 30.4375) < 30, tanner.months := NA_integer_]
+      pf[ht_idx & !is.na(tanner.months) & tanner.months < 30, tanner.months := NA_integer_]
 
       # Merge tanner reference (update-on-join preserves row order)
       pf[tanner.ht.vel.rev, `:=`(min.ht.vel = i.min.ht.vel, max.ht.vel = i.max.ht.vel),
@@ -4206,33 +4225,37 @@ cleanchild <- function(data.df,
       pf[ht_idx & !is.na(d_agedays) & d_agedays > 365.25 & !is.na(max.ht.vel) & max.ht.vel < 8 * 2.54,
          max.ht.vel := 8 * 2.54]
 
-      # Tanner-based mindiff/maxdiff (17C-b)
+      # Tanner-based mindiff/maxdiff (17C-b). The `< 365.25` and `>= 365.25`
+      # formulas are continuous at gap = 1 year, so the boundary assignment
+      # matches either limit; `>=` is used so a (non-integer) d_agedays of
+      # exactly 365.25 is covered.
       pf[ht_idx & !is.na(d_agedays) & d_agedays < 365.25,
          mindiff := .5 * min.ht.vel * (d_agedays / 365.25)^2 - 3]
-      pf[ht_idx & !is.na(d_agedays) & d_agedays > 365.25,
+      pf[ht_idx & !is.na(d_agedays) & d_agedays >= 365.25,
          mindiff := .5 * min.ht.vel - 3]
       pf[ht_idx & !is.na(d_agedays) & d_agedays < 365.25,
          maxdiff := 2 * max.ht.vel * (d_agedays / 365.25)^0.33 + 5.5]
-      pf[ht_idx & !is.na(d_agedays) & d_agedays > 365.25,
+      pf[ht_idx & !is.na(d_agedays) & d_agedays >= 365.25,
          maxdiff := 2 * max.ht.vel * (d_agedays / 365.25)^1.5 + 5.5]
 
-      # WHO age groups (17D)
+      # WHO age groups (17D). WHO reference covers only 0-24 months; NA-out
+      # whoagegrp.ht when either this row or the next row is beyond 24 months
+      # so the pair does not extrapolate past the WHO range.
       pf[ht_idx, whoagegrp.ht := NA_integer_]
       pf[ht_idx & agedays / 30.4375 <= 24, whoagegrp.ht := as.integer(round(agedays / 30.4375))]
-      pf[ht_idx, whoagegrp.ht.lead := shift(whoagegrp.ht, n = 1L, type = "lead"), by = .(subjid)]
-      pf[ht_idx & ((!is.na(whoagegrp.ht) & whoagegrp.ht > 24) |
-                    (!is.na(whoagegrp.ht.lead) & whoagegrp.ht.lead > 24)),
+      pf[ht_idx & !is.na(d_agedays) & (agedays + d_agedays) / 30.4375 > 24,
          whoagegrp.ht := NA_integer_]
 
-      # WHO increment age groups (17E)
+      # WHO increment age groups (17E). Single `< 46` clause covers the
+      # former split into `< 20` + `20–45`; single `>= 153` clause covers
+      # the former split into `153–198` + `>= 200` (previously leaving
+      # d_agedays == 199 as a gap).
       pf[ht_idx, whoinc.age.ht := NA_integer_]
-      pf[ht_idx & !is.na(d_agedays) & d_agedays < 20, whoinc.age.ht := 1L]
-      pf[ht_idx & !is.na(d_agedays) & d_agedays >= 20 & d_agedays < 46, whoinc.age.ht := 1L]
+      pf[ht_idx & !is.na(d_agedays) & d_agedays < 46, whoinc.age.ht := 1L]
       pf[ht_idx & !is.na(d_agedays) & d_agedays >= 46 & d_agedays < 76, whoinc.age.ht := 2L]
       pf[ht_idx & !is.na(d_agedays) & d_agedays >= 76 & d_agedays < 107, whoinc.age.ht := 3L]
       pf[ht_idx & !is.na(d_agedays) & d_agedays >= 107 & d_agedays < 153, whoinc.age.ht := 4L]
-      pf[ht_idx & !is.na(d_agedays) & d_agedays >= 153 & d_agedays < 199, whoinc.age.ht := 6L]
-      pf[ht_idx & !is.na(d_agedays) & d_agedays >= 200, whoinc.age.ht := 6L]
+      pf[ht_idx & !is.na(d_agedays) & d_agedays >= 153, whoinc.age.ht := 6L]
 
       # Merge WHO reference data (17F) — update-on-join
       who_ht_cols <- setdiff(colnames(who.ht.vel), c("sex", "whoagegrp.ht"))
@@ -4385,10 +4408,9 @@ cleanchild <- function(data.df,
   data.df[valid_set & sp_key %in% sp17_to_process, exclude := (function(df) {
     # work inside a closure to drop added column values
 
-    # save initial exclusions to keep track
+    # save initial exclusions and the original row indices so we can write
+    # the final exclude values back to data.df in their original row order.
     ind_all <- copy(df$index)
-    id_all <- copy(df$id)
-
     exclude_all <- copy(df$exclude)
 
     # Pre-merge WHO velocity columns BEFORE the while loop (once per group, not per iteration).
@@ -4412,13 +4434,13 @@ cleanchild <- function(data.df,
     }
 
     testing <- TRUE
-    iter_count <- 0
 
     while (testing & nrow(df) > 1){
-      iter_count <- iter_count + 1
-
-      # sort df since it got reordered with keys
-      # Include id for deterministic SDE order
+      # Re-sort each iteration: the tanner / WHO merges below use
+      # setkey(df, sex, ...) which reorders rows. The pairwise checks
+      # rely on (agedays, internal_id) order, and internal_id is the
+      # deterministic tiebreaker for same-day rows (none reach Step 17
+      # in practice because SDEs are resolved upstream).
       df <- df[order(agedays, internal_id),]
 
       # 17A
@@ -4426,10 +4448,11 @@ cleanchild <- function(data.df,
 
       # 17E -- only applies to height
       if (df$param[1] == "HEIGHTCM"){
-        # 17B
+        # 17B. tanner.months is keyed on the midpoint of the adjacent-measurement
+        # pair; NA-out when the bin falls below the lowest Tanner reference entry
+        # (30 months) so the NA filter matches the merge key.
         df[, tanner.months := 6+12*(round(.5*(agedays + shift(agedays, n = 1L, type = "lead"))/365.25))]
-        # set tanner to missing for smaller values
-        df[(agedays/30.4375) < 30, tanner.months := NA]
+        df[!is.na(tanner.months) & tanner.months < 30, tanner.months := NA]
 
         # merge with the tanner info
         setkey(df, sex, tanner.months)
@@ -4443,31 +4466,34 @@ cleanchild <- function(data.df,
         df[d_agedays > .5*365.25 & max.ht.vel < 4*2.54, max.ht.vel := 4*2.54]
         df[d_agedays > 365.25 & max.ht.vel < 8*2.54, max.ht.vel := 8*2.54]
 
-        # b
+        # b. Tanner-based mindiff/maxdiff. The `< 365.25` and `>= 365.25`
+        # formulas are continuous at gap = 1 year, so the boundary
+        # assignment matches either limit; `>=` covers (non-integer)
+        # d_agedays == 365.25. Maxdiff exponents: ^0.33 (cube root) for
+        # gaps < 1 year, ^1.5 for gaps >= 1 year.
         df[d_agedays < 365.25, mindiff := .5*min.ht.vel*(d_agedays/365.25)^2-3 ]
-        df[d_agedays > 365.25, mindiff := .5*min.ht.vel-3 ]
-        # maxdiff exponents: ^0.33 (cube root) for < 365.25 days, ^1.5 for > 365.25.
+        df[d_agedays >= 365.25, mindiff := .5*min.ht.vel-3 ]
         df[d_agedays < 365.25,
            maxdiff := 2*max.ht.vel*(d_agedays/365.25)^0.33 + 5.5 ]
-        df[d_agedays > 365.25,
+        df[d_agedays >= 365.25,
            maxdiff := 2*max.ht.vel*(d_agedays/365.25)^1.5 + 5.5 ]
 
         # 17D: whoagegrp.ht pre-computed outside loop (static for HEIGHTCM)
 
-        # 17E
-        df[d_agedays >= 20 & d_agedays < 46, whoinc.age.ht := 1]
+        # 17E: WHO increment age groups (maps d_agedays gap to a WHO
+        # reference interval). Single `< 46` covers the former split
+        # into `< 20` + `20–45`; single `>= 153` covers the former split
+        # into `153–198` + `>= 200` (previously leaving d_agedays == 199
+        # as a gap). Re-initialize to NA each iteration so any future
+        # boundary change that reintroduces a gap can't leave a stale
+        # value from the prior iteration.
+        df[, whoinc.age.ht := NA_integer_]
+        df[d_agedays < 46, whoinc.age.ht := 1]
         df[d_agedays >= 46 & d_agedays < 76, whoinc.age.ht := 2]
         df[d_agedays >= 76 & d_agedays < 107, whoinc.age.ht := 3]
         df[d_agedays >= 107 & d_agedays < 153, whoinc.age.ht := 4]
-        df[d_agedays >= 153 & d_agedays < 199, whoinc.age.ht := 6]
+        df[d_agedays >= 153, whoinc.age.ht := 6]
 
-
-        # Chris updated this to >= from ==
-        # update the edge intervals
-        df[d_agedays < 20, whoinc.age.ht := 1]
-        # Note: d_agedays == 200 is covered by the >= 200 line below
-        df[d_agedays >= 200, whoinc.age.ht := 6]
-        # Chris updated this to >= from ==
         # 17F: WHO velocity lookup (columns pre-merged outside loop; fcase selects by whoinc.age.ht)
         df[, who_mindiff_ht := fcase(
           !is.na(whoagegrp.ht) & whoinc.age.ht == 1, whoinc.1.ht,
@@ -4486,6 +4512,14 @@ cleanchild <- function(data.df,
           default = NA_real_
         )]
 
+        # NA-out WHO values when the pair crosses the 24-month WHO boundary:
+        # whoagegrp.ht is based on this row's agedays alone and was pre-merged
+        # before the while loop, but d_agedays changes each iteration, so this
+        # check has to be per-iteration. (In the pre-filter the equivalent check
+        # is applied directly to whoagegrp.ht.)
+        df[!is.na(d_agedays) & (agedays + d_agedays) / 30.4375 > 24,
+           `:=`(who_mindiff_ht = NA_real_, who_maxdiff_ht = NA_real_)]
+
         # 17G: Scale WHO velocity limits by actual gap relative to reference interval
         df[d_agedays < whoinc.age.ht*30.4375, who_mindiff_ht :=
              who_mindiff_ht * d_agedays/(whoinc.age.ht*30.4375)]
@@ -4495,8 +4529,8 @@ cleanchild <- function(data.df,
         df[d_agedays < 9*30.4375, who_mindiff_ht := who_mindiff_ht*.5-3]
         df[d_agedays < 9*30.4375, who_maxdiff_ht := who_maxdiff_ht*2+3]
 
-        # 17H: Choose between Tanner and WHO velocity limits
-        # For gap < 9 months: use WHO (already transformed at lines 4030-4031)
+        # 17H: Choose between Tanner and WHO velocity limits.
+        # For gap < 9 months: use WHO (already transformed in 17G above).
         df[d_agedays < 9*30.4375 & !is.na(who_mindiff_ht), mindiff := who_mindiff_ht]
         df[d_agedays < 9*30.4375 & !is.na(who_maxdiff_ht), maxdiff := who_maxdiff_ht]
         # Apply transformation for >= 9 month gaps.
@@ -4514,9 +4548,9 @@ cleanchild <- function(data.df,
         df[agedays == 0, mindiff := mindiff - 1.5]
         df[agedays == 0, maxdiff := maxdiff + 1.5]
 
-        # 17I
-        # sort df since it got reordered with keys
-        # Include id for deterministic SDE order
+        # 17I: sort df since the Tanner merge reorders rows by its key;
+        # the shift()s below rely on (agedays, internal_id) order within
+        # this per-(subjid, param) group.
         df <- df[order(agedays, internal_id),]
         df[, mindiff_prior := shift(mindiff, n = 1L, type = "lag")]
         df[, maxdiff_prior := shift(maxdiff, n = 1L, type = "lag")]
@@ -4566,8 +4600,10 @@ cleanchild <- function(data.df,
         # Birth adjustments: ±0.5 cm for HC.
         df[agedays == 0, `:=`(mindiff = mindiff - .5, maxdiff = maxdiff + .5)]
 
-        # 17N: Sort and lag thresholds for pairwise violation check
-        # Include id for deterministic SDE order
+        # 17N: Sort and lag thresholds for pairwise violation check.
+        # internal_id breaks ties for the rare same-ageday case (none
+        # reach Step 17 because SDEs are resolved upstream, but the sort
+        # is deterministic for free).
         df <- df[order(agedays, internal_id),]
         df[, mindiff_prior := shift(mindiff, n = 1L, type = "lag")]
         df[, maxdiff_prior := shift(maxdiff, n = 1L, type = "lag")]
@@ -4632,38 +4668,39 @@ cleanchild <- function(data.df,
         df[diff_prev > maxdiff_prior & bef.g.aftm1, val_excl_code := "3"]
         df[diff_next > maxdiff & aft.g.aftm1, val_excl_code := "4"]
       }else { # only 2 values
-        # 17Q/R -- exclusions for pairs
+        # 17Q/R -- exclusions for pairs. `>=` (rather than strict `>`) lets
+        # tied abs(tbc.sd) flag both rows so the internal_id tiebreaker
+        # below picks one; with strict `>` a tied pair would escape Step 17
+        # entirely despite the raw-diff violation.
         df[, val_excl := exclude]
-        df[diff_prev < mindiff_prior & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lag"),
+        df[diff_prev < mindiff_prior & abs(tbc.sd) >= shift(abs(tbc.sd), n = 1L, type = "lag"),
            val_excl := .child_exc(param, "Abs-Diff")]
-        df[diff_next < mindiff & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lead"),
+        df[diff_next < mindiff & abs(tbc.sd) >= shift(abs(tbc.sd), n = 1L, type = "lead"),
            val_excl := .child_exc(param, "Abs-Diff")]
-        df[diff_prev > maxdiff_prior & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lag"),
+        df[diff_prev > maxdiff_prior & abs(tbc.sd) >= shift(abs(tbc.sd), n = 1L, type = "lag"),
            val_excl := .child_exc(param, "Abs-Diff")]
-        df[diff_next > maxdiff & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lead"),
+        df[diff_next > maxdiff & abs(tbc.sd) >= shift(abs(tbc.sd), n = 1L, type = "lead"),
            val_excl := .child_exc(param, "Abs-Diff")]
-        df[diff_prev < mindiff_prior & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lag"),
+        df[diff_prev < mindiff_prior & abs(tbc.sd) >= shift(abs(tbc.sd), n = 1L, type = "lag"),
            val_excl_code := "5"]
-        df[diff_next < mindiff & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lead"),
+        df[diff_next < mindiff & abs(tbc.sd) >= shift(abs(tbc.sd), n = 1L, type = "lead"),
            val_excl_code := "6"]
-        df[diff_prev > maxdiff_prior & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lag"),
+        df[diff_prev > maxdiff_prior & abs(tbc.sd) >= shift(abs(tbc.sd), n = 1L, type = "lag"),
            val_excl_code := "7"]
-        df[diff_next > maxdiff & abs(tbc.sd) > shift(abs(tbc.sd), n = 1L, type = "lead"),
+        df[diff_next > maxdiff & abs(tbc.sd) >= shift(abs(tbc.sd), n = 1L, type = "lead"),
            val_excl_code := "8"]
       }
-
-
-
 
       # figure out if any of the exclusions hit
       count_exclude <- sum(df$val_excl != "Include")
 
       if (count_exclude > 0){
         if (nrow(df) > 2){
-          # Fix Min-diff tie-breaking
-          # Use the appropriate DEWMA based on exclusion type:
-          # - When comparing to previous value (codes 1,3): use dewma.before (excludes previous)
-          # - When comparing to next value (codes 2,4): use dewma.after (excludes next)
+          # Pick the appropriate dewma side based on which neighbor the
+          # violation was against — codes 1/3 flagged the diff-from-prior
+          # side, so score by dewma.before (the EWMA excluding the prior
+          # neighbor); codes 2/4 flagged diff-to-next, so score by
+          # dewma.after (excluding the next neighbor).
           df[, absval := NA_real_]
           df[val_excl_code %in% c("1", "3"), absval := abs(dewma.before)]
           df[val_excl_code %in% c("2", "4"), absval := abs(dewma.after)]
@@ -4671,18 +4708,17 @@ cleanchild <- function(data.df,
           df[, absval := abs(tbc.sd)]
         }
 
-        # choose the highest absval for exclusion
-        # Use id tie-breaker for deterministic selection
-        # which.max returns first tie, which depends on data order
+        # internal_id breaks ties on absval; order() is deterministic where
+        # which.max is not. Lowest internal_id wins among tied candidates.
         candidates <- df[val_excl != "Include"]
         ord <- order(-candidates$absval, candidates$internal_id)
         idx <- candidates$index[ord[1]]
 
-
         exclude_all[ind_all == idx] <- df[index == idx, val_excl]
 
-        # Continue iterating — after excluding 1 candidate, new violations may emerge.
-        # count_exclude > 0 outer guard makes count_exclude >= 1 always true here.
+        # Continue iterating — after excluding 1 candidate, new violations
+        # may emerge (the new neighbors, and the new d_agedays values,
+        # produce fresh pair checks).
         testing <- TRUE
         df <- df[index != idx, ]
       } else {
@@ -4703,41 +4739,51 @@ cleanchild <- function(data.df,
       Sys.time()
     ))
 
-  # order just for ease later
-  # Add id for consistent SDE order
+  # Sort so per-group df[1] is the earlier measurement and df[2] is the
+  # later measurement in the 2-row pair case. internal_id is a
+  # deterministic tiebreaker against a rare same-ageday case that does
+  # not normally reach Step 19 (SDEs are resolved upstream).
   data.df <- data.df[order(subjid, param, agedays, internal_id),]
 
-  # Compute valid_set AFTER sort, not before
-  # Create the valid set: only Include rows contribute to the singles/pairs
-  # count (so subjects whose excluded measurements leave them with 1 or 2
-  # remaining Includes still flow into this step).
+  # valid_set gates Step 19 to Include rows whose (subjid, param) has
+  # 1 or 2 remaining Include measurements. Counting only Include rows
+  # means subject-params whose excluded measurements leave them with 1
+  # or 2 Includes still flow into this step.
   include_df <- data.df[exclude == "Include"]
   sp_counts <- include_df[, .(sp_n = .N), by = .(subjid, param)]
   only_single_pairs <- sp_counts[data.df, on = .(subjid, param), fifelse(is.na(sp_n), FALSE, sp_n <= 2L)]
   valid_set <- .child_valid(data.df, include.temporary.extraneous = FALSE) &
     only_single_pairs
 
-  # Snapshot DOP data BEFORE by-group processing
-  # Problem: data.df is modified in-place during by=(subjid,param) processing.
-  # When HEIGHT is processed first and excluded, WEIGHT's DOP lookup won't find it.
-  # Solution: Snapshot all Include rows with z-scores before processing.
-  # This ensures consistent DOP lookups regardless of processing order.
+  # DOP snapshot: freeze the set of Include rows (with z-scores) used for
+  # cross-parameter comparisons before the per-(subjid, param) closure
+  # runs. data.df is modified in place during the closure, so without
+  # the snapshot the DOP lookup for the second-processed param would
+  # miss rows just excluded by the first-processed param — making the
+  # result depend on by-group processing order.
   dop_snapshot <- data.df[exclude == "Include", .(subjid, param, agedays, tbc.sd, ctbc.sd)]
   setkey(dop_snapshot, subjid, param, agedays)
 
   data.df <- data.df[valid_set, exclude := (function(df) {
-    # save initial exclusions to keep track
+    # ind_all holds the original row-order indices used to write
+    # exclusions back to the correct position in the return vector;
+    # exclude_all is the vector returned from the closure and refreshed
+    # after each exclusion rule below.
     ind_all <- copy(df$index)
     exclude_all <- copy(df$exclude)
 
-    # 19A: is it a single or a pair?
+    # valid_set already filtered to subject-params with <= 2 remaining
+    # Includes, so df has 1 or 2 rows.
     is_single <- nrow(df) == 1
 
-    # find the DOP (designated other parameter) from pre-Step-19 snapshot
-    # Use dop_snapshot instead of data.df for consistent results
-    dop <- dop_snapshot[.(df$subjid[1], get_dop(df$param[1]))]
+    # Look up all DOP Include rows for this subject. nomatch = NULL
+    # returns 0 rows when the DOP param has no Includes for this
+    # subject, sending control to the else branch below.
+    dop <- dop_snapshot[.(df$subjid[1], get_dop(df$param[1])), nomatch = NULL]
 
-    # 19D: calculate the voi comparison
+    # comp_diff quantifies disagreement with DOP, per row: same-day DOP
+    # tbc.sd if one exists, otherwise median DOP tbc.sd for this
+    # subject. NA when DOP has no Include data for this subject.
     if (nrow(dop) > 0){
       for (i in seq_len(nrow(df))){
         comp_val <-
@@ -4753,14 +4799,20 @@ cleanchild <- function(data.df,
       df[, comp_diff := rep(NA, nrow(df))]
     }
 
-    # 19B/C: for pairs, calculate info
+    # Pair case: compute z-score differences and the time gap between
+    # the two measurements. For non-potcorr subjects ctbc.sd equals
+    # tbc.sd, so diff_ctbc.sd equals diff_tbc.sd; the separate
+    # corrected check below matters only for potcorr subjects.
     if (!is_single){
       diff_tbc.sd <- df[2, tbc.sd] - df[1, tbc.sd]
       diff_ctbc.sd <- df[2, ctbc.sd] - df[1, ctbc.sd]
       diff_agedays <- df[2, agedays] - df[1, agedays]
 
-      # 19E: which is larger
-      # Use id tie-breaker for deterministic selection
+      # Pick which of the two rows gets excluded if the pair rule below
+      # fires. Primary criterion is larger comp_diff (worse DOP
+      # disagreement). Fallback when both comp_diff are NA (no DOP data
+      # for this subject) is larger abs(tbc.sd). internal_id breaks
+      # ties — the row with the lowest internal_id is excluded.
       max_ind <- if (!all(is.na(df$comp_diff))){
         ord <- order(-df$comp_diff, df$internal_id)
         ord[1]
@@ -4769,12 +4821,16 @@ cleanchild <- function(data.df,
         ord[1]
       }
 
-      # 19F/G: which exclusion. Use absolute differences for the z-score
-      # threshold comparisons.
-      # NA-safe: diff_tbc.sd can be NA if z-scores are NA (edge cases).
+      # Pair exclusion rule. Gaps >= 1 year allow more natural z-score
+      # change, so the threshold is higher (> 4); gaps < 1 year use a
+      # stricter threshold (> 2.5) because less legitimate change is
+      # expected. The corrected check (|diff_ctbc.sd|) must also exceed
+      # the same threshold (or be NA, which holds for non-potcorr
+      # subjects) to avoid excluding legitimate preterm catch-up.
+      # isTRUE() makes the condition NA-safe when z-scores are NA.
       if (isTRUE(abs(diff_tbc.sd) > 4 &
           (abs(diff_ctbc.sd) > 4 | is.na(diff_ctbc.sd)) &
-          diff_agedays >=365.25)){
+          diff_agedays >= 365.25)){
         df[max_ind, exclude := .child_exc(param, "Pair")]
       } else if (isTRUE(abs(diff_tbc.sd) > 2.5 &
                  (abs(diff_ctbc.sd) > 2.5 | is.na(diff_ctbc.sd)) &
@@ -4782,32 +4838,37 @@ cleanchild <- function(data.df,
         df[max_ind, exclude := .child_exc(param, "Pair")]
       }
 
-      # save the results
+      # Refresh exclude_all so the return vector reflects the pair
+      # decision even if the single rule below does not fire.
       exclude_all <- df$exclude
 
-      # 19H
-      # if one needs to get removed, we want to reevaluate as a single
+      # If one row was excluded as Pair, the remaining Include row
+      # drops into the single check below.
       df <- df[exclude == "Include",]
     }
 
     if (nrow(df) == 1){
-      # Check if 1-meas exclusion applies
-      # NA-safe: tbc.sd can be NA in edge cases
+      # Single exclusion rule. Two branches: with DOP data, require
+      # both an extreme tbc.sd (> 3) and strong DOP disagreement
+      # (comp_diff > 5); without DOP data (comp_diff NA), require a
+      # more extreme tbc.sd (> 5) alone. isTRUE() makes the condition
+      # NA-safe.
       one_meas_cond <- isTRUE(
         (abs(df$tbc.sd) > 3 & !is.na(df$comp_diff) & df$comp_diff > 5) |
         (abs(df$tbc.sd) > 5 & is.na(df$comp_diff))
       )
       if (one_meas_cond) {
         df[, exclude := .child_exc(param, "Single")]
-        # Only update exclude_all if 1-meas exclusion happens
-        # Previous code at line 4529 unconditionally overwrote exclude_all, losing 2-meas results
+        # Write the single exclusion into the correct position in
+        # exclude_all (keyed by index) so any pair exclusion already
+        # recorded above is preserved.
         exclude_all[ind_all == df$index] <- .child_exc(df$param, "Single")
       }
     }
 
     return(exclude_all)
   })(copy(.SD)), by = .(subjid, param),
-  .SDcols = c('index', 'id', 'internal_id', 'agedays', 'subjid', 'param', 'tbc.sd', 'ctbc.sd', 'exclude')]
+  .SDcols = c('index', 'internal_id', 'agedays', 'subjid', 'param', 'tbc.sd', 'ctbc.sd', 'exclude')]
 
   # 21: error load ----
 
@@ -4817,26 +4878,30 @@ cleanchild <- function(data.df,
       Sys.time()
     ))
 
-  # Error-load ratio: errors / (errors + includes). SDE codes, CF codes,
-  # Missing, and Not-Cleaned rows are excluded from both the numerator and
-  # the denominator (see non_error_codes below).
-  valid_set <- rep(TRUE, nrow(data.df))
-
-  # Non-error codes that should be excluded from both numerator AND denominator
-  # CF rescue codes removed — rescued CFs are now "Include" (stored in cf_rescued column)
+  # Error-load ratio: n_errors / (n_errors + n_includes) per (subjid, param).
+  # non_error_codes are the exclusion codes that do NOT count as measurement
+  # errors and are removed from both the numerator and the denominator:
+  #   Exclude-C-Identical / Exclude-C-Extraneous: SDE housekeeping
+  #     (same-day duplicates resolved in Child Step 13, not evidence of a bad
+  #     measurement).
+  #   Exclude-C-CF: detected carried-forward that was not rescued; a
+  #     data-entry artifact rather than a quality signal. (Rescued CFs are
+  #     "Include" here, tracked via the cf_rescued column, so they count as
+  #     Includes in the denominator.)
+  #   Exclude-Missing: row had no measurement; cannot be a measurement error.
+  #   Exclude-Not-Cleaned: HC row beyond cleaning age (> 3 * 365.25 days);
+  #     out of scope for the child algorithm entirely.
   non_error_codes <- c("Exclude-C-Identical",
                        "Exclude-C-Extraneous",
                        "Exclude-C-CF",
                        "Exclude-Missing",
                        "Exclude-Not-Cleaned")
 
-  data.df[valid_set,
+  data.df[,
           c("err_ratio", "n_errors") := {
-            # Count errors (not Include and not non-error codes)
+            # Count errors (not Include and not in non_error_codes)
             n_errors <- sum(!exclude %in% c("Include", non_error_codes))
-            # Count includes
             n_includes <- sum(exclude == "Include")
-            # Denominator is errors + includes (excludes SDE/CF/Missing)
             denom <- n_errors + n_includes
             err_ratio <- if (denom > 0) n_errors / denom else 0
             list(err_ratio, n_errors)
@@ -4846,7 +4911,7 @@ cleanchild <- function(data.df,
   # error.load.mincount guards against tripping the step on a subject with
   # a small number of errors (default: need at least 2 errors before the
   # ratio is considered).
-  data.df[valid_set & err_ratio > error.load.threshold & n_errors >= error.load.mincount & exclude == "Include",
+  data.df[err_ratio > error.load.threshold & n_errors >= error.load.mincount & exclude == "Include",
           exclude := .child_exc(param, "Too-Many-Errors")]
 
   # Cleanup

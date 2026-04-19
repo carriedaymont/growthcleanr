@@ -98,11 +98,20 @@ Defaults to -15.}
 \code{sd.orig_uncorr > biv.z.hc.high} are flagged as standardized BIV.
 Defaults to 15.}
 
-\item{error.load.mincount}{minimum count of exclusions on parameter before
-considering excluding all measurements. Defaults to 2.}
+\item{error.load.mincount}{Minimum number of real errors (exclusions other
+than \code{Exclude-C-Identical}, \code{Exclude-C-Extraneous},
+\code{Exclude-C-CF}, \code{Exclude-Missing}, and \code{Exclude-Not-Cleaned})
+required per (subject, param) group before Child Step 21 Error Load is
+evaluated for that group. Defaults to 2.}
 
-\item{error.load.threshold}{threshold of percentage of excluded measurement count to included measurement
-count that must be exceeded before excluding all measurements of either parameter. Defaults to 0.5.}
+\item{error.load.threshold}{Error ratio threshold for Child Step 21. The
+ratio is \code{n_errors / (n_errors + n_includes)} computed per
+(subject, param) group, where \code{n_errors} and \code{n_includes}
+exclude SDE / CF / Missing / Not-Cleaned rows from both numerator and
+denominator. If the ratio strictly exceeds this threshold (and at least
+\code{error.load.mincount} real errors are present), all remaining
+Include rows for that (subject, param) group are excluded with
+\code{Exclude-C-Too-Many-Errors}. Defaults to 0.5.}
 
 \item{sd.recenter}{Optional. A data.table with columns \code{param}, \code{sex},
 \code{agedays}, and \code{sd.median} to use for recentering instead of the

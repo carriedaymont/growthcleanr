@@ -111,7 +111,7 @@ Child-algorithm-internal helpers defined in `R/child_clean.R`. Each entry lists 
 
 **Purpose.** Scalar lookup of the designated other parameter (DOP) for a given growth parameter.
 
-**Callers.** Two sites inside `cleanchild()` — in the Child Step 15/16 block (approx line 3807) and in the Child Step 19 pairs/singles block (approx line 4696). Both callers pass `df$param[1]` from a single-param working subset.
+**Callers.** Two sites inside `cleanchild()` — in the Child Step 15/16 block (approx line 3845) and in the Child Step 19 pairs/singles block (approx line 4769). Both callers pass `df$param[1]` from a single-param working subset.
 
 **Inputs and return contract.**
 
@@ -1336,7 +1336,7 @@ Moderate EWMA thresholds (1, 2, 3, 4) and the ±5% / ±1 cm perturbation magnitu
 | **Prior step** | Child Steps 15/16 (EWMA2) |
 | **Next step** | Child Step 19 (Pairs and Singles) |
 | **Exclusion codes** | `Exclude-C-Abs-Diff` |
-| **Code location** | Inline in `cleanchild()` in `child_clean.R`; uses Tanner height velocity and WHO velocity reference tables loaded from `inst/extdata/` |
+| **Code location** | Inline in `cleanchild()` in `child_clean.R`. Uses Tanner height velocity (loaded once in `cleangrowth()` and passed in) and WHO HT / HC velocity reference tables (loaded inside `cleanchild()` from `inst/extdata/`); calls `ewma()` directly (not the cache API) for the 3+ measurement tiebreaker, `.child_valid()` for row eligibility, and `.child_exc()` for the exclusion code. |
 
 ### Overview
 
@@ -1351,8 +1351,8 @@ Weight is excluded because weight can legitimately decrease.
 
 **Height** uses two reference systems applied in priority order. Each pair of adjacent measurements gets a `mindiff` (minimum allowed change, typically negative = allowed decrease) and `maxdiff` (maximum allowed increase):
 
-**Tanner (ages 2.5+ years):**
-- `tanner.months = 6 + 12 * round(midpoint_age_years)` where midpoint is the mean of the two agedays values. Only used when midpoint age ≥ 30 months.
+**Tanner (midpoint age ≥ 30 months):**
+- `tanner.months = 6 + 12 * round(midpoint_age_years)` where midpoint is the mean of the two agedays values. NA-out if the resulting bin is below the lowest Tanner reference entry (`tanner.months < 30` → `tanner.months := NA`), so the NA filter matches the merge key.
 - Merge with Tanner reference table → `min.ht.vel` and `max.ht.vel` (annual velocity values by sex and age)
 - **max.ht.vel floors** (gap-dependent):
  - Always: floor at 2.54 cm (1 inch)
@@ -1360,23 +1360,21 @@ Weight is excluded because weight can legitimately decrease.
  - If gap > 6 months: floor at 10.16 cm (4 inches)
  - If gap > 1 year: floor at 20.32 cm (8 inches)
 - **mindiff** (gap < 1 year): `0.5 * min.ht.vel * (gap_years)^2 - 3`
-- **mindiff** (gap > 1 year): `0.5 * min.ht.vel - 3`
+- **mindiff** (gap ≥ 1 year): `0.5 * min.ht.vel - 3`
 - **maxdiff** (gap < 1 year): `2 * max.ht.vel * (gap_years)^0.33 + 5.5`
-- **maxdiff** (gap > 1 year): `2 * max.ht.vel * (gap_years)^1.5 + 5.5`
-- When gap equals exactly 1 year, the `< 365.25` and `> 365.25` branches both miss — mindiff/maxdiff use the `< 365.25` formula from the first condition that applies.
+- **maxdiff** (gap ≥ 1 year): `2 * max.ht.vel * (gap_years)^1.5 + 5.5`
+- The two pairs of formulas are continuous at gap = 1 year, so the boundary (d_agedays = 365.25) produces the same mindiff/maxdiff from either branch.
 
 **WHO (ages 0–24 months, height):**
-- `whoagegrp.ht = round(agedays / 30.4375)`, capped at 24
-- WHO increment age groups based on gap between adjacent measurements:
- - gap < 20 days → 1 month
- - 20 ≤ gap < 46 → 1 month
+- `whoagegrp.ht = round(agedays / 30.4375)` when `agedays/30.4375 ≤ 24`; otherwise NA. Never exceeds 24. Also NA-ed out when the next measurement (this row's ageyears + gap) exceeds 24 months, so a pair crossing the WHO/CDC boundary does not extrapolate past the WHO reference. In the pre-filter this is applied directly to `whoagegrp.ht`; inside the per-group while loop the same condition zeroes out `who_mindiff_ht` / `who_maxdiff_ht` each iteration because `d_agedays` changes as rows are excluded.
+- WHO increment age groups based on gap (`d_agedays`) between adjacent measurements:
+ - gap < 46 days → 1 month
  - 46 ≤ gap < 76 → 2 months
  - 76 ≤ gap < 107 → 3 months
  - 107 ≤ gap < 153 → 4 months
- - 153 ≤ gap < 199 → 6 months
- - gap ≥ 200 → 6 months
-- Merge with WHO velocity reference → `who_mindiff_ht`, `who_maxdiff_ht` at appropriate increment intervals
-- **Gap scaling:** If actual gap < reference interval (e.g., 45 days for a 2-month reference), scale mindiff proportionally. If gap > reference interval, scale maxdiff proportionally.
+ - gap ≥ 153 → 6 months
+- Merge with WHO velocity reference → `who_mindiff_ht`, `who_maxdiff_ht` at the selected increment interval
+- **Gap scaling:** If actual gap < reference interval (e.g., 45 days against a 2-month reference), scale `who_mindiff_ht` by gap / reference. If actual gap > reference interval, scale `who_maxdiff_ht` by gap / reference. The mindiff-side is scaled only when shorter than reference; the maxdiff-side is scaled only when longer. Intuition: a shorter interval allows less loss; a longer interval allows more gain.
 - **For gaps < 9 months** (WHO preferred):
  - Transform: `mindiff = who_mindiff * 0.5 - 3`
  - Transform: `maxdiff = who_maxdiff * 2 + 3`
@@ -1387,17 +1385,15 @@ Weight is excluded because weight can legitimately decrease.
 - **Birth adjustment (agedays == 0):** `mindiff -= 1.5`, `maxdiff += 1.5`
 
 **HC** uses WHO only (no Tanner):
-- WHO increment age groups (same gap-based mapping as HT but using HC-specific reference tables):
- - gap < 20 days → 1 month
- - 20 ≤ gap < 46 → 1 month
+- `whoagegrp.hc = round(agedays / 30.4375)` when `agedays/30.4375 ≤ 24`; otherwise NA. Same cap as HT.
+- WHO increment age groups: HC has no 1-month reference — the smallest interval is 2-month, so gaps shorter than 46 days (or longer than ~199 days) fall through to the fallback default below.
  - 46 ≤ gap < 76 → 2 months
  - 76 ≤ gap < 107 → 3 months
  - 107 ≤ gap < 153 → 4 months
- - 153 ≤ gap < 199 → 6 months
- - gap ≥ 200 → 6 months
-- **Gap scaling:** Same proportional scaling as HT
-- **Tolerance transform:** `mindiff = who_mindiff * 0.5 - 1.5` `maxdiff = who_maxdiff * 2 + 1.5` (tighter than HT: ±1.5 cm vs ±3 cm)
-- **Default** when no WHO data: `mindiff = -1.5`
+ - 153 ≤ gap < 200 → 6 months
+- **Gap scaling:** Same proportional scaling as HT (mindiff shrinks when actual gap < reference; maxdiff grows when actual > reference).
+- **Tolerance transform:** `mindiff = who_mindiff * 0.5 - 1.5` and `maxdiff = who_maxdiff * 2 + 1.5` (tighter than HT: ±1.5 cm vs ±3 cm).
+- **Default** when HC is outside the WHO-reference range (agedays beyond ~24 months, or gap outside the 46–199-day band): `mindiff = -1.5`, `maxdiff` left at NA (no upward bound). HC measurement pairs outside the reference band therefore gate only the decrease side and effectively skip the increase-side check — consistent with HC's narrower physiologic range.
 - **Birth adjustment (agedays == 0):** `mindiff -= 0.5`, `maxdiff += 0.5` (tighter than HT: ±0.5 cm vs ±1.5 cm)
 
 ### Violation detection and resolution
@@ -1411,16 +1407,17 @@ Where `diff_prev = v - v[prior]`, `diff_next = v[next] - v` (raw cm differences,
 **Resolution within each group:**
 
 For **3+ measurements**, EWMA-based tiebreaker:
-1. Compute EWMA on raw `tbc.sd` values
+1. Compute EWMA on raw `tbc.sd` values (via `ewma()`, not the cache API — EWMA is recomputed from scratch each iteration).
 2. For each violating pair, flag which member has a worse EWMA relationship:
  - `bef.g.aftm1`: TRUE if `|dewma.before|` exceeds the prior row's `|dewma.after|`
  - `aft.g.aftm1`: TRUE if `|dewma.after|` exceeds the next row's `|dewma.before|`
-3. Exclude the flagged member. Among multiple candidates, select by highest `|dewma.before|` (codes 1,3) or `|dewma.after|` (codes 2,4), with `internal_id` tiebreaker.
+3. Exclude the flagged member. Among multiple candidates, select by highest `|dewma.before|` (codes 1,3) or `|dewma.after|` (codes 2,4), with `internal_id` as the tiebreaker (lowest internal_id wins).
 4. Remove excluded row, recalculate, repeat until no violations remain.
 
 For **exactly 2 measurements:**
-- Exclude the one with higher `abs(tbc.sd)`, with `internal_id` tiebreaker.
-- No EWMA computation.
+- EWMA is still computed per the shared code path above but is not consumed — the tiebreaker uses `abs(tbc.sd)` directly.
+- The abs-comparison uses `>=` (not strict `>`) so that tied `abs(tbc.sd)` pairs with a violating diff flag both rows; the `order(-absval, internal_id)` candidate selection then picks one (lowest internal_id among tied candidates).
+- Only one row is excluded per violating 2-row group.
 
 ### Rationale
 
@@ -1435,17 +1432,21 @@ For **exactly 2 measurements:**
 
 ### Configurable parameters in scope for Child Step 17
 
-None. All velocity thresholds and tolerance formulas are hardcoded; velocity references come from `inst/extdata/` reference tables (Tanner height velocity, WHO velocity).
+| Parameter | Default | Where used |
+|---|---|---|
+| `ewma_window` | 15 | Max Include observations on each side for the 3+-measurement EWMA tiebreaker (`ewma()` call inside the while loop) |
+
+All velocity thresholds and tolerance formulas are hardcoded; velocity references come from `inst/extdata/` reference tables (Tanner height velocity, WHO HT velocity, WHO HC velocity).
 
 ### Variables created and dropped
 
-All working columns (`tanner.months`, `whoagegrp.ht`, `min.ht.vel`, `max.ht.vel`, `who_mindiff_ht`, `who_maxdiff_ht`, `mindiff`, `maxdiff`, `mindiff_prior`, `maxdiff_prior`, `diff_prev`, `diff_next`, `bef.g.aftm1`, `aft.g.aftm1`) are computed either inside per-group closures or as pre-filter columns and not persisted to `data.df`.
+Pre-filter columns live on `pf` (a local subset of `data.df`) and are discarded when `rm(pf)` runs at the end of the pre-filter block. Per-group closure columns (`tanner.months`, `whoagegrp.ht`, `whoagegrp.hc`, `whoinc.age.ht`, `whoinc.age.hc`, `min.ht.vel`, `max.ht.vel`, `who_mindiff_ht`, `who_maxdiff_ht`, `who_mindiff_hc`, `who_maxdiff_hc`, `mindiff`, `maxdiff`, `mindiff_prior`, `maxdiff_prior`, `diff_prev`, `diff_next`, `bef.g.aftm1`, `aft.g.aftm1`, `val_excl`, `val_excl_code`, `absval`, `d_agedays`, `ewma.all`, `ewma.before`, `ewma.after`, `dewma.all`, `dewma.before`, `dewma.after`, `exp_vals`) live on the closure-local `df` and are discarded when the closure returns — only `exclude` is written back to `data.df`. The top-level `sp_key` column is dropped explicitly after the step.
 
 ### Checklist findings
 
-1. **Boundaries:** `diff < mindiff` and `diff > maxdiff` — strict inequalities. WHO interval boundaries use `>=` / `<` consistently.
+1. **Boundaries:** `diff < mindiff` and `diff > maxdiff` — strict inequalities. WHO interval boundaries use `>=` / `<` consistently. The Tanner and formula-side boundaries (`< 365.25` / `>= 365.25`) are continuous at gap = 1 year so the boundary assignment matches either limit.
 2. **`.child_valid()` call:** Excludes temp SDEs, excludes weight.
-3. **Sort order:** Explicit `order(agedays, id)` inside each while-loop iteration.
+3. **Sort order:** Explicit `order(agedays, internal_id)` inside each while-loop iteration; `internal_id` is the deterministic tiebreaker (same-day rows don't reach Step 17 because SDEs are resolved upstream).
 4. **Parameter scope:** HT and HC only. HC has separate velocity tables, tighter tolerances, and no Tanner.
 5. **Factor levels:** `Exclude-C-Abs-Diff` exists in `exclude.levels`.
 
@@ -1456,61 +1457,61 @@ All working columns (`tanner.months`, `whoagegrp.ht`, `min.ht.vel`, `max.ht.vel`
 | | |
 |---|---|
 | **Scope** | All parameters |
-| **Operates on** | Include rows with 1–2 remaining measurements per subject-param |
+| **Operates on** | Include rows with 1–2 remaining Include measurements per subject-param |
 | **Prior step** | Child Step 17 (Height/HC Velocity) |
 | **Next step** | Child Step 21 (Error Load) |
 | **Exclusion codes** | `Exclude-C-Pair`, `Exclude-C-Single` |
-| **Code location** | Inline in `cleanchild()` in `child_clean.R`; uses `get_dop()` for designated-other-parameter lookup |
+| **Code location** | Inline in `cleanchild()` in `child_clean.R`; uses `get_dop()` for designated-other-parameter lookup, `.child_valid()` for the row eligibility mask, and `.child_exc()` for the exclusion codes. |
 
 ### Overview
 
-After all cleaning steps, some subject-params may have only 1–2 Include measurements remaining. Child Step 19 evaluates whether these isolated values are plausible by comparing them against the designated other parameter (DOP).
+After the prior individual-value cleaning steps, some subject-params may have only 1–2 Include measurements remaining. Child Step 19 evaluates whether these isolated values are plausible by comparing them against the designated other parameter (DOP) for the same subject.
 
 ### DOP snapshot
 
-A snapshot of all Include rows is taken BEFORE by-group processing. This prevents a cross-parameter ordering issue where excluding one param's values during processing could make the DOP lookup fail for the other param.
+A snapshot of all Include rows (with both `tbc.sd` and `ctbc.sd`) is taken before the per-(subjid, param) closure runs. The closure writes new exclusions back to `data.df` in place, so without the snapshot the DOP lookup for the second-processed parameter would miss rows just excluded by the first — and the result would depend on by-group processing order.
 
 ### Pair evaluation
 
-For 2 remaining measurements:
-1. Compute `diff_tbc.sd` and `diff_ctbc.sd` (z-score difference between the two)
-2. Compute DOP comparison: for each measurement, if a same-day DOP value exists, use `|dop_tbc - tbc|`; otherwise use `|median(dop_tbc) - tbc|`
-3. Select which to exclude: highest `comp_diff` (or highest `|tbc.sd|` if both DOP comparisons are NA), with lowest `id` as tiebreaker
+For 2 remaining Include measurements in the (subjid, param) group:
+1. Compute `diff_tbc.sd` and `diff_ctbc.sd` (z-score difference between the two) and `diff_agedays` (the time gap).
+2. Compute a per-row `comp_diff` against DOP: if a DOP Include row exists on the same ageday, use `|DOP.tbc.sd - tbc.sd|`; otherwise use `|median(DOP.tbc.sd) - tbc.sd|` over the subject's DOP Include rows. `comp_diff` is NA when the subject has no DOP Include rows.
+3. Select which of the two rows is excluded if the pair rule fires: primary criterion is larger `comp_diff`; fallback when both `comp_diff` are NA is larger `abs(tbc.sd)`. `internal_id` breaks ties — the row with the lowest `internal_id` is the one excluded.
 4. Apply exclusion:
- - `|diff_tbc| > 4 & (|diff_ctbc| > 4 or NA) & gap >= 365.25` → `Exclude-C-Pair`
- - `|diff_tbc| > 2.5 & (|diff_ctbc| > 2.5 or NA) & gap < 365.25` → `Exclude-C-Pair`
-5. If one excluded, re-evaluate remaining as single
+ - `|diff_tbc.sd| > 4 & (|diff_ctbc.sd| > 4 or NA) & diff_agedays >= 365.25` → `Exclude-C-Pair`
+ - `|diff_tbc.sd| > 2.5 & (|diff_ctbc.sd| > 2.5 or NA) & diff_agedays < 365.25` → `Exclude-C-Pair`
+5. If one row was excluded, the remaining Include row drops into the single rule below (it may itself meet the single criterion).
 
 ### Single evaluation
 
-For 1 remaining measurement:
-- `(|tbc.sd| > 3 & comp_diff > 5)` OR `(|tbc.sd| > 5 & no DOP data)` → `Exclude-C-Single`
+For 1 remaining Include measurement (either the original count was 1, or one of a pair was just excluded):
+- `(|tbc.sd| > 3 & comp_diff > 5)` OR `(|tbc.sd| > 5 & comp_diff is NA)` → `Exclude-C-Single`
 
 ### Rationale
 
 - **Subject-params with 1–2 Include measurements have no trajectory** to anchor plausibility checks, so EWMA and velocity steps cannot evaluate them. Without the DOP cross-check, implausible isolated values would pass through uncontested.
 - **Pairs: threshold depends on time gap.** A |Δz| of 4 over more than a year reflects either substantial genuine change or an error — comparing against the DOP distinguishes them. Within a year, a smaller |Δz| (2.5) is already suspicious because less legitimate change is expected.
-- **Corrected z check (`|diff_ctbc|`) must also agree:** A potcorr subject's uncorrected z-scores can look extreme while the corrected z-scores are normal; requiring both pipelines to show the jump prevents excluding legitimate preterm catch-up.
+- **Corrected z check (`|diff_ctbc.sd|`) must also agree:** A potcorr subject's uncorrected z-scores can look extreme while the corrected z-scores are normal; requiring both pipelines to show the jump prevents excluding legitimate preterm catch-up. For non-potcorr subjects `ctbc.sd` equals `tbc.sd`, so the corrected check is equivalent to the uncorrected check.
 - **Singles: two separate criteria** cover cases with and without DOP data. With DOP (`|tbc.sd| > 3 & comp_diff > 5`): the value is extreme AND disagrees with the other parameter's trajectory. Without DOP (`|tbc.sd| > 5`): only very extreme values can be excluded on their own.
 - **DOP snapshot taken before by-group processing:** Cross-parameter lookups for a subject could otherwise depend on processing order, producing subtle nondeterminism. The snapshot fixes the DOP view for this step.
 - **After excluding from a pair, re-evaluate the remaining as a single:** The remaining value may itself be implausible; the two checks compose naturally.
 
 ### Configurable parameters in scope for Child Step 19
 
-None. All thresholds (pair: > 4 / > 2.5 with 365.25-day split; single: > 3 with DOP, > 5 without) are hardcoded.
+None. All thresholds (pair: `> 4` / `> 2.5` with 365.25-day split; single: `> 3` with DOP, `> 5` without) are hardcoded.
 
 ### Variables created and dropped
 
-All working columns (`diff_tbc.sd`, `diff_ctbc.sd`, `comp_diff`, `dop_tbc`, `dop_ctbc`) are computed inside per-subject-param logic and not persisted to `data.df`.
+`diff_tbc.sd`, `diff_ctbc.sd`, and `diff_agedays` are local scalars in the closure (pair branch only) and vanish when the closure returns. `comp_diff` is added as a column on the closure-local copy of `.SD` and is also discarded on return. Only the `exclude` column on `data.df` is updated. No columns are persisted to `data.df` for downstream steps.
 
 ### Checklist findings
 
-1. **Boundaries:** Pair: `> 4` / `> 2.5` strict; gap `>= 365.25` inclusive. Single: `> 3` / `> 5` strict.
-2. **`.child_valid()` call:** Excludes temp SDEs. Counts only Include rows for singles/pairs determination.
-3. **DOP snapshot:** Correct — prevents cross-parameter interference.
-4. **Both `tbc.sd` and `ctbc.sd` checked** for pairs (corrected must also agree when available).
+1. **Boundaries:** Pair: `> 4` / `> 2.5` strict; gap `>= 365.25` inclusive (partitions the real line with `< 365.25`). Single: `> 3` / `> 5` strict.
+2. **`.child_valid()` call:** Excludes temp SDEs; counted Include rows drive the singles/pairs determination.
+3. **DOP snapshot:** Frozen before the per-group closure, so processing order does not affect the result.
+4. **Both `tbc.sd` and `ctbc.sd` checked** for pairs (corrected must also agree when defined). Singles use only `tbc.sd`; the `comp_diff` cross-check against DOP (which also uses `tbc.sd`) provides an implicit guard for potcorr subjects because the DOP also sits on the uncorrected scale.
 5. **Parameter scope:** All 3 params handled uniformly.
-6. **Factor levels:** All 3 codes exist.
+6. **Factor levels:** Both `Exclude-C-Pair` and `Exclude-C-Single` exist in `exclude.levels.peds`.
 
 ---
 
@@ -1519,30 +1520,30 @@ All working columns (`diff_tbc.sd`, `diff_ctbc.sd`, `comp_diff`, `dop_tbc`, `dop
 | | |
 |---|---|
 | **Scope** | All parameters |
-| **Operates on** | All rows |
+| **Operates on** | All rows (counts); modifies Include rows only |
 | **Prior step** | Child Step 19 (Pairs and Singles) |
 | **Next step** | Child Step 22 (Output) |
 | **Exclusion code** | `Exclude-C-Too-Many-Errors` |
-| **Code location** | Inline in `cleanchild()` in `child_clean.R` |
+| **Code location** | Inline in `cleanchild()` in `child_clean.R`; uses `.child_exc()` to build the exclusion code. |
 
 ### Overview
 
-If a subject-param has a high ratio of excluded values (excluding SDEs, CFs, and Missing from the denominator), all remaining Include values are also excluded.
+If a subject-param has a high ratio of excluded values (excluding SDEs, CFs, Missing, and Not-Cleaned from both numerator and denominator), all remaining Include values for that subject-param are also excluded.
 
 ### Logic
 
 1. `non_error_codes`: `Exclude-C-Identical`, `Exclude-C-Extraneous`, `Exclude-C-CF`, `Exclude-Missing`, `Exclude-Not-Cleaned` — excluded from both numerator and denominator
-2. `n_errors = count of excluded rows NOT in non_error_codes` (and not `Include`)
+2. `n_errors = count of rows whose exclude is neither "Include" nor in non_error_codes`
 3. `n_includes = count of Include rows`
-4. `err_ratio = n_errors / (n_errors + n_includes)`
-5. If `err_ratio > error.load.threshold` (default 0.5) AND `n_errors >= error.load.mincount` (default 2): all Include rows → `Exclude-C-Too-Many-Errors`
+4. `err_ratio = n_errors / (n_errors + n_includes)` (0 when the denominator is 0)
+5. If `err_ratio > error.load.threshold` (default 0.5) AND `n_errors >= error.load.mincount` (default 2): all Include rows within that (subjid, param) group → `Exclude-C-Too-Many-Errors`
 
 `Exclude-C-Temp-Same-Day` is not in `non_error_codes`. This is intentional: by the time Child Step 21 runs, Child Step 13 has resolved every temp SDE to `Include` or to a final `Exclude-C-Identical` / `Exclude-C-Extraneous` code. Any `Exclude-C-Temp-Same-Day` row still present at Child Step 21 would be a bug and would correctly count as an error.
 
 ### Rationale
 
 - **Data-quality argument:** A subject-param with a high fraction of "real" errors (BIV, Evil Twins, EWMA outliers, velocity violations, pair/single rejections) is more likely to have unreliable Includes than a subject-param whose data only needed SDE/CF housekeeping.
-- **Denominator excludes SDEs/CFs/Missing/Not-Cleaned:** Same-day duplicates, carried-forward values, missing rows, and HC measurements above the cleaning age are data-structure artifacts or out-of-scope rows, not signals of poor measurement quality — they should not inflate the error ratio.
+- **Numerator and denominator exclude SDEs/CFs/Missing/Not-Cleaned:** Same-day duplicates, carried-forward values, missing rows, and HC measurements above the cleaning age are data-structure artifacts or out-of-scope rows, not signals of poor measurement quality — they should not contribute to the error ratio on either side.
 - **Default threshold 0.5:** Chosen to be conservative; a lower threshold would cascade exclusions too easily, a higher threshold would let in subject-params with clearly poor data. Users who want more or less permissive behavior can adjust `error.load.threshold`.
 - **`error.load.mincount` floor:** A subject-param with 1 error and 1 include has a 50% error ratio but only 2 measurements; the error ratio is not a meaningful signal at that scale. The default mincount of 2 avoids triggering on the smallest subject-params.
 
@@ -1555,13 +1556,13 @@ If a subject-param has a high ratio of excluded values (excluding SDEs, CFs, and
 
 ### Variables created and dropped
 
-Working columns (`n_errors`, `n_includes`, `err_ratio`) are computed via `data.table` by-group operations on `data.df` and not persisted.
+Two working columns are added to `data.df` by the by-group `:=` assignment and dropped at the end of the step: `err_ratio` and `n_errors`. Each is constant within a (subjid, param) group. `n_includes` and `denom` are local scratch variables inside the `{}` expression and never become columns.
 
 ### Checklist findings
 
 1. **Boundary:** `err_ratio > error.load.threshold` — strict `>`. An exactly 50% error rate does NOT trigger at the default threshold.
 2. **`error.load.mincount`:** Default 2. Prevents a subject-param with 1 error and 1 include (50% ratio) from triggering.
-3. **Denominator excludes SDEs/CFs:** These are data-structure artifacts, not cleaning errors, so they are excluded from both numerator and denominator.
+3. **Numerator and denominator exclude SDEs/CFs/Missing/Not-Cleaned:** These are data-structure artifacts or out-of-scope rows, not cleaning errors, so they are excluded from both sides of the ratio (via `non_error_codes`).
 4. **Parameter scope:** All 3 params, grouped by `(subjid, param)`.
 5. **Factor level:** `Exclude-C-Too-Many-Errors` exists in `exclude.levels`.
 

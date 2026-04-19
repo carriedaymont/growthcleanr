@@ -334,6 +334,35 @@ For each step, systematically check all items that apply. Items are marked
     `message()` for CRAN. Flag any `cat()` or `print()` calls that are
     not gated behind `if (!quietly)`.
 
+21. **[both] Look for age gaps** — Scan every threshold-binning clause
+    (age bins for WHO/CDC reference lookup, `d_agedays` gap-to-interval
+    mappings, age-dependent formula branches) for boundary values that
+    fall through without an assignment. Canonical cases:
+    - Paired `< X` / `> X` clauses leave `d_agedays == X` unassigned.
+      Change one to `<=` or `>=` to close the gap (the two formulas are
+      typically continuous at the boundary, so the fix is
+      behavior-equivalent for values that can actually occur — but the
+      edge remains a silent footgun for non-integer inputs or future
+      refactors).
+    - Sequential `>= A & < B`, `>= B & < C`, ..., `>= Z` clauses
+      leaving a single integer between the last interior `< B` and the
+      final `>= Z` unassigned (e.g., `< 199` + `>= 200` leaves 199).
+      Collapse to `>= B` in the final clause, or extend the interior
+      range so the whole axis is covered.
+    - Conditional `:=` assignments inside an iterative loop that only
+      overwrite matching rows. Combined with a gap like the above, a
+      row whose binning variable transitions to the unassigned value
+      between iterations keeps the prior iteration's stale value and
+      produces wrong downstream thresholds. Add an explicit
+      `df[, <col> := NA_*]` reset at the top of the iteration as
+      defense-in-depth, so any future gap does not silently propagate.
+
+    For every binning clause encountered, enumerate the integer
+    (and half-integer, if agedays could be non-integer) values that
+    land in a gap and decide explicitly whether they should fall back
+    to the default or get a specific bin. Fix any gaps found (they are
+    almost always unintended).
+
 ### Step D: Classify findings
 
 **Fix now** if:
@@ -464,3 +493,4 @@ These are the most common issues found; check for these specifically:
 | Z-score blend boundaries | WHO-only < 2y, blend 2-5y, CDC-only > 5y; HC is always WHO |
 | Wrong z-score variable | Using `sd.orig` where `tbc.sd` or `ctbc.sd` is needed, or vice versa |
 | Stale Stata references | Comments referencing Stata line numbers or variables that no longer apply |
+| Age / gap binning gap | Paired `< X` / `> X` or `>= A & < B`, ..., `>= Z` clauses that leave an integer value between them unassigned (Step 17 `< 199` + `>= 200` leaving 199 was a real example). Combined with conditional `:=` in an iterative loop, a row whose binning variable lands on the gap can keep a stale bin from a prior iteration. Close the gap AND add an explicit NA reset at the top of each iteration. |
