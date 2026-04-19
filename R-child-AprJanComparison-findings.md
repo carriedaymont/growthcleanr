@@ -20,3 +20,14 @@ Walkthrough note: [walkthrough-todo-2026-04-19.md](walkthrough-todo-2026-04-19.m
 - [AJ7] Recentering: HC ≥ 5y exclusion code changed from `'Missing'` to `'Exclude-Not-Cleaned'` (semantic recategorization, beyond rename) — Intentional (other) — closed (confirmed intentional, no change needed) — `Infants_Main.R:1391` vs `child_clean.R:1121`
 
 **Session 1 status:** All 7 findings closed. AJ6 fixed in current code. AJ1/AJ2/AJ4/AJ5 confirmed correct in current as-is (bug fixes already present). AJ3/AJ7 confirmed intentional, no change needed.
+
+---
+
+## Session 2 — 2026-04-19 — Step 5 (Temp SDE) + Early Step 13 (SDE-Identicals)
+
+Walkthrough note: [walkthrough-todo-2026-04-19.md](walkthrough-todo-2026-04-19.md) — see "R-vs-R comparison — Session 2" section.
+
+- [AJ8] Early Step 13: `keep_id` empty-group handling — current guards with explicit `length(incl_ids) == 0L` check; reference's `ifelse(..., min(...), max(...))` with `na.rm = TRUE` on an empty Include subset returns `Inf`/`-Inf` with an R warning. Behavior-equivalent downstream (`has_dup` is FALSE so filter can't fire), but reference leaks warnings on datasets with all-excluded same-day groups — Bug fix — closed (current already correct, no change needed) — `Infants_Main.R:2634-2636` vs `child_clean.R:2638-2643`. Pitfall: **NA / empty-set handling**.
+- [AJ9] `.child_valid()` / `valid()`: reference assigns bare `"Missing"` and `"Not cleaned"` codes (no `Exclude-` prefix) at `Infants_Main.R:1207`, `:1212`, `:1387`, `:1391`. Reference's `!grepl("^Exclude", exclude)` returns TRUE for both, silently counting these rows as valid — most likely trigger is a subject with two HC measurements in the 3–5y window (both `"Not cleaned"`) where `extraneous.this.day` could re-label one as `Exclude-Temporary-Extraneous-Same-Day`. Current's 2026-04-14/16 code rename (`Missing` → `Exclude-Missing`, `Not cleaned` → `Exclude-Not-Cleaned`) fixes this as a side effect — Bug fix — closed (current already correct via rename; documented here so the bug-fix side effect is explicit) — `pediatric_support.R:21` vs `child_clean.R:5020`. Pitfalls: **Factor levels / exclusion codes** + **`.child_valid()` flag scope**.
+
+**Session 2 status:** Both findings closed with no code change needed. AJ8 is a minor warning-avoidance improvement already in current. AJ9 documents a bug-fix side effect of the 2026-04-14/16 exclusion-code rename that was previously framed as cosmetic. No tests re-run — baseline unchanged at 63 / 48 / 28 / 41 / 13.

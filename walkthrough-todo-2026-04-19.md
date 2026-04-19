@@ -524,3 +524,123 @@ Per procedure, no code changes have been made in this session. After Carrie's re
 - Findings index will be updated with status transitions (`open → approved → fixed → closed`).
 
 Next session candidate per `R-child-AprJanComparison-procedure.md`: **Session 2 — Step 5 (Temp SDE) + Early Step 13 (SDE-Identicals)**.
+
+---
+
+# R-vs-R comparison — Session 2 — 2026-04-19
+
+**Scope:** Early Step 13 SDE-Identicals block, Step 5 initial temp-SDE caller, and the shared helper `temporary_extraneous_infants()` → `identify_temp_sde()`. Helper internals walked in-line since Step 5's logic lives entirely there; later recalc callers (Steps 6, 7, 9, 11, and Main Step 13 final SDE) are out of scope for this session.
+
+Per `R-child-AprJanComparison-procedure.md`. Pure R-vs-R comparison; reference (Jan 2026) is `__Pipeline/current-infant-R-growthcleanr/growthcleanr/R/Infants_Main.R` (5011 lines) plus `__Pipeline/current-infant-R-growthcleanr/growthcleanr/R/pediatric_support.R` (166 lines); current (Apr 2026) is `__Pipeline/gc-github-latest/R/child_clean.R` (5027 lines).
+
+This is a **comparison-only** session per procedure — **no code edits made**. Both findings closed with no change needed.
+
+## Pre-session git hygiene
+
+Clean working tree; up to date with `origin/efficiency-updates`; no untracked work in stale `/Users/Shared/` copies.
+
+## Pre-session baseline tests
+
+Session 1 baseline retained (nothing touched since): **63 / 48 / 28 / 41 / 13**. Adult tests not re-run — no adult files in scope.
+
+## Scope
+
+| Sub-area | Reference lines | Current lines | What |
+|---|---|---|---|
+| Early Step 13 (SDE-Identicals) | `Infants_Main.R` 2625–2643 | `child_clean.R` 2628–2649 | Flag same-day same-value Include duplicates before CF detection |
+| Step 5 (Temp SDE initial pass) | `Infants_Main.R` 2656–2717 | `child_clean.R` 2651–2712 | First call to temp-SDE helper; sets `Exclude-C-Temp-Same-Day` on SDE losers |
+| Temp SDE helper (`identify_temp_sde()`) | `Infants_Main.R` 4888–5002 (`temporary_extraneous_infants()`) + `pediatric_support.R` 59–145 (`temporary_extraneous()`) | `child_clean.R` 2050–2200 | DOP-based SDE resolution with optional `exclude_from_dop_ids` |
+| `.child_valid()` / `valid()` | `pediatric_support.R` 10–32 | `child_clean.R` 4990–5033 | Eligibility predicate used throughout |
+
+**Function/name renames already documented in procedure** (treated as cosmetic): `valid()` → `.child_valid()`, `temporary_extraneous_infants()` / `temporary_extraneous()` → `identify_temp_sde()`, `id` → `internal_id`, `Exclude-SDE-Identical` → `Exclude-C-Identical`, `Exclude-Temporary-Extraneous-Same-Day` → `Exclude-C-Temp-Same-Day`. Step 5's `cleanbatch_infants()` caller → `cleanchild()`.
+
+## Known intentional changes encountered (logged briefly per procedure, no further analysis)
+
+- **dplyr → data.table refactor** of Early Step 13 block (`arrange` / `group_by` / `mutate` / `ungroup` / `select` → `order()` + `:=` with `by =`). Cosmetic idiom change; logic equivalent.
+- **`Exclude-SDE-Identical` → `Exclude-C-Identical`** (via `.child_exc(param, "Identical")`) — code rename (covered by 2026-04-14/16 rename).
+- **`Exclude-Temporary-Extraneous-Same-Day` → `Exclude-C-Temp-Same-Day`** — code rename.
+- **User `id` → `internal_id`** for sort key, tiebreaker, and `setkey()` throughout Early Step 13 and `identify_temp_sde()`.
+- **`valid()` → `.child_valid()`** rename.
+- **`cat("...\n")` → `message("...")`** for both Early Step 13 and Step 5 progress messages.
+- **Step 5 debug block stripped to a warning** — reference `fwrite()`-ed three debug CSVs and `stop()`-ped; current just `warning()`s when the temp-SDE filter would incorrectly mark all rows in a group. Production-readiness cleanup.
+- **Helper column-subset optimization** — current passes a narrow 7-column subset to `identify_temp_sde()` so the internal `copy(df)` is cheap; reference `copy()`-ed the full `data.df`.
+- **Defensive `is.null(df$subjid)` / `is.null(df$param)` blocks removed** from helper (Session 8 F51 / D-a cleanup — branches never fired; all callers pass both columns).
+- **`keyby = .(subjid, param, agedays, id)` → `by = ...` + explicit `order(...)`** in helper narrowing — cosmetic.
+- **`extraneous_result & valid.rows` redundant mask dropped** at helper return (Session 8 cleanup — `extraneous` already gated by `valid.rows & extraneous.this.day` in its `:=` assignment).
+- **Named-vector mapping → direct integer indexing** at helper return (`setNames(..., df$orig_row)` + `as.character(original_rows)` lookup → `result <- logical(nrow(df)); result[df$orig_row] <- df$extraneous`) — Session 8 cleanup, behavior equivalent.
+- **`janitor::round_half_up(..., 3)` then `round_half_up(..., 2)` double-rounding of `absdmedian.spz` / `absdmedian.dopz`** removed in current — per procedure, "Don't flag rounding-tolerance removal."
+- **Commented-out mid-Step-5 `saveRDS()` debug block** removed.
+- **`data.table(data.df)` re-conversion** after reference's dplyr chain — no longer needed in current.
+
+## Findings batched for review
+
+Per procedure, findings are logged with category. **No code changes made.**
+
+### AJ8. Early Step 13 `keep_id` empty-group handling (Bug fix — minor robustness / warning avoidance)
+
+- **Reference:** `Infants_Main.R:2634–2636`
+  ```r
+  keep_id = ifelse(agedays == 0,
+                   min(id[exclude == "Include"], na.rm = TRUE),
+                   max(id[exclude == "Include"], na.rm = TRUE))
+  ```
+- **Current:** `child_clean.R:2638–2643`
+  ```r
+  data.df[, keep_id := {
+    incl_ids <- internal_id[exclude == "Include"]
+    if (length(incl_ids) == 0L) NA_integer_
+    else if (agedays[1L] == 0L) min(incl_ids)
+    else max(incl_ids)
+  }, by = .(subjid, param, agedays, v)]
+  ```
+- **Issue:** Current guards against all-excluded `(subjid, param, agedays, v)` groups with an explicit `length(incl_ids) == 0L` check. Reference's `ifelse(..., min(...), max(...))` with `na.rm = TRUE` has no such guard — when a group has zero Include rows (e.g., all-Missing or all-already-excluded same-day duplicates), `min(integer(0), na.rm = TRUE)` / `max(integer(0), na.rm = TRUE)` returns `Inf` / `-Inf` along with an R warning: `no non-missing arguments to min/max; returning Inf`.
+- **Practical impact:** Behavior downstream is equivalent. In an all-excluded group, `has_dup` is FALSE (because `n_same_value = sum(exclude == "Include") = 0`), so the filter `has_dup & exclude == "Include" & id != keep_id` cannot fire regardless of what `keep_id` contains. Reference does not produce wrong results — it just leaks spurious warnings to users whose datasets contain all-excluded same-day groups (most likely from all-Missing rows on a given day).
+- **Category:** Bug fix (warning avoidance / robustness). Logic pitfall category: **NA / empty-set handling** (`min()` / `max()` on empty subset → `Inf` / `-Inf` with warning).
+- **Status:** Closed — current already correct, no change needed.
+
+### AJ9. Reference `valid()` regex does not catch `"Missing"` / `"Not cleaned"` (Bug fix — latent in reference; current corrects via documented code rename)
+
+- **Reference:** `pediatric_support.R:21`
+  ```r
+  keep <- !grepl("^Exclude", exclude)
+  ```
+- **Current:** `child_clean.R:5020`
+  ```r
+  keep <- !grepl("^Exclude", exclude)
+  ```
+- **Issue:** The regex is the same between the two files, but the exclusion-code strings it matches against are different. Reference's preprocessing assigns bare `"Missing"` and `"Not cleaned"` codes (no `Exclude-` prefix) at:
+  - `Infants_Main.R:1207` — `fifelse(is.na(v) | agedays < 0, 'Missing', 'Include')`
+  - `Infants_Main.R:1212` — `data.all[param == "HEADCM" & agedays > (3*365.25), exclude := "Not cleaned"]`
+  - `Infants_Main.R:1387` — `data.all[is.na(tbc.sd), exclude := 'Missing']`
+  - `Infants_Main.R:1391` — `data.all[param == "HEADCM" & agedays >= 5*365.25, exclude := 'Missing']` (current's AJ7 recategorized this to `Exclude-Not-Cleaned`)
+
+  Neither `"Missing"` nor `"Not cleaned"` starts with `Exclude`, so reference's `!grepl("^Exclude", exclude)` returns TRUE for both — silently including these ineligible rows in `valid.rows` at every Step that calls `valid()`.
+- **Where it matters in Step 5:** At Step 5, the in-helper flag `extraneous.this.day := (.N > 1), by = .(subjid, param, agedays)` runs inside `valid.rows`. Reference counts Missing/Not-cleaned rows as valid, so a subject with (say) two HC measurements in the 3–5y window (both `"Not cleaned"`, both carrying real `tbc.sd` from the recentering pass before the 1387 safety mark overwrites NA tbc.sd) could have one row silently re-labeled `"Exclude-Temporary-Extraneous-Same-Day"`. The Missing/Not-cleaned row (with NA `tbc.sd` → NA `absdmedian.spz`) sorts last by `order(absdmedian.spz)`, so the SDE loser assignment may reassign codes in a way that depends on upstream row order.
+- **Current:** Uses the same regex but pairs it with renamed codes (`Exclude-Missing`, `Exclude-Not-Cleaned`), both of which `^Exclude` correctly catches. `.child_valid()` returns FALSE for these rows as intended.
+- **Category:** Bug fix in reference; current corrects via a side-effect of the 2026-04-14 / 2026-04-16 code rename. Logic pitfall categories: **Factor levels / exclusion codes** + **`.child_valid()` flag scope**.
+- **Status:** Closed — current already correct; the rename's bug-fix side effect is now on record in this findings log. Worth noting even though no code change is needed, because the rename was framed as cosmetic in the procedure's "Known intentional changes" section and the bug-fix dimension was not previously explicit.
+
+## Items NOT flagged (audit trail)
+
+For the record, reviewed and explicitly chosen not to open as findings — all either listed above under "Known intentional changes" or verified logic-equivalent:
+
+- Rename of `temporary_extraneous_infants()` → `identify_temp_sde()` and consolidation with `temporary_extraneous()` from `pediatric_support.R` — one helper in current vs. two near-duplicates in reference. Walked in detail in Session 8; no behavioral divergence.
+- The `valid.rows & extraneous.this.day` gating inside the helper — same logic in reference and current.
+- `keyby = .(subjid, param, agedays, id)` in helper subset → `by = ...` + explicit `order(...)` in current. Cosmetic.
+- `setNames(...)` named-vector lookup vs. direct integer indexing at helper return. Equivalent.
+- Step 5's progress-message style (`cat` → `message`, loss of explicit newline).
+- Pre-session inventory confirms only Step 5's first call to the helper is "initial" (no `exclude_from_dop_ids`); Main Step 13 is the sole non-NULL caller. Later recalc callers (Steps 6, 7, 9, 11 mid-loop, 11 end-of-step) reuse the same signature but go out of scope for this session.
+- `data.table(data.df)` re-conversion after reference's dplyr chain — current's pure-data.table refactor eliminates the need.
+
+## Open questions for Carrie — RESOLVED
+
+Carrie approved (in the turn that asked "OK to batch AJ8 + AJ9 as closed, write up the walkthrough note + update findings index + CLAUDE.mds, and commit/push?"). Both findings closed with no code change:
+
+- **AJ8** — current code is correct as-is; reference emits spurious warnings but behavior downstream is equivalent.
+- **AJ9** — current code is correct as-is; reference bug masked by the 2026-04-14/16 exclusion-code rename. Documenting here so the rename's bug-fix side effect is explicit.
+
+## Approval and next steps
+
+Per procedure, no code changes have been made in this session (both findings closed without change). No new test run needed — baseline unchanged at 63 / 48 / 28 / 41 / 13.
+
+Next session candidate per `R-child-AprJanComparison-procedure.md`: **Session 3 — Child Step 6 (CF)**. Major intentional change (new CF rescue scheme with `cf_rescue` parameter + lookup thresholds); expect a narrower comparison since most differences are intentional.
