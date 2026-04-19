@@ -94,20 +94,33 @@ For each diff that is NOT a known intentional change above, assign one of:
 
 ## Per-session workflow
 
-1. **Pick step(s) for the session** (see Step Ordering below). Confirm with Carrie at start.
-2. **Locate line ranges** in reference (`Infants_Main.R` / `pediatric_support.R`) and current (`child_clean.R`) for the step.
-3. **Diff** the two ranges. Either:
+1. **Pre-session git hygiene check.** Before doing anything else, run `git status` and `git log origin/<branch>..HEAD --oneline` to detect uncommitted modifications, untracked files, or local commits not yet pushed. Also check for accidental work in stale `/Users/Shared/` copies. If anything is found:
+   - Surface to Carrie immediately with a one-screen summary (which files, what session/scope they likely belong to)
+   - Confirm whether to commit/push first OR knowingly bundle into this session's commit
+   - Do NOT silently inherit prior-session state — at minimum, document the state in the new session's walkthrough note so the eventual commit message can attribute correctly
+   - This step exists because Sessions 12-14 of the algorithm walkthrough series silently went uncommitted; the catch-up was painful (commit `fa7f0df`)
+2. **Pick step(s) for the session** (see Step Ordering below). Confirm with Carrie at start.
+3. **Locate line ranges** in reference (`Infants_Main.R` / `pediatric_support.R`) and current (`child_clean.R`) for the step.
+4. **Diff** the two ranges. Either:
    - `Read` both ranges and compare in head, or
    - Use `diff` via Bash (`diff -u <reference> <current> | less`) and walk hunks.
-4. **For each diff,** classify:
+5. **For each diff,** explicitly walk the Logic Pitfalls checklist (below), then classify:
    - Function rename / file consolidation / known intentional change → log briefly, move on.
-   - Otherwise → categorize (Bug fix / Error / Unclear) and record context.
-5. **Cross-check support functions** if the step calls them (e.g., `ewma()`, `identify_temp_sde()`, `get_dop()`). Either compare in line or defer to the dedicated support-function session (Session 10).
-6. **Batch findings** at end of session in the dated walkthrough note (per `algorithm-walkthrough-procedure.md` pattern).
-7. **Update findings index** (`R-child-AprJanComparison-findings.md`) with one-liner per finding.
-8. **Carrie reviews and approves** findings.
-9. **Fix approved findings in the same session.**
-10. **Re-run tests** to confirm no regression. Reinstall package first.
+   - Otherwise → categorize (Bug fix / New error / Unclear / Intentional (other)) and record context, including which Logic Pitfalls category (if any) the finding falls into.
+6. **Cross-check support functions** if the step calls them (e.g., `ewma()`, `identify_temp_sde()`, `get_dop()`). Either compare in line or defer to the dedicated support-function session (Session 10).
+7. **Batch findings** at end of session in the dated walkthrough note (per `algorithm-walkthrough-procedure.md` pattern). Each session's walkthrough section should include:
+   - Pre-session baseline test counts
+   - Scope table (sub-area / reference lines / current lines / what)
+   - Known intentional changes encountered (logged briefly, no further analysis)
+   - Findings (numbered, categorized, with file:line refs and Logic Pitfalls category)
+   - **Items NOT flagged** subsection — list items reviewed and explicitly chosen not to open as findings; provides an audit trail showing what coverage was attempted
+   - Open questions for Carrie (if any)
+8. **Update findings index** (`R-child-AprJanComparison-findings.md`) with one-liner per finding. Use `AJ##` prefix (Apr/Jan) to distinguish from the walkthrough series' `F##` numbering. Number monotonically across all sessions of this comparison series (Session 2 starts at AJ8).
+9. **Carrie reviews and approves** findings.
+10. **Fix approved findings in the same session.**
+11. **Re-run tests** to confirm no regression. Reinstall package first; verify counts match the documented baseline (see "Tests to run after each fix" below).
+12. **Update CLAUDE.md notes.** Prepend a one-paragraph session summary to the "Last updated:" entry in both `gc-github-latest/CLAUDE.md` and `__Pipeline/CLAUDE.md`. Keep concise; name the session number, scope, key findings (with status), and final test counts. The "Last updated:" date may be kept at the most recent walkthrough's date if older.
+13. **Stage, commit, and push.** Single commit per session, with title `R-vs-R Apr/Jan Comparison Session N: <scope>`. Body should list any code changes (with line refs), the AJ## findings touched, and final test counts. Push to `origin/<branch>` immediately. Confirm via `git status` that the working tree is clean and `git log origin/<branch>..HEAD` is empty before ending the session — closes the loop on step 1.
 
 ---
 
@@ -132,15 +145,19 @@ Approximate total: 8–10 sessions.
 
 ## Output files
 
-**Per-session walkthrough notes:** `__Pipeline/gc-github-latest/walkthrough-todo-YYYY-MM-DD.md` — same pattern as existing notes (matches `algorithm-walkthrough-procedure.md`). Add an "R-vs-R comparison findings" section with batched findings.
+**Per-session walkthrough notes:** `__Pipeline/gc-github-latest/walkthrough-todo-YYYY-MM-DD.md` — same pattern as existing notes (matches `algorithm-walkthrough-procedure.md`). Add a top-level `# R-vs-R comparison — Session N — YYYY-MM-DD` section with batched findings.
 
-**Cross-session findings index:** `__Pipeline/gc-github-latest/R-child-AprJanComparison-findings.md` — single growing markdown file. One-liner per finding:
+If the day's filename already exists (e.g., a regular walkthrough session was done earlier the same day), append the R-vs-R section to that file after a horizontal rule (`---`) separator. Do NOT create a parallel file with a suffix — keep one walkthrough-todo file per calendar day.
+
+**Cross-session findings index:** `__Pipeline/gc-github-latest/R-child-AprJanComparison-findings.md` — single growing markdown file. One section per session, one bullet per finding:
 
 ```
-- [F##] Step N: brief description — Category — Status — link to walkthrough note
+- [AJ##] Step N: brief description — Category — Status — file:line refs (or commit ref if fixed)
 ```
 
-Status values: `open` → `approved` → `fixed` → `closed`.
+Status values: `open` → `approved` → `fixed` → `closed`. Items can also go directly to `closed` when no change is needed (e.g., bug fixes already present in current code, intentional changes confirmed by Carrie).
+
+**CLAUDE.md updates:** at end of each session, prepend a one-paragraph summary to the "Last updated:" entry in both `gc-github-latest/CLAUDE.md` and `__Pipeline/CLAUDE.md`. The walkthrough-todo file is the authoritative detail; the CLAUDE.md note is a pointer + key takeaways.
 
 ---
 
@@ -175,7 +192,7 @@ Baseline child counts (as of Session 14, 2026-04-22): **63 / 48 / 28 / 41 / 13**
 
 ## Logic pitfalls to watch for at each diff
 
-These are categories of subtle bugs that have surfaced in prior walkthroughs. When inspecting a diff, explicitly check each of these — most "New error" findings will fall into one of them.
+These are categories of subtle bugs that have surfaced in prior walkthroughs. When inspecting a diff, explicitly check each of these — most "New error" findings will fall into one of them. Per workflow step 5, name the pitfall category in each finding so the index can be cross-referenced over time.
 
 ### Boundary changes
 
