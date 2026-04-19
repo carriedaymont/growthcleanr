@@ -644,3 +644,112 @@ Carrie approved (in the turn that asked "OK to batch AJ8 + AJ9 as closed, write 
 Per procedure, no code changes have been made in this session (both findings closed without change). No new test run needed — baseline unchanged at 63 / 48 / 28 / 41 / 13.
 
 Next session candidate per `R-child-AprJanComparison-procedure.md`: **Session 3 — Child Step 6 (CF)**. Major intentional change (new CF rescue scheme with `cf_rescue` parameter + lookup thresholds); expect a narrower comparison since most differences are intentional.
+
+---
+
+# R-vs-R comparison — Session 3 — 2026-04-19
+
+**Scope:** Main Child Step 6 (CF detection + rescue). Per procedure, this step has the largest intentional-change surface of the comparison series (CF rescue scheme redesign) — expected to yield fewer findings than Sessions 1/2, but with higher importance since CF is a well-trafficked step.
+
+Per `R-child-AprJanComparison-procedure.md`. Pure R-vs-R comparison; reference (Jan 2026) is `__Pipeline/current-infant-R-growthcleanr/growthcleanr/R/Infants_Main.R` plus `pediatric_support.R`; current (Apr 2026) is `__Pipeline/gc-github-latest/R/child_clean.R`.
+
+This is a **comparison-only** session per procedure — **no code edits made.** **No findings opened this session.** All non-intentional diffs are housekeeping / cleanup with logic-equivalent behavior in both reference and current; see "Items NOT flagged" below for the audit trail.
+
+## Pre-session git hygiene
+
+Clean working tree; up to date with `origin/efficiency-updates`; no untracked work in stale `/Users/Shared/` copies.
+
+## Pre-session baseline tests
+
+Baseline retained from prior sessions (nothing touched since): **63 / 48 / 28 / 41 / 13**. Adult tests not re-run — no adult files in scope.
+
+## Scope
+
+| Sub-area | Reference lines | Current lines | What |
+|---|---|---|---|
+| Step 6 outer frame + entry guard | `Infants_Main.R` 2677–2700 | `child_clean.R` 2673–2690 | `sde_identical_rows` init; `include.carryforward` wrapper (removed in current); `not_single` and `valid_set` construction |
+| CF pre-filter by sp_key | `Infants_Main.R` 2702–2715 | `child_clean.R` 2692–2705 | `uniqueN(v.orig) < .N` SP-level dup filter |
+| CF detection (prior-day single-value match) | `Infants_Main.R` 2717–2755 | `child_clean.R` 2707–2743 | Six-step data.table join detecting current-matches-prior-single pattern |
+| CF flag writeback | `Infants_Main.R` 2760–2815 | `child_clean.R` 2747–2758 | Assign `Exclude-Carried-Forward` / `Exclude-C-CF`; `any_cf` short-circuit |
+| Temp-SDE re-run post-CF | `Infants_Main.R` 2822–2836 | `child_clean.R` 2763–2773 | Reset temp SDEs, re-run helper now that CFs are excluded |
+| `wholehalfimp` computation | `Infants_Main.R` 2838–2876 | `child_clean.R` 2775–2784 | Row-level whole / half imperial unit flag |
+| SDE-Identical save & remove | `Infants_Main.R` 2879–2885 | `child_clean.R` 2786–2790 | Temporarily pull SDE-Identicals before string detection |
+| `ageday_has_include` + positional string detection | `Infants_Main.R` 2899–2931 | `child_clean.R` 2795–2826 | Originator, `cf_string_num`, `originator_z` assignment |
+| String-number / z propagation loop | `Infants_Main.R` 2932–2957 | `child_clean.R` 2827–2852 | `max_iterations` loop filling `cf_string_num` / `originator_z` across consecutive CFs |
+| `seq_win` / `cs` / `absdiff` | `Infants_Main.R` 2959–2977 | `child_clean.R` 2854–2866 | Position-in-string + z-diff-from-originator |
+| Column cleanup (first wave) | `Infants_Main.R` 2980–2981 | `child_clean.R` 2868–2869 | Drop intermediate string-detection columns |
+| CF rescue (big intentional change) | `Infants_Main.R` 2990–3031 | `child_clean.R` 2871–2948 | Reference: fixed 0.05 / 0.1 thresholds, 4 rescue codes (still exclusions) — current: `cf_rescue = "none"/"standard"/"all"` + lookup table, rescued CFs → `Include` with `cf_rescued` tag |
+| SDE-Identical restore + final sort | `Infants_Main.R` 3036–3040 | `child_clean.R` 2952–2956 | `rbind` + `order(subjid, param, agedays, id / internal_id)` |
+| `cf_detail` columns (current only) | — | `child_clean.R` 2958–2979 | Optional `cf_status` / `cf_deltaZ` output columns |
+| Post-Step-6 column cleanup (current only) | — | `child_clean.R` 2981–2989 | Drop `v.orig, wholehalfimp, seq_win, cs, absdiff, ageday_has_include, orig_ageday, cf_interval` |
+
+**Out of scope per procedure:** `.cf_rescue_lookup()` implementation (`child_clean.R:2406` and `cf-rescue-thresholds.md`) — reference has nothing to compare against.
+
+## Known intentional changes encountered (logged briefly per procedure, no further analysis)
+
+- **CF rescue scheme redesign** (2026-04-14; documented in procedure's intentional-changes list and `cf-rescue-thresholds.md`):
+  - New `cf_rescue = c("standard", "none", "all")` parameter replaces deprecated `include.carryforward`.
+  - Rescued CFs become `"Include"` and are tagged via new `cf_rescued` column (`"Rescued"` for standard-mode lookup-based, `"Rescued-All"` for `cf_rescue = "all"` mode).
+  - Reference's four rescue codes (`Exclude-1-CF-deltaZ-<0.05`, `Exclude-1-CF-deltaZ-<0.1-wholehalfimp`, `Exclude-Teen-2-plus-CF-deltaZ-<0.05`, `Exclude-Teen-2-plus-CF-deltaZ-<0.1-wholehalfimp`) are gone — rescued CFs are now Include; unrescued stay as `Exclude-C-CF`.
+  - Age / interval / param / rounding-specific lookup thresholds (0.05 / 0.20 / 0.40 / NR) replace the fixed 0.05 / 0.1 thresholds. Reference's age/sex gating (teens only for multi-CF rescue) is gone; lookup table handles age sensitivity via its age-bin axis.
+  - Optional `cf_detail = TRUE` adds `cf_status` (`"CF-NR"` / `"CF-Resc"` / `NA`) and `cf_deltaZ` columns to output.
+  - `cf_rescue = "all"` rescues every detected CF including shared-SPA CFs (CF on a day that also has an Include); downstream Main Child Step 13 resolves any resulting multi-Include SPAs (Session 4a change).
+- **`include.carryforward` deprecated** — no longer wraps Step 6. Reference's `if (!include.carryforward) { ... }` block is gone; Step 6 always runs. `include.carryforward` remains as an argument of `.child_valid()` only, not exposed through `cleangrowth()`.
+- **Exclusion code rename**:
+  - `Exclude-Carried-Forward` → `Exclude-C-CF` (via `.child_exc(param, "CF")`).
+  - `Exclude-Temporary-Extraneous-Same-Day` → `Exclude-C-Temp-Same-Day`.
+  - `Exclude-SDE-Identical` → `Exclude-C-Identical`.
+- **User `id` → `internal_id`** in all sort keys (`order(subjid, param, agedays, internal_id)` at CF detection sort `child_clean.R:2711` and at SDE-Identical restore `child_clean.R:2955`).
+- **`valid()` → `.child_valid()`** rename at the top of Step 6.
+- **`temporary_extraneous_infants()` → `identify_temp_sde()`** at the temp-SDE re-run call. Helper walked in detail in Session 2 + Session 8; not re-walked here.
+- **`cat(...)` → `message(...)`** for progress messages (Step 6 progress lines, CF-pre-filter count, CF-rescue-pre-filter log).
+- **Reference's `not_single` via `table(paste0(subjid, "_", param))` + `%in% names(...)`** (`Infants_Main.R:2694–2695`) → **current's data.table by-group `.N > 1` + right-join** (`child_clean.R:2686–2687`). Behavior equivalent; current is cleaner and avoids the theoretical underscore-concat key collision. Session 1's AJ4 is isomorphic (`names(table(subjid) > 1)` no-op filter).
+- **`janitor::round_half_up(abs(...), 3)` double-rounding of `absdiff`** removed in current (`absdiff` is now just `abs(sd.orig_uncorr - originator_z)`). Per procedure, "Don't flag rounding-tolerance removal."
+- **Dead commented-out code** — reference `Infants_Main.R:2762–2808` has two large blocks of commented-out prior CF-detection implementations (dplyr / `map_lgl`, legacy data.table); removed in current.
+- **`### CP DROP IN` / `### CP UP` Stata-era marker comments** and commented-out alternate wholehalfimp formulations (`Infants_Main.R:2838–2850`) — removed in current.
+- **Stale-changelog comments** — reference's `CP TOGGLED TO FALSE but then back to true because nothing changed?`, `Removed nnte filter`, `Fix:`, `Fix CF rescue logic` blocks — removed in current (F58 / F75 pattern from walkthrough series).
+- **`#### CP Untested, replicate of above code in data.table()`** orphan commented-out stub — removed in current.
+
+## Findings batched for review
+
+**No findings opened this session.** All non-intentional diffs are cleanup / housekeeping with equivalent behavior in both reference and current; see "Items NOT flagged" below for the audit trail.
+
+## Items NOT flagged (audit trail)
+
+For the record, reviewed and explicitly chosen not to open as findings — each is equivalent behavior or already covered by the intentional-changes list. No AJ## number assigned.
+
+1. **Reference `cf_string_length` dead variable** (`Infants_Main.R:2960` creates the column `sum(cf_binary == TRUE)` by (subjid, param, cf_string_num); `:2981` drops it). Grep confirms no read sites in between — reference's rescue logic keys on `max(seq_win)` to distinguish single-CF vs multi-CF strings, not on `cf_string_length`. Current has removed the computation entirely. Equivalent behavior. Category: cosmetic cleanup.
+
+2. **Reference `is_eligible_include` no-op drop** (`Infants_Main.R:2980–2981` drops this column in cleanup, but it is never created anywhere in Step 6 or earlier in the algorithm — data.table `:= NULL` on a non-existent column is silent). Current's cleanup list omits it. Equivalent behavior. Category: cosmetic cleanup.
+
+3. **`wholehalfimp` for `HEIGHTCM` / `HEADCM` uses redundant `%% 1 | %% 0.5` OR in reference** (`Infants_Main.R:2869–2870` and `:2874–2875`); current uses only `%% 0.5 < 0.01` (`child_clean.R:2782, :2784`). The `%% 1 < 0.01` branch is redundant — for a whole integer N, both `N %% 1` and `N %% 0.5` equal 0, and for a half-integer N+0.5, `N+0.5 %% 0.5` equals 0 while `N+0.5 %% 1` equals 0.5. The `%% 0.5` check alone catches both whole and half cases. `WEIGHTKG` line uses only `%% 1 < 0.01` in both impls (reference `:2865`, current `:2780`) — whole-pound check only, correct in both. Equivalent behavior. Category: cosmetic cleanup.
+
+4. **Step 6 working columns persist past Step 6 in reference** (`v.orig`, `wholehalfimp`, `seq_win`, `cs`, `absdiff`, `ageday_has_include`). Grep confirms no read sites past Step 6 in reference — all later uses of similar names are either Step 2b's own local `tmp[, seq_win := sequence(.N), by = subjid]` (on a different data.table, scoped out) or Step 13's own `absdiff_rel_to_median` / `absdiff_dop_med` (different variable names). Current drops all Step 6 working columns explicitly (`child_clean.R:2984–2989`). Orphan columns in reference are benign. Equivalent behavior. Category: output tidiness.
+
+5. **Reference `not_single` paste-concat construction** — `paste0(subjid, "_", param) %in% names(tmp)[tmp > 1]` has theoretical underscore-concat key-collision risk, but the `WEIGHTKG` / `HEIGHTCM` / `HEADCM` param vocabulary is fixed and contains no underscores, so collision is impossible in practice. Current uses clean `by = .(subjid, param)` group-aggregation instead. Isomorphic to Session 1's AJ4. Not re-flagged here — kept as an audit-trail note that the same latent pattern was reviewed.
+
+6. **`cf_subset <- cf_subset[order(subjid, param, agedays, internal_id)]` (current)** creates a re-ordered copy; reference's `setorder(cf_subset, subjid, param, agedays, id)` orders in place. Same final ordering; trivial efficiency nit only. (The `id` → `internal_id` rename is the only meaningful difference and is documented in the intentional-changes list.)
+
+7. **Current's `data.df[!exclude == "Exclude-C-Identical"]`** parses as `!(exclude == "Exclude-C-Identical")`, i.e., equivalent to `exclude != "Exclude-C-Identical"` — matches reference's `data.df[exclude != "Exclude-SDE-Identical"]` (after rename). Same filter.
+
+8. **Temp-SDE re-run helper call** — `temporary_extraneous_infants(data.df)` (ref) → `identify_temp_sde(data.df[, .(id, internal_id, subjid, param, agedays, tbc.sd, exclude)])` (current). Current passes a narrower column subset for efficient `copy()` inside the helper. Helper walked in detail in Sessions 2 + 8; no behavioral divergence in the re-run call path.
+
+9. **Sort direction for SDE-Identical restore** — reference `order(subjid, param, agedays, id)` vs current `order(subjid, param, agedays, internal_id)`. `id` → `internal_id` rename only (documented intentional change). Same sort semantics.
+
+10. **Originator selection**: both impls use `exclude == "Include" & nextcf == TRUE, originator := TRUE`. The comment "Any Include can be an originator - ageday_has_include only restricts CF rescue eligibility" is present in both. Identical logic.
+
+11. **String propagation loop** — both use `for (i in 1:max_iterations)` with `shift(cf_string_num, type = "lag")` under the same `(ageday_has_include == FALSE | is.na(ageday_has_include))` guard. Identical structure and conditions.
+
+12. **CF rescue outer filter** — both gate on `!is.na(seq_win) & (ageday_has_include == FALSE | is.na(ageday_has_include))`. Current adds an explicit `seq_win > 0` condition at the outer filter; reference folds this into the inner rescue-code branches via `seq_win != 0`. Equivalent effective filter — the outer gate plus inner filter in reference covers the same rows as current's combined outer gate.
+
+## Open questions for Carrie — RESOLVED
+
+No open questions. 0 findings to approve; the housekeeping items above are informational only.
+
+Carrie approved (in the turn that asked "OK to proceed with writing up and committing?") the session conclusion: 0 AJ## findings, session closes with walkthrough note + CLAUDE.md updates + single commit.
+
+## Approval and next steps
+
+Per procedure, no code changes have been made in this session. No new test run needed — baseline unchanged at 63 / 48 / 28 / 41 / 13. Adult tests not re-run — no adult files in scope.
+
+Next session candidate per `R-child-AprJanComparison-procedure.md`: **Session 4 — Child Step 7 (BIV) + Child Step 9 (Evil Twins)**. Step 7 has known intentional change (eight `biv.z.*` per-cell parameters replacing single `sd.extreme` / `z.extreme`); Step 9 expected low–medium complexity.

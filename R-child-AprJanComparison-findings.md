@@ -31,3 +31,17 @@ Walkthrough note: [walkthrough-todo-2026-04-19.md](walkthrough-todo-2026-04-19.m
 - [AJ9] `.child_valid()` / `valid()`: reference assigns bare `"Missing"` and `"Not cleaned"` codes (no `Exclude-` prefix) at `Infants_Main.R:1207`, `:1212`, `:1387`, `:1391`. Reference's `!grepl("^Exclude", exclude)` returns TRUE for both, silently counting these rows as valid — most likely trigger is a subject with two HC measurements in the 3–5y window (both `"Not cleaned"`) where `extraneous.this.day` could re-label one as `Exclude-Temporary-Extraneous-Same-Day`. Current's 2026-04-14/16 code rename (`Missing` → `Exclude-Missing`, `Not cleaned` → `Exclude-Not-Cleaned`) fixes this as a side effect — Bug fix — closed (current already correct via rename; documented here so the bug-fix side effect is explicit) — `pediatric_support.R:21` vs `child_clean.R:5020`. Pitfalls: **Factor levels / exclusion codes** + **`.child_valid()` flag scope**.
 
 **Session 2 status:** Both findings closed with no code change needed. AJ8 is a minor warning-avoidance improvement already in current. AJ9 documents a bug-fix side effect of the 2026-04-14/16 exclusion-code rename that was previously framed as cosmetic. No tests re-run — baseline unchanged at 63 / 48 / 28 / 41 / 13.
+
+---
+
+## Session 3 — 2026-04-19 — Step 6 (CF detection + rescue)
+
+Walkthrough note: [walkthrough-todo-2026-04-19.md](walkthrough-todo-2026-04-19.md) — see "R-vs-R comparison — Session 3" section.
+
+**Findings opened this session: 0.**
+
+AJ## numbering does not advance. The non-intentional diffs surfaced during the diff are all housekeeping / cleanup with logic-equivalent behavior — logged under "Items NOT flagged (audit trail)" in the walkthrough note rather than as standalone findings (e.g., reference's dead `cf_string_length` variable; reference's no-op drop of never-created `is_eligible_include`; redundant `%% 1` OR branch in `wholehalfimp` for HEIGHTCM/HEADCM; Step 6 working columns persisting past Step 6 in reference; paste-based `not_single` collision risk isomorphic to Session 1's AJ4).
+
+The big intentional change — CF rescue scheme redesign (lookup-table + `cf_rescue` + `cf_rescued` + `cf_detail`; rescued CFs → `Include` rather than different exclusion codes) — is documented in the procedure's "Known intentional changes" list and in `cf-rescue-thresholds.md`, so logged briefly and not analyzed further here.
+
+**Session 3 status:** Session closed with 0 findings and no code change. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Next session candidate: **Session 4 — Step 7 (BIV) + Step 9 (Evil Twins)**.
