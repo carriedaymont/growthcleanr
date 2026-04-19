@@ -74,6 +74,7 @@ These are documented design changes since reconciliation. If a diff matches one 
 - **File consolidation:** Reference's `Infants_Main.R` + `pediatric_support.R` consolidated into current `child_clean.R`. Cosmetic; not a logic change.
 - **`as_matrix_delta` made internal** (no longer exported).
 - **`ewma_cache_init()` / `ewma_cache_update()` added** — incremental EWMA caching for batch performance. Walked in Session 7b (2026-04-18). Reference uses only `ewma()` directly.
+- **`ewma_window` parameter / window default 25 → 15** — `ewma()` default changed from 25 (reference) to 15 (current). `ewma_window` is a configurable parameter (default 15) passed consistently to all `ewma()` and `ewma_cache_init()` calls. Confirmed intentional (AJ12, 2026-04-19).
 - **`gc_preload_refs()` added** — pre-loads reference closures for repeated calls.
 - **`cached_results` / `changed_subjids` added** — partial re-run support.
 

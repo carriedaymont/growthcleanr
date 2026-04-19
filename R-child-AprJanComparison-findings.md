@@ -56,3 +56,13 @@ Walkthrough note: [walkthrough-todo-2026-04-22.md](walkthrough-todo-2026-04-22.m
 - [AJ11] Step 9: `any(start_df$otl, na.rm = TRUE)` vs reference `any(start_df$oob)` — current adds `na.rm = TRUE` preventing `if (NA)` error when `otl` contains NAs and no TRUE values — Bug fix — closed (current already correct, no change needed) — `Infants_Main.R:3187` vs `child_clean.R:3123`. Pitfall: **NA / empty-set handling**.
 
 **Session 4 status:** 2 findings (AJ10 — Intentional (other); AJ11 — Bug fix). Both closed with no code change needed. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Next session candidate: **Session 5 — Child Step 11 (EWMA1)**.
+
+---
+
+## Session 5 — 2026-04-19 — Step 11 (EWMA1: Extreme EWMA)
+
+Walkthrough note: [walkthrough-todo-2026-04-19.md](walkthrough-todo-2026-04-19.md) — see "R-vs-R comparison — Session 5" section.
+
+- [AJ12] Step 11 / `ewma()` signature: EWMA window default changed from 25 (reference) to 15 (current `ewma_window` parameter); reference comment says 25 was "Changed … to 25 for better accuracy with minimal efficiency loss" — Intentional (other) — closed (confirmed intentional, no code change needed; all ewma() and ewma_cache_init() call sites already use `window = ewma_window` consistently) — `Infants_Main.R:2013–2015` vs `child_clean.R:1695`; call site `Infants_Main.R:3325` vs `child_clean.R:3285`. Pitfall: **Boundary changes**.
+
+**Session 5 status:** 1 finding (AJ12 — Intentional (other)). Closed with no code change. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run.

@@ -753,3 +753,108 @@ Carrie approved (in the turn that asked "OK to proceed with writing up and commi
 Per procedure, no code changes have been made in this session. No new test run needed — baseline unchanged at 63 / 48 / 28 / 41 / 13. Adult tests not re-run — no adult files in scope.
 
 Next session candidate per `R-child-AprJanComparison-procedure.md`: **Session 4 — Child Step 7 (BIV) + Child Step 9 (Evil Twins)**. Step 7 has known intentional change (eight `biv.z.*` per-cell parameters replacing single `sd.extreme` / `z.extreme`); Step 9 expected low–medium complexity.
+
+---
+
+# R-vs-R comparison — Session 5 — 2026-04-19
+
+Child Step 11 (EWMA1: Extreme EWMA)
+
+Per `R-child-AprJanComparison-procedure.md`. Pure R-vs-R diff of reference `Infants_Main.R` Step 11 (~lines 3257–3434) against current `child_clean.R` Step 11 (~lines 3206–3373).
+
+**1 finding opened and closed (AJ12 — Intentional (other), confirmed by Carrie). No code change.**
+
+## Pre-session git hygiene
+
+Clean working tree; up to date with `origin/efficiency-updates`; no untracked work in stale `/Users/Shared/` copies.
+
+## Pre-session baseline tests
+
+Baseline retained from prior sessions (nothing touched since Session 4 commit): **63 / 48 / 28 / 41 / 13**. Adult tests not re-run — no adult files in scope.
+
+## Scope
+
+| Sub-area | Reference lines | Current lines | What |
+|---|---|---|---|
+| Step 11 header / comments | `Infants_Main.R:3257–3276` | `child_clean.R:3206–3219` | Block comments, progress message |
+| 11a. Pre-filter / setup | (none — reference has count-filter only) | `child_clean.R:3221–3243` | `\|tbc.sd\| > 3.5` pre-filter added in current; reference filters only by `n_include > 2` |
+| Count filter + `subj_with_sde` | `Infants_Main.R:3278–3287` | `child_clean.R:3225–3243` | `include_counts`, `sp_to_process`, `subj_with_sde` setup |
+| Per-group closure | `Infants_Main.R:3299–3375` | `child_clean.R:3261–3334` | `had_ewma1_before`, closure body, `.SDcols` |
+| exp_vals computation | `Infants_Main.R:3312–3322` | `child_clean.R:3273–3280` | Reference: `sapply` over data.frame; current: vectorized `diff` + `pmax` |
+| EWMA calls | `Infants_Main.R:3325–3326` | `child_clean.R:3285–3291` | Reference: bare `ewma(...)`, no `window` arg (default 25); current: `ewma(..., window = ewma_window, cache_env = ewma_cache)` (default 15) |
+| pot_excl criteria | `Infants_Main.R:3344–3351` | `child_clean.R:3305–3312` | Reference: double-`round_half_up` before each comparison; current: no rounding |
+| Worst-row tiebreaker | `Infants_Main.R:3367` | `child_clean.R:3326` | Reference: `order(..., -id, ...)` + double-round; current: `order(..., -internal_id, ...)`, no round |
+| `.SDcols` | `Infants_Main.R:3375` | `child_clean.R:3334` | Reference: `c('index', 'id', 'sex', 'agedays', 'tbc.sd', 'ctbc.sd', 'nnte', 'exclude')`; current: `c('internal_id', 'param', 'agedays', 'tbc.sd', 'ctbc.sd', 'exclude')` |
+| Debug capture block | `Infants_Main.R:3377–3388` | (removed) | Reference saves `ewma1_it1.*` columns on first iteration; removed in current (dead code) |
+| `has_new_excl` + targeted SDE recalc | `Infants_Main.R:3390–3414` | `child_clean.R:3336–3361` | Same structure; function/code renames only |
+| 11c. End-of-step temp SDE refresh | `Infants_Main.R:3417–3423` | `child_clean.R:3363–3373` | Same structure; function/code renames only |
+
+## Known intentional changes encountered (logged briefly per procedure, no further analysis)
+
+- **Exclusion code renames** — `Exclude-EWMA1-Extreme` → `Exclude-C-Traj-Extreme` (via `.child_exc(param, "Traj-Extreme")`); `Exclude-Temporary-Extraneous-Same-Day` → `Exclude-C-Temp-Same-Day`. Known 2026-04-14/16.
+- **`valid()` → `.child_valid()`** — inside the per-group closure at `child_clean.R:3265`. Known rename.
+- **`id` → `internal_id`** — in `.SDcols`, `had_ewma1_before` tracking, worst-row tiebreaker. Known 2026-04-12.
+- **`temporary_extraneous_infants()` → `identify_temp_sde()`** — in targeted SDE recalc and end-of-step refresh. Known rename; current also passes a narrow column subset to the helper, consistent with Sessions 2 + 8.
+- **`cat(...)` → `message(...)`** — for progress lines. Known intentional change.
+- **EWMA caching (`cache_env`)** — `new.env(parent = emptyenv())` created per closure invocation and passed to both `ewma()` calls so the delta matrix is built once and reused. Listed under "Known intentional changes: `ewma_cache_init()` / `ewma_cache_update()` added." The **ctbc.sd shortcut** (copy `ewma.fields` directly when `all(ctbc.sd[include_set] == tbc.sd[include_set])` — non-potcorr subjects, vast majority) is bundled with this: logically equivalent (for non-potcorr ctbc.sd == tbc.sd so EWMA result is identical).
+- **Debug capture block removed** (`Infants_Main.R:3377–3388`) — reference saves first-iteration EWMA columns to `data.df`; confirmed dead code per algorithm walkthrough Session 6 (capture block never populated columns because EWMA fields live inside the per-group closure).
+- **Rounding removal in `pot_excl` criteria and worst-row sort** — per procedure: "Do NOT flag rounding-tolerance removal."
+
+## Findings batched for review
+
+### AJ12. EWMA window default 25 → 15 (Unclear — awaiting Carrie's review)
+
+- **Reference:** `Infants_Main.R:2013–2015`
+  ```r
+  ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 25) {
+  # Added window parameter to limit EWMA to max window values on each side
+  # Changed default to 25 for better accuracy with minimal efficiency loss
+  ```
+  Reference Step 11 calls `ewma(agedays, tbc.sd, exp_vals, TRUE)` — no `window` argument, so uses default of 25 (`Infants_Main.R:3325`).
+
+- **Current:** `child_clean.R:1695`
+  ```r
+  ewma <- function(agedays, z, ewma.exp, ewma.adjacent = TRUE, window = 15, cache_env = NULL) {
+  # window limits the EWMA at each observation to the ±window nearest positions (default 15)
+  ```
+  Current Step 11 calls `ewma(agedays, tbc.sd, exp_vals, TRUE, window = ewma_window, cache_env = ewma_cache)` where `ewma_window` defaults to 15 (`child_clean.R:3285`).
+
+- **Issue:** The window controls how many nearest-position neighbors on each side contribute to the EWMA; positions beyond `window` get zero weight. For most EHR patients with fewer than ~30 observations per parameter, window=15 vs window=25 makes no difference. But the reference explicitly notes the default was "Changed … to 25 for better accuracy with minimal efficiency loss" (implying a smaller value was tried before and found inferior). The `ewma_window` parameter is documented in CLAUDE.md configurable parameters table (default 15) but is NOT in the procedure's "Known intentional changes" list.
+
+- **Resolution (Carrie, 2026-04-19):** Window=15 is correct and intentional. All `ewma()` and `ewma_cache_init()` call sites in the current code already pass `window = ewma_window` consistently; no code change needed. Added to procedure's "Known intentional changes" list.
+
+- **Category:** Intentional (other). Logic pitfall category: **Boundary changes** (numeric threshold / window size).
+
+- **File:line refs:** `Infants_Main.R:2013–2015` vs `child_clean.R:1695` (ewma() signature); `Infants_Main.R:3325` vs `child_clean.R:3285` (Step 11 call site).
+
+- **Status:** Closed — confirmed intentional, no code change needed.
+
+## Items NOT flagged (audit trail)
+
+Reviewed and explicitly chosen not to open as findings — each is equivalent behavior, in the known-intentional list, or per-procedure "do not flag":
+
+1. **`|tbc.sd| > 3.5` pre-filter added in current** (`child_clean.R:3231–3240`) — logically equivalent efficiency optimization. The exclusion criteria require BOTH `|dewma.all| > 3.5` AND `|tbc.sd| > 3.5`, so if no Include row in a group has `|tbc.sd| > 3.5`, no exclusion can fire. Groups skipped by the pre-filter would have produced zero exclusions anyway.
+
+2. **exp_vals vectorization** (`Infants_Main.R:3312–3322` vs `child_clean.R:3273–3280`) — `sapply` + data.frame → `diff` + `pmax`. Same mathematical formula; current avoids intermediate object allocation. `ifelse(...)` → `fcase(...)` — equivalent.
+
+3. **Rounding removal in `pot_excl` criteria** — reference `janitor::round_half_up(round_half_up(..., 3), 2)` before each threshold; current: raw values. Per procedure: "Do NOT flag rounding-tolerance removal."
+
+4. **Rounding removal in worst-row sort** — `order(pot_excl, round_half_up(round_half_up(abs(tbc.sd + dewma.all), 3), 2), -id, ...)` (ref) vs `order(pot_excl, abs(tbc.sd + dewma.all), -internal_id, ...)` (current). Round removal is per procedure; `id` → `internal_id` is known.
+
+5. **`.SDcols` change** — `index`, `sex`, `nnte` removed (none used inside closure; `nnte` was vestigial even in the reference per its own "Removed nnte filter" comment); `param` added (needed for `.child_exc(param, ...)` call, though `.child_exc` ignores the param argument). `id` → `internal_id` is known.
+
+6. **Debug capture block removed** (`Infants_Main.R:3377–3388`) — dead code; confirmed per Session 6 walkthrough.
+
+7. **`subj_with_sde` pre-computed before loop in both** — both reference and current compute this once and do not refresh it as SDEs are recalculated within the loop. Subjects that gain a new temp SDE mid-iteration won't be in `subj_with_sde` and won't receive targeted recalculation in subsequent passes. This is the same behavior in both; the end-of-step full refresh (11c) catches any residual drift.
+
+8. **Targeted SDE recalc (loop body)** (`Infants_Main.R:3397–3408` vs `child_clean.R:3342–3354`) — same structure; differences are function rename + narrow column subset + code rename. All known intentional changes.
+
+9. **End-of-step temp SDE refresh** (`Infants_Main.R:3420–3423` vs `child_clean.R:3363–3373`) — same structure; function rename + narrow column subset + code rename. All known intentional changes.
+
+10. **`sp_key` cleanup placement** — reference has a comment-labeled "Cleanup" block; current drops the comment and does `data.df[, sp_key := NULL]` immediately. Same effect.
+
+## Approval and next steps
+
+AJ12 confirmed intentional (Carrie, 2026-04-19). No code changes; baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Adult tests not re-run — no adult files in scope.
+
+Next session candidate per `R-child-AprJanComparison-procedure.md`: **Session 6 — Child Step 13 (Final SDE resolution)**. Multi-phase (B1 / B2 / B3); high complexity.
