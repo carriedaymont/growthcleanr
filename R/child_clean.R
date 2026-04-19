@@ -88,7 +88,8 @@
 # This file contains the main cleanchild() function and supporting utilities:
 #   - identify_temp_sde(): Temporary SDE resolution (Step 5)
 #   - calc_otl_evil_twins(): Identifies Evil Twins (Step 9)
-#   - calc_and_recenter_z_scores(): Recomputes z-scores (Steps 11 and 15)
+#   - calc_and_recenter_z_scores(): Recomputes recentered z-scores for the
+#       p_plus / p_minus perturbation columns (Child Step 15/16 pre-loop)
 #   - ewma() / ewma_cache_init() / ewma_cache_update(): EWMA machinery
 #   - .child_valid(): Identifies included/partially-included rows for each step
 #   - .child_exc(): Generates Exclude-C-{Reason} codes
@@ -128,12 +129,26 @@
 #
 
 
-# Helper: generate child exclusion code
-# Usage: .child_exc("WEIGHTKG", "BIV") -> "Exclude-C-BIV"
-#        .child_exc("HEIGHTCM", "CF")  -> "Exclude-C-CF"
-# param_val is accepted but ignored — codes are no longer param-specific.
-# The param_val argument is retained to avoid changing ~40 call sites.
-# Vectorized over param_val (works in data.table j expressions).
+#' Generate a child-algorithm exclusion code.
+#'
+#' Convenience wrapper that returns `paste0("Exclude-C-", suffix)`. The
+#' `param_val` argument is accepted but ignored — child exclusion codes
+#' are no longer param-specific (the row's `param` column carries that
+#' information) — and is retained only to avoid changing ~50 call sites.
+#' The function is vectorised over `suffix` (and `param_val`), so it
+#' works inside data.table `j` expressions.
+#'
+#' @param param_val ignored. Kept for call-site compatibility.
+#' @param suffix reason code (e.g. `"BIV"`, `"CF"`, `"Traj"`). Must
+#'   correspond to a level in `exclude.levels` or downstream factor
+#'   assignment will silently produce NA.
+#'
+#' @return Character scalar or vector: `"Exclude-C-"` prepended to
+#'   `suffix`. E.g. `.child_exc("WEIGHTKG", "BIV")` returns
+#'   `"Exclude-C-BIV"`; the first arg's value is irrelevant.
+#'
+#' @keywords internal
+#' @noRd
 .child_exc <- function(param_val, suffix) {
   paste0("Exclude-C-", suffix)
 }
@@ -1995,8 +2010,27 @@ sd_median <- function(param, sex, agedays, sd.orig) {
 
 # supporting (all) ---
 
-# function that takes in a parameter name and returns the designated other
-# parameter (DOP)
+#' Look up the designated other parameter (DOP) for a growth parameter.
+#'
+#' Maps a single parameter name to its paired "other parameter" used in
+#' cross-parameter plausibility checks (Child Steps 5, 6, 11, 13, 15/16,
+#' 19). The DOP assignments are: WEIGHTKG -> HEIGHTCM (height is weight's
+#' anchor), HEIGHTCM -> WEIGHTKG (weight is height's anchor), and
+#' HEADCM -> HEIGHTCM (height is HC's anchor; there is no reverse
+#' mapping).
+#'
+#' Scalar-only: the internal `if / else if / else` chain requires a
+#' scalar logical test, so callers must pass a scalar param string. In
+#' practice both call sites pass `df$param[1]` from a single-param
+#' working subset.
+#'
+#' @param param_name character scalar: one of `"WEIGHTKG"`,
+#'   `"HEIGHTCM"`, or `"HEADCM"`. No validation — anything other than
+#'   `"WEIGHTKG"` or `"HEIGHTCM"` falls through to the HEADCM branch
+#'   and returns `"HEIGHTCM"`.
+#'
+#' @return Character scalar: the DOP for the given param.
+#'
 #' @keywords internal
 #' @noRd
 get_dop <- function(param_name){
@@ -2242,13 +2276,50 @@ calc_otl_evil_twins <- function(df){
 
 # moderate ewma ----
 
-# function to calculate and recenter z scores for a given column
-# df: data frame with parameter, agedays, sex, cn
-# cn: column name to calculate, smooth, and recenter
-# ref.data.path: reference data path
-#
-# returns df with additional column, tbc.(cn), which is the recentered z-score
-# for the input
+#' Recalculate recentered z-scores for a modified measurement column.
+#'
+#' Used by Child Step 15/16 (EWMA2 / moderate trajectory outliers) to
+#' compute `tbc.p_plus` and `tbc.p_minus` from pre-filled `p_plus` /
+#' `p_minus` columns — the ±5%-weight / ±1 cm perturbations of each
+#' included value. The same WHO/CDC blending window and NA-fallback
+#' logic as the main `cleangrowth()` z-score calculation are applied
+#' here so that the perturbed z-scores are on the same footing as
+#' `tbc.sd`.
+#'
+#' The `sd.median` column (populated by the main recentering in
+#' `cleangrowth()`) must already be present on `df`. The helper looks
+#' it up per row rather than recomputing or re-merging the recentering
+#' file.
+#'
+#' Called twice per batch from the Step 15/16 pre-loop inside
+#' `cleanchild()`, once with `cn = "p_plus"` and once with
+#' `cn = "p_minus"`. Both callers pass pre-built `measurement.to.z` /
+#' `measurement.to.z_who` closures so the expensive reference-table
+#' reads happen once per batch rather than once per call.
+#'
+#' @param df data.table with columns `param`, `agedays`, `sex`,
+#'   `sd.median`, and the measurement column named by `cn`. Modified
+#'   in place: intermediate columns `cn.orig_cdc`, `cn.orig_who`,
+#'   `cn.orig`, and a new `tbc.<cn>` column are added.
+#' @param cn character scalar naming the measurement column to
+#'   z-score and recenter (e.g. `"p_plus"` or `"p_minus"`). The output
+#'   column is named `paste0("tbc.", cn)`.
+#' @param ref.data.path path to reference-table directory; `""` uses
+#'   the installed package's `inst/extdata/`. Only consulted when
+#'   `measurement.to.z` / `measurement.to.z_who` are NULL.
+#' @param measurement.to.z optional pre-built CDC-only closure from
+#'   `read_anthro(..., cdc.only = TRUE)`. If NULL, is constructed here
+#'   (one disk read).
+#' @param measurement.to.z_who optional pre-built WHO-blended closure
+#'   from `read_anthro(..., cdc.only = FALSE)`. If NULL, is
+#'   constructed here (one disk read).
+#'
+#' @return The input `df` with an additional `tbc.<cn>` column
+#'   containing the recentered, age-blended CSD z-score of the
+#'   measurement column. The intermediate columns `cn.orig_cdc`,
+#'   `cn.orig_who`, and `cn.orig` are also left on `df` but are not
+#'   consumed downstream.
+#'
 #' @keywords internal
 #' @noRd
 calc_and_recenter_z_scores <- function(df, cn, ref.data.path,
@@ -2258,50 +2329,53 @@ calc_and_recenter_z_scores <- function(df, cn, ref.data.path,
   cn.orig_cdc <- param <- agedays <- sex <- cn.orig_who <- cn.orig <- subjid <-
     tbc.cn <- sd.median <- NULL
 
-  # for infants, use z and who
-  # Use pre-built closures if provided (avoids repeated disk reads from call sites)
+  # Use pre-built closures if provided (the Step 15/16 callers always do).
+  # The NULL fallback builds them on the fly — one disk read per closure —
+  # and exists for direct / debugging use only.
   if (is.null(measurement.to.z))
     measurement.to.z <- read_anthro(ref.data.path, cdc.only = TRUE)
   if (is.null(measurement.to.z_who))
     measurement.to.z_who <- read_anthro(ref.data.path, cdc.only = FALSE)
 
-  # calculate "standard deviation" scores
+  # CSD z-scores against each reference, one closure call per row of df.
   df[, cn.orig_cdc := measurement.to.z(param, agedays, sex, get(cn), TRUE)]
   df[, cn.orig_who := measurement.to.z_who(param, agedays, sex, get(cn), TRUE)]
 
-  # Fix smoothing formula
-  # Match base z-score smoothing: ages 2-5, who_weight = 5-age, divide by 3
+  # Age-blending weights. WHO gets more weight at younger ages, CDC at
+  # older ages; window boundaries and the /3 divisor match the main
+  # z-score blend in cleangrowth() exactly.
   who_weight <- 5 - (df$agedays/365.25)
   cdc_weight <- (df$agedays/365.25) - 2
 
   smooth_val <- df$agedays/365.25 >= 2 & df$agedays/365.25 <= 5 & df$param != "HEADCM"
 
-  # Fix data.table double-indexing bug
-  # When using df[smooth_val, ...], columns cn.orig_cdc/cn.orig_who are already subset
-  # Do NOT use [smooth_val] on column references inside the assignment
-  # Only use [smooth_val] on external vectors (cdc_weight, who_weight)
+  # Inside the 2-5 year smoothing window (HT/WT only), blend the two
+  # z-scores. Only cdc_weight and who_weight need to be re-subset with
+  # [smooth_val]; the column references cn.orig_cdc / cn.orig_who on
+  # the RHS are already restricted to smooth_val rows by the outer
+  # df[smooth_val, ...] subset.
   df[smooth_val,
      cn.orig := (cn.orig_cdc * cdc_weight[smooth_val] +
                    cn.orig_who * who_weight[smooth_val])/3]
 
-  # otherwise use WHO and CDC for older and younger, respectively
+  # Under 2y (and HEADCM at any age): pure WHO. who_val and smooth_val
+  # are mutually exclusive (HEADCM is excluded from smooth; <2y is
+  # excluded from smooth), so this cannot overwrite the blended value.
   who_val <- df$param == "HEADCM" | df$agedays/365.25 < 2
   df[who_val, cn.orig := df$cn.orig_who[who_val]]
 
-  # Use CDC z-scores for WT/HT at ages > 5 years
-  # Must match the main z-score blending window (2-5 years, line 773)
+  # Over 5y HT/WT: pure CDC. cdc_val and smooth_val are similarly
+  # mutually exclusive.
   cdc_val <- df$param != "HEADCM" & df$agedays/365.25 > 5
   df[cdc_val, cn.orig := df$cn.orig_cdc[cdc_val]]
 
-  # NA fallbacks for smooth zone: if one source is NA, use the other
-  # (matches main z-score calculation fallback logic)
+  # NA fallbacks inside the smooth zone: if one reference is unavailable
+  # for a row, use the other. Matches the main z-score path.
   df[smooth_val & is.na(cn.orig_cdc), cn.orig := cn.orig_who]
   df[smooth_val & is.na(cn.orig_who), cn.orig := cn.orig_cdc]
 
-
-  # now recenter -- already has the sd.median from the original recentering
-  setkey(df, subjid, param, agedays)
-
+  # Recenter against the sd.median column populated by the main
+  # recentering step; df inherits sd.median from its source data.df.
   df[, tbc.cn := cn.orig - sd.median]
 
   # rename ending column
@@ -4821,7 +4895,42 @@ cleanchild <- function(data.df,
 # Supporting pediatric growthcleanr functions
 # Supporting functions for pediatric piece of algorithm
 
-#' Helper function for cleanbatch to identify subset of observations that are either "included" or a "temporary extraneous"
+#' Identify rows currently eligible for child-algorithm processing.
+#'
+#' Returns a logical vector the same length as the input, marking which
+#' rows are currently "valid" for a given step of `cleanchild()`. A row
+#' is valid if its exclusion code does not start with `"Exclude-"`, so
+#' `"Include"` rows pass unconditionally and every `Exclude-*` code is
+#' filtered out by default (including `Exclude-Missing`,
+#' `Exclude-Not-Cleaned`, and all algorithm-assigned `Exclude-C-*`
+#' codes).
+#'
+#' Three optional flags add back specific soft-excluded categories so a
+#' step can opt them in without changing the default for the rest of
+#' the algorithm. `include.temporary.extraneous` also admits rows
+#' flagged `"Exclude-C-Temp-Same-Day"` by Child Step 5;
+#' `include.extraneous` also admits rows flagged `"Exclude-C-Extraneous"`
+#' by Child Step 13; `include.carryforward` also admits rows flagged
+#' `"Exclude-C-CF"` by Child Step 6. The flags are additive.
+#'
+#' Accepts either a data.frame / data.table (in which case `df$exclude`
+#' is used) or a plain character / factor vector of exclusion codes.
+#' The exclusion column is coerced to character so factor inputs and
+#' character inputs match identically under `^Exclude` pattern
+#' matching.
+#'
+#' @param df data.frame / data.table containing an `exclude` column, or
+#'   a character or factor vector of exclusion codes.
+#' @param include.temporary.extraneous if TRUE, also keep rows with
+#'   `exclude == "Exclude-C-Temp-Same-Day"`. Defaults to FALSE.
+#' @param include.extraneous if TRUE, also keep rows with
+#'   `exclude == "Exclude-C-Extraneous"`. Defaults to FALSE.
+#' @param include.carryforward if TRUE, also keep rows with
+#'   `exclude == "Exclude-C-CF"`. Defaults to FALSE.
+#'
+#' @return Logical vector the same length as the input, TRUE for rows
+#'   that the calling step should process.
+#'
 #' @keywords internal
 #' @noRd
 .child_valid <- function(df,

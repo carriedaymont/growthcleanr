@@ -1347,3 +1347,139 @@ After reinstalling the package and regenerating man pages with `roxygen2::roxyge
 - test-child-parameters.R: 13 PASS
 
 All child counts identical to baseline. No regressions. Adult tests not re-run — adult algorithm has its own separate `temp_sde()` in `adult_support.R`; `identify_temp_sde()` is child-only.
+
+---
+
+## Session 9 — `calc_and_recenter_z_scores()` walkthrough + narrative fixes + Support Functions section (2026-04-18)
+
+Three-part session. Part 1 is a dedicated support-function walkthrough of `calc_and_recenter_z_scores()` in `R/child_clean.R` (~lines 2243–2311 pre-edit). Parts 2 and 3 are narrative-only: fix stale pointers that fell out of the Part 1 walkthrough, and open a new "Support Functions" section in `child-algorithm-reference.md` that collects per-function documentation for the seven child-algorithm-internal helpers (plus cross-references to the wrapper's `Shared Helpers`). Mid-session addition per user request: check `.child_valid()`, `.child_exc()`, and `get_dop()` carefully before committing — F63–F65 below.
+
+### Pre-session baseline tests
+
+- test-cleangrowth.R: 63 PASS
+- test-child-regression.R: 48 PASS
+- test-child-edge-cases.R: 28 PASS
+- test-child-algorithms.R: 41 PASS (2 pre-existing codetools warnings)
+- test-child-parameters.R: 13 PASS
+- Adult tests not run (see Scope correction).
+
+### Scope correction
+
+- The original prompt suggested `calc_and_recenter_z_scores()` might be called from both child and adult algorithms. Inventory confirmed: called from only two sites, both in the Child Step 15/16 pre-loop in `cleanchild()` (`R/child_clean.R:3617` with `cn = "p_plus"` and `:3619` with `cn = "p_minus"`). The adult algorithm does not call this function; `adult_clean.R` and `adult_support.R` have no z-score pipeline of their own (the adult algorithm works directly with raw measurements and does not use recentered z-scores).
+- Net effect: this pass is child-scoped by code. Adult tests were not re-run — no adult files touched.
+- The function is still exported to parallel workers via `var_for_par` at `child_clean.R:593`; that was verified and left unchanged.
+
+### Fix-now items — Part 1 (`calc_and_recenter_z_scores()`)
+
+### F56. Full roxygen block replacing the pre-function plain-`#` header — FIXED
+- **File/lines:** `R/child_clean.R` ~lines 2245–2253 (pre-edit).
+- **Issue.** The function had a plain-`#` comment header (`# function to calculate and recenter z scores for a given column / # df: ... / # cn: ... / # ref.data.path: ... / # returns df with additional column, tbc.(cn), ...`) disconnected from the `#' @keywords internal` / `#' @noRd` floating lines right below it. Same transition-state pattern as F52 in Session 8 and the pre-F44 state of `ewma()`. No formal `@param` / `@return` tags.
+- **Fix.** Replaced the entire block with a unified roxygen header containing title, description, `@param df` / `@param cn` / `@param ref.data.path` / `@param measurement.to.z` / `@param measurement.to.z_who`, and `@return`. The description names both callers (Child Step 15/16 pre-loop, once for `p_plus` and once for `p_minus`), the per-batch-read optimization (closures built once outside and passed in), and the precondition that `sd.median` must already be present on `df` from the main recentering step.
+
+### F57. "# for infants, use z and who" stale comment removed — FIXED
+- **File/lines:** `R/child_clean.R` ~line 2261 (pre-edit).
+- **Issue.** Stata-era framing that misleadingly tied the CDC / WHO closure selection to "infants." Both closures are used at all ages inside the helper (the CDC-only closure for CDC z-scores, the WHO-blended closure for WHO z-scores), with the ages themselves handled by the blending logic below.
+- **Fix.** Comment removed. The pre-existing next line ("Use pre-built closures if provided (avoids repeated disk reads from call sites)") was rewritten to explain the NULL fallback more precisely: "Use pre-built closures if provided (the Step 15/16 callers always do). The NULL fallback builds them on the fly — one disk read per closure — and exists for direct / debugging use only."
+
+### F58. `# Fix smoothing formula / # Match base z-score smoothing: ages 2-5, ...` rewritten as current-state — FIXED
+- **File/lines:** `R/child_clean.R` ~lines 2272–2273 (pre-edit).
+- **Issue.** "Fix" framing with a pointer to what the previous formula had been. Same stale-content pattern.
+- **Fix.** Replaced with a single prose comment: "Age-blending weights. WHO gets more weight at younger ages, CDC at older ages; window boundaries and the /3 divisor match the main z-score blend in cleangrowth() exactly."
+
+### F59. `# Fix data.table double-indexing bug` block rewritten as current-state — FIXED
+- **File/lines:** `R/child_clean.R` ~lines 2279–2282 (pre-edit).
+- **Issue.** A 4-line "Fix ... bug / When using df[smooth_val, ...] ... / Do NOT use [smooth_val] on column references ... / Only use [smooth_val] on external vectors (cdc_weight, who_weight)" block that framed the current code as an error-correction rather than a description of current behavior.
+- **Fix.** Replaced with a single current-state paragraph that explains why only `cdc_weight` / `who_weight` are re-subset with `[smooth_val]` (the `cn.orig_cdc` / `cn.orig_who` column references are already restricted to `smooth_val` rows by the outer `df[smooth_val, ...]` subset). No "bug" language.
+
+### F60. "# otherwise use WHO and CDC for older and younger, respectively" rephrased — FIXED
+- **File/lines:** `R/child_clean.R` ~line 2287 (pre-edit).
+- **Issue.** Word-order was confusing: the sentence says "WHO and CDC for older and younger" but the actual semantics are WHO=younger (+HC), CDC=older. Reversed order made the comment read opposite to the code.
+- **Fix.** The WHO branch got a direct, accurate header comment: "Under 2y (and HEADCM at any age): pure WHO. who_val and smooth_val are mutually exclusive (HEADCM is excluded from smooth; <2y is excluded from smooth), so this cannot overwrite the blended value." The CDC branch got a symmetric header: "Over 5y HT/WT: pure CDC. cdc_val and smooth_val are similarly mutually exclusive." Both now document the key invariant that these branches cannot overwrite the blended assignment — derived during the walkthrough.
+
+### F61. Stale "line 773" reference removed — FIXED
+- **File/lines:** `R/child_clean.R` ~line 2292 (pre-edit).
+- **Issue.** `# Use CDC z-scores for WT/HT at ages > 5 years / # Must match the main z-score blending window (2-5 years, line 773)` referenced a specific line number in the main z-score pipeline. That line number has drifted since the comment was written (the main blending boundary is now ~line 706 after repeated refactors).
+- **Fix.** The line-number pointer was dropped. The "must match the main z-score blend" invariant is now captured more generally in the F58 rewrite and the F60 header comments above ("window boundaries and the /3 divisor match the main z-score blend in cleangrowth() exactly").
+
+### F62. "# now recenter -- already has the sd.median ..." rephrased — FIXED
+- **File/lines:** `R/child_clean.R` ~line 2302 (pre-edit).
+- **Issue.** Phrase "now recenter -- already has the sd.median from the original recentering" read as a stream-of-consciousness design note rather than a description of current behavior.
+- **Fix.** Rewritten as a single current-state sentence: "Recenter against the sd.median column populated by the main recentering step; df inherits sd.median from its source data.df."
+
+### D-a. Dead `setkey(df, subjid, param, agedays)` removed — FIXED
+- **File/lines:** `R/child_clean.R` ~line 2303 (pre-edit).
+- **Issue.** The `setkey()` was followed only by `df[, tbc.cn := cn.orig - sd.median]` and `setnames(df, "tbc.cn", paste0("tbc.", cn))`, neither of which requires a key. The caller (`cleanchild()` Step 15/16 block at ~line 3622) merges the result back via `data.df[zscore_subset, ..., on = "index"]` — also independent of the helper's key state. Pure ceremony left over from an earlier implementation.
+- **Fix.** Removed the `setkey()` call. Removed `subjid` from the NULL-binding declaration at the top of the function (it was only referenced by the removed setkey). The function still assigns its output column correctly; verified post-install against the full child test suite (counts unchanged).
+
+### Fix-now items — Part 1 bycatch + Part 2 narrative pointers
+
+### F-bycatch1. Wrapper-narrative "Age blending — `calc_and_recenter_z_scores()` (CF rescue)" heading and opening sentence corrected — FIXED
+- **File/lines:** `wrapper-narrative-2026-04-17.md` ~lines 399–401 (pre-edit).
+- **Issue.** The subsection heading framed the helper as "(CF rescue)" and the opening sentence attributed its use to "carry-forward rescue in Child Step 6." This was wrong — the function is called only from the Child Step 15/16 pre-loop, once with `cn = "p_plus"` and once with `cn = "p_minus"`. The blending-formula table beneath the heading was accurate; only the heading and opening prose were incorrect.
+- **Fix.** Heading changed to `### Age blending — calc_and_recenter_z_scores() (Child Step 15/16 p_plus / p_minus)`. Opening sentence rewritten to describe the actual use case (computing `tbc.p_plus` / `tbc.p_minus` from the perturbation columns so the perturbed z-scores are on the same footing as `tbc.sd`). Formula table unchanged.
+
+### F-bycatch2. `R/child_clean.R:91` file-header bullet corrected — FIXED
+- **File/lines:** `R/child_clean.R` line 91 (pre-edit).
+- **Issue.** The `SUPPORTING FUNCTIONS` index at the top of the file attributed `calc_and_recenter_z_scores()` to "Steps 11 and 15." Inventory confirmed only Step 15/16. Step 11 uses `ewma()` but does not call this helper.
+- **Fix.** Bullet rewritten to "Recomputes recentered z-scores for the p_plus / p_minus perturbation columns (Child Step 15/16 pre-loop)."
+
+### Fix-now items — Part 2 rename `child-gc-narrative-2026-04-13.md` → `child-algorithm-reference.md`
+
+### F-rename. Rename all current-state pointers — FIXED
+- **Files updated (current-state documents only):**
+  - `wrapper-narrative-2026-04-17.md` — 6 references (lines ~15, 459, 465, 529, 539, 643, 701 pre-edit), all replaced in place.
+  - `gc-github-latest/CLAUDE.md` — 1 reference in the "Algorithm Narrative Documents" table; replaced and the description cell updated to mention the new "Support Functions section (algorithm-internal helpers)" added in Part 3.
+  - `__Pipeline/CLAUDE.md` — 1 reference in the "Algorithm narratives" section of the Qual-AD project CLAUDE.md; replaced under the standing permission at the top of `gc-github-latest/CLAUDE.md`.
+- **Files intentionally not updated:** `walkthrough-todo-2026-04-16.md`, `-2026-04-16d.md`, `-2026-04-17.md` (this file, at pre-session positions before the Session 9 entry). These are historical session logs — the filename was accurate at the time each entry was written, and rewriting them would rewrite history. Future walkthroughs that grep for the old filename will still find it in the logs; new walkthrough-todo entries (Session 9 and beyond) will use the current filename.
+
+### Fix-now items — Part 2c `sd_median()` subsection added to wrapper narrative
+
+### F-sdm. Dedicated `sd_median()` subsection in `wrapper-narrative-2026-04-17.md → Shared Helpers` — FIXED
+- **File/lines:** `wrapper-narrative-2026-04-17.md`, between the existing `gc_preload_refs()` and `get_dop()` subsections.
+- **Issue (per user's pre-Session-4a D4 cleanup note).** `sd_median()` was mentioned only as a parenthetical in the Recentering subsection (line 419 pre-edit: "built once via the procedure implemented in `sd_median()` (year-of-age medians treated as midyear-age, linearly interpolated by day of age, clamped outside the covered range)"). The procedure deserves its own subsection because (a) the function is exported, (b) the packaged recentering file was built from it offline, and (c) any user who wants to recompute the medians against a different reference needs to be able to reproduce the procedure without reading the source.
+- **Fix.** New `### sd_median(param, sex, agedays, sd.orig)` subsection added. Documents: signature, purpose, that it is not called at runtime (the main recentering path reads `rcfile-2023-08-15_format.csv.gz` directly), what it returns (a keyed data.table with `sd.median` replicated across sex), the 7-step procedure (year-of-age → 19-cap → pooled median → midyear-anchor at `floor((ageyears + 0.5) * 365.25)` → `approx()` linear interpolation → `rule = 2` endpoint clamp → sex-duplicate), and the non-sex-stratification caveat. The line-419 parenthetical in the Recentering subsection was shortened to a pointer: "built once offline — see **Shared Helpers → `sd_median()`** below for the midyear-interpolation procedure."
+
+### Fix-now items — Part 3 Support Functions section (mid-session F63–F65 from user request)
+
+### F63. `.child_valid()` roxygen rewritten — FIXED
+- **File/lines:** `R/child_clean.R` ~line 4865 (pre-edit).
+- **Issue.** Title read "Helper function for cleanbatch to identify subset of observations that are either 'included' or a 'temporary extraneous'." Stale — there is no `cleanbatch()` function in the current codebase (the main loop is `cleanchild()`). Description listed only two of the three optional include flags (`include.temporary.extraneous`); `include.extraneous` and `include.carryforward` were undocumented in roxygen. No formal `@param` or `@return`.
+- **Fix.** Full roxygen block: new title ("Identify rows currently eligible for child-algorithm processing."), multi-paragraph description naming all three additive flags and the corresponding Child Step origins (Step 5 temp SDE, Step 13 permanent SDE, Step 6 CF), documentation of the data.frame-or-vector input contract and the factor-to-character coercion, and formal `@param` / `@return` tags. Existing inline "Base set: non-excluded rows..." comment inside the function body was already current-state and was left unchanged.
+
+### F64. `.child_exc()` converted from plain-`#` block to formal roxygen — FIXED
+- **File/lines:** `R/child_clean.R` ~lines 132–140 (pre-edit).
+- **Issue.** The function had a plain-`#` comment block (title, usage examples, ignored-arg rationale, call-site count). No `@keywords internal` / `@noRd` tags despite every other support-function neighbor having them. Minor inconsistency with the post-F43/F44/F55 house style.
+- **Fix.** Converted to a formal roxygen block with title, description, `@param param_val` (ignored), `@param suffix` (with the `exclude.levels` caveat), `@return`, `@keywords internal`, and `@noRd`. Call-site count updated from "~40" to "~50" to match the current Grep result (51 call sites).
+
+### F65. `get_dop()` roxygen rewritten — FIXED
+- **File/lines:** `R/child_clean.R` ~lines 1999–2013 (pre-edit).
+- **Issue.** Same F52-pattern as several prior-session support functions: plain-`#` comment block ("function that takes in a parameter name and returns the designated other parameter (DOP)") sat above floating `#' @keywords internal` / `#' @noRd` lines. Roxygen had tags but no title, description, `@param`, or `@return`. Additionally, the function is scalar-only (the internal `if / else if / else` chain requires a scalar test) — not documented. Both callers pass `df$param[1]` from a single-param working subset, so the scalar constraint is satisfied in practice.
+- **Fix.** Unified roxygen header with title ("Look up the designated other parameter (DOP) for a growth parameter."), description listing all three DOP assignments and noting that HC's DOP is height with no reverse mapping, an explicit scalar-only paragraph, and formal `@param param_name` / `@return` tags. `# HEADCM` inline comment inside the function body was kept as a useful local label.
+
+### Part 3 — new "Support Functions" section in `child-algorithm-reference.md`
+
+- **New section inserted after Key Concepts and before Architecture:** `## Support Functions`, with nine subsections: `.child_valid()`, `.child_exc()`, `get_dop()`, `identify_temp_sde()`, `calc_otl_evil_twins()`, `ewma()`, `ewma_cache_init()` / `ewma_cache_update()`, `as_matrix_delta()`, `calc_and_recenter_z_scores()`, plus a "Cross-references to wrapper helpers" subsection pointing at `read_anthro()` / `gc_preload_refs()` / `sd_median()` in the wrapper narrative.
+- Each child-algorithm-internal subsection follows a fixed format: Purpose / Callers (with step and call-site count) / Inputs and return contract / Key invariants / Code location (approx line numbers as of this session's commit). Material for `identify_temp_sde()` came from Session 8; `calc_otl_evil_twins()` from Session 5; `ewma()` / `ewma_cache_*` / `as_matrix_delta()` from Session 7b; `calc_and_recenter_z_scores()` from this session's Part 1 walkthrough; `.child_valid()` / `.child_exc()` / `get_dop()` from this session's F63–F65 walkthrough.
+- **`.child_valid()` subsection migrated out of Key Concepts:** the pre-Session-9 `***The .child_valid() function:***` paragraph in Key Concepts (lines ~66–73 pre-edit) was shortened to a single-line pointer ("See **Support Functions → `.child_valid()`** below for flag semantics and behavior.") and the full content moved into the new section.
+- **TOC index at lines ~101–110 rewritten:** the pre-edit bullet list ("`.child_valid()` — row eligibility filter / `identify_temp_sde()` — temp SDE resolution / ...") was rewritten as a quick index that points readers at the new Support Functions section for the per-function details. Wrapper helpers (`read_anthro()`, `gc_preload_refs()`, `sd_median()`) are explicitly called out as living in the wrapper narrative.
+- **Wrapper-narrative Shared Helpers intro updated:** `wrapper-narrative-2026-04-17.md` line 643 previously read "Algorithm-internal helpers (`.child_valid()`, `identify_temp_sde()`, ... ) are documented in `child-algorithm-reference.md` since they are child-only." Updated to add `.child_exc()` and `get_dop()` (which have always lived in `child_clean.R` but were not previously listed) and to point at the new "Support Functions" section explicitly rather than the document as a whole.
+
+### Session 9 deferreds
+
+None. All items flagged during the pass (F56–F65, D-a, F-bycatch1, F-bycatch2, F-rename, F-sdm) were resolved. Items out of scope and not opened as new deferreds:
+
+- The intermediate columns `cn.orig_cdc`, `cn.orig_who`, `cn.orig` remain on the return value of `calc_and_recenter_z_scores()` and are not consumed downstream (the caller merges only `tbc.p_plus` / `tbc.p_minus` via `on = "index"`). Cleaning them up would require a conditional NULL-assign that accounts for the second call's overwriting of the first's versions; no behavioral impact, and removing them would also reduce debugging visibility. Left as-is per the session prompt's explicit "NOT doing D-b" approval.
+- `calc_otl_evil_twins()` has a small "# Fix logic - SAME pair must exceed both thresholds / # Old logic allowed mixing: tbc from one neighbor, ctbc from another / # Correct: (tbc_next > 5 AND ctbc_next > 5) OR (tbc_prev > 5 AND ctbc_prev > 5)" stale-changelog block at ~lines 2250–2252. Same style concern as F43 / F58, but not in scope for this session (the function was walked in Session 5; Part 1 scope was only `calc_and_recenter_z_scores()`). Can be picked up in a future support-function pass if desired.
+- `calc_and_recenter_z_scores()` uses `df$agedays/365.25` three times in the smooth/WHO/CDC-val computations; a single `ageyears` variable would be marginally cleaner but the pattern matches the main z-score pipeline and replacing it is a style choice with no behavioral impact. Not worth changing during this pass.
+
+### Session 9 — post-fix test results
+
+After reinstalling the package and regenerating man pages with `roxygen2::roxygenise()`:
+
+- test-cleangrowth.R: 63 PASS, 0 warnings
+- test-child-regression.R: 48 PASS, 0 warnings
+- test-child-edge-cases.R: 28 PASS, 0 warnings
+- test-child-algorithms.R: 41 PASS (2 baseline codetools warnings, unchanged)
+- test-child-parameters.R: 13 PASS
+
+All child counts identical to baseline. No regressions. Adult tests not re-run — no adult files were modified and `calc_and_recenter_z_scores()` is not called by the adult algorithm (it has no z-score pipeline).

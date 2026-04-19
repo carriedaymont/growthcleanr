@@ -12,7 +12,7 @@ Code Last Updated: 2026-04-18
 
 This document describes what the current R code does in the package wrapper. The two algorithm cores are documented separately:
 
-- `child-gc-narrative-2026-04-13.md` — child algorithm (Child Steps 5, 6, 7, 9, 11, 13, 15/16, 17, 19, 21, 22)
+- `child-algorithm-reference.md` — child algorithm (Child Steps 5, 6, 7, 9, 11, 13, 15/16, 17, 19, 21, 22)
 - `adult-algorithm-narrative.md` — adult algorithm (Adult Steps 1, 2W, 3, 4W, 9Wa/9H/9Wb, 10H/10W, 11H/11Wa/11Wa2/11Wb, 13, 14)
 
 Child Step 2b (Gestational Age Correction) is documented here because it runs as preprocessing inside `cleangrowth()`, before dispatch to either algorithm.
@@ -396,9 +396,9 @@ Then Fenton is preferred over corrected WHO for ages ≤ 2: if Fenton (`unmod_zs
 
 Note: This smoothing window is 2–4 years with divisor 2, which is narrower than the main WHO/CDC blending window (2–5 years, divisor 3).
 
-### Age blending — `calc_and_recenter_z_scores()` (CF rescue)
+### Age blending — `calc_and_recenter_z_scores()` (Child Step 15/16 p_plus / p_minus)
 
-This helper function, used during carry-forward rescue in Child Step 6, recalculates z-scores for modified measurement values. It uses the same WHO/CDC blending formula as the main z-score calculation (2–5 year window).
+This helper function, used in the Child Step 15/16 pre-loop (EWMA2 / moderate trajectory outliers), recalculates recentered z-scores for each row's perturbed `p_plus` and `p_minus` measurement values. It uses the same WHO/CDC blending formula as the main z-score calculation (2–5 year window) so that the perturbed z-scores are on the same footing as `tbc.sd`.
 
 | Age range | Parameter | Formula |
 |-----------|-----------|---------|
@@ -416,7 +416,7 @@ tbc.sd = sd.orig - sd.median
 ctbc.sd = sd.corr - sd.median
 ```
 
-Recentering uses a precomputed reference file (`inst/extdata/rcfile-2023-08-15_format.csv.gz`) whose medians were built once via the procedure implemented in `sd_median()` (year-of-age medians treated as midyear-age, linearly interpolated by day of age, clamped outside the covered range). Callers can override by passing a `sd.recenter` data.table to `cleangrowth()`.
+Recentering uses a precomputed reference file (`inst/extdata/rcfile-2023-08-15_format.csv.gz`) whose medians were built once offline — see **Shared Helpers → `sd_median()`** below for the midyear-interpolation procedure. Callers can override by passing a `sd.recenter` data.table to `cleangrowth()`.
 
 The recentering median file is indexed by param, sex, and agedays. It is merged into the data by a rolling join on these keys.
 
@@ -456,13 +456,13 @@ The two algorithms differ in many cross-cutting respects that are worth understa
 | Sort key (within algorithm) | `setkey(data.df, subjid, param, agedays, internal_id)` | All sorts include `internal_id` (integer) as final tiebreaker; `as.character(internal_id)` used for named-vector keys |
 | Missing-as-infinity edge handling | N/A | `ifelse(is.na(...), Inf, ...)` for edge EWMA values |
 
-For the full child working-dataframe mechanics (how `.child_valid()` works, the temp-SDE soft-flag mechanism, SDE-Identical removal during CF detection), see `child-gc-narrative-2026-04-13.md → Working Dataframe and Output`.
+For the full child working-dataframe mechanics (how `.child_valid()` works, the temp-SDE soft-flag mechanism, SDE-Identical removal during CF detection), see `child-algorithm-reference.md → Working Dataframe and Output`.
 
 ---
 
 ## Variable Glossary (wrapper-level)
 
-For child-specific variables (CF working columns, EWMA working columns, exclusion/status columns), see `child-gc-narrative-2026-04-13.md → Variable Glossary`.
+For child-specific variables (CF working columns, EWMA working columns, exclusion/status columns), see `child-algorithm-reference.md → Variable Glossary`.
 
 ### Input and identification
 
@@ -526,7 +526,7 @@ For child-specific variables (CF working columns, EWMA working columns, exclusio
 
 After merging with adult results, `cleangrowth()` also includes checkpoint diagnostic columns (`sd.corr`, `potcorr`, `uncorr`, `sd.orig_uncorr`) when the child algorithm was used, and adult-specific columns (`mean_ht`, `bin_result`) when the adult algorithm was used. Cross-algorithm columns are NA on rows that were processed by the other algorithm (e.g., `tbc.sd` is NA on adult-processed rows).
 
-For the **child-specific exclusion code list** and CF rescue reason codes, see `child-gc-narrative-2026-04-13.md → Output Format`.
+For the **child-specific exclusion code list** and CF rescue reason codes, see `child-algorithm-reference.md → Output Format`.
 
 For the **adult-specific exclusion code list**, see `adult-algorithm-narrative.md` (or `gc-github-latest/CLAUDE.md → Adult Exclusion Codes`).
 
@@ -536,7 +536,7 @@ For the **adult-specific exclusion code list**, see `adult-algorithm-narrative.m
 
 The parameters in the table below refer to parameters used in the wrapper code. Some of these are child- or adult-specific but are handled in the wrapper.
 
-For parameters used only in the child algorithm code (BIV cutoffs, CF rescue modes, EWMA window, error load, etc.), see `child-gc-narrative-2026-04-13.md → Configurable Parameters`.
+For parameters used only in the child algorithm code (BIV cutoffs, CF rescue modes, EWMA window, error load, etc.), see `child-algorithm-reference.md → Configurable Parameters`.
 
 For parameters used only in the adult algorithm code (permissiveness presets, wtallow/ET caps, `mod_ewma_f`, `ht_band`, etc.), see `adult-algorithm-narrative.md` (and the `adult_permissiveness` / `adult_scale_max_lbs` rows below for the wrapper-level adult parameters).
 
@@ -640,7 +640,7 @@ Walkthrough checklist findings for the GA-correction section (Phase 10 / Child S
 
 ## Shared Helpers
 
-These helpers are defined in `child_clean.R`, in the same file as `cleangrowth()`, and are used by the wrapper or by both algorithm cores. Algorithm-internal helpers (`.child_valid()`, `identify_temp_sde()`, `calc_otl_evil_twins()`, `calc_and_recenter_z_scores()`, `ewma()`, `ewma_cache_*`, `as_matrix_delta()`) are documented in `child-gc-narrative-2026-04-13.md` since they are child-only.
+These helpers are defined in `child_clean.R`, in the same file as `cleangrowth()`, and are used by the wrapper or exposed to external callers. Child-algorithm-internal helpers (`.child_valid()`, `.child_exc()`, `get_dop()`, `identify_temp_sde()`, `calc_otl_evil_twins()`, `calc_and_recenter_z_scores()`, `ewma()`, `ewma_cache_*`, `as_matrix_delta()`) are documented in `child-algorithm-reference.md → Support Functions`.
 
 ### `read_anthro(path = "", cdc.only = FALSE)`
 
@@ -653,6 +653,24 @@ The closure approach lets the reference tables be resolved at load time (one dis
 Preloads both reference closures via two `read_anthro()` calls and returns them as `list(mtz_cdc_prelim, mtz_who_prelim)`. Pass the returned list as `cleangrowth(..., ref_tables = refs)` to skip the per-call disk reads (~0.9 sec saved per call). The closures are session-lifetime — rebuild only if the reference files themselves change. See **Batching and Dispatch → Partial runs and preloaded references** above for benchmark numbers.
 
 Note that velocity reference tables (`tanner_ht_vel`, `who_ht_vel_for_age`, `who_hc_vel_for_age`) are NOT included in `gc_preload_refs()` and are loaded separately (the Tanner table once per `cleangrowth()` call, the WHO velocity tables once per batch inside `cleanchild()`). All three are tiny so the loads are fast; a possible future extension to include them in `gc_preload_refs()` is tracked under `gc-github-latest/CLAUDE.md → Known Issues → Open (wrapper)`.
+
+### `sd_median(param, sex, agedays, sd.orig)`
+
+Exported helper that derives population median CSD z-scores by day of age. **Not called at runtime.** It was used once offline to build the packaged recentering file `inst/extdata/rcfile-2023-08-15_format.csv.gz`; `cleangrowth()` reads that precomputed file directly and does not invoke `sd_median()`. The function is retained as an exported API so that users who want to rebuild the recentering file against their own reference distribution can reproduce the procedure.
+
+Returns a data.table keyed on `(param, sex, agedays)` with columns `param`, `sex`, `agedays`, and `sd.median`. The same `sd.median` value is replicated across `sex = 0` and `sex = 1` for each (param, agedays) — the procedure pools sexes before taking the median and does not sex-stratify.
+
+Procedure:
+
+1. Assign each input row its integer year-of-age (`ageyears = floor(agedays / 365.25)`).
+2. Cap `ageyears` at 19 so all observations at age 19 or older are pooled into a single terminal year.
+3. For each `(param, ageyears)` cell, compute `median(sd.orig)` pooled across sexes (rows with `is.na(sd.orig)` are dropped first).
+4. Treat each per-year median as anchored at midyear-age in days — `floor((ageyears + 0.5) * 365.25)`, i.e. year 0 → day 182, year 1 → day 547, …, year 19 → day 7122.
+5. Linearly interpolate `sd.median` by day of age between midyear anchors (`approx()`) onto the full day range from `floor(min(ageyears) * 365.25)` through `floor(max(ageyears + 1) * 365.25)`.
+6. For days outside the interpolation range, clamp to the nearest midyear median (`approx(..., rule = 2)` — constant extrapolation to both endpoints).
+7. Replicate the resulting (param, agedays) → sd.median map for both `sex = 0` and `sex = 1`.
+
+Sex is carried as a column on the output for downstream join compatibility with the main algorithm's `setkey(sd.recenter, param, sex, agedays)` rolling join, but the underlying medians are not sex-stratified. A caller who wants sex-specific recentering can run the same procedure manually per sex.
 
 ### `get_dop(param_name)`
 
@@ -698,7 +716,7 @@ Cross-cutting wrapper-level pitfalls that have caused real bugs. The two algorit
 
 ## Cross-References
 
-- Child algorithm steps (5, 6, 7, 9, 11, 13, 15/16, 17, 19, 21, 22): `child-gc-narrative-2026-04-13.md`
+- Child algorithm steps (5, 6, 7, 9, 11, 13, 15/16, 17, 19, 21, 22): `child-algorithm-reference.md`
 - Adult algorithm steps: `adult-algorithm-narrative.md`
 - CF rescue lookup table methodology: `cf-rescue-thresholds.md`
 - Wtallow formulas (adult): `wtallow-formulas.md`

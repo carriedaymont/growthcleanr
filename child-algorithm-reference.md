@@ -63,16 +63,180 @@ This section covers concepts specific to the child algorithm. For wrapper-level 
 
 ***EWMA (Exponentially Weighted Moving Average):*** The central mechanism for detecting implausible values. For each measurement, the EWMA computes a weighted average of the subject's other measurements for the same parameter, giving exponentially more weight to temporally closer values. The deviation from EWMA (dewma) indicates how far a value is from what we would predict. Default exponent is -1.5 (child) vs. -5 (adult). With -1.5, the weighting is less dominated by the nearest neighbor, spreading influence across a wider time range — appropriate for pediatric data where growth trajectories change more rapidly.
 
-***The `.child_valid()` function:*** A critical gatekeeper that determines which rows participate in each step. It returns a logical vector indicating which rows are currently "valid" (eligible for processing). Its `include.*` flags control whether temporarily excluded categories (temp SDEs, permanent SDEs, carried-forward values) are included:
-
-- `.child_valid(df)` — only rows with `exclude` that does not start with "Exclude"
-- `.child_valid(df, include.temporary.extraneous = TRUE)` — also includes "Exclude-C-Temp-Same-Day"
-- `.child_valid(df, include.extraneous = TRUE)` — also includes "Exclude-C-Extraneous"
-- `.child_valid(df, include.carryforward = TRUE)` — also includes "Exclude-C-CF"
-
-`.child_valid()` works by checking the text of the `exclude` column rather than using factor ordering. It uses `grepl("^Exclude", ...)` to identify excluded rows, then checks for specific codes to conditionally re-include the temporary categories (`"Exclude-C-Temp-Same-Day"`, `"Exclude-C-Extraneous"`, `"Exclude-C-CF"`). `"Include"` is the only non-Exclude value the algorithm produces, so it passes through unconditionally.
+***The `.child_valid()` function:*** A critical gatekeeper that determines which rows participate in each step. See **Support Functions → `.child_valid()`** below for flag semantics and behavior.
 
 ***Age-dependent internal_id tiebreaking:*** When resolving same-day duplicates, the child algorithm uses an age-dependent rule based on `internal_id` (the sequential integer assigned in id-sorted order at session start): at birth (agedays == 0), keep the lowest `internal_id` (earliest measurement, before postnatal fluid shifts and interventions); at all other ages, keep the highest `internal_id` (later measurement, which may represent a more careful re-measurement). This differs from the adult algorithm, which always keeps the highest `internal_id`. The user's original `id` column is never used as a tiebreaker; it is preserved untouched into output.
+
+---
+
+## Support Functions
+
+Child-algorithm-internal helpers defined in `R/child_clean.R`. Each entry lists purpose, callers, input/return contract, key invariants the function assumes at entry, and approximate code location (line numbers as of the Session 9 commit — may drift with future edits). For wrapper-level helpers that both algorithms share, see `wrapper-narrative-2026-04-17.md → Shared Helpers`.
+
+### `.child_valid(df, include.temporary.extraneous = FALSE, include.extraneous = FALSE, include.carryforward = FALSE)`
+
+**Purpose.** The central row-eligibility filter for every step. Returns a logical vector marking which rows are currently "valid" for the step that called it.
+
+**Callers.** Called 18 times across `cleanchild()`, at the entry of every step that needs to filter rows.
+
+**Inputs and return contract.**
+
+- `df` — either a data.frame / data.table containing an `exclude` column, or a plain character / factor vector of exclusion codes. Coerced to character internally, so factor and character inputs behave identically.
+- `include.*` flags — three additive booleans that opt specific soft-excluded categories back in: `include.temporary.extraneous` (Child Step 5 temp SDEs), `include.extraneous` (Child Step 13 permanent SDEs), `include.carryforward` (Child Step 6 CFs).
+- Returns a logical vector the same length as the input. TRUE = keep for processing.
+
+**Default behavior.** Base set is `!grepl("^Exclude", exclude)`. Because every exclusion code in the child algorithm (`Exclude-Missing`, `Exclude-Not-Cleaned`, `Exclude-C-*`) starts with `"Exclude-"`, the default call filters out all excluded rows and admits only `"Include"`.
+
+**Key invariants.** The `exclude` column is populated for every row by the time any step calls `.child_valid()` — `Exclude-Missing` and `Exclude-Not-Cleaned` are set pre-dispatch by `cleangrowth()`, and step-level exclusion codes are written in place. A row cannot have `NA` in `exclude`.
+
+**Code location.** `R/child_clean.R` approx lines 4868–4920. No reverse dependencies on `identify_temp_sde()` or the other support functions — `.child_valid()` uses only the `exclude` column.
+
+### `.child_exc(param_val, suffix)`
+
+**Purpose.** Generates a child exclusion code from a reason suffix. Returns `paste0("Exclude-C-", suffix)`.
+
+**Callers.** ~50 call sites across `cleanchild()` — essentially every place that writes an `Exclude-C-*` code.
+
+**Inputs and return contract.**
+
+- `param_val` — accepted but ignored. Retained only to avoid churning ~50 call sites left over from the 2026-04-14 param-indicator rename. Can safely be any value, including an unused column reference inside a data.table `j` expression.
+- `suffix` — reason code (e.g. `"BIV"`, `"CF"`, `"Traj"`, `"Evil-Twins"`, `"Temp-Same-Day"`, `"Too-Many-Errors"`). Must correspond to a level in `exclude.levels` or the factor assignment silently produces NA.
+- Returns a character scalar or vector (vectorised via `paste0`).
+
+**Key invariants.** The full canonical list of allowed `suffix` values is in `gc-github-latest/CLAUDE.md → Complete List of Exclusion Codes`. Adding a new suffix requires also adding the corresponding code to `exclude.levels` in `cleangrowth()`.
+
+**Code location.** `R/child_clean.R` approx lines 131–154.
+
+### `get_dop(param_name)`
+
+**Purpose.** Scalar lookup of the designated other parameter (DOP) for a given growth parameter.
+
+**Callers.** Two sites inside `cleanchild()` — in the Child Step 15/16 block (approx line 3807) and in the Child Step 19 pairs/singles block (approx line 4696). Both callers pass `df$param[1]` from a single-param working subset.
+
+**Inputs and return contract.**
+
+- `param_name` — scalar character: `"WEIGHTKG"`, `"HEIGHTCM"`, or `"HEADCM"`.
+- Returns a scalar character: the DOP. `WEIGHTKG -> HEIGHTCM`, `HEIGHTCM -> WEIGHTKG`, `HEADCM -> HEIGHTCM` (no reverse mapping; HC's DOP is height, not the other way around).
+
+**Key invariants.** Scalar-only — the internal `if / else if / else` chain requires a scalar logical test. Vector input produces an R warning / error. No validation: anything other than `"WEIGHTKG"` or `"HEIGHTCM"` falls through to the `HEADCM` branch.
+
+**Code location.** `R/child_clean.R` approx lines 1999–2032.
+
+### `identify_temp_sde(df, exclude_from_dop_ids = NULL)`
+
+**Purpose.** Selects the "keeper" on each `(subjid, param, agedays)` group that has more than one valid measurement, marking the rest for a temporary same-day-extraneous flag. The keeper is the row closest to the subject-parameter `tbc.sd` median (primary) and the cross-parameter DOP `tbc.sd` median (secondary), with an age-dependent `internal_id` tiebreaker.
+
+**Callers.** Seven sites inside `cleanchild()`. Only the Step 13 caller passes a non-NULL `exclude_from_dop_ids`:
+
+| Step | `exclude_from_dop_ids` | Purpose |
+|---|---|---|
+| Step 5 (initial) | NULL | First temp-SDE pass |
+| Step 6 (recalc) | NULL | After CF identification |
+| Step 7d (recalc) | NULL | After BIV |
+| Step 9d (recalc) | NULL | After Evil Twins |
+| Step 11 mid-loop (subset recalc) | NULL | After each EWMA1 iteration |
+| Step 11c end-of-step | NULL | Full-dataset refresh |
+| Step 13 | `temp_sde_ids_step13` | Final SDE, with DOP anchor restricted |
+
+**Inputs and return contract.**
+
+- `df` — data.table column-subset containing `id`, `internal_id`, `subjid`, `param`, `agedays`, `tbc.sd`, `exclude`, and `orig_row`. Not mutated.
+- `exclude_from_dop_ids` — optional vector of `id` values to remove from the DOP median calculation only (they still contribute to the SP median).
+- Returns a logical vector aligned to the caller's row order. TRUE marks rows the caller should flag `"Exclude-C-Temp-Same-Day"`; FALSE means leave `exclude` unchanged.
+
+**Key invariant.** Identical same-day values are removed earlier (Early Child Step 13 SDE-Identicals), so by the time `identify_temp_sde()` runs, all same-day values in any given (subjid, param, agedays) group are dissimilar.
+
+**Code location.** `R/child_clean.R` approx lines 2015–2218. Fully walked in Session 8.
+
+### `calc_otl_evil_twins(df)`
+
+**Purpose.** Marks each row with `otl = TRUE` if it is part of an adjacent `(subjid, param)` pair where *both* `tbc.sd` and `ctbc.sd` differ by more than 5 from at least one neighbor on the same side. "OTL" stands for "out-of-line" (formerly "out-of-bounds" / "oob").
+
+**Callers.** One site: Child Step 9 (Evil Twins) inside `cleanchild()`.
+
+**Inputs and return contract.**
+
+- `df` — data.table with `subjid`, `param`, `tbc.sd`, `ctbc.sd` at minimum, sorted by `(subjid, param, agedays, internal_id)`.
+- Returns `df` with an added `otl` boolean column. On `nrow(df) < 2` inputs it sets `otl = FALSE` for all rows and returns early.
+
+**Key invariants.** Adjacent-pair comparison assumes the caller's sort is `(subjid, param, agedays, internal_id)` — neighbors in row order are neighbors in age within the same subject-parameter. The function pads both ends with `Inf` to avoid cross-(subjid, param) neighbor leaks; `same_sp_next` / `same_sp_prev` then masks out pairs that span a subject or parameter boundary. A pair must exceed the 5-unit threshold on *both* `tbc.sd` and `ctbc.sd` against the *same* neighbor — separate directions (prev vs next) do not combine.
+
+**Code location.** `R/child_clean.R` approx lines 2219–2254. Walked in Session 5.
+
+### `ewma(tbc.sd, agedays, ewma.exp, ewma.adjacent = TRUE, ctbc.sd = NULL, window = 15, cache_env = NULL)`
+
+**Purpose.** Core exponentially-weighted moving-average helper. For each observation i, computes a weighted average of all other observations in the group, with weights `(5 + |agedays_i - agedays_j|) ^ ewma.exp_i` and `w_ii = 0`. Returns three variants (`ewma.all`, `ewma.before`, `ewma.after`) that exclude different subsets of the group.
+
+**Callers.** Four sites in `cleanchild()`:
+
+- Child Step 11 (EWMA1 Extreme) — iterative, via `ewma_cache_*`
+- Child Step 13 — final SDE resolution
+- Child Step 15/16 (EWMA2 Moderate) — iterative, via `ewma_cache_*`
+- Child Step 17 — height/HC velocity context
+
+**Inputs and return contract.**
+
+- `tbc.sd` — numeric vector, the primary z-score.
+- `agedays` — integer vector, aligned with `tbc.sd`.
+- `ewma.exp` — scalar or per-observation vector. All in-algorithm callers pass a per-observation vector that varies by widest neighbor age gap.
+- `ewma.adjacent` — if FALSE, only `ewma.all` is returned (one-element list).
+- `ctbc.sd` — optional corrected z-score vector; when supplied, the function emits paired results for the corrected score as well.
+- `window` — max Include observations on each side to include; `Inf` disables windowing.
+- `cache_env` — optional environment for paired tbc/ctbc caching across iterative steps.
+- Returns a named **list** of numeric vectors (not a data.frame). Single-element when `ewma.adjacent = FALSE`.
+
+**Key invariants.** Self-weight is zero, so observation i is excluded from its own EWMA. Groups with `n <= 2` follow first/last-row conventions documented inline. The `+5` constant prevents infinite weight for zero-gap pairs; the negative `ewma.exp` makes weight decay with gap.
+
+**Code location.** `R/child_clean.R` approx lines 1665–1754. Walked in Session 7b (closes D33).
+
+### `ewma_cache_init(...)` / `ewma_cache_update(...)`
+
+**Purpose.** Incremental EWMA machinery for iterative EWMA1 (Child Step 11) and EWMA2 (Child Steps 15/16). `ewma_cache_init()` builds a per-group weight matrix and initial cached weighted sums; `ewma_cache_update()` removes an excluded observation from the cache in O(n) arithmetic without rebuilding the matrix.
+
+**Callers.** Used by the EWMA1 / EWMA2 iteration loops in `cleanchild()`; not called directly by any step outside that context.
+
+**Inputs and return contract.**
+
+- `ewma_cache_init()` — takes the same arguments as `ewma()` plus initial `exclude` state. Returns an environment with the weight matrix, cached row sums, and cached weighted sums per variant.
+- `ewma_cache_update()` — takes the environment plus the position of the newly-excluded observation; mutates the environment in place to reflect the removal, checking up to 2 positions on each side for max-gap shifts.
+- The child `ewma()` function reads from the environment when supplied with `cache_env`.
+
+**Code location.** `R/child_clean.R` approx lines 1762–1924. Walked in Session 7b.
+
+### `as_matrix_delta(agedays)`
+
+**Purpose.** Internal helper that builds an `n × n` matrix of pairwise absolute age differences from an `agedays` vector. Used by `ewma()` and `ewma_cache_init()` for building the age-gap weight matrix.
+
+**Callers.** Two sites, both in the EWMA machinery above.
+
+**Inputs and return contract.** Takes a numeric vector; returns a square numeric matrix. No edge-case guards — a zero-length input returns a `0 × 0` matrix.
+
+**Code location.** `R/child_clean.R` approx line 1607. Walked in Session 7b — left unchanged.
+
+### `calc_and_recenter_z_scores(df, cn, ref.data.path, measurement.to.z = NULL, measurement.to.z_who = NULL)`
+
+**Purpose.** Recalculates recentered z-scores for a perturbed measurement column (`p_plus` / `p_minus`, built in the Child Step 15/16 pre-loop). Applies the same WHO/CDC blending window and NA-fallback logic as the main `cleangrowth()` z-score calculation, then subtracts the precomputed `sd.median`.
+
+**Callers.** Two sites in Child Step 15/16 (approx lines 3617, 3619), once with `cn = "p_plus"` and once with `cn = "p_minus"`. Both callers pass pre-built `measurement.to.z` / `measurement.to.z_who` closures to avoid repeat disk reads.
+
+**Inputs and return contract.**
+
+- `df` — data.table with `param`, `agedays`, `sex`, `sd.median`, and the measurement column named by `cn`. Modified in place: intermediate `cn.orig_cdc`, `cn.orig_who`, `cn.orig`, and a new `tbc.<cn>` column are added.
+- `cn` — character scalar column name.
+- `ref.data.path` — only consulted when the closures are NULL.
+- Returns `df` with the new `tbc.<cn>` column. Intermediate `cn.orig*` columns are left on `df` but are not consumed downstream.
+
+**Key invariants.** `sd.median` must already be populated by the main recentering step; the helper does not re-merge the recentering file.
+
+**Code location.** `R/child_clean.R` approx lines 2254–2351. Walked in Session 9. For the underlying z-score mechanics (CSD formula, blending boundaries, NA-fallback logic), see `wrapper-narrative-2026-04-17.md → Z-Score Infrastructure`.
+
+### Cross-references to wrapper helpers
+
+The child algorithm also uses several wrapper-level helpers; their detailed treatment lives in `wrapper-narrative-2026-04-17.md → Shared Helpers`:
+
+- `read_anthro(path, cdc.only)` — builds CDC / WHO closures from `inst/extdata/` reference tables. Called once per closure at the top of `cleangrowth()` (and as a fallback inside `calc_and_recenter_z_scores()` when closures are not supplied).
+- `gc_preload_refs(path)` — pre-loads both closures as a list for repeated `cleangrowth()` calls (~0.9 s saved per call).
+- `sd_median(param, sex, agedays, sd.orig)` — derives the recentering median file. Not called at runtime; included here for reference because the main recentering path in `cleangrowth()` reads the file it produced.
 
 ---
 
@@ -98,16 +262,17 @@ Processes one batch of pediatric data through all cleaning steps:
 - Child Step 21: Error Load
 - Child Step 22: Output Preparation
 
-Support functions are defined in `child_clean.R` (after `cleanchild`) and `utils.R`:
+Support functions are defined in `child_clean.R` (all child helpers live in the same file as `cleanchild()`; `utils.R` is reserved for cross-algorithm utilities). Full per-function documentation — purpose, callers, inputs, invariants, and code locations — is in the **Support Functions** section above. Quick index:
 
-- `.child_valid()` — row eligibility filter
-- `identify_temp_sde()` — temp SDE resolution
-- `calc_otl_evil_twins()` — evil twins OTL calculation
-- `calc_and_recenter_z_scores()` — z-score recalculation for CF rescue
-- `ewma()` — EWMA computation with matrix operations
-- `ewma_cache_init()` / `ewma_cache_update()` — incremental EWMA cache for iterative steps
+- `.child_valid()` — row-eligibility filter (called 18× across steps)
+- `.child_exc()` — generate `Exclude-C-*` codes (~50 call sites)
 - `get_dop()` — designated other parameter lookup
-- `read_anthro()` — growth reference table loader
+- `identify_temp_sde()` — temp SDE resolution (7 call sites)
+- `calc_otl_evil_twins()` — Evil Twins OTL calculation
+- `ewma()` + `ewma_cache_init()` / `ewma_cache_update()` + `as_matrix_delta()` — EWMA machinery
+- `calc_and_recenter_z_scores()` — z-score recalculation for Child Step 15/16 `p_plus` / `p_minus`
+
+Wrapper-level helpers (`read_anthro()`, `gc_preload_refs()`, `sd_median()`) are documented in `wrapper-narrative-2026-04-17.md → Shared Helpers`.
 
 ---
 
