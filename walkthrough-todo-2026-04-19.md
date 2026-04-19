@@ -858,3 +858,118 @@ Reviewed and explicitly chosen not to open as findings — each is equivalent be
 AJ12 confirmed intentional (Carrie, 2026-04-19). No code changes; baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Adult tests not re-run — no adult files in scope.
 
 Next session candidate per `R-child-AprJanComparison-procedure.md`: **Session 6 — Child Step 13 (Final SDE resolution)**. Multi-phase (B1 / B2 / B3); high complexity.
+
+---
+
+# R-vs-R comparison — Session 6 — 2026-04-19
+
+**Scope:** Child Step 13 (Final SDE resolution) — multi-phase: B1 (SDE-Identicals), B2 (One-Day SDE + SDE-All-Extreme), B3 (SDE-EWMA), B4 (merge back).
+**Reference:** `Infants_Main.R:3434–3792` (Step 13 starts at `# 13: SDEs ----`; Step 15 begins at `:3793`)
+**Current:** `child_clean.R:3375–3671` (Step 13 starts at `# 13: SDEs ----`; Step 15 begins at `:3673`)
+**Pre-session baseline:** 63 / 48 / 28 / 41 / 13 (child regression / algorithms / parameters / edge-cases / cleangrowth). Adult tests not in scope.
+**Pre-session git check:** working tree clean; branch up to date with `origin/efficiency-updates`; no stale work in `/Users/Shared/`.
+
+---
+
+## Scope table
+
+| Sub-area | Reference lines | Current lines | What |
+|---|---|---|---|
+| Phase A: temp SDE restore + debug checks | 3434–3481 | 3375–3405 | Restore Temp-SDEs, safety checks |
+| Pre-filter (SDE-day subjects) | 3482–3500 | 3406–3424 | Skip subjects with no same-day groups |
+| Phase B1: SDE-Identicals | 3501–3549 | 3425–3467 | Mark identical same-day duplicates |
+| Temp SDE restoration + `was_temp_sde` | 3550–3555 | 3469–3473 | Track which rows were Temp-SDE before restoring |
+| Phase B2: One-Day SDE + SDE-All-Extreme | 3556–3665 | 3474–3553 | One-day subjects; median + DOP median; keep best |
+| Phase B3: SDE-EWMA | 3669–3780 | 3554–3651 | EWMA-based SDE resolution |
+| Phase B4: merge back + cleanup | 3783–3791 | 3652–3671 | Write exclusions back to data.df |
+
+---
+
+## Known intentional changes encountered (logged briefly, not analyzed)
+
+- **Exclusion code renames throughout** — `Exclude-Temporary-Extraneous-Same-Day` → `Exclude-C-Temp-Same-Day`; `Exclude-SDE-Identical` → `.child_exc(param, "Identical")` (`Exclude-C-Identical`); `Exclude-SDE-One-Day` → `.child_exc(param, "Extraneous")` (`Exclude-C-Extraneous`); `Exclude-SDE-All-Extreme` → `.child_exc(param, "Extraneous")`; `Exclude-SDE-EWMA` → `.child_exc(param, "Extraneous")`. All per 2026-04-14/16 rename.
+- **`id` → `internal_id` in all sort keys and tiebreakers** — `setkey(..., id)` → `setkey(..., internal_id)`; `if(agedays[1] == 0) id else -id` → `fifelse(agedays == 0L, internal_id, -internal_id)`. Per 2026-04-12 rename.
+- **`valid()` → `.child_valid()`** and **`temporary_extraneous_infants()` → `identify_temp_sde()`** — known renames throughout.
+- **`cat()` → `message()`** — throughout.
+- **dplyr → data.table refactor** — reference's Phase B1/B2/B3 use `%>%` / `group_by` / `mutate` / `case_when`; current uses pure data.table `:=` / `by=`. Intentional reorganization; logic verified equivalent at each sub-step.
+- **Double-rounding (`janitor::round_half_up`) removed** — from `absdiff_rel_to_median`, `min_absdiff_rel_to_median`, `absdiff_dop_rounded`, `absdiff_median_rounded`, `absdewma`, `min_absdewma`. Per procedure: do NOT flag rounding-tolerance removal.
+- **`ewma_window` passed to `ewma()` call** (`child_clean.R:3585`) — AJ12, known intentional (window default 15 vs 25 in reference).
+- **Debug code (fwrite/stop)** at reference `:3453–3463` and `:3470–3481` → simple `warning()` in current. Intentional cleanup.
+
+---
+
+## Finding
+
+### AJ13 — Bug fix — Phase B3 EWMA: Inf guards on `ewma_fill` and `spa_ewma`
+
+**Reference (`Infants_Main.R:3722–3730`):**
+```r
+mutate(ewma.all = case_when(
+         is.na(ewma.all) & was_temp_sde ~ max(ewma.all[!was_temp_sde], na.rm = TRUE),
+         TRUE ~ ewma.all),
+       spa_ewma = max(ewma.all, na.rm = TRUE),
+       absdewma = janitor::round_half_up(janitor::round_half_up(abs(tbc.sd - spa_ewma), 3), 2))
+```
+
+**Current (`child_clean.R:3593–3608`):**
+```r
+data.sde[, ewma_fill := suppressWarnings(
+  max(ewma.all[!was_temp_sde], na.rm = TRUE)), by = .(subjid, param, agedays)]
+data.sde[is.infinite(ewma_fill), ewma_fill := NA_real_]
+data.sde[is.na(ewma.all) & was_temp_sde, ewma.all := ewma_fill]
+data.sde[, ewma_fill := NULL]
+...
+data.sde[, spa_ewma := suppressWarnings(max(ewma.all, na.rm = TRUE)), by = .(subjid, param, agedays)]
+data.sde[is.infinite(spa_ewma), spa_ewma := NA_real_]
+data.sde[, absdewma := abs(tbc.sd - spa_ewma)]
+```
+
+**Difference:** Current adds explicit `is.infinite → NA` conversions for both `ewma_fill` and `spa_ewma`.
+
+**Bug in reference:** In the edge case where a `(subjid, param, agedays)` group in `data.sde` has **only** temp SDE rows (no stable Include rows — e.g., all stable Include rows on that day for that param were excluded by earlier steps such as BIV or EWMA1):
+1. `ewma_df` (`exclude == "Include" & !was_temp_sde`) has zero rows from this group.
+2. After the merge, the group's `ewma.all` is all NA.
+3. Reference: `max(ewma.all[!was_temp_sde], na.rm = TRUE)` = `max(numeric(0), na.rm = TRUE)` = `-Inf` (with warning). So `ewma.all` for the temp SDE rows is set to `-Inf`.
+4. Reference: `spa_ewma = max(-Inf, ..., na.rm = TRUE)` = `-Inf` (no real values to dominate).
+5. Reference: `absdewma = abs(tbc.sd - (-Inf))` = `Inf`.
+6. Reference: `min_absdewma = Inf > 1` → TRUE → all rows erroneously marked `Exclude-SDE-All-Extreme` (Extraneous).
+7. Then `eligible_mask` is empty (all rows already Extraneous) → `keep_id_ewma = NA` → no rows restored to Include.
+
+**Result in reference:** The entire group is excluded as Extraneous. The subject loses all measurements on that day for that param, even though at least one of the temp SDE rows should have been kept as the only candidate.
+
+**Current behavior:** `is.infinite(ewma_fill) → NA` prevents `-Inf` propagation into `ewma.all`. `is.infinite(spa_ewma) → NA` prevents `-Inf` `spa_ewma`. With `spa_ewma = NA`, `absdewma = NA`, `min_absdewma = NA`, `!is.na(NA) = FALSE` → SDE-All-Extreme not triggered. The `keep_id_ewma` block proceeds with `eligible_mask = TRUE` for all temp SDE rows (all still Include/Temp-SDE), sorts by `absdewma` (all NA, so only tiebreaker matters), and selects one row to keep as Include. Remaining rows become Extraneous.
+
+**When does this edge case occur?** A subject has 2+ measurements on the same (param, agedays). Step 5 flags one as Temp-SDE; one remains Include. A later step (7 BIV, 9 Evil Twins, or 11 EWMA1) excludes the stable Include row. Entering Step 13, that day-group has only Temp-SDE rows remaining in data.sde.
+
+**Category:** Bug fix — reference has edge-case error; current is correct.
+**Pitfall:** NA / empty-set handling (`max()` on empty subset → `-Inf` with warning; propagates to erroneous SDE-All-Extreme).
+**Status:** Closed — current already correct, no code change needed.
+
+---
+
+## Items NOT flagged (audit trail)
+
+- **Phase A debug code → `warning()`**: Reference stops execution via `stop()` after writing debug CSVs (`Infants_Main.R:3453–3463`, `:3470–3481`); current emits `warning()` only. Intentional cleanup (these were debug aids, not production logic).
+- **Phase B1 SDE-Identical first check — no `exclude == "Include"` guard**: Both reference and current mark non-kept rows as SDE-Identical even without the `exclude == "Include"` guard in the all-values-identical check. Only Include/Temp-SDE rows are in data.sde anyway (filtered by `.child_valid(include.temporary.extraneous = TRUE)`), so both are equivalent.
+- **Phase B1 SDE-Identical second check — `exclude == "Include"` guard**: Both reference (`:3541`) and current (`:3461`) require `exclude == "Include"` for the duplicate-value check. Same.
+- **Phase B2 `median_tbc_gt2` dead variable**: Reference computes a `median_tbc_gt2` column (`Infants_Main.R:3588–3594`) that is never subsequently read — the SDE-All-Extreme check at `:3599` recomputes the same condition inline. Current correctly omits this dead variable. Cleanup (no logic impact).
+- **Phase B2 SDE-All-Extreme check: `!is.na(min_absdiff_rel_to_median)` guard**: Current adds explicit guard; reference relies on row-level `!is.na(absdiff_rel_to_median)` alone. Practically equivalent (if `min_absdiff_rel_to_median` were Inf from an empty group, `absdiff_rel_to_median` for non-Include rows would be NA, blocking the marking via the row-level check). Cleanup.
+- **Phase B2 `absdiff_dop_for_sort` rounding**: Reference uses double-rounded `absdiff_dop_rounded`; current uses unrounded `absdiff_dop_med`. Per procedure: do NOT flag rounding-tolerance removal.
+- **Phase B2 `keep_id_oneday` sort key**: Reference uses `absdiff_median_rounded` (double-rounded); current uses `absdiff_rel_to_median` (unrounded). Per procedure: do NOT flag.
+- **Phase B2 explicit `~ "Include"` arm in reference**: Reference includes `id == keep_id_oneday ~ "Include"` in the `case_when`; current omits it (winner stays Include by default). Logically redundant — the winner already has `exclude == "Include"`. Cleanup.
+- **Phase B3 `suppressWarnings` added to `max(ewma.all[!was_temp_sde])` and `max(ewma.all)`**: Reference does not suppress these warnings; they would fire on empty groups. Current adds `suppressWarnings`. This is cleanup that also happens to prevent the reference's `-Inf` propagation bug (AJ13). Note that AJ13 is the main finding here — the `suppressWarnings` is secondary.
+- **Phase B4 merge guard**: Reference uses `case_when(!is.na(sde_exclude) ~ sde_exclude)` to overwrite any row that was in data.sde; current adds explicit `exclude %in% c("Include", "Exclude-C-Temp-Same-Day")` guard. Functionally equivalent because data.sde only contains Include/Temp-SDE rows (filtered by `.child_valid(include.temporary.extraneous = TRUE)`) — no BIV/CF/etc. rows are present. Defensive cleanup.
+- **Phase B4 `select(which(names(...) %in% keep_cols_sde))` → `setdiff + := NULL`**: Reference uses dplyr `select` to drop extra columns; current uses `setdiff(names(data.df), keep_cols_sde)` + `:=` NULL. Equivalent.
+- **`sde_this` computation grouping**: Both use `(subjid, param, agedays)` grouping for `sde_this`. Same.
+- **Subject-level SDE filter**: Both filter to subjects with any `sde_this == TRUE`, at the subjid level (not param level). Same.
+- **DOP median grouping level**: Both group by `(subjid, agedays)` (not param) for cross-parameter DOP computation. Same.
+- **`as.data.frame()` conversions**: Reference's dplyr chain requires data.frame; current stays in data.table. Logic equivalent.
+- **Stata-era reference comment** (`Infants_Main.R:3450`: "Matches Stata Step 13 line 1516"): Replaced with a plain English explanation in current. Cleanup (stale reference numbers are noise).
+
+---
+
+## Approval and next steps
+
+AJ13 confirmed as Bug fix already in current code (no change needed). Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Adult tests not re-run — no adult files in scope.
+
+Next session candidate: **Session 7 — Child Step 15 (EWMA2 Moderate) + Child Step 16 (Birth HT/HC)**.

@@ -66,3 +66,13 @@ Walkthrough note: [walkthrough-todo-2026-04-19.md](walkthrough-todo-2026-04-19.m
 - [AJ12] Step 11 / `ewma()` signature: EWMA window default changed from 25 (reference) to 15 (current `ewma_window` parameter); reference comment says 25 was "Changed … to 25 for better accuracy with minimal efficiency loss" — Intentional (other) — closed (confirmed intentional, no code change needed; all ewma() and ewma_cache_init() call sites already use `window = ewma_window` consistently) — `Infants_Main.R:2013–2015` vs `child_clean.R:1695`; call site `Infants_Main.R:3325` vs `child_clean.R:3285`. Pitfall: **Boundary changes**.
 
 **Session 5 status:** 1 finding (AJ12 — Intentional (other)). Closed with no code change. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run.
+
+---
+
+## Session 6 — 2026-04-19 — Step 13 (Final SDE resolution, multi-phase B1/B2/B3)
+
+Walkthrough note: [walkthrough-todo-2026-04-19.md](walkthrough-todo-2026-04-19.md) — see "R-vs-R comparison — Session 6" section.
+
+- [AJ13] Step 13 Phase B3: `ewma_fill` and `spa_ewma` Inf guards — reference has no guard: when a `(subjid, param, agedays)` group has only temp SDE rows (stable Include rows excluded by BIV/EWMA1), `max(ewma.all[!was_temp_sde], na.rm = TRUE)` = `-Inf`, propagates to `spa_ewma = -Inf`, `absdewma = Inf`, `min_absdewma > 1` → all rows erroneously marked Extraneous; current adds `is.infinite → NA` conversions for both `ewma_fill` and `spa_ewma`, preventing erroneous marking and correctly keeping the best-tiebreaker row as Include — Bug fix — closed (current already correct, no change needed) — `Infants_Main.R:3722–3730` vs `child_clean.R:3593–3607`. Pitfall: **NA / empty-set handling**.
+
+**Session 6 status:** 1 finding (AJ13 — Bug fix). Closed with no code change. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Next session candidate: **Session 7 — Child Step 15 (EWMA2) + Step 16 (Birth HT/HC)**.
