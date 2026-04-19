@@ -14,6 +14,8 @@ This CLAUDE.md is for **Claude Code agents working on gc code**. For pipeline/Qu
 
 **Standing permission** (2026-04-17): While working in `__Pipeline/gc-github-latest/`, it is OK to edit `__Pipeline/CLAUDE.md` without asking — typically to sync its "Last updated" / milestone summary with work that happened in `gc-github-latest/`. Edits to other files outside `gc-github-latest/` still require explicit per-change permission.
 
+**Repo scope note:** Only the `gc-github-latest/` directory is a git repository (origin: `carriedaymont/growthcleanr`, branch `efficiency-updates`). The parent `__Pipeline/` directory is **not** under version control and `__Pipeline/CLAUDE.md` is not in any repo, so it does not need to be staged, committed, or pushed — edits to it are saved on disk only. When committing/pushing growthcleanr work, only stage files under `gc-github-latest/`.
+
 ---
 
 ## Algorithms
