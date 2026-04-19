@@ -1075,3 +1075,63 @@ Moved from the wrapper technical reference on 2026-04-18. These are walkthrough 
 5. **Fenton merge failure.** Correctly resets `potcorr_wt` to FALSE and recomputes subject-level `potcorr` so the subject is excluded from downstream Fenton logic without silently using partial results.
 6. **Correction revert rule.** The abssumdiff comparison is computed only over weight rows with `ageyears_2b < 2` and `seq_win ≤ 4`. The check is first-weight-only (`is_first`), which matches its purpose (the correction is driven by the first qualifying weight).
 7. **HEIGHTCM supine/standing offsets** (+0.8 WHO, +0.7 CDC) are applied only when `agedays > 730 & cagedays ≤ 730` — the band where chronological age is post-2y but corrected age is still under 2y.
+
+---
+
+## Session 7 — Step 11 (EWMA1 Extreme) deeper pass (2026-04-18)
+
+Second pass over Child Step 11 after Session 6 (2026-04-17). Session 6 covered the main cleanup (F34–F38: debug parameter removal, 11a/11b/11c sub-sectioning, current-state narrative rewrite, `lowest id` → `lowest internal_id`). This pass surfaced four narrow items, all fixed in place, plus one deferred.
+
+### Pre-session baseline tests
+
+After the 2026-04-18 wrapper-reference / D27–D31 work, the installed package was retested:
+
+- test-cleangrowth.R: 63 PASS, 0 warnings
+- test-child-regression.R: 48 PASS, 0 warnings
+- test-child-edge-cases.R: 28 PASS, 0 warnings
+- test-child-algorithms.R: 41 PASS (2 baseline codetools warnings from parallel test)
+- test-child-parameters.R: 13 PASS
+
+### Fix-now items
+
+### F39. Stale `# Return z-scores and EWMA1 iteration 1 values for comparison` comment removed — FIXED
+- **File/lines:** `child_clean.R` pre-edit line 4784 — header comment for the output-assembly column-build block in `cleanchild()`.
+- **Issue.** The `debug` parameter and `ewma1_it1.*` capture block were removed in Session 6 F34; the current code returns only essentials (`id`, `line`, `exclude`, `param`, `cf_rescued`), optional z-score columns, `final_tbc`, and (when `cf_detail = TRUE`) `cf_status` / `cf_deltaZ`. The "EWMA1 iteration 1 values for comparison" clause described a capture mechanism that no longer exists.
+- **Fix.** Replaced the comment with current-state prose: `# Assemble return columns: essentials + z-scores + final_tbc + optional cf_detail columns.`
+
+### F40. Dead columns in Step 11 `.SDcols` removed — FIXED
+- **File/lines:** `child_clean.R` pre-edit line 3235 — `.SDcols` for the per-group closure at the end of Step 11b.
+- **Issue.** The `.SDcols` list included `index`, `id`, and `sex`, none of which are referenced inside the per-group closure body. The closure reads `exclude` (for `.child_valid(df)`), `agedays`/`tbc.sd`/`ctbc.sd` (for EWMA and the pot_excl criteria), `param` (for `.child_exc(param, "Traj-Extreme")`), and `internal_id` (worst-row tiebreaker). `id`, `index`, and `sex` are copied into `.SD` per group with no consumer.
+- **Fix.** Reduced the list to `c('internal_id', 'param', 'agedays', 'tbc.sd', 'ctbc.sd', 'exclude')`. No expected behavioral change (the removed columns were never read).
+- **Verification.** All 5 child test suites pass after reinstall: 63 / 48 / 28 / 41 / 13, identical to baseline.
+
+### F41. Narrative "the closure resets those subjects' temp SDEs" phrasing clarified — FIXED
+- **File/lines:** `child-algorithm-reference.md` Step 11b iteration-bookkeeping item 2 (pre-edit line 967).
+- **Issue.** The reset + `identify_temp_sde()` rerun happens in the outer iteration-loop block (`child_clean.R` ~lines 3243–3254), not inside the per-group closure. The word "closure" misleadingly suggested the per-group `copy(.SD)` closure.
+- **Fix.** Replaced "the closure resets those subjects' temp SDEs to Include and reruns `identify_temp_sde()` on that subset" with "the post-pass recalc block resets those subjects' temp SDEs to Include and reruns `identify_temp_sde()` on that subset."
+
+### F42. Narrative Code-location cell now names `identify_temp_sde()` — FIXED
+- **File/lines:** `child-algorithm-reference.md` Step 11 summary table (pre-edit line 881).
+- **Issue.** Code-location cell listed only `ewma()` as a support function used by Step 11, but Step 11b (per-iteration targeted recalc at `child_clean.R` ~lines 3250–3254) and Step 11c (end-of-step refresh at ~lines 3273–3274) also call `identify_temp_sde()`.
+- **Fix.** Cell now reads: "Inline in `cleanchild()` in `child_clean.R`; support functions `ewma()` and `identify_temp_sde()` also defined in `child_clean.R`."
+
+### Session 7 deferreds
+
+### D33. Legacy Stata-style `# 6. / a. / b. / c. / i. / ii. / iii.` comment block in `ewma()` — DEFERRED (support-function scope)
+- **File/lines:** `child_clean.R` ~lines 1662–1682 — numbered block inside the `ewma()` function body describing the original EWMA formula in pseudo-math notation (`EWMASDi`, `SDj…SDn`, `ΔAgej`, `EWMAZ`, `EWMAZbef`, `EWMAZaft`).
+- **Issue.** Per walkthrough convention (F26/F30/F35), Stata-style enumeration and algorithm-design prose in the implementation file should be rewritten as current-state R-idiom comments. The block predates the R implementation and does not use current variable names (`tbc.sd`, `ctbc.sd`, `ewma.all`/`before`/`after`, `delta`).
+- **Why deferred.** `ewma()` is a shared support function used by Child Steps 11, 13, 15/16, and 17, and also by the adult algorithm indirectly. The block is not inside Step 11's main logic; it's inside the `ewma()` function definition. Rewriting it belongs with a broader `ewma()` / `ewma_cache_init()` / `ewma_cache_update()` support-function pass rather than inside a single-step walkthrough. The technical content is still accurate (the formula described matches what the code computes).
+- **Related.** `child_clean.R` ~lines 3571–3576 has a similar "Restructured to use global iterations for efficiency / Key changes:" block at the top of Child Steps 15/16 — Step 15/16 scope, not Step 11. To be handled during the Steps 15/16 walkthrough.
+- **Where fixed later.** Dedicated `ewma()` / support-function cleanup pass (prompt proposed separately).
+
+### Session 7 — post-fix test results
+
+After reinstalling the package:
+
+- test-cleangrowth.R: 63 PASS, 0 warnings
+- test-child-regression.R: 48 PASS, 0 warnings
+- test-child-edge-cases.R: 28 PASS, 0 warnings
+- test-child-algorithms.R: 41 PASS (2 baseline codetools warnings, unchanged)
+- test-child-parameters.R: 13 PASS
+
+All counts identical to baseline. No regressions.

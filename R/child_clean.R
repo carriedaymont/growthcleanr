@@ -3232,7 +3232,7 @@ cleanchild <- function(data.df,
               return(df$exclude)
             })(copy(.SD)),
             by = .(subjid, param),
-            .SDcols = c('index', 'id', 'internal_id', 'param', 'sex', 'agedays', 'tbc.sd', 'ctbc.sd', 'exclude')]
+            .SDcols = c('internal_id', 'param', 'agedays', 'tbc.sd', 'ctbc.sd', 'exclude')]
 
     # Find subject-params with NEW exclusions this iteration
     data.df[sp_key %in% sp_to_process, has_new_excl :=
@@ -4781,8 +4781,8 @@ cleanchild <- function(data.df,
     data.df[, final_tbc := tbc.sd]
   }
 
-  # Return z-scores and EWMA1 iteration 1 values for comparison
-  # Build list of columns to return - start with essential columns
+  # Assemble return columns: essentials + z-scores + final_tbc + optional
+  # cf_detail columns.
   return_cols <- c("id", "line", "exclude", "param", "cf_rescued")
 
   # Add z-score columns if they exist

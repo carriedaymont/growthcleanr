@@ -878,7 +878,7 @@ None. The OTL threshold (`> 5` on both `tbc.sd` and `ctbc.sd`) is hardcoded in `
 | **Prior step** | Child Step 9 (Evil Twins) |
 | **Next step** | Child Step 13 (Final SDE Resolution) |
 | **Exclusion code** | `Exclude-C-Traj-Extreme` |
-| **Code location** | Inline in `cleanchild()` in `child_clean.R`; support function `ewma()` also defined in `child_clean.R` |
+| **Code location** | Inline in `cleanchild()` in `child_clean.R`; support functions `ewma()` and `identify_temp_sde()` also defined in `child_clean.R` |
 
 ### Overview
 
@@ -964,7 +964,7 @@ When more than one value meets criteria, the worst is selected by `order(pot_exc
 After each per-group pass:
 
 1. Subject-params with a NEW exclusion this pass are identified (comparing `had_ewma1_before` flags against the post-pass state).
-2. Temp SDEs are recalculated ONLY for subjects that are both in `subj_with_sde` (had a temp SDE going into Child Step 11) AND produced a new exclusion this pass — the closure resets those subjects' temp SDEs to Include and reruns `identify_temp_sde()` on that subset.
+2. Temp SDEs are recalculated ONLY for subjects that are both in `subj_with_sde` (had a temp SDE going into Child Step 11) AND produced a new exclusion this pass — the post-pass recalc block resets those subjects' temp SDEs to Include and reruns `identify_temp_sde()` on that subset.
 3. The next iteration's `sp_to_process` is the set of subject-params with new exclusions from this pass.
 4. The loop terminates when no subject-param produces a new exclusion.
 
