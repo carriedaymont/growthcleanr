@@ -88,3 +88,13 @@ Walkthrough note: [walkthrough-todo-2026-04-19.md](walkthrough-todo-2026-04-19.m
 AJ## numbering does not advance. All non-intentional diffs are known-intentional or equivalent cleanup — logged under "Items NOT flagged (audit trail)" in the walkthrough note. Key items: tbc_range pre-filter before the Step 15 while loop (safe efficiency optimization, range ≤ 1 groups cannot pass the `|dewma| > 1` addcrit threshold); DOP snapshot timing change (`dop_snap` keyed at iteration start vs. reference's live per-closure `data.df` scan — current is strictly more correct, eliminates implicit within-iteration ordering dependency); `include.temporary.extraneous = TRUE` removal from `include_counts` (Session 11 F74, confirmed intentional); sp_key-level Step 16 birth filter (Session 11 F85, confirmed intentional behavior-neutral tightening); EWMA caching (`ewma_cache_init`/`ewma_cache_update`/`ewma2_caches` — known intentional performance feature); `cols_to_drop_15_16` scope (Session 11 F81, drops p_plus/p_minus/tbc.p_plus/tbc.p_minus/first_meas after Step 16); all rounding-tolerance removals (per procedure, do NOT flag).
 
 **Session 7 status:** 0 findings. Closed with no code change. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Next session candidate: **Session 8 — Child Step 17 (Height/HC Velocity)**.
+
+---
+
+## Session 8 — 2026-04-22 — Step 17 (Height/HC Velocity)
+
+Walkthrough note: [walkthrough-todo-2026-04-22.md](walkthrough-todo-2026-04-22.md) — see "R-vs-R comparison — Session 8" section.
+
+- [AJ14] Step 17 HC velocity: reference HC branch is effectively a no-op — for-loop condition `!is.na(df$whoagegrp.hc)` always FALSE because `whoagegrp.hc` is never set (reference sets `whoagegrp.ht` instead); loop body references `sub_m_who_ht_vel` (HT variable, undefined in HEADCM context) and `.ht`-suffix column names; result: only `mindiff = -1.5` fallback applied, no upper bound check. Current correctly implements HC velocity via pre-merged `.hc`-suffix columns and `fcase` lookup — Bug fix — closed (current already correct, no change needed) — `Infants_Main.R:4452–4523` vs `child_clean.R:4557–4609`. Pitfalls: **NA / empty-set handling** + **Parameter scope**.
+
+**Session 8 status:** 1 finding (AJ14 — Bug fix). Closed with no code change. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Next session candidate: **Session 9 — Child Step 19 (Pairs/Singles) + Step 21 (Error Load) + Step 22 (Output)**.

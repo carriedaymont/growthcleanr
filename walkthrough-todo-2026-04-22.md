@@ -287,3 +287,115 @@ None.
 ## Session 4 status
 
 2 findings (AJ10 — Intentional (other); AJ11 — Bug fix). Both closed with no code change needed. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Next session candidate: **Session 5 — Child Step 11 (EWMA1, complex closure and EWMA caching).**
+
+---
+
+# R-vs-R comparison — Session 8 — 2026-04-22
+
+Scope: Child Step 17 (Height/HC Velocity). Per `R-child-AprJanComparison-procedure.md`. Pure R-vs-R diff of reference `Infants_Main.R` (~lines 4210–4715) against current `child_clean.R` (~lines 4115–4733).
+
+---
+
+## Pre-session baseline tests
+
+Baseline from today's prior sessions (same process instance):
+
+- test-cleangrowth.R: 63 PASS
+- test-child-regression.R: 48 PASS
+- test-child-edge-cases.R: 28 PASS
+- test-child-algorithms.R: 41 PASS (2 baseline codetools warnings)
+- test-child-parameters.R: 13 PASS
+
+---
+
+## Scope
+
+| Sub-area | Reference lines | Current lines | What |
+|---|---|---|---|
+| Velocity table loading | `Infants_Main.R:4210–4283` | `child_clean.R:4115–4162` | tanner + WHO HT + WHO HC tables |
+| Sort + valid_set + pre-filter | `Infants_Main.R:4285–4300` | `child_clean.R:4164–4405` | Pre-filter (perf opt in current) + valid_set |
+| Step 17 closure | `Infants_Main.R:4301–4715` | `child_clean.R:4408–4733` | Per-(subjid, param) while loop |
+
+---
+
+## Known intentional changes encountered (logged briefly, not analyzed)
+
+- **Pre-filter structure (performance):** Current builds a vectorized `pf` pre-filter over all valid rows, identifies groups with at least one raw-diff violation (`sp17_to_process`), and runs the closure only on those groups. Reference runs the closure on all valid groups. Equivalent results; groups without violations trivially exit the while loop in the reference.
+- **WHO merge moved pre-loop:** Current pre-merges WHO HT velocity columns before the while loop (inside the closure, before the `testing <- TRUE / while` block), and uses `fcase` inside the loop to select the per-row value. Reference merges inside the while loop per iteration, causing `.x/.y` column suffix duplication on iteration 2+ when merge encounters columns already added in iteration 1. The pre-loop approach is both correct and more efficient. Reference merge at `Infants_Main.R:4387–4388`; current pre-merge at `child_clean.R:4420–4422`.
+- **Tanner table loading pre-batch:** Reference loads `tanner.ht.vel.rev` fresh inside each per-batch `cleanbatch_infants()` call. Current loads it once in `cleangrowth()` and passes it as a parameter; aliased to `tanner.ht.vel.rev` at `child_clean.R:4118` for naming compatibility.
+- **`dplyr::lead/lag` → `shift`:** Cosmetic refactor throughout. Reference used `dplyr::lead(agedays)` etc.; current uses `shift(agedays, n = 1L, type = "lead")` etc. Equivalent.
+- **`.SDcols` narrowed:** Reference uses `.SDcols = colnames(data.df)` (all columns); current uses a specific 9-column list. Equivalent; current is more efficient.
+- **`id` → `internal_id` as final tiebreaker:** Sort and candidate selection use `internal_id` in current, `id` in reference. Known rename.
+- **`valid()` → `.child_valid()`:** Known rename.
+- **`cat()` → `message()`:** Known rename.
+- **Exclusion codes:** Reference uses `"Exclude-Min-diff"` / `"Exclude-Max-diff"`; current uses `.child_exc(param, "Abs-Diff")` → `"Exclude-C-Abs-Diff"`. Known code rename.
+- **Rounding removal:** Reference applies `janitor::round_half_up(janitor::round_half_up(..., 3), 2)` to mindiff/maxdiff, diff_prev/diff_next, and dewma comparisons. Per procedure: do NOT flag.
+- **17B Tanner months threshold:** F94 (walkthrough Session 12) — reference uses `(agedays/30.4375) < 30` (this row's age); current uses `tanner.months < 30` (midpoint-based). Known bug fix.
+- **17C-b boundary `>` → `>=` for d_agedays == 365.25:** F95 — reference `d_agedays > 365.25` left exactly 365.25 unhandled; current `d_agedays >= 365.25`. Known bug fix.
+- **17D WHO endpoint check (17D F101):** Reference used `whoagegrp.ht > 24 | dplyr::lead(whoagegrp.ht) > 24` (wrong: compares capped values, not actual endpoint); current uses `(agedays + d_agedays) / 30.4375 > 24`. Known bug fix (F101, Session 12).
+- **17E whoinc.age.ht interval consolidation (F102):** Reference: `d_agedays >= 20 & < 46 → 1` and separate `d_agedays < 20 → 1`, with gap at d_agedays == 199; current: `d_agedays < 46 → 1`, `d_agedays >= 153 → 6` (gap closed). Known bug fix (F102, Session 12).
+- **2-row branch `>` → `>=` for tied abs(tbc.sd) (F97):** Reference strict `>` meant tied-absval pairs flagged neither row, letting violations escape Step 17 entirely; current `>=` flags both, then `internal_id` picks the lowest. Known bug fix (F97, Session 12).
+- **Dead `if (count_exclude >= 1)` else-branch collapsed:** Reference has `if (count_exclude > 0) { ... if (count_exclude >= 1) { testing <- TRUE; df <- df[index != idx, ] } else { testing <- FALSE } }` — inner if is always TRUE inside the outer if, making the else dead. Current collapses to `if (count_exclude > 0) { ... testing <- TRUE; df <- df[index != idx, ] } else { testing <- FALSE }`. Known pre-walkthrough cleanup.
+- **Dead `id_all <- copy(df$id)` removed:** Reference line 4306 creates `id_all` but never reads it; already removed in current (confirmed in walkthrough Session 12). Not re-flagged.
+- **Dead `iter_count` variable removed:** Reference lines 4311/4314 initialize and increment `iter_count` but never read it; already removed in current. Not re-flagged.
+- **Reference debug block:** Lines 4644–4666 print to console when `unique(df$subjid) == "76234"`, plus commented-out code at lines 4683–4712. Debugging artifacts; already cleaned up in current.
+- **`ewma()` now passes `window = ewma_window`:** AJ12 (Session 5) — known intentional parameter addition.
+
+---
+
+## Findings
+
+### AJ14 — Step 17: HC velocity section in reference is effectively a no-op — Bug fix — closed
+
+**Reference (`Infants_Main.R:4452–4523`, HEADCM branch inside closure):**
+
+```r
+# 17D
+df[, whoagegrp.ht := round(agedays/30.4375)]           # sets .ht, not .hc
+df[whoagegrp.ht > 24 | dplyr::lead(whoagegrp.ht) > 24,
+   whoagegrp.ht := NA]
+
+# 17J
+df[d_agedays >= 46 & d_agedays < 76,  whoinc.age.hc := 2]
+df[d_agedays >= 76 & d_agedays < 107, whoinc.age.hc := 3]
+df[d_agedays >= 107 & d_agedays < 153,whoinc.age.hc := 4]
+df[d_agedays >= 153 & d_agedays < 199,whoinc.age.hc := 6]  # gap at 199
+
+# 17K
+m_who_hc_vel <- merge(df, who.hc.vel, by = c("sex", "whoagegrp.ht"), ...)
+for (i in unique(df$whoinc.age.hc[!is.na(df$whoinc.age.hc) &
+                                  !is.na(df$whoagegrp.hc)])){  # whoagegrp.hc NEVER SET
+  sub_m_who_hc_vel <- m_who_hc_vel[whoinc.age.ht == i,]  # wrong: uses .ht
+  cn <- paste0("whoinc.", i, ".ht")                        # wrong: .ht suffix
+  df[whoinc.age.hc == i,
+     who_mindiff_hc := as.numeric(sub_m_who_ht_vel[, get(cn)])]  # wrong: ht df
+  ...
+}
+```
+
+The for-loop condition `!is.na(df$whoagegrp.hc)` is always FALSE because `whoagegrp.hc` is never set in the HC branch — the code sets `whoagegrp.ht` instead. The preallocate block at lines 4486–4492 runs (because `length(unique(...)) < 1`), setting `who_mindiff_hc = NA` and `who_maxdiff_hc = NA`. Then `df[, mindiff := who_mindiff_hc]` assigns all NA, and `df[is.na(mindiff), mindiff := -1.5]` applies the fixed fallback for every row. Result: HC velocity checking in the reference applies only `mindiff = -1.5` (or -2.0 at birth) with **no upper bound check**. Additionally, if the loop had somehow run, it would reference `sub_m_who_ht_vel` (HT data frame, undefined in HEADCM context) and `.ht`-suffix column names — causing an error or silently using HT data.
+
+**Current (`child_clean.R:4419–4434`, pre-loop HC merge; `child_clean.R:4557–4609`, HEADCM in-loop):**
+
+Pre-loop: copies `who.hc.vel`, renames all `whoinc.N.ht` / `max.whoinc.N.ht` / `whoagegrp.ht` columns to `.hc` suffix, creates `whoagegrp.hc` in `df` (NA for rows > 24 months), merges renamed table into `df`. Inside loop: computes `whoinc.age.hc` per-iteration (corrects the `d_agedays >= 153 & < 199` gap to `< 200`); uses `fcase` to extract `who_mindiff_hc` / `who_maxdiff_hc` from the pre-merged `.hc` columns; applies the 17L gap-scaling and 17M tolerance (±1.5 cm); falls back to `mindiff = -1.5` when no WHO data available.
+
+Result: HC velocity checking in the current code correctly applies WHO HC velocity limits for pairs within the 0–24 month range, with a proper upper bound check and the standard gap-scaled tolerance. **Bug fix — closed (current already correct, no change needed).** `Infants_Main.R:4452–4523` vs `child_clean.R:4557–4609`. **Pitfalls: NA / empty-set handling** (loop condition always FALSE due to unset variable) + **Parameter scope** (HC-specific variable `whoagegrp.hc` never initialized).
+
+---
+
+## Items NOT flagged (audit trail)
+
+- **HC 24-month endpoint boundary check not present for HC:** Unlike HT (where F101 added an explicit per-iteration NA-out of `who_mindiff_ht`/`who_maxdiff_ht` when `(agedays + d_agedays) / 30.4375 > 24`), the current HC section has no equivalent per-iteration endpoint check. In practice, all WHO HC velocity reference values correspond to `d_agedays < 200` (< 6.6 months), which is less than the 9-month threshold; a HC pair starting just before 24 months with a 6-month gap would end just before 30 months, still within the HC cleaning age (< 3 × 365.25 days). Edge case is rare and the practical impact is small. Not flagged as a regression since the reference HC section was entirely non-functional; noted here for completeness.
+- **HC `whoinc.age.hc` boundary d_agedays == 199 gap:** Reference `d_agedays >= 153 & < 199` leaves d_agedays == 199 unhandled; current uses `< 200`. Analogous to F102 for HT — part of the broader HC fix (AJ14); no independent flag since reference HC was non-functional anyway.
+
+---
+
+## Open questions
+
+None.
+
+---
+
+## Session 8 status
+
+1 finding (AJ14 — Bug fix). Closed with no code change needed. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run since no code change. Next session candidate: **Session 9 — Child Step 19 (Pairs/Singles) + Step 21 (Error Load) + Step 22 (Output).**
