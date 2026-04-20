@@ -2466,7 +2466,7 @@ calc_and_recenter_z_scores <- function(df, cn, ref.data.path,
     int_labels = int_labels,
     tables = list(
       HEIGHTCM = list(other = ht_other, imperial = ht_imperial),
-      HEADCM   = list(other = ht_other, imperial = ht_imperial),  # placeholder: use HT thresholds
+      HEADCM   = list(other = ht_other, imperial = ht_imperial),  # HT thresholds appropriate for HC: both WHO-only with similar reference-standard structure
       WEIGHTKG = list(other = wt_other, imperial = wt_imperial)
     )
   )

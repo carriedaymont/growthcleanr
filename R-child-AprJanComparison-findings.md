@@ -48,7 +48,7 @@ The big intentional change — CF rescue scheme redesign (lookup-table + `cf_res
 
 ---
 
-## Session 4 — 2026-04-22 — Step 7 (BIV) + Step 9 (Evil Twins)
+## Session 4 — 2026-04-19 — Step 7 (BIV) + Step 9 (Evil Twins)
 
 Walkthrough note: [walkthrough-todo-2026-04-22.md](walkthrough-todo-2026-04-22.md) — see "R-vs-R comparison — Session 4" section.
 
@@ -91,7 +91,7 @@ AJ## numbering does not advance. All non-intentional diffs are known-intentional
 
 ---
 
-## Session 8 — 2026-04-22 — Step 17 (Height/HC Velocity)
+## Session 8 — 2026-04-19 — Step 17 (Height/HC Velocity)
 
 Walkthrough note: [walkthrough-todo-2026-04-22.md](walkthrough-todo-2026-04-22.md) — see "R-vs-R comparison — Session 8" section.
 
@@ -101,7 +101,7 @@ Walkthrough note: [walkthrough-todo-2026-04-22.md](walkthrough-todo-2026-04-22.m
 
 ---
 
-## Session 9 — 2026-04-22 — Step 19 (Pairs/Singles) + Step 21 (Error Load) + Step 22 (Output)
+## Session 9 — 2026-04-19 — Step 19 (Pairs/Singles) + Step 21 (Error Load) + Step 22 (Output)
 
 Walkthrough note: [walkthrough-todo-2026-04-22.md](walkthrough-todo-2026-04-22.md) — see "R-vs-R comparison — Session 9" section.
 
@@ -111,7 +111,7 @@ Walkthrough note: [walkthrough-todo-2026-04-22.md](walkthrough-todo-2026-04-22.m
 
 ---
 
-## Session 10 — 2026-04-22 — Support functions
+## Session 10 — 2026-04-19 — Support functions
 
 Walkthrough note: [walkthrough-todo-2026-04-22.md](walkthrough-todo-2026-04-22.md) — see "R-vs-R comparison — Session 10" section.
 
