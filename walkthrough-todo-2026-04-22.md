@@ -511,3 +511,122 @@ None.
 ## Session 9 status
 
 1 finding (AJ15 — Bug fix). Closed with no code change needed. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run since no code change.
+
+---
+
+# R-vs-R comparison — Session 10 — 2026-04-22
+
+Pure R-vs-R diff of reference support functions (`pediatric_support.R` + `Infants_Main.R` helper definitions) against current `child_clean.R` consolidated helpers. Per `R-child-AprJanComparison-procedure.md`. This is the final session.
+
+---
+
+## Pre-session baseline tests
+
+63 / 48 / 28 / 41 / 13 — unchanged from Session 9.
+
+---
+
+## Scope
+
+| Sub-area | Reference location | Current location |
+|---|---|---|
+| `valid()` / `.child_valid()` | `pediatric_support.R:8–31` | `child_clean.R:5010–5030` |
+| `na_as_false()` | `pediatric_support.R:37–40` | (removed) |
+| `temporary_extraneous()` | `pediatric_support.R:59–119` | (merged into `identify_temp_sde()`) |
+| `swap_parameters()` | `pediatric_support.R:128–155` | (merged into `get_dop()`) |
+| `as_matrix_delta()` | `pediatric_support.R:161–166` | `child_clean.R:1636–1640` |
+| `read_anthro()` | `Infants_Main.R:1702–1973` | `child_clean.R:1436–1595` |
+| `ewma()` | `Infants_Main.R:2013–2085` | `child_clean.R:1695–1784` |
+| `sd_median()` | `Infants_Main.R:2116–2153` | `child_clean.R:1980–2017` |
+| `get_dop()` | `Infants_Main.R:2167–2177` | `child_clean.R:2050–2060` |
+| `temporary_extraneous_infants()` | `Infants_Main.R:2205–2383` | `child_clean.R:2103–2250` |
+| `calc_oob_evil_twins()` | `Infants_Main.R:2393–2429` | `child_clean.R:2260–2289` |
+| `calc_and_recenter_z_scores()` | `Infants_Main.R:2442–2502` | `child_clean.R:2339–2399` |
+| `.child_exc()` | (not in reference — new) | `child_clean.R:153–155` |
+| `ewma_cache_init()` / `ewma_cache_update()` | (not in reference — new) | `child_clean.R:1793–1949` |
+
+Note: reference also has an orphan duplicate `valid()` at `Infants_Main.R:4991–5010` (identical content to `pediatric_support.R:8–31`; procedure flags it as likely orphaned — not compared).
+
+---
+
+## Known intentional changes encountered
+
+- **`valid()` → `.child_valid()`** rename and code-string updates (`Exclude-Temporary-Extraneous-Same-Day` → `Exclude-C-Temp-Same-Day`, etc.) — known exclusion-code rename.
+- **`as_matrix_delta` made internal** (removed from exports) — known legacy cleanup.
+- **`ewma()` window default 25 → 15** (AJ12, confirmed intentional 2026-04-19).
+- **`ewma()` return type `data.frame` → named `list`** — Session 7b, known intentional for data.table `:=` compatibility.
+- **`ewma()` before/after O(n²) matrix copy → O(n) arithmetic** — Session 7b, mathematically equivalent.
+- **`ewma_cache_init()` / `ewma_cache_update()` added** — known intentional performance feature.
+- **`read_anthro()` `prelim_infants` parameter removed** — legacy removal (2026-04-16); current always uses the consolidated `growthfile_who.csv.gz` path that reference's `prelim_infants = TRUE` used.
+- **`na_as_false()` removed** — only called from legacy `pediatric_clean.R` (non-infant path, removed 2026-04-16); grep-confirmed absent from `Infants_Main.R` proper.
+- **`temporary_extraneous()` (`pediatric_support.R`) not present in current** — infant path always called `temporary_extraneous_infants()` (`Infants_Main.R`), never `temporary_extraneous()`; only listed in `var_for_par` (parallel machinery, now removed).
+- **`swap_parameters()` (`pediatric_support.R`) not present in current** — infant path always called `get_dop()` (`Infants_Main.R`); `swap_parameters()` only listed in `var_for_par`.
+- **`identify_temp_sde()` (vs `temporary_extraneous_infants()`)**: `id` → `internal_id` tiebreaker (known); string-keyed named-vector return → direct integer indexing (Session 8 fix D-c); dead debug comment block removed (cleanup).
+- **`calc_otl_evil_twins()` (vs `calc_oob_evil_twins()`)**: `oob` → `otl` column name (known); rounding removed (per procedure).
+- **`calc_and_recenter_z_scores()`**: `measurement.to.z` / `measurement.to.z_who` optional parameters added (Session 9 walkthrough); dead `setkey()` removed (Session 9 walkthrough D-a); stale comments removed.
+- **`gc_preload_refs()` added** — known intentional performance feature.
+- **`.child_exc()` added** — new helper (no reference equivalent).
+
+---
+
+## Findings
+
+### AJ16 — `calc_and_recenter_z_scores()` CDC boundary `>= 4` (reference) vs `> 5` (current)
+
+**Category:** Bug fix — **Status:** closed (current already correct, no change needed)
+
+**Reference** (`Infants_Main.R:2485`):
+```r
+cdc_val <- df$param != "HEADCM" & df$agedays/365.25 >= 4
+df[cdc_val, cn.orig := df$cn.orig_cdc[cdc_val]]
+```
+
+**Current** (`child_clean.R:2383`):
+```r
+cdc_val <- df$param != "HEADCM" & df$agedays/365.25 > 5
+df[cdc_val, cn.orig := df$cn.orig_cdc[cdc_val]]
+```
+
+The reference `calc_and_recenter_z_scores()` applies `cdc_val` with `>= 4`, which overwrites the 2–5y smooth blend with pure CDC for ages 4–5y. This is inconsistent with the reference's own main z-score pipeline (`Infants_Main.R:748–749`) which correctly uses `> 5` and applies CDC only outside the smooth window. The current aligns the helper with the main pipeline.
+
+Practical impact: in the reference, EWMA2 perturbation z-scores (`p_plus`, `p_minus`) for 4–5 year olds would be pure CDC, while the main z-score (`tbc.sd`) for the same age is blended WHO/CDC. The current correctly blends both.
+
+Additionally, current adds explicit NA fallbacks within the smooth zone:
+```r
+df[smooth_val & is.na(cn.orig_cdc), cn.orig := cn.orig_who]
+df[smooth_val & is.na(cn.orig_who), cn.orig := cn.orig_cdc]
+```
+Reference lacks these; the reference's own main pipeline has equivalent fallbacks at `Infants_Main.R:745–752`. Current is more consistent.
+
+**Pitfall:** **Boundary changes**.
+
+---
+
+## Items NOT flagged (audit trail)
+
+- **`valid()` vs `.child_valid()`**: name + code strings — known intentional (see above).
+- **`na_as_false()` removed**: grep-confirmed never called from `Infants_Main.R` (only from legacy `pediatric_clean.R` / `adjustcarryforward.R`); absent from current correctly.
+- **`temporary_extraneous()` / `swap_parameters()` from `pediatric_support.R` not in current**: grep-confirmed infant path only used `temporary_extraneous_infants()` and `get_dop()` from `Infants_Main.R`; these two were only in `var_for_par` (parallel machinery); both removed as part of legacy removal.
+- **`as_matrix_delta()` logic**: identical in both.
+- **`read_anthro()` signature and closure body**: `prelim_infants` removed (legacy); closure inner logic (`src <- ifelse(agedays < 5*365.25 & !cdc.only, 'WHO', 'CDC')`, CSD formula, key/join/return) is identical between reference `prelim_infants = TRUE` path and current.
+- **`sd_median()` logic**: identical in both — identical data.table operations, `approx()` call, and return.
+- **`get_dop()` logic**: identical in both.
+- **`ewma()` diagonal zeroing**: reference uses `ifelse(delta == 0, 0, sweep(...))` which keeps the zero from `as_matrix_delta()` diagonal; current does `sweep(...)` then `diag(delta) <- 0` explicitly — both produce zero diagonal.
+- **`ewma()` before/after computation**: reference creates `delta2`/`delta3` copies and zeroes one diagonal then remultiplies; current subtracts the single off-diagonal element's contribution from the cached sums — O(n) arithmetic, mathematically equivalent.
+- **`identify_temp_sde()` vs `temporary_extraneous_infants()`**: DOP mapping and median computation logic is equivalent; key structural diffs are all known (internal_id, rounding removal, return mechanism).
+- **`calc_otl_evil_twins()` vs `calc_oob_evil_twins()`**: logic is identical modulo `oob` → `otl` column name and rounding removal — both correctly require SAME adjacent pair to exceed both tbc and ctbc thresholds.
+- **`calc_and_recenter_z_scores()` remaining diffs**: `measurement.to.z` optional params (Session 9), `setkey` removed (Session 9), stale comments — all known.
+- **Orphan duplicate `valid()` at `Infants_Main.R:4991`**: identical content to `pediatric_support.R:valid()`, not compared per procedure note. Presence confirms that R loaded `pediatric_support.R` first and this definition silently shadowed it, but since content is identical, no behavioral impact.
+- **`.child_exc()` and `ewma_cache_*` new in current**: no reference equivalent, no comparison needed.
+
+---
+
+## Open questions
+
+None.
+
+---
+
+## Session 10 status
+
+1 finding (AJ16 — Bug fix). Closed with no code change needed. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run since no code change. **R-vs-R Apr/Jan Comparison complete (all 10 sessions closed).**

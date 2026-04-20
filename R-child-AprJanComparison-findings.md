@@ -108,3 +108,13 @@ Walkthrough note: [walkthrough-todo-2026-04-22.md](walkthrough-todo-2026-04-22.m
 - [AJ15] Step 21: `"Not cleaned"` omitted from reference `non_error_codes` — HC rows with `agedays > 3 × 365.25` carry the `"Not cleaned"` code in reference (assigned in preprocessing), but reference's `non_error_codes` includes `"Missing"` without `"Not cleaned"`; those HC rows are counted as `n_errors` per `(subjid, HEADCM)` group, inflating the error-load ratio. Current correctly adds `Exclude-Not-Cleaned` to `non_error_codes`, excluding out-of-scope HC rows from both numerator and denominator — Bug fix — closed (current already correct; fixed as side effect of exclusion code rename + deliberate addition to non_error_codes) — `Infants_Main.R:4873–4884` vs `child_clean.R:4894–4898`. Pitfall: **Factor levels / exclusion codes**.
 
 **Session 9 status:** 1 finding (AJ15 — Bug fix). Closed with no code change needed. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run.
+
+---
+
+## Session 10 — 2026-04-22 — Support functions
+
+Walkthrough note: [walkthrough-todo-2026-04-22.md](walkthrough-todo-2026-04-22.md) — see "R-vs-R comparison — Session 10" section.
+
+- [AJ16] `calc_and_recenter_z_scores()`: CDC boundary `>= 4` (reference) vs `> 5` (current) — reference helper applied pure CDC z-scores for ages 4–5y when computing EWMA2 perturbation values, inconsistent with the reference's own main pipeline which uses `> 5` (ages 4–5y should receive the 2–5y smooth blend); current correctly uses `> 5`, matching the main pipeline. Current also adds NA fallbacks for the smooth zone (`smooth_val & is.na(cn.orig_cdc) → cn.orig_who` and vice versa) absent in reference — Bug fix — closed (current already correct, no change needed) — `Infants_Main.R:2485` vs `child_clean.R:2383`. Pitfall: **Boundary changes**.
+
+**Session 10 status:** 1 finding (AJ16 — Bug fix). Closed with no code change. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. **R-vs-R Apr/Jan Comparison series complete — all 10 sessions closed.**
