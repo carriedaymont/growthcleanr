@@ -431,6 +431,8 @@ The recentering median file is indexed by param, sex, and agedays. It is merged 
 
 `setkey(sd.recenter, param, sex, agedays)` is called on the supplied table before the rolling join; the caller does not need to set the key but the columns must be named exactly as above. Values outside the (param, sex, agedays) range covered by the table receive the clamped endpoint median.
 
+**Recentering limitation.** Recentering has a small but sometimes meaningful impact on cleaning results. The provided recentering data are based on growth from a single large health system. Some datasets may have different growth patterns. Users may wish to use their own data to create a recentering reference. If doing so, we would suggest creating smoothed medians using data from your own study population or a similar population, and would caution about bias related to small sample sizes and overfitting.
+
 ---
 
 ## Cross-Algorithm Differences
@@ -710,7 +712,7 @@ Cross-cutting wrapper-level pitfalls that have caused real bugs. The two algorit
 ### Reference data
 
 - **Reference-table loading is gated by `ref_tables`.** When set, disk reads are skipped — but the closures must still be valid for the current input. Rebuild `gc_preload_refs()` if the reference files change.
-- **HC reference data only goes to 5 years.** Phase 11 sets `Exclude-Not-Cleaned` for HC at `agedays > 3 * 365.25` (pre-recentering) and also at `agedays >= 5 * 365.25` (post-recentering), so all non-cleaned HC rows share a single consistent exclusion code. The 3y–5y band has valid z-score data for reporting but is not cleaned by the algorithm.
+- **HC reference data limits cleaning to 5 years.** Phase 11 sets `Exclude-Not-Cleaned` for HC at `agedays > 5 * 365.25` (no WHO HC reference above 5 years). HC measurements through 5 years are cleaned by all standard steps; the velocity check (Child Step 17) applies only `mindiff = -1.5` with no upper bound for HC pairs spanning ages 24 months to 5 years, since the WHO HC velocity reference ends at 24 months.
 
 ---
 

@@ -74,18 +74,20 @@ When this reference disagrees with code, reference documents, or CLAUDE.md, rais
 | `biv.z.hc.high` | `15` | Child Step 7 | Upper unrecentered CSD z cutoff for HEADCM (all ages) |
 | `cf_rescue` | `"standard"` | Child Step 6 | CF rescue mode: `"standard"` (lookup), `"none"` (all CFs excluded), `"all"` (all rescued). Validated via `match.arg()`. |
 | `cf_detail` | `FALSE` | Child Step 6; output | If TRUE, add diagnostic columns `cf_status` and `cf_deltaZ` to output |
-| `ewma_window` | `15` | Child Steps 11, 13, 15/16, 17 (passed to `ewma()` / cache helpers) | Max Include observations on each side that contribute to EWMA weighting |
+| `ewma_window` | `15` | Child Steps 11, 13, 15/16, 17; Adult Steps 9Wb, 11Wb | Max observations on each side that contribute to EWMA weighting. Single parameter in `cleangrowth()` affecting both child and adult. |
 | `error.load.mincount` | `2` | Child Step 21 | Minimum "real" errors (not SDE / CF / Missing / Not-Cleaned) before error-load is evaluated |
 | `error.load.threshold` | `0.5` | Child Step 21 | Error ratio above which all remaining Include rows for the subject-param are excluded. Strict `>`. |
+| `length.adjust` | `FALSE` | Preprocessing (before z-scores) | If TRUE, subtracts 0.7 cm from LENGTHCM measurements with `agedays > 2 × 365.25` before z-score calculation. Converts post-infancy recumbent-labeled lengths to the standing equivalent assumed by WHO/CDC references at those ages. No effect for `agedays ≤ 730`. `child_clean.R` → `cleangrowth()`, inside the outer batch loop before `param == 'LENGTHCM'` relabeling. |
 
 ### 1C. Adult algorithm (wrapper-exposed)
 
-Only two adult parameters are exposed directly through `cleangrowth()`; the rest are set by the permissiveness preset (Section 1D).
+Three adult parameters are exposed directly through `cleangrowth()`; the rest are set by the permissiveness preset (Section 1D).
 
 | Parameter | Default | Used in | Role |
 |-----------|---------|---------|------|
 | `adult_permissiveness` | `"looser"` | `cleanadult` preset resolver | Preset level: `"loosest"`, `"looser"`, `"tighter"`, `"tightest"`. Sets defaults for all adult sub-parameters. |
 | `adult_scale_max_lbs` | `Inf` | Adult Step 4W | Physical scale upper limit in pounds. Weights at this cap (± rounding) get `Exclude-A-Scale-Max`. |
+| `ewma_window` | `15` | Adult Steps 9Wb, 11Wb | See Section 1B — shared parameter with child; single value in `cleangrowth()` affects both algorithms. |
 
 ### 1D. Adult permissiveness presets (set by `adult_permissiveness`)
 
@@ -584,3 +586,4 @@ All 11 discrepancies flagged in the initial build have been resolved. Full recor
 |------|--------|
 | 2026-04-18 | Initial version. Built from a code scan, three references scans, and two CLAUDE.md scans. |
 | 2026-04-18 | All 11 initial discrepancies resolved. Updates to child-algorithm-reference, gc CLAUDE.md, and wrapper-narrative applied accordingly. Full record in Section 5. |
+| 2026-04-20 | `ewma_window` scope extended to adult (Steps 9Wb, 11Wb); now passed through `cleangrowth()` to `cleanadult()`. Section 1B updated; Section 1C row added. |

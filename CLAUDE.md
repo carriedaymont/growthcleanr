@@ -137,7 +137,7 @@ Child exclusion codes follow the `Exclude-C-{Reason}` format. Codes are NOT para
 |------|------|-------|-------------|
 | `Include` | — | All | Value passes all checks |
 | `Exclude-Missing` | Init | All | NA, NaN, agedays < 0 |
-| `Exclude-Not-Cleaned` | Init | HEADCM | HC with agedays > 3 × 365.25 (also HC ≥ 5y, which has no WHO reference) |
+| `Exclude-Not-Cleaned` | Init | HEADCM | HC with agedays > 5 × 365.25 (no WHO reference above 5 years) |
 | `Exclude-C-CF` | 6 | All | Carried forward: identical to prior-day value (not rescued) |
 | `Exclude-C-BIV` | 7 | All | Biologically implausible value (absolute or standardized) |
 | `Exclude-C-Evil-Twins` | 9 | All | Adjacent extreme value pair/group |
@@ -351,6 +351,7 @@ For the authoritative cross-algorithm parameter and threshold index (including t
 | `cached_results` | NULL | Partial run | data.table from prior `cleangrowth()` call. Auto-detects changed subjects if `changed_subjids` is NULL; uses explicit list if both provided |
 | `changed_subjids` | NULL | Partial run | Optional vector of subject IDs to re-run. If NULL and `cached_results` provided, changed subjects are auto-detected |
 | `batch_size` | 2000 | Batching | Number of subjects per processing batch |
+| `length.adjust` | FALSE | Preprocessing | If TRUE, subtracts 0.7 cm from LENGTHCM measurements with `agedays > 2 × 365.25` before z-score calculation, converting post-infancy recumbent-labeled lengths to the standing equivalent assumed by the reference standards |
 
 ### gc_preload_refs() and partial runs (cached_results)
 
@@ -377,8 +378,9 @@ Designed for two workflows: (1) error-injection pipelines where most subjects ar
 |-----------|---------|-------------|
 | `adult_permissiveness` | `"looser"` | Sets defaults for all adult sub-parameters |
 | `adult_scale_max_lbs` | `Inf` | Physical scale upper limit in lbs |
+| `ewma_window` | `15` | Max observations on each side for EWMA (Adult Steps 9Wb, 11Wb); shared with child |
 
-All adult sub-parameters (BIV limits, 1D limits, wtallow formula, etc.) can be passed individually to `cleanadult()` to override the preset. See `adult_clean.R` roxygen for the full list. `cleangrowth()` currently exposes only `adult_permissiveness` and `adult_scale_max_lbs`.
+All adult sub-parameters (BIV limits, 1D limits, wtallow formula, etc.) can be passed individually to `cleanadult()` to override the preset. See `adult_clean.R` roxygen for the full list. `cleangrowth()` exposes `adult_permissiveness`, `adult_scale_max_lbs`, and `ewma_window` for adult.
 
 ---
 
@@ -412,7 +414,7 @@ This is intentionally more sensitive to extreme high values than standard LMS z-
 | 2–5 years | `(cdc × (age-2) + who × (5-age)) / 3` | WHO only |
 | > 5 years | CDC only | WHO only (through 5y) |
 
-HC is WHO-only at all ages. HC > 3y is `Exclude-Not-Cleaned`; HC ≥ 5y is also `Exclude-Not-Cleaned` (no WHO reference data above 5y).
+HC is WHO-only at all ages. HC > 5y is `Exclude-Not-Cleaned` (no WHO reference data above 5 years). HC measurements 3–5y are cleaned by all standard steps; Child Step 17 applies only `mindiff = -1.5` with no upper bound for these ages since the WHO HC velocity reference ends at 24 months.
 
 ### Age-dependent id tiebreaking
 
@@ -499,6 +501,7 @@ Parallel produces identical results to sequential (verified 77,721 rows, 0 misma
 - **HEADCM CF rescue thresholds reuse HEIGHTCM matrices (confirmed intentional, 2026-04-19).** `.cf_rescue_lookup()` uses the same `other` and `imperial` matrices for HEADCM as for HEIGHTCM. Both parameters are WHO-only with similar reference-standard structure; the WHO HC velocity files used in Child Step 17 are in raw units (cm/interval) and not directly usable for z-score threshold derivation. HT thresholds are confirmed appropriate as-is.
 - [ ] **F96: Step 17 EWMA caching** (performance, deferred 2026-04-19): Child Step 17 calls `ewma()` directly on every iteration rather than the `ewma_cache_*` API used by Steps 11/13/15/16; the 2-row branch also invokes `ewma()` even though its tiebreaker keys on `abs(tbc.sd)` rather than the EWMA result. No correctness impact. `child_clean.R:~4593`.
 - **`parallel = TRUE` requires installed package.** Will fail with `load_all()` only — workers need `system.file()` access to extdata. Install with `devtools::install_local(".")` first.
+- [ ] **Ensure recommendation to use all available data is prominent in user-facing documentation.** Using all available data (including outside the study age range) is intentional and recommended — surrounding context improves cleaning accuracy. As a consequence, the same measurement may receive a different exclusion outcome depending on what other data are available for that subject; this is expected behavior, not a bug. Users who run growthcleanr on a pre-filtered dataset (e.g., ages 2–10 only) may get less accurate results than if they ran on the full dataset and then restricted to the age range of interest for analysis. This recommendation should appear prominently in the vignette and/or user documentation.
 
 ### Robustness audit (2026-04-14)
 
@@ -526,6 +529,7 @@ Deferred from walkthrough sessions 1–3 (2026-04-16):
 
 - [ ] **Deferred test gaps:** Error load with -5 exponent, UW scaling edge cases (very low/high UW).
 - [ ] **Performance:** `setkey(df, subjid)` optimization deferred.
+- [ ] **`adult_ewma_cache_update()` not wired into iteration loops (2026-04-20).** `remove_ewma_wt()` (`adult_support.R:942`) and `remove_mod_ewma_wt()` (`:1071`) both call `adult_ewma_cache_init()` at the top of every round, rebuilding the full O(n²) delta matrix each iteration. `adult_ewma_cache_update()` (`:347`) is an O(n) incremental update that subtracts column j and trims the matrix; it was implemented but never wired in. **Integration plan for `remove_ewma_wt()`:** (1) Move `adult_ewma_cache_init()` call to before the while loop; (2) Remove it from inside the loop; (3) After `subj_df <- subj_df[-to_rem, ]`, add `cache <- adult_ewma_cache_update(cache, to_rem)`. Results should be regression-identical: the adult EWMA uses a fixed exponent (−5) so no neighbor-row recomputation is needed (unlike the child, whose variable exponent −1.5 to −3.5 triggers a 4-neighbor rebuild loop). The position-based windowing approximation (zero entries near the window boundary may not shift correctly after removal) is shared with the child cache and negligible in practice — at `ewma_window = 15`, weights at the boundary are `(gap_days + 5)^(−5)` ≈ 10⁻¹¹ to 10⁻¹⁴. `remove_mod_ewma_wt()` has the same structure and can be updated the same way; it is more complex (7-step loop) so should be done separately after `remove_ewma_wt()` is validated. Both callers are listed in `var_for_par` for parallel worker export. **Adult code is closed pending validation — do not implement without checking with Carrie.**
 
 ### Fixed (recent — condensed 2026-04-16)
 

@@ -217,27 +217,40 @@ test_that("child algorithm marks negative agedays as Missing", {
 })
 
 # ---------------------------------------------------------------------------
-# Test 8: HEADCM > 3 years excluded from cleaning
+# Test 8: HEADCM > 5 years excluded from cleaning; 3-5y cleaned
 # ---------------------------------------------------------------------------
-test_that("child algorithm excludes HEADCM > 3 years from cleaning", {
+test_that("child algorithm excludes HEADCM > 5 years; cleans HEADCM 3-5 years", {
 
-  # Use syngrowth subjects plus synthetic HC rows for a more realistic dataset
-  d <- .sg_peds[subjid %in% unique(.sg_peds$subjid)[1:10]]
+  # Build synthetic single-subject dataset with HC at three age ranges.
+  # Using one subject with plausible HC trajectory to avoid EWMA-based
+  # exclusions confounding the age-cutoff check.
+  subj <- data.table(
+    id       = 1L:12L,
+    subjid   = "hc_age_test",
+    sex      = 0L,
+    param    = "HEADCM",
+    # Plausible measurements: ~45 cm at birth, growing gradually
+    agedays  = c(30L, 90L, 180L, 365L,   # under 3 years
+                 730L, 1095L, 1460L,      # 2–4 years (3-5y range)
+                 1826L, 1827L, 2000L,     # boundary + over 5 years
+                 2500L, 3000L),
+    measurement = c(39, 42, 44, 47,
+                    49, 50, 51,
+                    52, 52.5, 53,
+                    54, 55)
+  )
 
-  # Add HC rows: some under 3 years, some over 3 years
-  young_ht <- d[param == "HEIGHTCM" & agedays < 1000]
-  old_ht <- d[param == "HEIGHTCM" & agedays > 1200]
+  # Add WT rows so the subject is not all-HC (needed for DOP checks)
+  wt <- data.table(
+    id       = 101L:112L,
+    subjid   = "hc_age_test",
+    sex      = 0L,
+    param    = "WEIGHTKG",
+    agedays  = subj$agedays,
+    measurement = c(4, 6, 8, 10, 12, 14, 16, 18, 18.2, 19, 21, 24)
+  )
 
-  hc_young <- young_ht[, .(
-    id = id + 200000L, subjid, sex, param = "HEADCM",
-    agedays, measurement = 35 + agedays * (10 / 365.25)
-  )]
-  hc_old <- old_ht[, .(
-    id = id + 300000L, subjid, sex, param = "HEADCM",
-    agedays, measurement = 50 + agedays * (2 / 365.25)
-  )]
-
-  combined <- rbind(d, hc_young, hc_old, fill = TRUE)
+  combined <- rbind(subj, wt, fill = TRUE)
 
   res <- suppressWarnings(cleangrowth(
     subjid = combined$subjid,
@@ -251,19 +264,25 @@ test_that("child algorithm excludes HEADCM > 3 years from cleaning", {
 
   expect_equal(nrow(res), nrow(combined))
 
-  # HEADCM under 3 years should NOT be "Exclude-Not-Cleaned"
-  hc_young_res <- res[id %in% hc_young$id]
-  if (nrow(hc_young_res) > 0) {
-    expect_false(any(hc_young_res$exclude == "Exclude-Not-Cleaned"),
-                 info = "HC under 3 years should not be 'Not cleaned'")
+  hc_res <- res[id %in% subj$id]
+
+  # HC under 3 years: should not be Exclude-Not-Cleaned
+  hc_under3 <- hc_res[id %in% subj[agedays < 3 * 365.25]$id]
+  expect_false(any(hc_under3$exclude == "Exclude-Not-Cleaned"),
+               info = "HC under 3 years should not be Exclude-Not-Cleaned")
+
+  # HC 3–5 years (agedays 730–1826): should not be Exclude-Not-Cleaned
+  hc_mid <- hc_res[id %in% subj[agedays >= 3 * 365.25 & agedays < 5 * 365.25]$id]
+  if (nrow(hc_mid) > 0) {
+    expect_false(any(hc_mid$exclude == "Exclude-Not-Cleaned"),
+                 info = "HC 3-5 years should not be Exclude-Not-Cleaned (WHO reference covers this range)")
   }
 
-  # HEADCM over 3 years should be excluded from cleaning
-  # (marked "Exclude-Not-Cleaned" or equivalent exclusion)
-  hc_old_res <- res[id %in% hc_old$id]
-  if (nrow(hc_old_res) > 0) {
-    expect_true(all(hc_old_res$exclude != "Include"),
-                info = "HC over 3 years should not be Include")
+  # HC strictly over 5 years (agedays > 5*365.25 = 1826.25): should be Exclude-Not-Cleaned
+  hc_over5 <- hc_res[id %in% subj[agedays > 5 * 365.25]$id]
+  if (nrow(hc_over5) > 0) {
+    expect_true(all(hc_over5$exclude == "Exclude-Not-Cleaned"),
+                info = "HC over 5 years should be Exclude-Not-Cleaned")
   }
 })
 

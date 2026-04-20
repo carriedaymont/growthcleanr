@@ -124,6 +124,251 @@ Weight steps (include steps shared by HT and WT):
 
 ---
 
+## Configurable Parameters
+
+For wrapper-level parameters (`id`, `adult_cutpoint`, `sd.recenter`, `ref.data.path`, `batch_size`, `parallel`, `num.batches`, `log.path`, `ref_tables`, `cached_results`, `changed_subjids`, `tri_exclude`, `quietly`), see `wrapper-narrative-2026-04-17.md → Configurable Parameters (wrapper-level)`.
+
+For the full cross-algorithm parameter and threshold index (including all hardcoded adult thresholds by step), see [`parameters-reference.md`](parameters-reference.md).
+
+This table covers adult-specific parameters exposed via `cleangrowth()`. All permissiveness sub-parameters (BIV limits, 1D limits, `wtallow_formula`, `mod_ewma_f`, `perclimit_*`, `ht_band`, `allow_ht_loss`, `allow_ht_gain`, `repval_handling`, `max_rounds`, `error_load_threshold`) are set by `adult_permissiveness` and documented in full in `parameters-reference.md` Section 1D. Individual sub-parameters can also be passed directly to `cleanadult()` to override the preset.
+
+| Parameter | Default | Used in | Description |
+|-----------|---------|---------|-------------|
+| `adult_permissiveness` | `"looser"` | All adult steps (via preset resolver) | Permissiveness level: `"loosest"`, `"looser"`, `"tighter"`, `"tightest"`. Sets all sub-parameters unless individually overridden. See `parameters-reference.md` Section 1D for the full preset table. |
+| `adult_scale_max_lbs` | `Inf` | Adult Step 4W | Physical scale upper limit in pounds. Weights within rounding tolerance of this cap receive `Exclude-A-Scale-Max`. |
+| `ewma_window` | `15` | Adult Steps 9Wb, 11Wb | Maximum observations on each side contributing to EWMA weighting. Shared with child algorithm — a single `cleangrowth()` argument affects both. |
+
+---
+
+## Support Functions
+
+Algorithm-internal helpers defined in `R/adult_support.R`. Each entry lists purpose, callers, input/return contract, key invariants, and approximate code location. For step-implementing functions already fully documented in their step sections, this section provides a brief cross-reference only. For wrapper-level helpers shared across algorithms, see `wrapper-narrative-2026-04-17.md → Shared Helpers`.
+
+---
+
+### Permissiveness configuration: `permissiveness_presets()` / `resolve_permissiveness()`
+
+**Purpose.** `permissiveness_presets()` returns a named list of four complete parameter sets (loosest, looser, tighter, tightest), each containing the full set of adult algorithm thresholds and flags. `resolve_permissiveness()` merges a preset with user-supplied parameter overrides: any non-NULL override replaces the preset value; NULL values fall through to the preset default.
+
+**Callers.** `permissiveness_presets()` is exported and may be called directly by users. It is also called from within `resolve_permissiveness()`. `resolve_permissiveness()` is called once at the top of `cleanadult()` before any algorithm steps run.
+
+**Inputs and return contract.**
+
+- `permissiveness_presets()` — no arguments. Returns a named list of four lists; each inner list has identical parameter names (BIV/1D limits, `wtallow_formula`, `perclimit_*`, `error_load_threshold`, `mod_ewma_f`, `ht_band`, `allow_ht_loss`, `allow_ht_gain`, `repval_handling`).
+- `resolve_permissiveness(permissiveness, ...)` — `permissiveness` must be one of the four valid level strings; stops with an informative message otherwise. `...` are named parameter overrides. Returns a single flat named list of resolved parameters identical in structure to one inner list from `permissiveness_presets()`.
+
+**Key invariants.** All four preset lists share the same parameter names. The resolved list keys match the named parameters that `cleanadult()` unpacks and passes to each step.
+
+**Code location.** `R/adult_support.R` approx lines 15–113.
+
+---
+
+### Utility helpers: `check_between()` / `round_pt()`
+
+**Purpose.** Small one-liners used throughout the algorithm. `check_between(vect, num_low, num_high, incl = TRUE)` returns a logical vector indicating whether elements of `vect` fall within the given range (inclusive by default; `incl = FALSE` for strict). `round_pt(val, pt)` rounds `val` to the nearest multiple of `pt` (e.g. `round_pt(78.14, 0.2)` → 78.2).
+
+**Callers.** `check_between()` is called from `cleanadult()` at Adult Step 4W (weight cap range check at two sites) and Adult Step 10H (height w2-window inclusion/exclusion). `round_pt()` is called from `compute_trajectory_fails()` to round extrapolated values to the nearest 0.2 kg before applying the ±error window.
+
+**Inputs and return contract.** Both functions are fully vectorized. `check_between()` returns a logical vector the same length as `vect`. `round_pt()` returns a numeric vector the same length as `val`. No input validation — callers are responsible for non-NA numeric inputs.
+
+**Code location.** `R/adult_support.R` approx lines 121–136.
+
+---
+
+### Adult EWMA: `as.matrix.delta_dn()` / `ewma_dn()`
+
+**Purpose.** `as.matrix.delta_dn(agedays)` builds an n × n matrix of pairwise absolute age differences — the weight matrix used by adult EWMA calculations. `ewma_dn()` is the original adult EWMA function using |delta|^(–5) weighting (the adult exponent; the child algorithm uses (5 + |delta|)^(–1.5) instead). It returns three variants: EWMA-all, EWMA-before (excluding predecessor), EWMA-after (excluding successor).
+
+**Callers.** `as.matrix.delta_dn()` is called from `adult_ewma_cache_init()` (and was also used by `ewma_dn()`). `ewma_dn()` has **no active callers** in the current algorithm — it was superseded by `adult_ewma_cache_init()` when the cache-based approach was introduced. Both functions are listed in `var_for_par` (the parallel-worker export list in `child_clean.R`) but `ewma_dn()` is not invoked from any algorithm step or support function.
+
+**Inputs and return contract.**
+
+- `as.matrix.delta_dn(agedays)` — numeric vector; returns an n × n numeric matrix.
+- `ewma_dn(agedays, meas, ewma.exp = -5, ewma.adjacent = TRUE, ewma_window = 15)` — `agedays` and `meas` are aligned numeric vectors. Returns a **data.frame** (unlike the child `ewma()` which returns a named list) with columns `ewma.all`, `ewma.before`, `ewma.after`. When `ewma.adjacent = FALSE`, returns only `ewma.all`. Emits an unsorted-input warning but does not stop.
+
+**Key invariants.** Input should be sorted by age. The window parameter zeroes out weight-matrix entries more than `ewma_window` positions from the diagonal (position-based, not age-based). For n ≤ 2, all three EWMA variants equal `ewma.all`.
+
+**Code location.** `R/adult_support.R` approx lines 236–283.
+
+---
+
+### Adult EWMA cache: `adult_ewma_cache_init()` / `adult_ewma_cache_update()`
+
+**Purpose.** `adult_ewma_cache_init()` builds the full weight matrix once (O(n²)) and returns pre-computed EWMA-all, EWMA-before, and EWMA-after vectors as a plain named list. `adult_ewma_cache_update()` was designed to remove one observation from the cache in O(n) arithmetic — a performance path that avoids rebuilding the full matrix each round.
+
+**Callers.** `adult_ewma_cache_init()` is called from `remove_ewma_wt()` (Adult Step 9Wb) and `remove_mod_ewma_wt()` (Adult Step 11Wb) — once per iteration round in each. `adult_ewma_cache_update()` has **no active callers**: both step functions rebuild the full cache from scratch each round rather than using the incremental update. Integration is straightforward (see `gc-github-latest/CLAUDE.md → Open (adult)`) and is deferred pending clinician validation of the adult algorithm.
+
+**Inputs and return contract.**
+
+- `adult_ewma_cache_init(agedays, meas, ewma_exp = -5, ewma_window = 15)` — sorted, aligned numeric vectors. Returns a named list: `delta` (n × n weight matrix), `ws` (weighted sums), `rs` (row sums), `meas`, `agedays`, `n`, `ewma_all`, `ewma_before`, `ewma_after`. Returns NULL for n = 0.
+- `adult_ewma_cache_update(cache, pos_j)` — `cache` from `adult_ewma_cache_init()`; `pos_j` is the integer row index to remove. Returns a new named list with n – 1 observations (does not mutate the input, unlike the child version which mutates an environment in place). Returns NULL if the result would have n = 0.
+
+**Key invariants.** Input must be sorted by age. For n ≤ 2, EWMA-before and EWMA-after equal EWMA-all (no distinct predecessor/successor to remove). The return from `adult_ewma_cache_update()` has the same structure as `adult_ewma_cache_init()` and can be passed back to `adult_ewma_cache_update()` iteratively.
+
+**Code location.** `R/adult_support.R` approx lines 295–390.
+
+---
+
+### BIV detection: `remove_biv()` / `remove_biv_low()` / `remove_biv_high()`
+
+**Purpose.** `remove_biv()` is the BIV dispatcher: returns a logical vector indicating which rows in `subj_df` are biologically implausible — too low OR too high. `remove_biv_low()` and `remove_biv_high()` are one-line sub-helpers that check the low and high bounds independently, each applying the 0.12 cm/kg rounding tolerance.
+
+**Callers.** `remove_biv()` is called from `cleanadult()` at Adult Steps 1H and 1W, once per parameter per subject.
+
+**Inputs and return contract.**
+
+- `remove_biv(subj_df, type, biv_df)` — `subj_df` has a `meas_m` column; `type` is a row-name key into `biv_df` (a matrix-like object with "low" and "high" columns); returns a logical vector the same length as `nrow(subj_df)`.
+- `remove_biv_low(subj_df, type, biv_df)` — returns logical: TRUE if `meas_m < biv_df[type, "low"] – 0.12`.
+- `remove_biv_high(subj_df, type, biv_df)` — returns logical: TRUE if `meas_m > biv_df[type, "high"] + 0.12`.
+
+**Key invariants.** The 0.12 rounding tolerance is applied at every BIV check in the algorithm. `biv_df` must have a row named `type` and columns named "low" and "high".
+
+**Code location.** `R/adult_support.R` approx lines 397–417.
+
+---
+
+### Repeated value detection: `identify_rv()` / `redo_identify_rv()`
+
+**Purpose.** `identify_rv()` scans a single-subject weight data frame for repeated (identical) measurement values and adds two boolean columns: `is_rv` (TRUE for all occurrences after the first) and `is_first_rv` (TRUE for the first occurrence of any value that has at least one duplicate). Uses exact numeric equality. `redo_identify_rv()` handles the case where `temp_sde()` marked an `is_first_rv` row as extraneous — it subsets to non-extraneous rows, re-runs `identify_rv()`, and maps results back to the full data frame so the RV group still has a valid `is_first_rv`.
+
+**Callers.** `identify_rv()` is called from `cleanadult()` at Adult Step 2W (initial RV scan after BIV) and again after non-SDE exclusions (weight cap, evil twins). `redo_identify_rv()` is called from `cleanadult()` immediately after each `temp_sde()` call that could have displaced an `is_first_rv`.
+
+**Inputs and return contract.**
+
+- `identify_rv(w_subj_df)` — single-subject weight data frame, assumed pre-sorted by `age_days` / `internal_id`. Returns the same data frame with `is_rv` and `is_first_rv` columns added or overwritten.
+- `redo_identify_rv(w_subj_df)` — same structure. Only re-derives RV flags when at least one `is_first_rv` is currently extraneous; returns unchanged data frame otherwise.
+
+**Key invariants.** Exact numeric equality only — floating-point near-duplicates (e.g. 78.1 vs 78.101) are not treated as repeated values. Does not filter by extraneous status; the `identify_rv → temp_sde → redo_identify_rv` cycle is the caller's responsibility to sequence correctly.
+
+**Code location.** `R/adult_support.R` approx lines 429–501.
+
+---
+
+### Temporary SDE flagging: `temp_sde()`
+
+**Purpose.** Selects the keeper on each same-day group, marking all other rows `extraneous = TRUE`. The keeper is the row with the smallest absolute deviation from the subject median; ties keep the highest `internal_id` (consistent with final SDE resolution). For weight (`ptype = "weight"`), the subject median is computed over non-RV values only; for height (`ptype = "height"`), over all values.
+
+**Callers.** Called from `cleanadult()` at Adult Steps 3H and 3W (initial temp SDE), and again within the Adult Step 9H and 10W final-SDE resolution sequences.
+
+**Inputs and return contract.**
+
+- `temp_sde(subj_df, ptype = "height")` — single-subject data frame with `age_days`, `meas_m`, `internal_id`, and (for weight) `is_rv`. Returns the same data frame with `extraneous` column added. If `nrow == 0`, returns as-is. If `nrow == 1` or no duplicate days, returns with `extraneous = FALSE` for all rows.
+
+**Key invariants.** For weight, the median excludes `is_rv == TRUE` rows. Duplicate-day detection is character-key-based (`table(subj_df$age_days)` → `names(...)[count > 1]`), so the result is stable across integer and double `age_days` representations.
+
+**Code location.** `R/adult_support.R` approx lines 449–481.
+
+---
+
+### Weight allowance: `compute_wtallow()` / `compute_et_limit()` / `compute_perc_limit()`
+
+**Purpose.** Three functions for interval- and weight-based thresholds used across multiple steps. `compute_wtallow()` computes the maximum plausible weight change for a given interval and, optionally, upper weight (UW). `compute_et_limit()` computes the Evil Twins / extreme EWMA cap (wtallow-cap + 20 kg for PW-H/PW-L; allofus15 12-month cap for allofus15; fixed 70/100 for custom CSV). `compute_perc_limit()` returns an observation-level percentage ratio threshold tiered by weight.
+
+See `wtallow-formulas.md` for full formula derivations and design rationale.
+
+**Callers.** `compute_wtallow()` is called from `cleanadult()` (Adult Steps 11Wa and 11Wa2) and from `evil_twins()`, `remove_ewma_wt()`, and `remove_mod_ewma_wt()`. `compute_et_limit()` is called from `evil_twins()` and `remove_ewma_wt()`. `compute_perc_limit()` is called from `remove_mod_ewma_wt()`.
+
+**Inputs and return contract.**
+
+- `compute_wtallow(months, formula = "piecewise", uw = NULL)` — `months` is a numeric vector of interval lengths in months; `formula` is `"piecewise"` (PW-H), `"piecewise-lower"` (PW-L), `"allofus15"`, or a file path to a custom CSV with columns `months` and `wtallow`; `uw` is an optional upper-weight vector (NULL = base, UW = 120). Returns a numeric vector of weight allowances.
+- `compute_et_limit(interval_months, formula = "piecewise", uw = NULL)` — same signature; returns ET caps. Two-tier output: ≤ 6 months → et_6m cap, > 6 months → et_12m cap (except allofus15, which is flat across all intervals).
+- `compute_perc_limit(meas, perclimit_low, perclimit_mid, perclimit_high)` — vectorized over `meas` (weight in kg). Returns `perclimit_low` for meas ≤ 45, `perclimit_mid` for 45 < meas ≤ 80, `perclimit_high` for meas > 80.
+
+**Key mechanics not in wtallow-formulas.md.**
+
+- All three formulas cap `uw_eff` at 180 kg via `pmin(uw, 180)` before applying scale factors.
+- Custom CSV path: the file is loaded once and cached in `.GlobalEnv` under `.wtallow_custom_cache`; a `path` attribute on the cache detects when a different file is passed. This side effect persists across `cleangrowth()` calls within the same R session.
+- `compute_et_limit()` for allofus15: returns a flat value (the allofus15 12-month cap for that UW) regardless of interval — unlike PW-H/PW-L which have ≤ 6m / > 6m tiers.
+
+**Code location.** `R/adult_support.R` approx lines 154–229 (`compute_et_limit`, `compute_perc_limit`) and 620–769 (`compute_wtallow`).
+
+---
+
+### Height evaluation: `ht_allow()` / `ht_change_groups()` / `ht_3d_growth_compare()`
+
+**Purpose.** Three helpers supporting Adult Step 10H (Height Distinct Values). `ht_allow(velocity, ageyears1, ageyears2)` computes the maximum expected height gain over an age range using a log-based growth model. `ht_change_groups(h_subj_df, cutoff, type)` groups consecutive height measurements within 2 inches (5.08 + 0.12 cm rounding tolerance) of each other; exits early if a measurement diverges by more than 2 inches from the current group in the specified direction. `ht_3d_growth_compare(mean_ht, min_age, glist, compare)` checks whether adjacent height groups have plausible height differences, applying velocity tiers based on the inter-group age gap, with a 25-year age cap.
+
+**Callers.** All three are called exclusively from `cleanadult()` in the Adult Step 10H block. `ht_allow()` is called only from within `ht_3d_growth_compare()`.
+
+**Inputs and return contract.**
+
+- `ht_allow(velocity, ageyears1, ageyears2)` — three scalars; returns a scalar. Formula: `velocity × (log(ageyears2 – 16.9) – log(ageyears1 – 16.9))`. Undefined for `ageyears ≤ 16.9` — safe in practice because the adult algorithm processes only patients ≥ 20 years old.
+- `ht_change_groups(h_subj_df, cutoff, type = "loss")` — `h_subj_df` pre-sorted by age; `cutoff` is the maximum number of groups to form; `type = "loss"` exits early if any measurement drops > 5.08 + 0.12 cm below the current group minimum, `type = "gain"` exits if any measurement rises > 5.08 + 0.12 cm above the current group maximum. Returns a list with entries `"meas"` (list of named numeric vectors, names = internal_id) and `"age"` (list of age vectors). Returns empty lists if the early-exit condition fires before completing any groups.
+- `ht_3d_growth_compare(mean_ht, min_age, glist, compare = "before")` — `mean_ht` and `min_age` are numeric vectors indexed by group; `compare = "before"` checks each group against the immediately preceding group, `compare = "first"` checks against the first group. Velocity tiers: < 1-year gap → 20 cm/yr, 1–3 year gap → 15 cm/yr, > 3-year gap → 12 cm/yr. Comparison age is capped at 25 years. Returns a single boolean: TRUE if any adjacent pair fails the velocity check.
+
+**Key invariants.** `ht_3d_growth_compare()` skips groups indexed beyond `length(glist)` via `next`, so short group lists are safe. The 0.12 cm rounding tolerance is applied to the 5.08 cm (2-inch) threshold in `ht_change_groups()`. The height loss/gain check uses `mh2 – mh1` relative to zero and `hta`, with the 0.12 tolerance applied at both bounds.
+
+**Code location.** `R/adult_support.R` approx lines 508–594.
+
+---
+
+### Trajectory helpers: `detect_runs()` / `compute_trajectory_fails()`
+
+**Purpose.** `detect_runs(flagged)` detects consecutive runs of TRUE in a logical vector and returns run metadata for each element: run_id (which run), run_len (length of that run), and run_pos (position within the run). `compute_trajectory_fails(meas, age_days, err = 5)` pre-computes which observations fail all three trajectory rescue methods — returning TRUE for "not rescued" (candidate eligible for exclusion). The three rescue methods: (1) within ±`err` kg of the linear interpolation between the two adjacent observations; (2) within ±`err` kg of the extrapolation from the prior pair (p2 → p1 → current); (3) within ±`err` kg of the extrapolation from the next pair (n2 → n1 → current). Extrapolation is not trusted when the extrapolation distance exceeds 2× the source interval.
+
+**Callers.** `detect_runs()` is called from `remove_mod_ewma_wt()` twice per round (once for the standard-pathway candidates, once for the alternate-pathway candidates). `compute_trajectory_fails()` is called from `remove_mod_ewma_wt()` once per round.
+
+**Inputs and return contract.**
+
+- `detect_runs(flagged)` — logical vector; returns a named list with three integer vectors of the same length: `run_id` (NA for non-run elements), `run_len` (NA for non-run elements), `run_pos` (NA for non-run elements). All NAs for empty input or all-FALSE input.
+- `compute_trajectory_fails(meas, age_days, err = 5)` — aligned numeric vectors; returns a logical vector. For n < 3, returns all TRUE (no rescue possible). NA interpolation/extrapolation results are explicitly coerced to FALSE before the final fails computation, so NA observations are treated as "rescued" (kept).
+
+**Key invariants.** Extrapolated values in `compute_trajectory_fails()` are rounded to the nearest 0.2 kg via `round_pt()` before the ±`err` window is applied — matching the 0.2 kg rounding precision used elsewhere. The distance guard compares raw absolute age differences without rounding tolerance.
+
+**Code location.** `R/adult_support.R` approx lines 776–853.
+
+---
+
+### Evil Twins: `evil_twins()`
+
+See **Evil Twins (Adult Step 9Wa)** in this narrative for full documentation.
+
+**Brief.** Iteratively excludes the most-deviant member of adjacent weight pairs where the absolute difference exceeds the interval-specific ET cap from `compute_et_limit()`. Stops when no out-of-bounds pairs remain or fewer than 3 values are left. Returns a character vector of `internal_id` values to exclude.
+
+**Code location.** `R/adult_support.R` approx lines 863–920.
+
+---
+
+### Extreme EWMA + RV propagation: `remove_ewma_wt()` / `propagate_to_rv()`
+
+See **Extreme EWMA (Adult Step 9Wb)** in this narrative for the `remove_ewma_wt()` algorithm description.
+
+**Brief — `remove_ewma_wt()`.** Iteratively excludes weight outliers whose EWMA deviation exceeds the interval-specific ET cap (with 90% directional rule on before/after dewma). Rebuilds the EWMA cache from scratch each round via `adult_ewma_cache_init()`. Returns a named character vector (internal_id → exclusion code).
+
+**`propagate_to_rv()`.** Extends firstRV exclusions to matching RV copies and extraneous values in linked-mode processing. For each excluded `internal_id`, finds all still-Include rows in the subject's weight data with the same `meas_m` value and marks them with the source exclusion code + `"-RV-Propagated"`. Propagation is forward-only (firstRV → later copies); this differs from the bidirectional Scale-Max propagation in Adult Step 4W. Called from `cleanadult()` in both the Extreme EWMA (Adult Step 9Wb) and Moderate EWMA (Adult Step 11Wb) linked-mode firstRV passes.
+
+**Inputs and return contract (`propagate_to_rv`).**
+
+- `propagate_to_rv(exc_codes, w_subj_df, w_subj_keep)` — `exc_codes` is a named character vector (internal_id → exclusion code) from the firstRV pass; `w_subj_df` is the full weight data frame for the subject (must have `meas_m` and `internal_id`); `w_subj_keep` is the named exclusion-code vector for all weight rows. Returns a list: `w_subj_keep` (updated) and `propagated_ids` (character vector of IDs that received propagated codes). Returns the unchanged inputs unchanged if `exc_codes` is empty.
+
+**Code location.** `R/adult_support.R` approx lines 942–1059.
+
+---
+
+### Moderate EWMA: `remove_mod_ewma_wt()`
+
+See **Moderate EWMA (Adult Step 11Wb)** in this narrative for full documentation of the 7-step flow.
+
+**Brief.** Iteratively excludes weight outliers using wtallow-based thresholds, trajectory rescue, alternate pathway (short-gap neighbors), percentage criterion, and 4+-consecutive error-load detection. Rebuilds the EWMA cache from scratch each round. Returns a named character vector (internal_id → exclusion code).
+
+**Code location.** `R/adult_support.R` approx lines 1071–1350.
+
+---
+
+### 2D non-ordered pairs, 1D evaluation, error load: `eval_2d_nonord()` / `eval_1d()` / `eval_error_load()`
+
+See **2D Non-Ordered Weight Pairs (Adult Step 11Wa2)**, **Single Distinct Value: 1D Evaluation (Adult Step 13)**, and **Error Load (Adult Step 14)** in this narrative for full documentation.
+
+**Brief summaries:**
+
+- `eval_2d_nonord()` — identifies and applies exclusion rules to subjects with exactly two interleaved (non-time-ordered) distinct weight values: all-within-wtallow → keep all; outside-wtallow + prior non-SDE exclusions → exclude all; outside-wtallow + dominant value (> 65%) → exclude minority; outside-wtallow + neither dominant → exclude all. Returns character vector of `internal_id` values to exclude.
+- `eval_1d()` — two-pass evaluation of subjects with a single distinct height or weight value. Pass 1: evaluate with BMI when available (BMI-based limits), or without (no-BMI limits). Pass 2: re-evaluate if Pass 1 excluded a height or weight that removed BMI availability. Returns character vector of `internal_id` values.
+- `eval_error_load()` — per-subject, per-param (HT and WT processed separately) error ratio check. Enumerates param-specific error codes (HT errors: BIV, Single, Ord-Pair, Window; WT errors: BIV, Single, 2D-Ordered, 2D-Non-Ordered, Scale-Max variants, Evil-Twins; EWMA trajectory codes count as errors, except `-RV-Propagated` variants). Excludes SDEs from denominator. Requires `denom ≥ 3`. Excludes all remaining Include rows when ratio exceeds `error_threshold`. Returns named character vector (internal_id → exclusion code).
+
+**Code locations.** `eval_2d_nonord()`: approx lines 1360–1433. `eval_1d()`: approx lines 1443–1513. `eval_error_load()`: approx lines 1522–end.
+
+---
+
 ## BIV: Biologically Implausible Values (Adult Step 1)
 
 ***Exclude values outside absolute biological limits.***
@@ -388,7 +633,7 @@ All thresholds include the standard 0.12 kg rounding tolerance (see Rounding Tol
 ***Logic and implementation:***
 
 1. **Pre-check:** Skip if <3 non-extraneous values, or if max-min range ≤ minimum possible ET cap + 0.12 (computed via `compute_et_limit(1, formula, uw = min(weights))`, no pair could exceed any interval-specific cap)
-2. **Repeat until no OOB pairs found or <3 values remain:** a. Remove previously excluded values; break if <3 remain b. Sort by age (internal_id tiebreaker) c. Compute adjacent weight differences and age intervals (in months, using 30.4375 days/month) d. Compute dynamic ET cap per pair: `compute_et_limit(interval, formula, uw = uw_pair)` + 0.12 rounding tolerance. `uw_pair` is the larger of the two weights in the pair. ET caps scale with UW (see wtallow-formulas.md). e. Flag OOB pairs: both members of any pair where diff > cap f. If no OOB pairs, break (done) g. Compute subject median from all remaining values (Inc + RV) h. Compute absolute deviation from median for each value i. **Plausibility guardrail:** Set deviation to 99999 for OOB values <38 kg or >180 kg j. **Pairs guard:** Break if <3 values remain k. Among OOB values, sort by: most deviant from median → highest weight → lowest id l. Exclude the top-ranked OOB value
+2. **Repeat until no OOB pairs found or <3 values remain:** a. Remove previously excluded values; break if <3 remain b. Sort by age (internal_id tiebreaker) c. Compute adjacent weight differences and age intervals (in months, using 30.4375 days/month) d. Compute dynamic ET cap per pair: `compute_et_limit(interval, formula, uw = uw_pair)` + 0.12 rounding tolerance. `uw_pair` is the larger of the two weights in the pair. ET caps scale with UW (see wtallow-formulas.md). e. Flag OOB pairs: both members of any pair where diff > cap f. If no OOB pairs, break (done) g. Compute subject median from all remaining values (Inc + RV) h. Compute absolute deviation from median for each value i. **Plausibility guardrail:** Set deviation to 99999 for OOB values <38 kg or >180 kg j. **Pairs guard:** Break if <3 values remain k. Among OOB values, sort by: most deviant from median → highest weight → lowest internal_id l. Exclude the top-ranked OOB value
 3. After all exclusions: re-run `identify_rv()`, `temp_sde()`, `redo_identify_rv()` on remaining values
 
 ***Rationale for selected decisions:***
@@ -419,7 +664,7 @@ All thresholds include the standard 0.12 kg rounding tolerance (see Rounding Tol
 
 This step does the final resolution of same-day height duplicates that were temporarily flagged in Adult Step 3H. It has two parts:
 
-- **Part A (Identical):** When all same-day values are identical, exclude all but one (keep lowest id). If removing identical values eliminates all duplicates on a day, that day is no longer treated as SDE.
+- **Part A (Identical):** When all same-day values are identical, exclude all but one (keep lowest internal_id). If removing identical values eliminates all duplicates on a day, that day is no longer treated as SDE.
 - **Part B (Non-identical):** For remaining days with multiple different values, categorize the subject and choose which value to keep based on category-specific median comparisons.
 
 The keeper retains its original measurement value — no averaging or mean replacement is performed.
@@ -441,7 +686,7 @@ None. This step has no configurable parameters.
 **Part A — Identical values:**
 1. All values (including those temporarily marked extraneous by Adult Step 3H) remain in `h_subj_df`; extraneous flags identify which days have duplicates
 2. On each day with extraneous values, identify measurements that appear more than once (exact match on meas_m)
-3. Keep the first occurrence (lowest id); exclude the rest with `Exclude-A-Identical`
+3. Keep the first occurrence (lowest internal_id); exclude the rest with `Exclude-A-Identical`
 4. Re-run `temp_sde()` to update extraneous flags on remaining values
 
 **Part B — Non-identical SDEs:**
@@ -455,14 +700,14 @@ None. This step has no configurable parameters.
    - **Category 2 (high non-SDE):** `daystot >= 4` AND `sderatio < 0.5`
    - **Category 3 (low non-SDE):** `daystot == 2 or 3` OR `sderatio >= 0.5`
 4. For each SDE day, choose keeper by sorting:
-   - **Category 1:** closest to day-median, tiebreaker highest id
-   - **Category 2:** closest to non-SDE median, then day-median, then highest id
-   - **Category 3:** closest to median-of-medians, then non-SDE median, then day-median, then highest id
+   - **Category 1:** closest to day-median, tiebreaker highest internal_id
+   - **Category 2:** closest to non-SDE median, then day-median, then highest internal_id
+   - **Category 3:** closest to median-of-medians, then non-SDE median, then day-median, then highest internal_id
 5. Keep the first value after sorting; exclude the rest with `Exclude-A-Extraneous`
 
 ***Rationale for selected decisions:***
 
-- **Tiebreaker — lowest id for identical, highest id for non-identical:** For identical values there is no meaningful difference, so keep the first-entered. For non-identical values, the later measurement may represent a more careful re-measurement.
+- **Tiebreaker — lowest internal_id for identical, highest internal_id for non-identical:** For identical values there is no meaningful difference, so keep the first-entered. For non-identical values, the later measurement may represent a more careful re-measurement.
 - **Three categories:** The choice of reference median depends on how much non-SDE data exists. With many non-SDE days (Category 2), the non-SDE median is the best reference. With few non-SDE days (Category 3), the median-of-medians balances across days. With only one day (Category 1), only the day-median is available.
 - **No averaging:** The keeper retains its original value. Mean height calculation is a separate step that happens later (Adult Step 11H).
 
@@ -517,7 +762,7 @@ The threshold is computed dynamically per observation: `compute_et_limit(min_gap
 
 **Independent mode (single pass):**
 1. Call `remove_ewma_wt()` with all non-extraneous values (including RVs)
-2. Each round: a. Compute minimum neighbor gap in months for each value. Missing gaps (edge values) → Inf (Stata missing-as-infinity convention). b. Compute per-observation threshold: `compute_et_limit(min_gap_months, formula, uw)` where `uw = max(wt, ewma_all)` c. Compute EWMA (exponent e=-5, anchor a=0, window = ewma_window observations on each side) d. **Positive outlier:** dewma_all > threshold + 0.12 AND dewma_before > 0.9×threshold + 0.12 AND dewma_after > 0.9×threshold + 0.12 e. **Negative outlier:** dewma_all < -(threshold + 0.12) AND dewma_before < -(0.9×threshold + 0.12) AND dewma_after < -(0.9×threshold + 0.12) f. Missing directional dewma (edge values) → Inf, confirming exclusion g. Among candidates, select the one with largest |dewma_all|, then earliest age, then lowest id h. Exclude with code `"Exclude-A-Traj-Ext"` i. Rebuild EWMA for next round (window boundaries shift after removal)
+2. Each round: a. Compute minimum neighbor gap in months for each value. Missing gaps (edge values) set to Inf. b. Compute per-observation threshold: `compute_et_limit(min_gap_months, formula, uw)` where `uw = max(wt, ewma_all)` c. Compute EWMA (exponent e=-5, anchor a=0, window = ewma_window observations on each side) d. **Positive outlier:** dewma_all > threshold + 0.12 AND dewma_before > 0.9×threshold + 0.12 AND dewma_after > 0.9×threshold + 0.12 e. **Negative outlier:** dewma_all < -(threshold + 0.12) AND dewma_before < -(0.9×threshold + 0.12) AND dewma_after < -(0.9×threshold + 0.12) f. Missing directional dewma (edge values) → Inf, confirming exclusion g. Among candidates, select the one with largest |dewma_all|, then earliest age, then lowest internal_id h. Exclude with code `"Exclude-A-Traj-Extreme"` i. Rebuild EWMA for next round (incremental O(n) update via `adult_ewma_cache_update()` deferred; see CLAUDE.md → Open (adult))
 3. Iterate until no candidates or <3 values remain (no artificial round limit)
 4. After exclusions: re-identify RVs on remaining values
 
@@ -530,7 +775,7 @@ The threshold is computed dynamically per observation: `compute_et_limit(min_gap
 
 ***Rationale for selected decisions:***
 
-- **No round limit:** Unlike the original Stata implementation (capped at 3 rounds), R iterates until convergence. In practice, extreme EWMA rarely exceeds 3 rounds, but removing the artificial cap ensures all genuine outliers are caught.
+- **No round limit:** The algorithm iterates until convergence — no artificial cap. In practice, extreme EWMA rarely exceeds 3 rounds.
 - **90% rule:** The directional confirmation (before/after must exceed 90% of threshold) prevents excluding values that are outliers in one direction but consistent with the trend in the other. With e=-5, the 90% rule is effectively unreachable (nearest neighbor dominates so heavily that dewma_before/after are nearly equal to dewma_all), but it is retained at zero cost for consistency with the algorithm's theoretical framework.
 - **Missing-as-infinity for edge values:** When a value has no prior or next neighbor, the missing directional dewma is treated as confirming exclusion. An extreme outlier at the edge of a patient's data should still be excludable based on the neighbors that do exist.
 - **Two-tier structure:** Both Evil Twins and Extreme EWMA use the same ET cap structure derived from the wtallow formula (ET cap = wtallow cap + 20 for PW-H/PW-L). The distinction between ET and Extreme EWMA is the detection method (adjacent pairs vs EWMA deviation), not the cap structure.
@@ -712,7 +957,7 @@ This step computes a representative mean height for each subject, used later for
 
 Same logic as Adult Step 9H (Final SDE Height Resolution), applied to weight. Resolves same-day weight duplicates that were temporarily flagged in Adult Step 3W. Two parts:
 
-- **Part A (Identical):** Exclude all but one when same-day values are identical (keep lowest id).
+- **Part A (Identical):** Exclude all but one when same-day values are identical (keep lowest internal_id).
 - **Part B (Non-identical):** Categorize subject and choose keeper using category-specific median comparisons.
 
 The keeper retains its original measurement value — no averaging is performed. After exclusions, RVs are re-identified since a first_rv may have been excluded.
@@ -869,7 +1114,7 @@ Same as Adult Step 11Wa — uses `compute_wtallow()` with `wtallow_formula`. UW 
 
 ***Logic and implementation:***
 
-1. Sort observations by age (tiebreaker: id)
+1. Sort observations by age (tiebreaker: internal_id)
 2. For each adjacent pair where the weight values differ:
    - Compute time gap in months: `abs(age_days[i+1] - age_days[i]) / 30.4375`
    - Compute wtallow for that gap using `compute_wtallow()`
@@ -927,10 +1172,10 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
 - **wta_base** — wtallow at UW=120 (no UW adjustment), used as the denominator in prioritization scoring. This ensures scoring is not distorted by UW-dependent wtallow.
 - **minagediff** — minimum of before and after age gaps (years), used to determine wtallow
 - **perclimit** — observation-level ratio threshold via `compute_perc_limit(meas, permissiveness)`. Weight-dependent and permissiveness-dependent (see permissiveness table). Note: observation-level here, unlike Adult Step 11Wa which uses subject-level max.
-- **exc_stand** — standard pathway candidates (Adult Step 1)
-- **exc_pair** — alternate pathway candidates (Adult Step 3)
-- **exc_wt_i** — accumulated exclusion candidates across Adult Steps 2, 4, 5
-- **error_load** — observations in 4+ consecutive exc_wt_i runs
+- **Standard-pathway candidates** (`exc_stand`) — observations that pass the standard EWMA criterion and fail all trajectory rescue methods (Adult Step 1)
+- **Alternate-pathway candidates** (`exc_pair`) — observations flagged by the alternate pathway for being adjacent to unreliable neighbors (Adult Step 3)
+- **Accumulated exclusion candidates** (`exc_wt_i`) — combined set from standard (Adult Step 2) and alternate (Adult Step 4) pathways, used for consecutive-run detection
+- **Error-load observations** (`error_load`) — observations in runs of 4+ consecutive accumulated candidates, excluded immediately in Adult Step 7
 - **ewma_window** — number of observations on each side used for EWMA computation (default 15, so up to 30 total neighbors)
 - **trajectory rescue** — three methods (interpolation, prior extrapolation, next extrapolation) that can protect a value from standard-pathway exclusion
 
@@ -957,7 +1202,7 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
 **EWMA computation:**
 - Exponent e = -5, anchor a = 0 (same as Extreme EWMA)
 - Position-based window: only the nearest `ewma_window` (default 15) observations on each side contribute
-- Rebuilt from scratch each round (window boundaries shift when observations are removed)
+- Rebuilt from scratch each round (incremental O(n) update via `adult_ewma_cache_update()` deferred; see CLAUDE.md → Open (adult))
 
 **7-step exclusion flow (each round):**
 
@@ -1012,7 +1257,7 @@ Each round excludes at most one non-error-load value (the highest-scoring candid
     - `multiplier = min(1.0, 0.6 + 0.4 × min_excess)`
     - Full score when both directions independently exceed wtallow; 0.6× discount when only one direction is bad
   - Scoring uses excess above UW-adjusted wtallow divided by base wtallow, so a 10 kg excess at any UW always scores the same
-  - Tiebreakers: smallest wtallow → closest to median age → earliest position → lowest id
+  - Tiebreakers: smallest wtallow → closest to median age → earliest position → lowest internal_id
 
 **Mode handling:**
 

@@ -47,7 +47,7 @@ This document covers, in order:
 
 This section covers concepts specific to the child algorithm. For wrapper-level concepts (data retention, CSD z-scores, prematurity correction, recentering, three growth parameters, `internal_id` tiebreaking), see `wrapper-narrative-2026-04-17.md → Key Concepts (wrapper-level)`.
 
-***Three growth parameters (child scope):*** The child algorithm cleans WEIGHTKG, HEIGHTCM (including LENGTHCM relabeled to HEIGHTCM), and HEADCM. HEADCM is only cleaned through age 3 years (marked `Exclude-Not-Cleaned` for `agedays > 3 × 365.25`). HC rows at `agedays ≥ 5 × 365.25` also get `Exclude-Not-Cleaned` because the WHO HC reference ends at 5 years.
+***Three growth parameters (child scope):*** The child algorithm cleans WEIGHTKG, HEIGHTCM (including LENGTHCM relabeled to HEIGHTCM; see `length.adjust` parameter), and HEADCM. HEADCM is cleaned through age 5 years — HC measurements with `agedays > 5 × 365.25` are marked `Exclude-Not-Cleaned` because the WHO HC reference ends at 5 years. For HC ages 2–5 years, the velocity check (Child Step 17) uses only `mindiff = -1.5` with no upper bound since the WHO HC velocity reference ends at 24 months; EWMA steps provide the primary outlier detection for this range.
 
 ***Designated Other Parameter (DOP):*** Many steps compare a measurement against a different growth parameter for the same subject. The designated other parameter (DOP) for weight is height; the DOP for height is weight; the DOP for HC is height. DOP comparisons are used in temporary SDE resolution (Child Step 5), CF rescue, EWMA steps, final SDE resolution (Child Step 13), and pairs/singles evaluation (Child Step 19). In Child Step 13, DOP medians are computed for one-day SDE resolution (cross-parameter comparison) and DOP is used as a secondary sort key for selecting which SDE to keep.
 
@@ -396,9 +396,9 @@ The remainder of this section covers child-specific exclusion codes and the `cf_
 | Code | Child Step | Param | Description |
 |------|------|-------|-------------|
 | `Include` | — | All | Value passes all checks |
-| `Exclude-Missing` | Init | All | Measurement is NA, NaN, or agedays < 0; also HC ≥ 5y |
-| `Exclude-Not-Cleaned` | Init | HEADCM | HC with agedays > 3 × 365.25 |
-| `Exclude-C-Temp-Same-Day` | 5 | All | Temp SDE (may persist if not resolved by Child Step 13) |
+| `Exclude-Missing` | Init | All | Measurement is NA, NaN, or agedays < 0 |
+| `Exclude-Not-Cleaned` | Init | HEADCM | HC with agedays > 5 × 365.25 (no WHO reference above 5 years) |
+| `Exclude-C-Temp-Same-Day` | 5 | All | Temp SDE; should always be resolved by Child Step 13 — if it survives to output, a warning is issued and the row is reclassified as `Exclude-C-Extraneous` |
 | `Exclude-C-CF` | 6 | All | Value identical to prior-day value (not rescued) |
 | `Exclude-C-BIV` | 7 | All | Outside absolute or standardized biological limits |
 | `Exclude-C-Evil-Twins` | 9 | All | Adjacent extreme value pair/group |
@@ -733,7 +733,7 @@ An optional `cf_detail = TRUE` adds two diagnostic columns to the output:
 
 Detected CFs have `exclude` set to `Exclude-C-CF` via `.child_exc(param, "CF")`.
 
-**Why only single-value prior days?** Prevents false CF detection when a prior day has an SDE group whose values happen to span the current day's measurement.
+**Why only single-value prior days?** Prevents false CF detection when a prior day has an SDE group whose values happen to span the current day's measurement. For example, if a subject had WTs 8.2 and 9.1 on day 1, and had a WT of 9.1 on the next day, the 9.1 would not be flagged as a CF. This is done to avoid false positives and to avoid resource-intensive, low-yield evaluations, but can lead to missing some CFs.
 
 ### Phase 2: Temp SDE re-evaluation
 
@@ -1393,7 +1393,7 @@ Weight is excluded because weight can legitimately decrease.
  - 153 ≤ gap < 200 → 6 months
 - **Gap scaling:** Same proportional scaling as HT (mindiff shrinks when actual gap < reference; maxdiff grows when actual > reference).
 - **Tolerance transform:** `mindiff = who_mindiff * 0.5 - 1.5` and `maxdiff = who_maxdiff * 2 + 1.5` (tighter than HT: ±1.5 cm vs ±3 cm).
-- **Default** when HC is outside the WHO-reference range (agedays beyond ~24 months, or gap outside the 46–199-day band): `mindiff = -1.5`, `maxdiff` left at NA (no upward bound). HC measurement pairs outside the reference band therefore gate only the decrease side and effectively skip the increase-side check — consistent with HC's narrower physiologic range.
+- **Default** when HC is outside the WHO-reference range (agedays beyond ~24 months, or gap outside the 46–199-day band): `mindiff = -1.5`, `maxdiff` left at NA (no upward bound). HC measurement pairs outside the reference band therefore gate only the decrease side and effectively skip the increase-side check. This is intentional: (1) for height, the upper velocity bound catches very few values that the lower bound does not already catch; (2) an appropriate HC upper limit for ages beyond 24 months would need to be interval- and starting-age-specific and lacks an established reference; (3) large HC increases outside the reference band are already likely to be identified by EWMA steps (Child Steps 9, 11, 15, or 16) or by the subsequent measurement showing an implausibly large decrease.
 - **Birth adjustment (agedays == 0):** `mindiff -= 0.5`, `maxdiff += 0.5` (tighter than HT: ±0.5 cm vs ±1.5 cm)
 
 ### Violation detection and resolution

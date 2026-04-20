@@ -962,7 +962,8 @@ remove_ewma_wt <- function(subj_df, wtallow_formula = "piecewise",
     gap_aft_check <- ifelse(is.na(gap_aft), Inf, gap_aft)
     min_gap_months <- pmin(gap_bef_check, gap_aft_check) / 30.4375
 
-    # EWMA — rebuild each round (window shifts when observations are removed)
+    # EWMA — rebuilt each round; adult_ewma_cache_update() is an O(n) alternative
+    # (not yet wired in — deferred; see CLAUDE.md → Open (adult))
     cache <- adult_ewma_cache_init(subj_df$age_days, subj_df$meas_m,
                              ewma_window = ewma_window)
     dewma_all <- subj_df$meas_m - cache$ewma_all
@@ -1101,7 +1102,8 @@ remove_mod_ewma_wt <- function(full_inc_df, exc_label = "Exclude-A-Traj-Moderate
     wt_bef <- c(NA, diff(meas))
     wt_aft <- c(diff(meas), NA)
 
-    # EWMA — rebuild each round (window shifts when observations are removed)
+    # EWMA — rebuilt each round; adult_ewma_cache_update() is an O(n) alternative
+    # (not yet wired in — deferred; see CLAUDE.md → Open (adult))
     cache <- adult_ewma_cache_init(adays, meas, ewma_window = ewma_window)
     dewma_all <- meas - cache$ewma_all
     dewma_bef <- meas - cache$ewma_before

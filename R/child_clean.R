@@ -169,7 +169,8 @@
 #'   'HEIGHTCM'/'HEIGHTIN' vs. 'LENGTHCM' only affects z-score calculations between ages 24 to 35 months (730 to 1095 days).
 #'   All linear measurements below 731 days of life (age 0-23 months) are interpreted as supine length, and
 #'   all linear measurements above 1095 days of life (age 36+ months) are interpreted as standing height.
-#'   Note: at the moment, all LENGTHCM will be converted to HEIGHTCM. In the future, the algorithm will be updated to consider this difference.
+#'   Note: at the moment, all LENGTHCM will be converted to HEIGHTCM. See \code{length.adjust}
+#'   for an optional correction for recumbent-labeled measurements taken after age 2 years.
 #'   Additionally, imperial 'HEIGHTIN' and 'WEIGHTLBS' measurements are converted to
 #'   metric during algorithm calculations.
 #' @param agedays Numeric vector containing the age in days at each measurement.
@@ -281,6 +282,13 @@
 #'   subjects are re-processed. When NULL and \code{cached_results} is provided, changed
 #'   subjects are auto-detected by comparing input data to cached results.
 #'   Defaults to NULL.
+#' @param length.adjust Logical. If TRUE, subtracts 0.7 cm from all LENGTHCM measurements
+#'   with \code{agedays > 2 * 365.25} (age > 2 years) before z-score calculation. Recumbent
+#'   length is approximately 0.7 cm longer than standing height for the same child; if a
+#'   facility records older children's heights as LENGTHCM (recumbent), this correction
+#'   converts them to the standing equivalent assumed by the WHO/CDC reference standards at
+#'   those ages. Has no effect for \code{agedays <= 2 * 365.25} (where recumbent is the
+#'   expected measurement method). Defaults to FALSE.
 #' @param tri_exclude Logical. If TRUE, include a \code{tri_exclude} column in the output
 #'   that classifies each row as \code{"Include"}, \code{"Same-Day"} (same-day extraneous
 #'   values), or \code{"Exclude"} (all other exclusions). Defaults to FALSE.
@@ -368,7 +376,8 @@ cleangrowth <- function(subjid,
                         cached_results = NULL,
                         changed_subjids = NULL,
                         tri_exclude = FALSE,
-                        batch_size = 2000)
+                        batch_size = 2000,
+                        length.adjust = FALSE)
                         {
   # ewma_window: number of neighbors on each side for EWMA weighting.
 
@@ -697,8 +706,15 @@ cleangrowth <- function(subjid,
     # - CSD z-scores (not LMS z-scores) form the basis for the algorithm.
     #   CSD is more sensitive to extreme high values than standard LMS z-scores.
 
+    # If length.adjust = TRUE, subtract 0.7 cm from LENGTHCM measurements taken
+    # after age 2 years. Recumbent length is ~0.7 cm longer than standing height;
+    # for sites that record older children's heights as LENGTHCM, this converts
+    # to the standing equivalent assumed by the WHO/CDC references at those ages.
+    if (length.adjust) {
+      data.all[param == 'LENGTHCM' & agedays > 2 * 365.25, v := v - 0.7]
+    }
+
     # recategorize linear parameters as 'HEIGHTCM'
-    # NOTE: this will be changed in future to consider this difference
     data.all[param == 'LENGTHCM', param := 'HEIGHTCM']
 
     # calculate z/sd scores
@@ -1046,8 +1062,11 @@ cleangrowth <- function(subjid,
       ifelse(is.na(v) | agedays < 0, 'Exclude-Missing', 'Include'),
     levels = exclude.levels,
     ordered = TRUE)]
-    # also mark certain measurements to not consider
-    data.all[param == "HEADCM" & agedays > (3*365.25), exclude := "Exclude-Not-Cleaned"]
+    # HC measurements beyond the WHO HC reference (> 5 years) are not cleaned.
+    # HC measurements 3–5 years are cleaned by all standard steps; the velocity
+    # check (Child Step 17) applies only mindiff = -1.5 with no upper bound for
+    # these ages since the WHO HC velocity reference ends at 24 months.
+    data.all[param == "HEADCM" & agedays > (5*365.25), exclude := "Exclude-Not-Cleaned"]
 
     # Initialize cf_rescued column to track CF rescue status
     # Populated in Step 6; rescued CFs get set back to "Include" but this column
@@ -1118,10 +1137,11 @@ cleangrowth <- function(subjid,
     # safety check: treat observations where tbc.sd cannot be calculated as missing
     data.all[is.na(tbc.sd), exclude := 'Exclude-Missing']
 
-    # HC >= 5 years: WHO HC reference only goes to 5 years, so no z-score data
-    # exists. Combined with the pre-recentering assignment of
-    # `Exclude-Not-Cleaned` for HC > 3*365.25, this keeps a single consistent
-    # code across both "we don't clean HC >3y" and ">=5y has no reference".
+    # HC >= 5 years: WHO HC reference ends at 5 years, so z-scores are not
+    # available. The pre-recentering assignment above excluded HC > 5*365.25;
+    # this line catches the boundary (agedays exactly == 5*365.25, which is
+    # not caught by strict >) and overwrites any is.na(tbc.sd) code with the
+    # more informative Exclude-Not-Cleaned.
     data.all[param == "HEADCM" & agedays >= 5*365.25, exclude := 'Exclude-Not-Cleaned']
 
     # pediatric: cleanchild (most of steps) ----
@@ -1242,6 +1262,7 @@ cleangrowth <- function(subjid,
       res <- cleanadult(data.adult,
                         permissiveness = adult_permissiveness,
                         scale_max_lbs = adult_scale_max_lbs,
+                        ewma_window = ewma_window,
                         quietly = quietly)
     } else {
       res <- ddply(
@@ -1252,6 +1273,7 @@ cleangrowth <- function(subjid,
         .paropts = list(.packages = c("data.table", "growthcleanr")),
         permissiveness = adult_permissiveness,
         scale_max_lbs = adult_scale_max_lbs,
+        ewma_window = ewma_window,
         quietly = quietly
       )
 
@@ -1385,12 +1407,16 @@ cleangrowth <- function(subjid,
   # so they are consistent regardless of code path.
 
   # Check for Exclude-C-Temp-Same-Day surviving to output —
-  # this is an internal working code that should be resolved before output.
-  if (any(as.character(all_results$exclude) == "Exclude-C-Temp-Same-Day",
-          na.rm = TRUE)) {
-    stop("Exclude-C-Temp-Same-Day found in final output. ",
-         "This is an internal code that should have been resolved during processing. ",
-         "This indicates a bug in the algorithm.")
+  # this is an internal working code that should be resolved by Child Step 13.
+  n_unresolved_sde <- sum(as.character(all_results$exclude) == "Exclude-C-Temp-Same-Day",
+                          na.rm = TRUE)
+  if (n_unresolved_sde > 0) {
+    warning("Exclude-C-Temp-Same-Day found in final output (", n_unresolved_sde,
+            " rows). This code should have been resolved during processing. ",
+            "Unresolved rows reclassified as Exclude-C-Extraneous. ",
+            "Please report this bug at https://github.com/carriedaymont/growthcleanr/issues")
+    all_results[as.character(exclude) == "Exclude-C-Temp-Same-Day",
+                exclude := "Exclude-C-Extraneous"]
   }
 
   excl_char <- as.character(all_results$exclude)

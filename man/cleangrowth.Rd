@@ -37,7 +37,8 @@ cleangrowth(
   cached_results = NULL,
   changed_subjids = NULL,
   tri_exclude = FALSE,
-  batch_size = 2000
+  batch_size = 2000,
+  length.adjust = FALSE
 )
 }
 \arguments{
@@ -47,7 +48,8 @@ cleangrowth(
 'HEIGHTCM'/'HEIGHTIN' vs. 'LENGTHCM' only affects z-score calculations between ages 24 to 35 months (730 to 1095 days).
 All linear measurements below 731 days of life (age 0-23 months) are interpreted as supine length, and
 all linear measurements above 1095 days of life (age 36+ months) are interpreted as standing height.
-Note: at the moment, all LENGTHCM will be converted to HEIGHTCM. In the future, the algorithm will be updated to consider this difference.
+Note: at the moment, all LENGTHCM will be converted to HEIGHTCM. See \code{length.adjust}
+for an optional correction for recumbent-labeled measurements taken after age 2 years.
 Additionally, imperial 'HEIGHTIN' and 'WEIGHTLBS' measurements are converted to
 metric during algorithm calculations.}
 
@@ -195,6 +197,14 @@ values), or \code{"Exclude"} (all other exclusions). Defaults to FALSE.}
 
 \item{batch_size}{Number of subjects per processing batch. Subjects are never split
 across batches. Defaults to 2000.}
+
+\item{length.adjust}{Logical. If TRUE, subtracts 0.7 cm from all LENGTHCM measurements
+with \code{agedays > 2 * 365.25} (age > 2 years) before z-score calculation. Recumbent
+length is approximately 0.7 cm longer than standing height for the same child; if a
+facility records older children's heights as LENGTHCM (recumbent), this correction
+converts them to the standing equivalent assumed by the WHO/CDC reference standards at
+those ages. Has no effect for \code{agedays <= 2 * 365.25} (where recumbent is the
+expected measurement method). Defaults to FALSE.}
 }
 \value{
 A data.table with columns: \code{id} (user-provided row identifier),
