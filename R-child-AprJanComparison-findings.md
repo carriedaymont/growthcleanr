@@ -98,3 +98,13 @@ Walkthrough note: [walkthrough-todo-2026-04-22.md](walkthrough-todo-2026-04-22.m
 - [AJ14] Step 17 HC velocity: reference HC branch is effectively a no-op — for-loop condition `!is.na(df$whoagegrp.hc)` always FALSE because `whoagegrp.hc` is never set (reference sets `whoagegrp.ht` instead); loop body references `sub_m_who_ht_vel` (HT variable, undefined in HEADCM context) and `.ht`-suffix column names; result: only `mindiff = -1.5` fallback applied, no upper bound check. Current correctly implements HC velocity via pre-merged `.hc`-suffix columns and `fcase` lookup — Bug fix — closed (current already correct, no change needed) — `Infants_Main.R:4452–4523` vs `child_clean.R:4557–4609`. Pitfalls: **NA / empty-set handling** + **Parameter scope**.
 
 **Session 8 status:** 1 finding (AJ14 — Bug fix). Closed with no code change. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Next session candidate: **Session 9 — Child Step 19 (Pairs/Singles) + Step 21 (Error Load) + Step 22 (Output)**.
+
+---
+
+## Session 9 — 2026-04-22 — Step 19 (Pairs/Singles) + Step 21 (Error Load) + Step 22 (Output)
+
+Walkthrough note: [walkthrough-todo-2026-04-22.md](walkthrough-todo-2026-04-22.md) — see "R-vs-R comparison — Session 9" section.
+
+- [AJ15] Step 21: `"Not cleaned"` omitted from reference `non_error_codes` — HC rows with `agedays > 3 × 365.25` carry the `"Not cleaned"` code in reference (assigned in preprocessing), but reference's `non_error_codes` includes `"Missing"` without `"Not cleaned"`; those HC rows are counted as `n_errors` per `(subjid, HEADCM)` group, inflating the error-load ratio. Current correctly adds `Exclude-Not-Cleaned` to `non_error_codes`, excluding out-of-scope HC rows from both numerator and denominator — Bug fix — closed (current already correct; fixed as side effect of exclusion code rename + deliberate addition to non_error_codes) — `Infants_Main.R:4873–4884` vs `child_clean.R:4894–4898`. Pitfall: **Factor levels / exclusion codes**.
+
+**Session 9 status:** 1 finding (AJ15 — Bug fix). Closed with no code change needed. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run.

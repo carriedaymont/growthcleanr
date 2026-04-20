@@ -399,3 +399,115 @@ None.
 ## Session 8 status
 
 1 finding (AJ14 — Bug fix). Closed with no code change needed. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run since no code change. Next session candidate: **Session 9 — Child Step 19 (Pairs/Singles) + Step 21 (Error Load) + Step 22 (Output).**
+
+---
+
+# R-vs-R comparison — Session 9 — 2026-04-22
+
+Pure R-vs-R diff of reference `Infants_Main.R` Steps 19, 21, and 22 (~lines 4725–4960) against current `child_clean.R` Steps 19, 21, and 22 (~lines 4735–4966). Per `R-child-AprJanComparison-procedure.md`.
+
+---
+
+## Pre-session baseline tests
+
+63 / 48 / 28 / 41 / 13 — unchanged from Session 8.
+
+---
+
+## Scope
+
+| Sub-area | Reference lines | Current lines | What |
+|---|---|---|---|
+| Step 19 (Pairs/Singles) | `Infants_Main.R:4725–4857` | `child_clean.R:4735–4871` | 1–2 remaining measurements evaluation |
+| Step 21 (Error Load) | `Infants_Main.R:4859–4908` | `child_clean.R:4873–4918` | Error-load ratio and escalation |
+| Step 22 (Output) | `Infants_Main.R:4918–4960` | `child_clean.R:4928–4966` | final_tbc assembly and return columns |
+
+---
+
+## Known intentional changes encountered (logged briefly)
+
+- **`id` → `internal_id`** tiebreaker in Step 19 sort and `order()` calls — known rename.
+- **`valid()` → `.child_valid()`** in Step 19 valid_set — known rename.
+- **Rounding removed** (all `janitor::round_half_up()` calls in Steps 19 and 21) — per procedure, do NOT flag.
+- **Exclusion codes renamed** — `"Exclude-2-meas->1-year"` / `"Exclude-2-meas-<1-year"` → `.child_exc(param, "Pair")`; `"Exclude-1-meas"` → `.child_exc(param, "Single")`; `"Exclude-Error-load"` → `.child_exc(param, "Too-Many-Errors")` — known rename.
+- **`valid_set <- rep(TRUE, nrow(data.df))` removed** from Step 21 — F123 from Session 14 walkthrough; was unconditionally TRUE since v3.0.0 initial commit.
+- **Error load threshold `.4` → `error.load.threshold`** — known intentional bug fix, documented in procedure's "Known intentional changes" list.
+- **`cf_rescued` added to return_cols** in Step 22 — part of new CF rescue scheme (Step 6 intentional change).
+- **`ewma1_it1.*` loop removed** from Step 22 return_cols — stale debug columns from `debug` parameter removed in Session 6 (F34).
+- **`cf_detail` columns added** to Step 22 return — part of new CF rescue scheme.
+- **Step 21 `non_error_codes` updated** to new exclusion code names (`Exclude-SDE-Identical` → `Exclude-C-Identical`, SDE sub-codes → `Exclude-C-Extraneous`, `Exclude-Carried-Forward` → `Exclude-C-CF`, `"Missing"` → `Exclude-Missing`) — known exclusion code rename.
+- **Step 21 old CF rescue codes removed from `non_error_codes`** (`Exclude-1-CF-deltaZ-<0.05` etc.) — rescued CFs are now `Include` rows, so they no longer need to be listed as non-error exclusion codes; they count as Includes in the denominator.
+
+---
+
+## Findings
+
+### AJ15 — Step 21: `"Not cleaned"` omitted from reference `non_error_codes`
+
+**Category:** Bug fix
+
+**Status:** closed (current already correct, no code change needed)
+
+**Reference** (`Infants_Main.R:4873–4884`):
+```r
+non_error_codes <- c("Exclude-SDE-Identical",
+                     "Exclude-SDE-All-Exclude",
+                     "Exclude-SDE-All-Extreme",
+                     "Exclude-SDE-EWMA",
+                     "Exclude-SDE-One-Day",
+                     "Exclude-Carried-Forward",
+                     "Exclude-1-CF-deltaZ-<0.05",
+                     "Exclude-1-CF-deltaZ-<0.1-wholehalfimp",
+                     "Exclude-Teen-2-plus-CF-deltaZ-<0.05",
+                     "Exclude-Teen-2-plus-CF-deltaZ-<0.1-wholehalfimp",
+                     "Missing")
+```
+
+**Current** (`child_clean.R:4894–4898`):
+```r
+non_error_codes <- c("Exclude-C-Identical",
+                     "Exclude-C-Extraneous",
+                     "Exclude-C-CF",
+                     "Exclude-Missing",
+                     "Exclude-Not-Cleaned")
+```
+
+**Analysis:** The reference lists `"Missing"` as a non-error code (correctly excluding missing measurements from both numerator and denominator) but does NOT list `"Not cleaned"`. `"Not cleaned"` is assigned to HC rows with agedays > 3 × 365.25 days (and HC ≥ 5y) — rows that are out-of-scope for cleaning, not measurement errors. In the reference, these rows would be counted as `n_errors` per `(subjid, HEADCM)` group, inflating the error-load ratio and potentially triggering error-load escalation for subjects with many HC > 3y measurements. The current correctly adds `Exclude-Not-Cleaned` to `non_error_codes`, matching the intent already expressed by including `"Missing"`. The fix is a side effect of the exclusion code rename + deliberate addition to the non_error_codes list.
+
+**Pitfall:** **Factor levels / exclusion codes** — adding `"Missing"` but forgetting `"Not cleaned"` when both are assigned in the same preprocessing step.
+
+---
+
+## Items NOT flagged (audit trail)
+
+### Step 19
+
+- **DOP keyed lookup + `nomatch = NULL`**: `dop_snapshot[.(df$subjid[1], get_dop(df$param[1])), nomatch = NULL]` vs reference filter syntax `dop_snapshot[subjid == ... & param == ...]`. Equivalent behavior (both return 0 rows on no match). The `nomatch = NULL` addition restores the dead else branch reachability — F109 fix from Session 13 walkthrough, confirmed intentional.
+- **`isTRUE()` wrapping** of pair and single conditions: reference uses `if (round_half_up(...) > 4 & ...)`, current uses `if (isTRUE(abs(...) > 4 & ...))`. The `isTRUE()` makes the condition NA-safe (avoids `if (NA)` error if z-scores are unexpectedly NA). Rounding removal is per procedure; `isTRUE()` is defensive improvement.
+- **`for (i in 1:nrow(df))` → `for (i in seq_len(nrow(df)))`**: cosmetic equivalence (both iterate over valid row indices when `nrow(df) > 0`).
+- **Dead variables removed** from reference pair branch: `abs_tbd.sd`, `abs_ctbd.sd` (computed but never used — pair conditions use `abs(diff_tbc.sd)`, not these); `med_dop`, `med_cdop` (computed but never used — conditions use `abs(diff_tbc.sd)` directly). Correctly removed in current.
+- **`.SDcols = colnames(data.df)` → trimmed `.SDcols`**: reference passes all columns to closure; current trims to `c('index', 'internal_id', 'agedays', 'subjid', 'param', 'tbc.sd', 'ctbc.sd', 'exclude')` — F113 from Session 13 walkthrough.
+- **`paste0 + table` → data.table by-group `.N`** for `only_single_pairs`: equivalent computation, same results. Known pattern from prior sessions.
+- **`exclude_all` refresh after pair rule** (`exclude_all <- df$exclude`): identical in both — keeps the pair exclusion recorded before trimming to single for the 19H re-evaluation.
+- **Index-keyed single write** (`exclude_all[ind_all == df$index] <- ...`): identical logic in both — preserves any pair exclusion already recorded.
+
+### Step 21
+
+- **`valid_set &` filter removal**: reference had `data.df[valid_set, ...]` with `valid_set = rep(TRUE, ...)` (all-TRUE, dead); current drops `valid_set` entirely — F123 from Session 14 walkthrough.
+- **CF rescue code removal from `non_error_codes`**: reference listed old CF rescue exclusion codes in non_error_codes; current does not (rescued CFs are now Include rows). The net effect is the same — neither rescued CFs (now Include) nor excluded CFs (`Exclude-C-CF`, listed in current) count toward `n_includes` or `n_errors` differently than intended.
+
+### Step 22
+
+- **Dead `checkpoint_data` merge block removed**: reference contains `if (!"potcorr" %in% colnames(data.df) && exists("checkpoint_data") && ...)` inside an outer `if (has_potcorr && ...)` — the inner condition is always FALSE (the outer block already confirmed `"potcorr" %in% colnames(data.df)`), making the merge a no-op. Correctly removed in current.
+
+---
+
+## Open questions
+
+None.
+
+---
+
+## Session 9 status
+
+1 finding (AJ15 — Bug fix). Closed with no code change needed. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run since no code change.
