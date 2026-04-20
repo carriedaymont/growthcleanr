@@ -973,3 +973,70 @@ data.sde[, absdewma := abs(tbc.sd - spa_ewma)]
 AJ13 confirmed as Bug fix already in current code (no change needed). Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Adult tests not re-run — no adult files in scope.
 
 Next session candidate: **Session 7 — Child Step 15 (EWMA2 Moderate) + Child Step 16 (Birth HT/HC)**.
+
+---
+
+# R-vs-R comparison — Session 7
+
+**Date:** 2026-04-19
+**Scope:** Child Step 15 (EWMA2 Moderate) + Child Step 16 (Birth HT/HC)
+**Reference lines:** `Infants_Main.R` ~3793–4201
+**Current lines:** `child_clean.R` ~3673–4106
+**Baseline tests (pre-session):** 63 / 48 / 28 / 41 / 13 (unchanged from Session 6)
+
+---
+
+## Scope
+
+| Item | Reference | Current |
+|---|---|---|
+| Pre-loop setup | `Infants_Main.R:3793–3856` | `child_clean.R:3673–3733` |
+| Step 15 loop | `Infants_Main.R:3857–4092` | `child_clean.R:3734–3953` |
+| Step 16 | `Infants_Main.R:4093–4201` | `child_clean.R:3954–4106` |
+
+---
+
+## Known intentional changes encountered (logged briefly, not analyzed further)
+
+- **Exclusion code rename:** Old EWMA2-specific codes (`Exclude-Traj-EWMA2-Middle`, `Exclude-Traj-EWMA2-First`, `Exclude-Traj-EWMA2-Last`, `Exclude-Traj-EWMA2-BirthWT`, `Exclude-Traj-EWMA2-BirthHT`, `Exclude-Traj-EWMA2-BirthHC`) → unified `Exclude-C-Traj` in current. Known per procedure's "Known intentional changes" list and the 2026-04-14/16 code rename session.
+- **`id` → `internal_id` tiebreaker:** All candidate sort keys use `internal_id` (sequential integer) instead of user `id`. Known per procedure.
+- **`valid()` → `.child_valid()`:** All eligibility checks. Known per procedure.
+- **`cat()` → `message()`:** All progress output. Known per procedure.
+- **Rounding tolerance removal:** `round_half_up` double-rounding throughout Step 15 comparisons removed; bare `> 1` / `< 1` comparisons used. Per procedure: do NOT flag.
+- **`include.temporary.extraneous = TRUE` removed from `include_counts`:** Reference calls `valid(data.df, include.temporary.extraneous = TRUE)` to compute `include_counts` at Step 15 pre-loop; current calls `.child_valid(data.df)` (no temp SDE flag). Confirmed intentional by Carrie (Session 11 F74): a straggler temp SDE should manifest as "too few Include rows" rather than being counted toward the n ≥ 3 threshold, and temp SDEs are fully resolved by Phase B4 of Step 13 before Step 15 runs.
+- **EWMA caching:** Reference calls `ewma()` directly in each closure invocation; current uses `ewma_cache_init()` / `ewma_cache_update()` / `ewma2_caches` environment to avoid recomputing EWMA from scratch each iteration. Known intentional performance improvement per Session 11 walkthrough.
+- **sp_key-level Step 16 birth filter:** Reference uses `subj_with_birth` (per-subjid) to build `step16_filter`; current uses `sp_with_birth` (per-sp_key). Avoids wasted iteration for subjects with birth HT but no birth HC (or vice versa). Confirmed intentional behavior-neutral tightening per Session 11 F85.
+- **Additional closures to `calc_and_recenter_z_scores()`:** Current passes pre-loaded CDC/WHO reference closures (from `gc_preload_refs()`) rather than just `ref.data.path`. Known intentional (performance feature).
+- **`cols_to_drop_15_16` naming and scope:** Reference drops only `sp_key` at end of Step 16; current uses `cols_to_drop_15_16` to drop `p_plus`, `p_minus`, `tbc.p_plus`, `tbc.p_minus`, and `first_meas` after Step 16 in addition to `sp_key`. Confirmed intentional per Session 11 F81 (these columns feed the addcrit check in BOTH Steps 15 and 16, so they should be dropped after Step 16, not Step 15).
+- **`rm(ewma2_caches)` / `rm(ewma2b_caches)` after loops:** Reference has no analogous cleanup (no caches to remove). Cleanup.
+
+---
+
+## Findings opened this session: 0
+
+AJ## numbering does not advance.
+
+All non-intentional diffs are either known from prior sessions (per "Known intentional changes" above), safe optimizations with equivalent behavior, or cleanup — logged under "Items NOT flagged" below.
+
+---
+
+## Items NOT flagged (audit trail)
+
+- **tbc_range pre-filter:** Current adds `tbc_range_check <- sp_data[, .(tbc_range = diff(range(tbc.sd))), by = sp_key]` before the while loop and skips groups where `tbc_range ≤ 1` (since addcrit requires `|dewma| > 1`, which is impossible if the full range ≤ 1). Reference has no equivalent filter. Safe efficiency optimization — cannot produce false exclusions (skipped groups have no candidate that could pass the `> 1` threshold). Not flagged.
+- **DOP snapshot timing change:** Reference performs the DOP lookup inside the per-(subjid, param) closure by scanning live `data.df` (`data.df[subjid == df$subjid[1] & param == get_dop(df$param[1]) & exclude == "Include",]`); current takes a keyed snapshot `dop_snap` at the top of each iteration (before the per-group closures fire) and uses `dop_snap[.(df$subjid[1], get_dop(df$param[1]))]`. Current's snapshot approach is logically correct — within a single iteration pass, the DOP lookup represents the state of Include rows *before* any exclusion in this iteration fires, which is the intended semantics. Reference's live scan would see any exclusion already applied to earlier groups in the same iteration, introducing an implicit within-iteration ordering dependency. Current is strictly more correct. Not flagged as a bug fix (the reference's ordering is fixed by iteration structure, not a latent bug on real data), but noted here for completeness.
+- **include_counts eligibility filter (no temp SDE):** Covered under Known intentional changes above (F74 / Carrie confirmation). Not flagged.
+- **sp_key-level Step 16 birth filter:** Covered under Known intentional changes above (Session 11 F85). Not flagged.
+- **EWMA caching:** Covered under Known intentional changes above (Session 11). Not flagged.
+- **`cols_to_drop_15_16` scope and naming:** Covered under Known intentional changes above (Session 11 F81). Not flagged.
+- **`compare_df <- compare_df[!is.na(tbc.sd)]` NA filter in DOP lookup:** Current adds explicit NA filter after the keyed `dop_snap` lookup; reference's live `data.df` scan omits this (Include rows with NA tbc.sd would be rare but possible for HC > 3y not-cleaned rows, and both current and reference guard downstream usage). Cleanup / defensive equivalent.
+- **All double-rounding comparisons removed:** Per procedure, do NOT flag.
+- **Stata-era sub-labels (`15A`, `15B`, etc.):** Reference uses Stata-era letter labels in comments (`# 15A`, `# 15B`, etc.); current uses descriptive English names or no headers. Cleanup (established pattern in Sessions 3–14 walkthroughs).
+- **`dplyr` / `case_when` removal:** Reference uses some dplyr idioms in Step 15 (notably `case_when` for exclusion assignment); current uses data.table `:=` exclusively. Logic equivalent. Cleanup.
+
+---
+
+## Approval and next steps
+
+0 findings opened. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Adult tests not re-run — no adult files in scope.
+
+Next session candidate: **Session 8 — Child Step 17 (Height/HC Velocity)**.

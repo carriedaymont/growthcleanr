@@ -76,3 +76,15 @@ Walkthrough note: [walkthrough-todo-2026-04-19.md](walkthrough-todo-2026-04-19.m
 - [AJ13] Step 13 Phase B3: `ewma_fill` and `spa_ewma` Inf guards — reference has no guard: when a `(subjid, param, agedays)` group has only temp SDE rows (stable Include rows excluded by BIV/EWMA1), `max(ewma.all[!was_temp_sde], na.rm = TRUE)` = `-Inf`, propagates to `spa_ewma = -Inf`, `absdewma = Inf`, `min_absdewma > 1` → all rows erroneously marked Extraneous; current adds `is.infinite → NA` conversions for both `ewma_fill` and `spa_ewma`, preventing erroneous marking and correctly keeping the best-tiebreaker row as Include — Bug fix — closed (current already correct, no change needed) — `Infants_Main.R:3722–3730` vs `child_clean.R:3593–3607`. Pitfall: **NA / empty-set handling**.
 
 **Session 6 status:** 1 finding (AJ13 — Bug fix). Closed with no code change. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Next session candidate: **Session 7 — Child Step 15 (EWMA2) + Step 16 (Birth HT/HC)**.
+
+---
+
+## Session 7 — 2026-04-19 — Step 15 (EWMA2 Moderate) + Step 16 (Birth HT/HC)
+
+Walkthrough note: [walkthrough-todo-2026-04-19.md](walkthrough-todo-2026-04-19.md) — see "R-vs-R comparison — Session 7" section.
+
+**Findings opened this session: 0.**
+
+AJ## numbering does not advance. All non-intentional diffs are known-intentional or equivalent cleanup — logged under "Items NOT flagged (audit trail)" in the walkthrough note. Key items: tbc_range pre-filter before the Step 15 while loop (safe efficiency optimization, range ≤ 1 groups cannot pass the `|dewma| > 1` addcrit threshold); DOP snapshot timing change (`dop_snap` keyed at iteration start vs. reference's live per-closure `data.df` scan — current is strictly more correct, eliminates implicit within-iteration ordering dependency); `include.temporary.extraneous = TRUE` removal from `include_counts` (Session 11 F74, confirmed intentional); sp_key-level Step 16 birth filter (Session 11 F85, confirmed intentional behavior-neutral tightening); EWMA caching (`ewma_cache_init`/`ewma_cache_update`/`ewma2_caches` — known intentional performance feature); `cols_to_drop_15_16` scope (Session 11 F81, drops p_plus/p_minus/tbc.p_plus/tbc.p_minus/first_meas after Step 16); all rounding-tolerance removals (per procedure, do NOT flag).
+
+**Session 7 status:** 0 findings. Closed with no code change. Baseline unchanged at 63 / 48 / 28 / 41 / 13; no tests re-run. Next session candidate: **Session 8 — Child Step 17 (Height/HC Velocity)**.
